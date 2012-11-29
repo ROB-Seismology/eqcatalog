@@ -125,13 +125,17 @@ Completeness_Rosset = Completeness([1350, 1926, 1960, 1985], [5.0, 4.0, 3.0, 1.8
 class EQCatalog:
 	"""
 	Class defining a collection of local earthquakes.
-	Initialization parameters:
-		Required:
-			eq_list: list of LocalEarthquake objects
-		Optional:
-			start_date: datetime object of start of catalog, defaults to datetime of first earthquake in list
-			end_date: datetime object of end of catalog, defaults to datetime of last earthquake in list
-			name: catalog name, defaults to empty string
+
+	:param eq_list:
+		List containing instances of :class:`LocalEarthquake`
+	:param start_date:
+		datetime, start of catalog (default: None = datetime of oldest
+		earthquake in catalog)
+	:param end_date:
+		datetime, end of catalog (default: None = datetime of youngest
+		earthquake in catalog)
+	:param name:
+		String, catalog name (default: "")
 	"""
 	def __init__(self, eq_list, start_date=None, end_date=None, name=""):
 		self.eq_list = eq_list[:]
@@ -158,7 +162,14 @@ class EQCatalog:
 		return self.eq_list.__iter__()
 
 	def __getitem__(self, item):
-		return self.eq_list.__getitem__(item)
+		"""
+		Indexing --> instance of :class:`LocalEarthquake`
+		Slicing --> instance of :class:`EQCatalog`
+		"""
+		if isinstance(item, int):
+			return self.eq_list.__getitem__(item)
+		elif isinstance(item, slice):
+			return EQCatalog(self.eq_list.__getitem__(item), name=self.name + " %s" % item)
 
 	def timespan(self):
 		"""
@@ -860,19 +871,35 @@ class EQCatalog:
 		"""
 		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		hours = np.array([eq.get_fractional_hour() for eq in subcatalog])
-		bins_Hr = range(0, 25)
+		bins_Hr = numpy.arange(25)
 		bins_N, junk = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
-	def HourlyMean(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, day=(10, 17), night=(19, 7)):
-		bins_N, bins_Hr = self.bin_hour(Mmin, Mmax, Mtype, start_year, end_year)
+	def HourlyMean(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, day=(10, 17), night=(19, 7)):
+		bins_N, bins_Hr = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		mean = np.mean(bins_N)
 		mean_day = np.mean(bins_N[day[0]:day[1]])
 		mean_night = np.mean(np.concatenate((bins_N[:night[1]], bins_N[night[0]-24:])))
 		return (mean, mean_day, mean_night)
 
 	def plot_HourHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None):
-		bins_N, bins_Hr = self.bin_hour(Mmin, Mmax, Mtype, start_year, end_year)
+		"""
+		Plot histogram with number of earthquakes per hour of the day.
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			String, magnitude scaling relation (default: None)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		"""
+		bins_N, bins_Hr = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		pylab.bar(bins_Hr, bins_N)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((0, 24, ymin, ymax))
@@ -885,17 +912,72 @@ class EQCatalog:
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
-	def bin_depth(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
-		depths = [eq.depth for eq in self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype) if not eq.depth in (None, 0)]
+	def bin_depth(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+		"""
+		Bin earthquakes into depth bins
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			String, magnitude scaling relation (default: None)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param min_depth:
+			Int, minimum depth in km (default: 0)
+		:param max_depth:
+			Int, maximum depth in km (default: 30)
+		:param bin_width:
+			Int, bin width in km (default: 2)
+
+		:return:
+			tuple (bins_N, bins_depth)
+			bins_N: array containing number of earthquakes for each bin
+			bins_depth: array containing lower depth value of each interval
+		"""
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, junk = np.histogram(depths, bins_depth)
 		return bins_N, bins_depth[:-1]
 
-	def DepthBinByM0(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+	def bin_depth_by_M0(self, Mmin, Mmax, Mtype="MW", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+		"""
+		Bin earthquake moments into depth bins
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			String, magnitude scaling relation (default: None)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param min_depth:
+			Int, minimum depth in km (default: 0)
+		:param max_depth:
+			Int, maximum depth in km (default: 30)
+		:param bin_width:
+			Int, bin width in km (default: 2)
+
+		:return:
+			tuple (bins_M0, bins_depth)
+			bins_M0: array containing summed seismic moment in each bin
+			bins_depth: array containing lower depth value of each interval
+		"""
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_M0 = np.zeros(len(bins_depth))
-		print bins_depth
-		for eq in self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype):
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		for eq in subcatalog:
 			if eq.depth not in (None, 0):
 				try:
 					bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
@@ -903,7 +985,7 @@ class EQCatalog:
 					## These are earthquakes that are deeper
 					pass
 				else:
-					bins_M0[bin_id] += eq.get_M0()
+					bins_M0[bin_id] += eq.get_M0(relation=Mrelation)
 		return bins_M0, bins_depth
 
 	def plot_DepthHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2, color='b', want_title=True, fig_filespec="", fig_width=0, dpi=300):
@@ -935,7 +1017,7 @@ class EQCatalog:
 			pylab.show()
 
 	def plot_Depth_M0_Histogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2, color='b', want_title=True, log=True, fig_filespec="", fig_width=0, dpi=300):
-		bins_M0, bins_depth = self.DepthBinByM0(Mmin, Mmax, Mtype, start_year, end_year, min_depth, max_depth, bin_width)
+		bins_M0, bins_depth = self.bin_depth_by_M0(Mmin, Mmax, Mtype, start_year, end_year, min_depth, max_depth, bin_width)
 		pylab.bar(bins_depth, bins_M0, orientation="vertical", width=bin_width, log=log, color=color)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((min_depth, max_depth, ymin, ymax))
@@ -1094,7 +1176,7 @@ class EQCatalog:
 			Optional:
 				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MS"
 				completeness: Completeness object with initial years of completeness and corresponding
-					minimum magnitudes, defaults to Completeness_Leynaud
+					minimum magnitudes, defaults to Completeness_Rosset
 				beta: fixed beta (= b * ln(10)) value to use for calculating a, defaults to None
 				Mc: cutoff magnitude = magnitude for which to calculate lambda (defaults to None)
 				verbose: boolean indicating whether some messages should be printed or not, defaults to False
@@ -1470,37 +1552,81 @@ class EQCatalog:
 
 		return synthetic_catalogs
 
-	def analyse_completeness_Stepp(self, Mmin=1.8, dM=1.0, Mtype="MS", dt=5, ttol=0.2):
+	def analyse_completeness_Stepp(self, Mmin=1.8, dM=1.0, Mtype="MS", Mrelation=None, dt=5, ttol=0.2):
+		"""
+		Analyze catalog completeness with the Stepp algorithm.
+		This method is a wrapper for :meth:`stepp_analysis` in the OQ
+		hazard modeller's toolkit.
+
+		:param Mmin:
+			Float, minimum magnitude (default: 1.8)
+		:param dM:
+			Float, magnitude bin width (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			String, magnitude conversion relation (default: None)
+		:param dt:
+			Int, time interval (in years?) (default: 5)
+		:param ttol:
+			Positive float, tolerance threshold (default: 0.2)
+
+		:return:
+			instance of :class:`Completeness`
+		"""
 		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.completeness import stepp_analysis
-		subcatalog = self.subselect(Mmin=Mmin, Mtype=Mtype)
-		years = np.array([eq.datetime.year for eq in subcatalog])
-		if Mtype.upper() == "ML":
-			Mags = [eq.ML for eq in subcatalog]
-		elif Mtype.upper() == "MS":
-			Mags = [eq.get_MS() for eq in subcatalog]
-		elif Mtype.upper() == "MW":
-			Mags = [eq.get_MW() for eq in subcatalog]
-		Mags = np.array(Mags)
+		subcatalog = self.subselect(Mmin=Mmin, Mtype=Mtype, Mrelation=Mrelation)
+		years = self.get_years()
+		Mags = self.get_magnitudes(Mtype, Mrelation)
 		result = stepp_analysis(years, Mags, dM, dt, ttol, iloc=True)
 		Min_Years, Min_Mags = result[:,0].astype('i'), result[:,1]
 		return Completeness(Min_Years, Min_Mags)
 
-	def decluster(self, Mtype="MS"):
-		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.declustering import afteran_decluster
-		eq_catalog = np.zeros((len(self), 6) ,'f')
+	def decluster(self, method="afteran", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
+		"""
+		Decluster catalog.
+		This method is a wrapper for the declustering methods in the OQ
+		hazard modeller's toolkit.
+
+		:param method:
+			String, method name: "afteran" or "gardner_knopoff" (default: "afteran")
+		:param window_opt:
+			String, declustering window type: "GardnerKnopoff", "Gruenthal" or "Uhrhammer"
+			(default: "GardnerKnopoff")
+		:param fs_time_prop:
+			Positive float, foreshock time window as a proportion of
+			aftershock time window. Only applies to gardner_knopoff method
+			(default: 0.)
+		:param time_window:
+			Positive float, length (in days) of moving time window.
+			Only applies to afteran method (default: 60.)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			String, magnitude conversion relation (default: None)
+		"""
+		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.declustering import *
+
+		if method == "afteran":
+			decluster_func = afteran_decluster
+			decluster_param = time_window
+		elif method == "gardner_knopoff":
+			decluster_func = gardner_knopoff_decluster
+			decluster_param = fs_time_prop
+
+		eq_matrix = np.zeros((len(self), 6) ,'f')
 		for i, eq in enumerate(self):
-			if Mtype.upper() == "ML":
-				M = eq.ML
-			elif Mtype.upper() == "MS":
-				M = eq.get_MS()
-			elif Mtype.upper() == "MW":
-				M = eq.get_MW()
-			eq_catalog[i,:] = (eq.datetime.year, eq.datetime.month, eq.datetime.day, eq.lon, eq.lat, M)
-		cluster_vector, main_shock_catalog, flag_vector = afteran_decluster(eq_catalog)
-		print len(eq_catalog)
+			M = eq.get_M(Mtype, Mrelation)
+			eq_matrix[i,:] = (eq.datetime.year, eq.datetime.month, eq.datetime.day, eq.lon, eq.lat, M)
+		cluster_vector, main_shock_catalog, flag_vector = decluster_func(eq_matrix, window_opt, decluster_param)
+
+		# TODO: return value should be EQCatalog with declustered catalog, and
+		# EQCatalog with clustered events (either all together, or one for each
+		# cluster.
+		print len(eq_matrix)
 		print len(cluster_vector), len(main_shock_catalog), len(flag_vector)
 		print len(np.where(cluster_vector != 0.)[0]), len(np.where(flag_vector != 0.)[0])
-		for i in range(len(eq_catalog)):
+		for i in range(len(eq_matrix)):
 			if flag_vector[i] != 0:
 				print i, cluster_vector[i], flag_vector[i]
 

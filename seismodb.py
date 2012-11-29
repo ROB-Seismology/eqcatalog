@@ -196,7 +196,8 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, ML, MS, MW, name, intensity_max, macro_radius)
 		eq_list.append(eq)
 
-	return EQCatalog(eq_list)
+	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
+	return EQCatalog(eq_list, start_date, end_date, name=name)
 
 
 def query_ROB_LocalEQCatalogByID(id_earth, verbose=False, errf=None):

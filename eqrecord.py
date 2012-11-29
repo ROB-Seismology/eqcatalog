@@ -132,7 +132,7 @@ class LocalEarthquake:
 			- "ahorner": calculate MW from ML using relation by Ahorner (1983)
 			- "hinzen": calculate MW from ML using relation by Hinzen (2004)
 			- "grunthal": calculate MW from ML using chi-square maximum likelihood
-				regression of Grünthal and Wahlström (2003)
+				regression of Gruenthal and Wahlstrom (2003)
 			- "bungum": calculate MW from MS using formulae by Bungum et al. (2003)
 			- None: use Geller relation if MS != 0, Hinzen relation otherwise
 			(default: None)
@@ -165,7 +165,7 @@ class LocalEarthquake:
 			elif relation.lower() == "hinzen":
 				log_Mo = 1.083 * self.ML + 10.215
 				MW = (2.0/ 3) * log_Mo - 6.06
-			## Relation with ML by Grünthal & Wahlström (2003)
+			## Relation with ML by Gruenthal & Wahlstrom (2003)
 			elif relation.lower() in ("grunthal", "grünthal"):
 				MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
 		else:
