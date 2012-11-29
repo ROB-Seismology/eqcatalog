@@ -1331,7 +1331,7 @@ class EQCatalog:
 			GIS table (default: True)
 
 		:return:
-			ordered dict {String sourceID: EQCollection}
+			ordered dict {String sourceID: EQCatalog}
 		"""
 		## Construct WGS84 projection system corresponding to earthquake coordinates
 		wgs84 = osr.SpatialReference()
@@ -1377,7 +1377,7 @@ class EQCatalog:
 				point.SetPoint(0, eq.lon, eq.lat)
 				if point.Within(zone_poly):
 					zone_eq_list.append(eq)
-			zone_catalogs[zoneID] = EQCollection(zone_eq_list, self.start_date, self.end_date, zoneID)
+			zone_catalogs[zoneID] = EQCatalog(zone_eq_list, self.start_date, self.end_date, zoneID)
 
 		return zone_catalogs
 

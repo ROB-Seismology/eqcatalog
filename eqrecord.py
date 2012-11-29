@@ -7,7 +7,7 @@ import math
 
 
 ## Import ROB modules
-import mapping.geodetic as geodetic
+import mapping.geo.geodetic as geodetic
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
