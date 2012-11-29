@@ -44,7 +44,7 @@ import osr
 
 
 ## Import ROB modules
-import users.kris.Seismo.db.seismodb as seismodb
+import seismodb
 from thirdparty.recipes.dummyclass import *
 from thirdparty.recipes.my_arange import *
 
@@ -352,9 +352,9 @@ class EQCatalog:
 		elif isinstance(end_date, datetime.datetime):
 			end_date = end_date.date()
 		if start_date is None:
-			start_date = self.start_date.date()
+			start_date = self.start_date
 		if end_date is None:
-			end_date = self.end_date.date()
+			end_date = self.end_date
 		if Mmin is None:
 			Mmin = 0.
 		if Mmax is None:
@@ -654,7 +654,7 @@ class EQCatalog:
 		pylab.axis((start_year, end_year, 0, ymax))
 		pylab.show()
 
-	def plot_CumulatedM0(self, start_date=None, end_date=None, ddate=10, ddate_spec="years", relation=None, M0max=None, fig_filespec=None):
+	def plot_CumulatedM0(self, start_date=None, end_date=None, ddate=10, ddate_spec="years", Mrelation=None, M0max=None, fig_filespec=None):
 		if start_date == None:
 			start_date = self.start_date
 		if end_date == None:
@@ -672,13 +672,13 @@ class EQCatalog:
 		if ddate_spec.lower()[:4] == "year":
 			for j, eq in enumerate(self):
 				i = list(eq.datetime.year < bins_Dates).index(True) - 1
-				bins_M0[i] += eq.get_M0(relation=relation)
-				M0[j] = eq.get_M0(relation=relation)
+				bins_M0[i] += eq.get_M0(relation=Mrelation)
+				M0[j] = eq.get_M0(relation=Mrelation)
 		elif ddate_spec.lower()[:3] == "day":
 			for j, eq in enumerate(self):
 				i = (eq.datetime.date() - start_date).days
-				bins_M0[i] += eq.get_M0(relation=relation)
-				M0[j] = eq.get_M0(relation=relation)
+				bins_M0[i] += eq.get_M0(relation=Mrelation)
+				M0[j] = eq.get_M0(relation=Mrelation)
 		bins_M0_cumul = np.add.accumulate(bins_M0)
 		M0_cumul = np.add.accumulate(M0)
 
@@ -821,12 +821,10 @@ class EQCatalog:
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
-	def DepthBin(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+	def bin_depth(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
 		depths = [eq.depth for eq in self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype) if not eq.depth in (None, 0)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, junk = np.histogram(depths, bins_depth)
-		print bins_depth
-		print bins_N
 		return bins_N, bins_depth[:-1]
 
 	def DepthBinByM0(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
@@ -845,7 +843,7 @@ class EQCatalog:
 		return bins_M0, bins_depth
 
 	def plot_DepthHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2, color='b', want_title=True, fig_filespec="", fig_width=0, dpi=300):
-		bins_N, bins_depth = self.DepthBin(Mmin, Mmax, Mtype, start_year, end_year, min_depth, max_depth, bin_width)
+		bins_N, bins_depth = self.bin_depth(Mmin, Mmax, Mtype, start_year, end_year, min_depth, max_depth, bin_width)
 		pylab.bar(bins_depth, bins_N, orientation="vertical", width=bin_width, color=color)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((min_depth, max_depth, ymin, ymax))

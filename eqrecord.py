@@ -131,7 +131,7 @@ class LocalEarthquake:
 			- "ahorner": calculate MW from ML using relation by Ahorner (1983)
 			- "hinzen": calculate MW from ML using relation by Hinzen (2004)
 			- "grunthal": calculate MW from ML using chi-square maximum likelihood
-				regression of Grünthal & Wahlström (2003)
+				regression of Grünthal and Wahlström (2003)
 			- "bungum": calculate MW from MS using formulae by Bungum et al. (2003)
 			- None: use Geller relation if MS != 0, Hinzen relation otherwise
 			(default: None)
