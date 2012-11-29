@@ -174,6 +174,20 @@ class EQCatalog:
 		"""
 		return [eq.datetime for eq in self]
 
+	def get_years(self):
+		"""
+		Return array of integer years for all earthquakes in catalog
+		"""
+		return np.array([date.year for date in self.get_datetimes()])
+
+	def get_fractional_years(self):
+		"""
+		Return array with fractional years for all earthquakes in catalog
+		"""
+		years = np.array([eq.get_fractional_year() for eq in self])
+		#years = [eq.datetime.year + (eq.datetime.month - 1.0) /12 + ((eq.datetime.day - 1.0) / 31) / 12 for eq in self]
+		return years
+
 	def get_magnitudes(self, Mtype="MS", relation=None):
 		"""
 		Return array of magnitudes for all earthquakes in catalog
@@ -404,7 +418,7 @@ class EQCatalog:
 
 		return EQCollection(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (completeness-constrained)")
 
-	def Mbin(self, Mmin, Mmax, dM=0.2, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, trim=False, verbose=False):
+	def bin_mag(self, Mmin, Mmax, dM=0.2, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, trim=False, verbose=False):
 		"""
 		Bin all earthquake magnitudes in catalog according to specified magnitude interval.
 
@@ -536,7 +550,7 @@ class EQCatalog:
 		:param verbose:
 			Bool, whether or not to print binning information (default: False)
 		"""
-		bins_N, bins_Mag, bins_timespans, num_events, Mmax_obs = self.Mbin(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
+		bins_N, bins_Mag, bins_timespans, num_events, Mmax_obs = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
 		pylab.bar(bins_Mag, bins_N, width=dM)
 		pylab.xlabel("Magnitude (%s)" % Mtype)
 		pylab.ylabel("Number of events")
@@ -548,7 +562,7 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def YearBin(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MS", Mrelation=None):
+	def bin_year(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MS", Mrelation=None):
 		"""
 		Bin earthquakes into year intervals
 
@@ -574,7 +588,8 @@ class EQCatalog:
 		"""
 		bins_Years = np.arange(start_year, end_year+dYear, dYear)
 		## Select years according to magnitude criteria
-		Years = [eq.datetime.year for eq in self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)]
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		Years = subcatalog.get_years()
 		bins_N, bins_Years = np.histogram(Years, bins_Years)
 		return (bins_N, bins_Years[:-1])
 
@@ -611,7 +626,7 @@ class EQCatalog:
 		"""
 		from matplotlib.patches import FancyArrowPatch
 		catalog_start_year = self.start_date.year // dYear * dYear
-		bins_N, bins_Years = self.YearBin(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		bins_N, bins_Years = self.bin_year(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		bins_N_cumul = np.add.accumulate(bins_N)
 		start_year_index = np.where(bins_Years == start_year)[0][0]
 		bins_N = bins_N[start_year_index:]
@@ -711,55 +726,79 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_NumDate(self, start_date=None, end_date=None, ddate=1, ddate_spec="days"):
-		if start_date == None:
-			start_date = self.start_date
-		if end_date == None:
-			end_date = self.end_date
+	def plot_DateHistogram(self, start_date=None, end_date=None, ddate=1, ddate_spec="year", mag_limits=[2,3], Mtype="ML", Mrelation=None):
+		"""
+		Plot histogram with number of earthqukes versus date.
+
+		:param start_date:
+			Int or date or datetime object specifying start of time window to plot
+			If integer, start_date is interpreted as start year
+			(default: None)
+		:param end_date:
+			Int or date or datetime object specifying end of time window to plot
+			If integer, start_date is interpreted as start year
+			(default: None)
+		:param ddate:
+			Int, date interval (default: 1)
+		:param ddate_spec:
+			String, ddate specification, either "day" or "year"
+		:param mag_limits:
+			List, magnitude limits
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "ML")
+		:param Mrelation:
+			String, magnitude scaling relation (default: None)
+		"""
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date)
+		start_date, end_date = subcatalog.start_date, subcatalog.end_date
 
 		if ddate_spec.lower()[:4] == "year":
-			bins_Dates = my_arange(start_date.year, end_date.year+ddate, ddate)
+			bins_Dates = np.arange(start_date.year, end_date.year+ddate, ddate)
 		elif ddate_spec.lower()[:3] == "day":
-			bins_Dates = my_arange((end_date - start_date).days + 1)
+			bins_Dates = np.arange((end_date - start_date).days + 1)
 		bins_Num = []
-		for i in range(3):
+		mag_limits = np.array(mag_limits)
+		Nmag = len(mag_limits) + 1
+		for i in range(Nmag):
 			bins_Num.append(np.zeros(len(bins_Dates), 'd'))
-		if ddate_spec.lower()[:4] == "year":
-			for eq in self:
-				i = list(eq.datetime.year < bins_Dates).index(True) - 1
-				if eq.ML < 2.0:
-					bins_Num[0][i] += 1
-				elif 2.0 <= eq.ML < 3.0:
-					bins_Num[1][i] += 1
-				elif eq.ML >= 3.0:
-					bins_Num[2][i] += 1
-		elif ddate_spec.lower()[:3] == "day":
-			for eq in self:
-				i = (eq.datetime.date() - start_date).days
-				if eq.ML < 2.0:
-					bins_Num[0][i] += 1
-				elif 2.0 <= eq.ML < 3.0:
-					bins_Num[1][i] += 1
-				elif eq.ML >= 3.0:
-					bins_Num[2][i] += 1
+
+		for eq in subcatalog:
+			M = eq.get_M(Mtype, Mrelation)
+			try:
+				im = np.where(M < mag_limits)[0][0]
+			except IndexError:
+				im = -1
+			if ddate_spec.lower()[:4] == "year":
+				id = np.where(eq.datetime.year == bins_Dates)[0][0]
+			elif ddate_spec.lower()[:3] == "day":
+				id = (eq.datetime.date() - start_date).days
+			bins_Num[im][id] += 1
 
 		fig = pylab.figure()
-		fig.add_subplot(311)
-		ax = pylab.bar(bins_Dates, bins_Num[2], ddate)
-		pylab.ylabel("M > 3.0")
-		fig.add_subplot(312)
-		ax = pylab.bar(bins_Dates, bins_Num[1], ddate)
-		pylab.ylabel("Number of earthquakes\n2.0 <= M < 3.0")
-		fig.add_subplot(313)
-		ax = pylab.bar(bins_Dates, bins_Num[0], ddate)
-		print dir(ax)
-		pylab.ylabel("M < 2.0")
+		for i in range(Nmag):
+			subplot_nr = Nmag * 100 + 10 + i + 1
+			fig.add_subplot(subplot_nr)
+			ax = pylab.bar(bins_Dates, bins_Num[Nmag-i-1], ddate)
+			if Nmag > 1:
+				if i == 0:
+					label = "M > %.1f" % mag_limits[-1]
+				elif i == Nmag - 1:
+					label = "M < %.1f" % mag_limits[0]
+				else:
+					label = "%.1f <= M < %.1f" % (mag_limits[Nmag-i-2], mag_limits[Nmag-i-1])
+				pylab.ylabel(label)
+			xmin, xmax, ymin, ymax = pylab.axis()
+			pylab.axis((bins_Dates[0], bins_Dates[-1], ymin, ymax))
+
 		pylab.xlabel("Time (%s)" % ddate_spec)
 		pylab.show()
 
-	def plot_MagnitudeDate(self):
-		dates = [eq.datetime for eq in self]
-		values = [eq.ML for eq in self]
+	def plot_Magnitude_Date(self, Mtype="MS", Mrelation=None):
+		"""
+		Plot magnitude versus date
+		"""
+		dates = self.get_datetimes()
+		magnitudes = self.get_magnitudes(Mtype, Mrelation)
 
 		days = pylab.DayLocator()
 		weeks = pylab.WeekdayLocator()
@@ -767,7 +806,7 @@ class EQCatalog:
 
 		fig = pylab.figure()
 		ax = fig.add_subplot(111)
-		pylab.plot_date(pylab.date2num(dates), values)
+		pylab.plot_date(pylab.date2num(dates), magnitudes)
 		pylab.xlabel("Date")
 		pylab.ylabel("Magnitude")
 		ax.xaxis.set_major_locator(weeks)
@@ -778,37 +817,62 @@ class EQCatalog:
 		#ax.set(labels, rotation=30, fontsize=10)
 		pylab.show()
 
-	def plot_MagTime(self, Mtype="MS", lang="en"):
-		if Mtype.upper() == "ML":
-			Mags = [eq.ML for eq in self]
-		elif Mtype.upper() == "MS":
-			Mags = [eq.get_MS() for eq in self]
-		elif Mtype.upper() == "MW":
-			Mags = [eq.get_MW() for eq in self]
-		Years = [eq.datetime.year + (eq.datetime.month - 1.0) /12 + ((eq.datetime.day - 1.0) / 31) / 12 for eq in self]
-		pylab.plot(Mags, Years, '+')
+	def plot_Magnitude_Time(self, Mtype="MS", Mrelation=None, lang="en"):
+		"""
+		Plot magnitude versus time
+
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			String, magnitude scaling relation (default: None)
+		:param lang:
+			String, language of plot labels (default: "en")
+		"""
+		magnitudes = self.get_magnitudes(Mtype, Mrelation)
+		years = self.get_fractional_years()
+		pylab.plot(magnitudes, years, '+')
 		pylab.xlabel("Magnitude (%s)" % Mtype)
 		pylab.ylabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
 		pylab.grid(True)
 		pylab.show()
 
-	def HourBin(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None):
-		hours = [(eq.datetime.hour + eq.datetime.minute/60.0 + eq.datetime.second/3600.0) for eq in self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype)]
-		bins_Hr = range(1, 25)
-		bins_N, junk = np.histogram(hours, bins_Hr, new=False)
-		#print bins_N
-		#print bins_Hr
+	def bin_hour(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+		"""
+		Bin earthquakes into hour intervals
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			String, magnitude scaling relation (default: None)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+
+		:return:
+			tuple (bins_N, bins_Hours)
+			bins_N: array containing number of earthquakes for each bin
+			bins_Hours: array containing lower limit of each hour interval
+		"""
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		hours = np.array([eq.get_fractional_hour() for eq in subcatalog])
+		bins_Hr = range(0, 25)
+		bins_N, junk = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
 	def HourlyMean(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, day=(10, 17), night=(19, 7)):
-		bins_N, bins_Hr = self.HourBin(Mmin, Mmax, Mtype, start_year, end_year)
+		bins_N, bins_Hr = self.bin_hour(Mmin, Mmax, Mtype, start_year, end_year)
 		mean = np.mean(bins_N)
 		mean_day = np.mean(bins_N[day[0]:day[1]])
 		mean_night = np.mean(np.concatenate((bins_N[:night[1]], bins_N[night[0]-24:])))
 		return (mean, mean_day, mean_night)
 
 	def plot_HourHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None):
-		bins_N, bins_Hr = self.HourBin(Mmin, Mmax, Mtype, start_year, end_year)
+		bins_N, bins_Hr = self.bin_hour(Mmin, Mmax, Mtype, start_year, end_year)
 		pylab.bar(bins_Hr, bins_N)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((0, 24, ymin, ymax))
@@ -922,7 +986,7 @@ class EQCatalog:
 			Mmax_obs: maximum observed magnitude in analyzed collection
 			Note that order of arrays is reversed with respect to Mbin !
 		"""
-		bins_N, bins_Mag, bins_Years, num_events, Mmax_obs = self.Mbin(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
+		bins_N, bins_Mag, bins_Years, num_events, Mmax_obs = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
 		## Chop off last element of bins_Mag, as it is not a lower bin value
 		bins_Mag = bins_Mag[:-1]
 		## We need to normalize n values to maximum time span !
@@ -1051,7 +1115,7 @@ class EQCatalog:
 			This regression depends very strongly on the Mmax specified. Empty bins are taken into account.
 			It is therefore important to specify Mmax not larger than the evaluated Mmax for the specific area.
 		"""
-		bins_N, bins_Mag, bins_Years, num_events, Mmax_obs = self.Mbin(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=False, verbose=verbose)
+		bins_N, bins_Mag, bins_Years, num_events, Mmax_obs = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=False, verbose=verbose)
 		bins_Mag += dM/2.0
 
 		if not beta:
@@ -1808,7 +1872,7 @@ if __name__ == "__main__":
 	#catalog.plot_MagnitudeDate()
 
 	## Bin magnitudes with verbose output
-	#bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.Mbin(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
+	#bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
 
 	## Plot magnitude histogram
 	#catalog.plot_Mhistogram(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness)
@@ -1900,7 +1964,7 @@ if __name__ == "__main__":
 	catalog = read_catalogSQL(region=region, start_date=start_date, end_date=end_date)
 	cat = DummyClass()
 	cat.a, cat.b, cat.beta, cat.stda, cat.stdb, cat.stdbeta = catalog.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
-	bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.Mbin(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=False)
+	bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=False)
 	cat.num_events = num_events
 	"""
 
@@ -1951,7 +2015,7 @@ if __name__ == "__main__":
 				a, b, r = catalog.calcGR_lsq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
 				a, b, beta, stda, stdb, stdbeta = catalog.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
 				zone.a, zone.b, zone.beta, zone.stda, zone.stdb, zone.stdbeta = catalog.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True, beta=BETA)
-				zone.num_events = catalog.Mbin(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=True, verbose=False)[3]
+				zone.num_events = catalog.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=True, verbose=False)[3]
 			except:
 				pass
 			else:

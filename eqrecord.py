@@ -3,6 +3,7 @@
 
 ## Import standard python modules
 import datetime
+import time
 import math
 
 
@@ -84,9 +85,9 @@ class LocalEarthquake:
 	def get_ML(self, relation=None):
 		"""
 		Return ML
-		Not yet implemented
+		Not yet implemented!
 		"""
-		pass
+		return self.ML
 
 	def get_MS(self, relation=None):
 		"""
@@ -199,6 +200,40 @@ class LocalEarthquake:
 			Float, scalar seismic moment in N.m
 		"""
 		return 10**((self.get_MW(relation=relation) + 6.06) * 3.0 / 2.0)
+
+	def get_fractional_year(self):
+		"""
+		Compute fractional year of event
+
+		:return:
+			Float, fractional year
+		"""
+		def sinceEpoch(date):
+			# returns seconds since epoch
+			epoch = datetime.datetime(1970, 1, 1)
+			diff = epoch - date
+			return diff.days * 24. * 3600. + diff.seconds
+			## The line below only works for dates after the epoch
+			#return time.mktime(date.timetuple())
+
+		year = self.datetime.year
+		startOfThisYear = datetime.datetime(year=year, month=1, day=1)
+		startOfNextYear = datetime.datetime(year=year+1, month=1, day=1)
+
+		yearElapsed = sinceEpoch(self.datetime) - sinceEpoch(startOfThisYear)
+		yearDuration = sinceEpoch(startOfNextYear) - sinceEpoch(startOfThisYear)
+		fraction = yearElapsed/yearDuration
+
+		return self.datetime.year + fraction
+
+	def get_fractional_hour(self):
+		"""
+		Compute fractional hour of event
+
+		:return:
+			Float, fractional hour
+		"""
+		return self.datetime.hour + self.datetime.minute/60.0 + self.datetime.second/3600.0
 
 	def epicentral_distance(self, pt):
 		"""
