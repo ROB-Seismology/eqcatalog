@@ -1589,7 +1589,7 @@ class EQCatalog:
 		hazard modeller's toolkit.
 
 		:param method:
-			String, method name: "afteran" or "gardner_knopoff" (default: "afteran")
+			String, method name: "afteran" or "gardner-knopoff" (default: "afteran")
 		:param window_opt:
 			String, declustering window type: "GardnerKnopoff", "Gruenthal" or "Uhrhammer"
 			(default: "GardnerKnopoff")
@@ -1610,7 +1610,7 @@ class EQCatalog:
 		if method == "afteran":
 			decluster_func = afteran_decluster
 			decluster_param = time_window
-		elif method == "gardner_knopoff":
+		elif method == "gardner-knopoff":
 			decluster_func = gardner_knopoff_decluster
 			decluster_param = fs_time_prop
 
