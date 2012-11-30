@@ -1605,7 +1605,7 @@ class EQCatalog:
 		:param Mrelation:
 			String, magnitude conversion relation (default: None)
 		"""
-		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.declustering import *
+		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.declustering import afteran_decluster, gardner_knopoff_decluster
 
 		if method == "afteran":
 			decluster_func = afteran_decluster

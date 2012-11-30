@@ -166,7 +166,7 @@ class LocalEarthquake:
 				log_Mo = 1.083 * self.ML + 10.215
 				MW = (2.0/ 3) * log_Mo - 6.06
 			## Relation with ML by Gruenthal & Wahlstrom (2003)
-			elif relation.lower() in ("grunthal", "grünthal"):
+			elif relation.lower() == "grunthal":
 				MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
 		else:
 			MW = self.MW

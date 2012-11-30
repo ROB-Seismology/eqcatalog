@@ -59,7 +59,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		If integer, start_date is interpreted as start year
 		(default: None)
 	:param end_date:
-		Int date or datetime object specifying end of time window of interest
+		Int or date or datetime object specifying end of time window of interest
 		If integer, end_date is interpreted as end year
 		(default: None)
 	:param Mmin:
@@ -171,7 +171,13 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 			continue
 
 		year, month, day = [int(s) for s in date.split("-")]
-		date = datetime.date(year, month, day)
+		## Take into account historical earthquakes where part of date is missing
+		if month and day:
+			date = datetime.date(year, month, day)
+		elif month:
+			date = datetime.date(year, month, 1)
+		else:
+			date = datetime.date(year, 1, 1)
 		hour, minutes, seconds = [int(s) for s in time.split(":")]
 		time = datetime.time(hour, minutes, seconds)
 
