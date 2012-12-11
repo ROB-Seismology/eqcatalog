@@ -90,85 +90,88 @@ class LocalEarthquake:
 		"""
 		return self.ML
 
-	def get_MS(self, relation=None):
+	def get_MS(self, relation={"ML": "ambraseys"}):
 		"""
 		Return MS.
-		If MS is None or zero, calculate it from ML using the specified
+		If MS is None or zero, calculate it using the specified
 		magnitude conversion relation
 
 		:param relation:
-			String, name of magnitude conversion relation.
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MS" or "ML").
 			Only one relation is currently supported:
-			- "ambraseys": relation by Ambraseys (1985) for earthquakes
-				in NW Europe (quoted in Leynaud et al., 2000).
-			- None: use ambraseys
-			(default: None)
+			- "ambraseys": relation with ML by Ambraseys (1985) for
+				earthquakes in NW Europe (quoted in Leynaud et al., 2000).
+			(default: {"ML": "ambraseys"})
 
 		:return:
 			Float, surface-wave magnitude
 		"""
 		if relation is None:
-			relation = "ambraseys"
+			relation={"ML": "ambraseys"}
+
 		if not self.MS:
-			if relation == "ambraseys" and self.ML:
+			if relation["ML"] == "ambraseys" and self.ML:
 				return 0.09 + 0.93 * self.ML
+			# TODO: add relation for MW
 			else:
 				return 0.
 		else:
 			return self.MS
 
-	def get_MW(self, relation=None):
+	def get_MW(self, relation={"MS": "bungum", "ML": "hinzen"}):
 		"""
 		Return MW.
 		If MW is None or zero, calculate it using the specified
 		magnitude conversion relation
 
 		:param relation:
-			String, name of magnitude conversion relation.
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MS" or "ML"). Note that MS takes precedence
+			over ML.
 			The following relations are supported:
-			- "geller": calculate MW from MS assuming a stress drop of 50 bars
-				(only valid for MS < 6.76);
-				Note that MS is in most cases calculated in turn from ML,
-				implying a double conversion
-			- "ahorner": calculate MW from ML using relation by Ahorner (1983)
-			- "hinzen": calculate MW from ML using relation by Hinzen (2004)
-			- "grunthal": calculate MW from ML using chi-square maximum likelihood
-				regression of Gruenthal and Wahlstrom (2003)
-			- "bungum": calculate MW from MS using formulae by Bungum et al. (2003)
-			- None: use Geller relation if MS != 0, Hinzen relation otherwise
-			(default: None)
+			- MS --> MW:
+				- "bungum": calculate MW from MS using formulae by Bungum
+					et al. (2003)
+				- "geller": calculate MW from MS assuming a stress drop of
+					50 bars (only valid for MS < 6.76);
+			- ML --> MW:
+				- "ahorner": caculate MW from ML using relation by Ahorner (1983)
+				- "hinzen": calculate MW from ML using relation by Hinzen (2004)
+				- "gruenthal": calculate MW from ML using chi-square maximum
+					likelihood regression of Gruenthal and Wahlstrom (2003)
+			(default: {"MS": "bungum", "ML": "hinzen"})
 
 		:return:
 			Float, moment magnitude
 		"""
+		if relation is None:
+			relation={"MS": "bungum", "ML": "hinzen"}
+
 		if not self.MW:
-			if relation == None:
-				if self.MS:
-					relation = "geller"
-				else:
-					relation = "hinzen"
-			## Conversion (ML ->) MS -> MW (Geller, 1976)
-			if relation.lower() == "geller":
-				log_Mo_dyncm = self.get_MS() + 18.89
-				MW = (2.0/3) * log_Mo_dyncm - 10.73
-			## Conversion (ML ->) MS -> MW (Bungum  et al., 2003)
-			elif relation.lower() == "bungum":
-				MS = self.get_MS()
-				if MS < 5.4:
-					MW = 0.585 * MS + 2.422
-				else:
-					MW = 0.769 * MS + 1.280
-			## Relation with ML by Ahorner (1983)
-			elif relation.lower() == "ahorner":
-				log_Mo_dyncm = 17.4 + 1.1 * self.ML
-				MW = (2.0/3) * log_Mo_dyncm - 10.73
-			## Relation with ML by Hinzen (2004)
-			elif relation.lower() == "hinzen":
-				log_Mo = 1.083 * self.ML + 10.215
-				MW = (2.0/ 3) * log_Mo - 6.06
-			## Relation with ML by Gruenthal & Wahlstrom (2003)
-			elif relation.lower() == "grunthal":
-				MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
+			if self.MS:
+				## Conversion MS -> MW (Geller, 1976)
+				if relation.lower() == "geller":
+					log_Mo_dyncm = self.MS + 18.89
+					MW = (2.0/3) * log_Mo_dyncm - 10.73
+				## Conversion MS -> MW (Bungum  et al., 2003)
+				elif relation.lower() == "bungum":
+					if self.MS < 5.4:
+						MW = 0.585 * self.MS + 2.422
+					else:
+						MW = 0.769 * self.MS + 1.280
+			elif self.ML:
+				## Relation with ML by Ahorner (1983)
+				if relation.lower() == "ahorner":
+					log_Mo_dyncm = 17.4 + 1.1 * self.ML
+					MW = (2.0/3) * log_Mo_dyncm - 10.73
+				## Relation with ML by Hinzen (2004)
+				elif relation.lower() == "hinzen":
+					log_Mo = 1.083 * self.ML + 10.215
+					MW = (2.0/ 3) * log_Mo - 6.06
+				## Relation with ML by Gruenthal & Wahlstrom (2003)
+				elif relation.lower() == "gruenthal":
+					MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
 		else:
 			MW = self.MW
 		return MW
@@ -179,8 +182,10 @@ class LocalEarthquake:
 
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
-		:param relation":
-			String, magnitude conversion relation (default: None)
+		:param relation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 
 		:return:
 			Float, magnitude
@@ -194,7 +199,8 @@ class LocalEarthquake:
 		magntiude conversion relation.
 
 		:param relation:
-			String, name of magnitude conversion relation.
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type.
 			See :meth:`get_MW`
 
 		:return:

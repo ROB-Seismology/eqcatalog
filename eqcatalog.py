@@ -206,7 +206,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param relation:
-			String, magnitude conversion relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 
 		:return:
 			1-D numpy float array, earthquake magnitudes
@@ -255,7 +257,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude conversion relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		"""
 		DateTimes = self.get_datetimes()
 		if Mmax != None:
@@ -277,7 +281,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param relation:
-			String, magnitude conversion relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		"""
 		Mags = self.get_magnitudes(Mtype=Mtype, relation=relation)
 		return (Mags.min(), Mags.max())
@@ -309,30 +315,33 @@ class EQCatalog:
 		"""
 		return self.lon_minmax() + self.lat_minmax()
 
-	def get_M0(self, relation="Hinzen"):
+	def get_M0(self, Mrelation={"MS": "bungum", "ML": "hinzen"}):
 		"""
 		Compute total seismic moment.
 
-		:param relation:
-			String, magnitude conversion relation (default: "Hinzen")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MS" or "ML")
+			(default: {"MS": "bungum", "ML": "hinzen"})
 
 		:return:
 			Float, total seismic moment in N.m
 		"""
-		return np.add.reduce(np.array([eq.get_M0(relation=relation) for eq in self]))
+		return np.add.reduce(np.array([eq.get_M0(relation=Mrelation) for eq in self]))
 
 	def get_M0rate(self, relation="Hinzen"):
 		"""
 		Compute seismic moment rate.
 
-		:param relation:
-			String, magnitude conversion relation (default: "Hinzen")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MS" or "ML")
+			(default: {"MS": "bungum", "ML": "hinzen"})
 
 		:return:
 			Float, seismic moment rate in N.m/yr
 		"""
-		# TODO: check if this should not be N.m/sec
-		return self.get_M0(relation=relation) / self.timespan()
+		return self.get_M0(Mrelation=Mrelation) / self.timespan()
 
 	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MS", Mrelation=None):
 		"""
@@ -360,7 +369,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
 		:param Mrelation:
-			String, magnitude conversion relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 
 		:return:
 			instance of :class:`EQCatalog`
@@ -412,7 +423,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
 		:param Mrelation":
-			String, magnitude conversion relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 
 		:return:
 			instance of :class:`EQCatalog`
@@ -446,7 +459,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -554,7 +569,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param fig_filespec:
 			String, full path of image to be saved.
 			If None (default), histogram is displayed on screen.
@@ -590,7 +607,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 
 		:return:
 			tuple (bins_N, bins_Years)
@@ -621,7 +640,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param major_tick_interval:
 			Int, interval in years for major ticks (default: 10)
 		:param minor_tick_interval:
@@ -758,7 +779,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "ML")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		"""
 		subcatalog = self.subselect(start_date=start_date, end_date=end_date)
 		start_date, end_date = subcatalog.start_date, subcatalog.end_date
@@ -835,7 +858,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param lang:
 			String, language of plot labels (default: "en")
 		"""
@@ -858,7 +883,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param start_year:
 			Int, lower year to bin (default: None)
 		:param end_year:
@@ -882,7 +909,7 @@ class EQCatalog:
 		mean_night = np.mean(np.concatenate((bins_N[:night[1]], bins_N[night[0]-24:])))
 		return (mean, mean_day, mean_night)
 
-	def plot_HourHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None):
+	def plot_HourHistogram(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
 		"""
 		Plot histogram with number of earthquakes per hour of the day.
 
@@ -893,7 +920,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param start_year:
 			Int, lower year to bin (default: None)
 		:param end_year:
@@ -923,7 +952,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param start_year:
 			Int, lower year to bin (default: None)
 		:param end_year:
@@ -957,7 +988,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
-			String, magnitude scaling relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param start_year:
 			Int, lower year to bin (default: None)
 		:param end_year:
@@ -1565,7 +1598,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude conversion relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		:param dt:
 			Int, time interval (in years?) (default: 5)
 		:param ttol:
@@ -1603,7 +1638,9 @@ class EQCatalog:
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
-			String, magnitude conversion relation (default: None)
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		"""
 		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.declustering import afteran_decluster, gardner_knopoff_decluster
 
@@ -1634,7 +1671,38 @@ class EQCatalog:
 EQCollection = EQCatalog
 
 
-#TODO: moment balancing with MFD objects
+class CompositeEQCatalog:
+	"""
+	Class representing a catalog that has been split into a number
+	of non-overlapping subcatalogs (e.g., split according to different
+	source zones).
+	"""
+	def __init__(self, master_catalog, zone_catalogs):
+		self.master_catalog = master_catalog
+		self.zone_catalogs = zone_catalogs
+
+	def balance_MFD_by_moment_rate(self, Nsamples):
+		"""
+		For each zone catalog: MC sampling of b value, compute corresponding
+		a value. Sum total moment rate of all zonee catalogs, and check that
+		it falls within +/- 2 sigma of total moment rate in master catalog.
+		"""
+		pass
+
+	def balance_MFD_by_num_eq(self, Nsamples):
+		"""
+		For each zone catalog: MC sampling of b value, compute corresponding
+		a value. Then, for each magnitude bin, compute total number of
+		earthquakes (or annual rate) up to Mmax - 1 or 2 bins of each zone,
+		and check that sum of all zone catalogs falls within +/- 2 sigma of
+		annual rate of master catalog.
+		"""
+		pass
+
+	def balance_MFD_by_fixed_b_value(self):
+		pass
+
+
 
 def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, zone_model=None, zone_names=[], verbose=False):
 	"""
