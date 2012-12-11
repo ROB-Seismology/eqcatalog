@@ -111,7 +111,7 @@ class LocalEarthquake:
 			relation={"ML": "ambraseys"}
 
 		if not self.MS:
-			if relation["ML"] == "ambraseys" and self.ML:
+			if relation["ML"].lower() == "ambraseys" and self.ML:
 				return 0.09 + 0.93 * self.ML
 			# TODO: add relation for MW
 			else:
@@ -151,26 +151,26 @@ class LocalEarthquake:
 		if not self.MW:
 			if self.MS:
 				## Conversion MS -> MW (Geller, 1976)
-				if relation.lower() == "geller":
+				if relation["MS"].lower() == "geller":
 					log_Mo_dyncm = self.MS + 18.89
 					MW = (2.0/3) * log_Mo_dyncm - 10.73
 				## Conversion MS -> MW (Bungum  et al., 2003)
-				elif relation.lower() == "bungum":
+				elif relation["MS"].lower() == "bungum":
 					if self.MS < 5.4:
 						MW = 0.585 * self.MS + 2.422
 					else:
 						MW = 0.769 * self.MS + 1.280
 			elif self.ML:
 				## Relation with ML by Ahorner (1983)
-				if relation.lower() == "ahorner":
+				if relation["ML"].lower() == "ahorner":
 					log_Mo_dyncm = 17.4 + 1.1 * self.ML
 					MW = (2.0/3) * log_Mo_dyncm - 10.73
 				## Relation with ML by Hinzen (2004)
-				elif relation.lower() == "hinzen":
+				elif relation["ML"].lower() == "hinzen":
 					log_Mo = 1.083 * self.ML + 10.215
 					MW = (2.0/ 3) * log_Mo - 6.06
 				## Relation with ML by Gruenthal & Wahlstrom (2003)
-				elif relation.lower() == "gruenthal":
+				elif relation["ML"].lower() == "gruenthal":
 					MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
 			else:
 				MW = 0.
