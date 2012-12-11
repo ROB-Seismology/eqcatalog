@@ -172,6 +172,8 @@ class LocalEarthquake:
 				## Relation with ML by Gruenthal & Wahlstrom (2003)
 				elif relation.lower() == "gruenthal":
 					MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
+			else:
+				MW = 0.
 		else:
 			MW = self.MW
 		return MW
