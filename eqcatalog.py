@@ -249,6 +249,24 @@ class EQCatalog:
 		"""
 		return np.array([eq.lat for eq in self])
 
+	def get_cartesian_coordinates(self, proj="lambert1972"):
+		"""
+		Return cartesian coordinates
+
+		:param proj:
+			String, projection name: either "lambert1972" or "utm31"
+
+		:return:
+			List with (easting, northing) tuples
+		"""
+		import mapping.geo.coordtrans as coordtrans
+		lons, lats = self.get_longitudes(), self.get_latitudes()
+		coord_list = zip(lons, lats)
+		if proj == "lambert1972":
+			return coordtrans.lonlat_to_lambert1972(coord_list)
+		elif proj == "utm31N":
+			return coordtrans.utm_to_lonlat(coord_list, proj)
+
 	def Tminmax(self, Mmax=None, Mtype="MS", Mrelation=None):
 		"""
 		Return tuple with oldest date and youngest date in catalog.
@@ -1642,6 +1660,52 @@ class EQCatalog:
 			kmldoc.write(kml_filespec)
 		else:
 			return kmldoc.root.toxml()
+
+	def export_VTK(vtk_filespec, proj="lambert1972", Mtype="MW", Mrelation=None):
+		"""
+		Export earthquake catalog to VTK format for 3D viewing
+
+		:param vtk_filespec:
+			String, full path to output VTK file
+		:param proj:
+			String, projection name: either "lambert1972" or "utm31"
+			(default: "lambert1972")
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		"""
+		cartesian_coords = self.get_cartesian_coordinates(proj)
+		num_rows = len(self)
+
+		f = open(vtk_filespec, 'w')
+		f.write("# vtk DataFile Version 2.0\n")
+		f.write("Belgiean earthquake catalog\n")
+		f.write("ASCII\n")
+		f.write("DATASET UNSTRUCTURED_GRID\n")
+		f.write("POINTS %d float\n" % num_rows)
+		for i, eq in enumerate(self):
+			x, y = cartesian_coords[i]
+			f.write("%.2f %.2f %.2f\n" % (x, y, eq.depth*-1.0))
+		f.write("CELLS %d %d\n" % (num_rows, num_rows * 2))
+		for i in range(num_rows):
+			f.write("1 %d\n" % i)
+		f.write("CELL_TYPES %d\n" % num_rows)
+		for i in range(num_rows):
+			f.write("1\n")
+		f.write("\n")
+		f.write("POINT_DATA %d\n" % num_rows)
+		f.write("SCALARS Depth float 1\n")
+		f.write("LOOKUP_TABLE default\n")
+		for eq in self:
+			f.write("%.2f\n" % eq.depth)
+		f.write("SCALARS Magnitude float 1\n")
+		f.write("LOOKUP_TABLE default\n")
+		for eq in self:
+			f.write("%.2f\n" % eq.get_M(Mtype, Mrelation))
+		f.close()
 
 	def pickle(self, filespec):
 		"""
