@@ -35,6 +35,7 @@ import numpy as np
 if platform.uname()[1] == "seissrv3":
 	import matplotlib
 	matplotlib.use('AGG')
+import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator
@@ -1666,7 +1667,43 @@ class EQCatalog:
 		for i in range(len(eq_matrix)):
 			if flag_vector[i] != 0:
 				print i, cluster_vector[i], flag_vector[i]
+	
+	def plot_3d(self, limits=None, Mtype=None, relation=None):
+		"""
+		Plot catalog in 3D. Points are colored by magnitude.
 
+		:param limits:
+			Tuple of six floats, defining respectively minumum and maximum for
+			longitude scale, minumum and maximum for latitude scale and minumum,
+			and minimum and maximum for depth scale (default: None). This param
+			should be used to create plots with identical scales.
+		:param Mtype:
+			See :method: get_magnitudes.
+		:param relation:
+			See :method: get_magnitudes.
+		"""
+		from mpl_toolkits.mplot3d.axes3d import Axes3D
+		fig = plt.figure()
+		ax = fig.add_subplot(111, projection='3d')
+		kwargs = {}
+		if Mtype:
+			kwargs['Mtype'] = Mtype
+		if relation:
+			kwargs['relation'] = relation
+		p = ax.scatter(self.get_longitudes(), self.get_latitudes(), self.get_depths()*-1, c=self.get_magnitudes(**kwargs), cmap=plt.cm.jet)
+		## set labels
+		ax.set_xlabel('longitude')
+		ax.set_ylabel('latitude')
+		ax.set_zlabel('depth')
+		## set limits
+		if limits:
+			ax.set_xlim(*limits[0:2])
+			ax.set_ylim(*limits[2:4])
+			ax.set_zlim(limits[5]*-1, limits[4])
+		## create colorbar
+		fig.colorbar(p)
+		## plot
+		plt.show()
 
 EQCollection = EQCatalog
 
