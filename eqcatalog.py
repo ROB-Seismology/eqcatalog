@@ -1488,6 +1488,161 @@ class EQCatalog:
 			f.write('%d,"%s","%s","%s",%.3f,%.3f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d\n' % (eq.ID, date, time, eq.name, eq.lon, eq.lat, eq.depth, eq.ML, eq.MS, eq.MW, eq.get_MS(), eq.intensity_max, eq.macro_radius))
 		f.close()
 
+	def export_KML(self, kml_filespec=None, time_folders=True, instrumental_start_year=1910, color_by_depth=False):
+		"""
+		Export earthquake catalog to KML.
+
+		:param kml_filespec:
+			String, full path to output KML file. If None, kml is printed
+			on screen (default: None)
+		:param time_folders:
+			Bool, whether or not to organize earthquakes in folders by time
+			(default: True)
+		:param instrumental_start_year:
+			Int, start year of instrumental period (only applies when time_folders
+			is True) (default: 1910)
+		:param color_by_depth:
+			Bool, whether or not to color earthquakes by depth (default: False)
+		"""
+		import mapping.kml.mykml as mykml
+
+		kmldoc = mykml.KML()
+		#year, month, day = self.start_date.year, self.start_date.month, self.start_date.day
+		#start_time = datetime.datetime(year, month, day)
+		start_time = datetime.datetime.now()
+		kmldoc.addTimeStamp(start_time)
+
+		depth_colors = [(255, 0, 0),
+						(255, 156, 0),
+						(255, 255, 0),
+						(0, 255, 0),
+						(0, 0, 255),
+						(205, 0 , 255)]
+
+		if time_folders:
+			hist_folder = kmldoc.addFolder("Historical", visible=False, open=False)
+			inst_folder = kmldoc.addFolder("Instrumental", visible=True, open=False)
+
+			folder_24h = kmldoc.createFolder("Past 24 hours", visible=True, open=False)
+			inst_folder.appendChild(folder_24h)
+			folder_2w = kmldoc.createFolder("Past 2 weeks", visible=True, open=False)
+			inst_folder.appendChild(folder_2w)
+			folder_lastyear = kmldoc.createFolder("Past year", visible=True, open=False)
+			inst_folder.appendChild(folder_lastyear)
+			folder_2000 = kmldoc.createFolder("2000 -", visible=True, open=False)
+			inst_folder.appendChild(folder_2000)
+			folder_1990 = kmldoc.createFolder("1990 - 2000", visible=True, open=False)
+			inst_folder.appendChild(folder_1990)
+			folder_1980 = kmldoc.createFolder("1980 - 1990", visible=True, open=False)
+			inst_folder.appendChild(folder_1980)
+			folder_1970 = kmldoc.createFolder("1970 - 1980", visible=True, open=False)
+			inst_folder.appendChild(folder_1970)
+			folder_1960 = kmldoc.createFolder("1960 - 1970", visible=True, open=False)
+			inst_folder.appendChild(folder_1960)
+			folder_1950 = kmldoc.createFolder("1950 - 1960", visible=True, open=False)
+			inst_folder.appendChild(folder_1950)
+			folder_1940 = kmldoc.createFolder("1940 - 1950", visible=True, open=False)
+			inst_folder.appendChild(folder_1940)
+			folder_1930 = kmldoc.createFolder("1930 - 1940", visible=True, open=False)
+			inst_folder.appendChild(folder_1930)
+			folder_1920 = kmldoc.createFolder("1920 - 1930", visible=True, open=False)
+			inst_folder.appendChild(folder_1920)
+			folder_1910 = kmldoc.createFolder("1910 - 1920", visible=True, open=False)
+			inst_folder.appendChild(folder_1910)
+			folder_1900 = kmldoc.createFolder("1900 - 1910", visible=True, open=False)
+			inst_folder.appendChild(folder_1900)
+		else:
+			topfolder = kmldoc.addFolder("Earthquake catalog", visible=True, open=False)
+
+		for eq in self:
+			if eq.datetime.year < instrumental_start_year:
+				Mtype = "MS"
+			else:
+				Mtype = "ML"
+			if time_folders:
+				if eq.datetime.year < instrumental_start_year:
+					folder = hist_folder
+					visible = False
+					color = (0, 255, 0)
+					Mtype = "MS"
+				else:
+					visible = True
+					Mtype = "ML"
+					if start_time - eq.datetime <= datetime.timedelta(1, 0, 0):
+						folder = folder_24h
+						color = (255, 0, 0)
+					elif start_time - eq.datetime <= datetime.timedelta(14, 0, 0):
+						folder = folder_2w
+						color = (255, 128, 0)
+					elif start_time - eq.datetime <= datetime.timedelta(365, 0, 0):
+						folder = folder_lastyear
+						color = (255, 255, 0)
+					elif eq.datetime.year >= 2000:
+						folder = folder_2000
+						color = (192, 0, 192)
+					elif 1990 <= eq.datetime.year < 2000:
+						folder = folder_1990
+						color = (0, 0, 255)
+					elif 1980 <= eq.datetime.year < 1990:
+						folder = folder_1980
+						color = (0, 0, 255)
+					elif 1970 <= eq.datetime.year < 1980:
+						folder = folder_1970
+						color = (0, 0, 255)
+					elif 1960 <= eq.datetime.year < 1970:
+						folder = folder_1960
+						color = (0, 0, 255)
+					elif 1950 <= eq.datetime.year < 1960:
+						folder = folder_1950
+						color = (0, 0, 255)
+					elif 1940 <= eq.datetime.year < 1950:
+						folder = folder_1940
+						color = (0, 0, 255)
+					elif 1930 <= eq.datetime.year < 1940:
+						folder = folder_1930
+						color = (0, 0, 255)
+					elif 1920 <= eq.datetime.year < 1930:
+						folder = folder_1920
+						color = (0, 0, 255)
+					elif 1910 <= eq.datetime.year < 1920:
+						folder = folder_1910
+						color = (0, 0, 255)
+			else:
+				folder = topfolder
+				color = (255, 128, 0)
+				visible = True
+
+			if color_by_depth:
+				color = depth_colors[max(min(int(eq.depth*2-6), 5), 0)]
+
+			t = eq.datetime.time()
+			url = '<a href="http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d">ROB web page</a>' % eq.ID
+			values = OrderedDict()
+			values['ID'] = eq.ID
+			values['Date'] = eq.datetime.date().isoformat()
+			values['Time'] = "%02d:%02d:%02d" % (t.hour, t.minute, int(round(t.second + t.microsecond/1e+6)))
+			values['Name'] = mykml.xmlstr(eq.name)
+			values['ML'] = eq.ML
+			values['MS'] = eq.MS
+			values['MW'] = eq.MW
+			values['Lon'] = eq.lon
+			values['Lat'] = eq.lat
+			values['Depth'] = eq.depth
+			values[None] = url
+			name = "%s %.1f %s %s %s" % (Mtype, values[Mtype], values['Date'], values['Time'], values['Name'])
+			labelstyle = kmldoc.createLabelStyle(scale=0)
+			#iconstyle = kmldoc.createStandardIconStyle(palette="pal2", icon_nr=26, scale=0.75+(values[Mtype]-3.0)*0.15, rgb=color)
+			icon_href = "http://kh.google.com:80/flatfile?lf-0-icons/shield3_nh.png"
+			iconstyle = kmldoc.createIconStyle(href=icon_href, scale=0.75+(values[Mtype]-3.0)*0.15, rgb=color)
+			style = kmldoc.createStyle(styles=[labelstyle, iconstyle])
+			ts = kmldoc.createTimeSpan(begin=eq.datetime)
+			kmldoc.addPointPlacemark(name, eq.lon, eq.lat, folder=folder, description=values, style=style, visible=visible, timestamp=ts)
+
+		if kml_filespec:
+			kmldoc.write(kml_filespec)
+		else:
+			return kmldoc.root.toxml()
+
 	def pickle(self, filespec):
 		"""
 		Dump earthquake collection to a pickled file.
@@ -1667,7 +1822,7 @@ class EQCatalog:
 		for i in range(len(eq_matrix)):
 			if flag_vector[i] != 0:
 				print i, cluster_vector[i], flag_vector[i]
-	
+
 	def plot_3d(self, limits=None, Mtype=None, relation=None):
 		"""
 		Plot catalog in 3D. Points are colored by magnitude.
