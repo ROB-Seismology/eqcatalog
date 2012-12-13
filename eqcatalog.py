@@ -2096,6 +2096,59 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	return EQCollection(catalog, start_date, end_date, name=name)
 
 
+def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MS", Mrelation=None):
+	"""
+	Read ROB local earthquake catalog from txt file.
+	
+	:param filespec:
+		String, defining filespec of a txt file with columns defining at least
+		the attributes id, year, month, day, hours, minutes, seconds, longitude,
+		latitude and depth. ML, MS and MW are optional.
+	:param column_map:
+		Dictionary, mapping attributes to number of column (starting from 0).
+		ML, MS and MW must be set to None if not given.
+	:param skiprows:
+		Integer, defining number of lines to skip at top of file (default: 0).
+		To be used when header is present.
+	
+	See method EQCatalog.read_catalogSQL for other params.
+	"""
+	eq_list_txt = np.loadtxt(filespec, skiprows=skiprows)
+	eq_list = []
+	for eq_txt in eq_list_txt:
+		id = eq_txt[column_map['id']]
+		year = int(eq_txt[column_map['year']])
+		month = int(eq_txt[column_map['month']])
+		day = int(eq_txt[column_map['day']])
+		date = datetime.date(year, month, day)
+		hour = int(eq_txt[column_map['hour']])
+		minute = int(eq_txt[column_map['minute']])
+		second = int(eq_txt[column_map['second']])
+		time = datetime.time(hour, minute, second)
+		lon = eq_txt[column_map['lon']]
+		lat = eq_txt[column_map['lat']]
+		depth = eq_txt[column_map['depth']]
+		ML = eq_txt[column_map['ML']]
+		if column_map['ML']:
+			ML = eq_txt[column_map['ML']]
+		else:
+			ML = 0
+		if column_map['MS']:
+			MS = eq_txt[column_map['MS']]
+		else:
+			MS = 0
+		if column_map['MW']:
+			MW = eq_txt[column_map['MW']]
+		else:
+			MW = 0
+		eq_list.append(seismodb.LocalEarthquake(id, date, time, lon, lat, depth,
+			ML, MS, MW))
+	eqc = EQCatalog(eq_list)
+	eqc = eqc.subselect(region, start_date, end_date, Mmin, Mmax, min_depth,
+		max_depth, Mtype, Mrelation)
+	return eqc
+
+
 def read_zonesMI(tabname):
 	"""
 	Read zone model through MapInfo.
