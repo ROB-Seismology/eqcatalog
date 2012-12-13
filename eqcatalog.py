@@ -1530,13 +1530,6 @@ class EQCatalog:
 		start_time = datetime.datetime.now()
 		kmldoc.addTimeStamp(start_time)
 
-		depth_colors = [(255, 0, 0),
-						(255, 156, 0),
-						(255, 255, 0),
-						(0, 255, 0),
-						(0, 0, 255),
-						(205, 0 , 255)]
-
 		if time_folders:
 			hist_folder = kmldoc.addFolder("Historical", visible=False, open=False)
 			inst_folder = kmldoc.addFolder("Instrumental", visible=True, open=False)
@@ -1631,7 +1624,20 @@ class EQCatalog:
 				visible = True
 
 			if color_by_depth:
-				color = depth_colors[max(min(int(eq.depth*2-6), 5), 0)]
+				if eq.depth == 0.:
+					color = (255, 255, 255)
+				elif 0 < eq.depth <= 2.:
+					color = (205, 0 , 255)
+				elif 2. < eq.depth <= 5.:
+					color = (0, 0, 255)
+				elif 5. < eq.depth <= 10.:
+					color = (0, 255, 0)
+				elif 10. < eq.depth <= 15.:
+					color = (255, 255, 0)
+				elif 15. < eq.depth <= 20.:
+					color = (255, 156, 0)
+				elif eq.depth > 20.:
+					color = (255, 0, 0)
 
 			t = eq.datetime.time()
 			url = '<a href="http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d">ROB web page</a>' % eq.ID
@@ -1661,7 +1667,7 @@ class EQCatalog:
 		else:
 			return kmldoc.root.toxml()
 
-	def export_VTK(vtk_filespec, proj="lambert1972", Mtype="MW", Mrelation=None):
+	def export_VTK(self, vtk_filespec, proj="lambert1972", Mtype="MW", Mrelation=None):
 		"""
 		Export earthquake catalog to VTK format for 3D viewing
 
@@ -1682,13 +1688,13 @@ class EQCatalog:
 
 		f = open(vtk_filespec, 'w')
 		f.write("# vtk DataFile Version 2.0\n")
-		f.write("Belgiean earthquake catalog\n")
+		f.write("%s\n" % self.name)
 		f.write("ASCII\n")
 		f.write("DATASET UNSTRUCTURED_GRID\n")
 		f.write("POINTS %d float\n" % num_rows)
 		for i, eq in enumerate(self):
 			x, y = cartesian_coords[i]
-			f.write("%.2f %.2f %.2f\n" % (x, y, eq.depth*-1.0))
+			f.write("%.2f %.2f %.2f\n" % (x, y, eq.depth*-1000.0))
 		f.write("CELLS %d %d\n" % (num_rows, num_rows * 2))
 		for i in range(num_rows):
 			f.write("1 %d\n" % i)
