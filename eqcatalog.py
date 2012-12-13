@@ -1338,7 +1338,7 @@ class EQCatalog:
 			print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
 		return (a, -b, r)
 
-	def calcGR_mle(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, beta=None, Mc=None, verbose=False):
+	def calcGR_mle(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation (mle).
 		Adapted from calB.m and calBfixe.m Matlab modules written by Philippe Rosset (ROB, 2004),
@@ -1372,19 +1372,22 @@ class EQCatalog:
 			This regression depends very strongly on the Mmax specified. Empty bins are taken into account.
 			It is therefore important to specify Mmax not larger than the evaluated Mmax for the specific area.
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 		bins_Mag += dM/2.0
 
-		if not beta:
+		if not bval:
+			## Initial trial value
 			BETA = 1.5
 		else:
-			BETA = beta
+			## Fixed beta
+			BETA = bval * np.log(10)
 		BETL = 0
-		#i = 0
 		while(abs(BETA-BETL)) >= 0.0001:
+			#print BETA
+
 			SNM = 0.0
-			NKNOUT = 0.0
+			NKOUNT = 0.0
 			STMEX = 0.0
 			SUMTEX = 0.0
 			STM2X = 0.0
@@ -1392,7 +1395,7 @@ class EQCatalog:
 
 			for k in range(len(bins_N)):
 				SNM += bins_N[k] * bins_Mag[k]
-				NKNOUT += bins_N[k]
+				NKOUNT += bins_N[k]
 				TJEXP = bins_timespans[k] * np.exp(-BETA * bins_Mag[k])
 				TMEXP = TJEXP * bins_Mag[k]
 				SUMEXP += np.exp(-BETA * bins_Mag[k])
@@ -1400,39 +1403,45 @@ class EQCatalog:
 				SUMTEX += TJEXP
 				STM2X += bins_Mag[k] * TMEXP
 
+			#print SNM, NKOUNT, STMEX, SUMTEX, STM2X, SUMEXP
+
 			try:
 				DLDB = STMEX / SUMTEX
 			#if np.isnan(DLDB):
 			except:
 				break
 			else:
-				D2LDB2 = NKNOUT * (DLDB**2 - STM2X/SUMTEX)
-				DLDB = DLDB*NKNOUT - SNM
+				D2LDB2 = NKOUNT * (DLDB*DLDB - STM2X/SUMTEX)
+				DLDB = DLDB * NKOUNT - SNM
 				BETL = BETA
-				if not beta:
+				if not bval:
 					BETA -= DLDB/D2LDB2
-			#i += 1
 
 		STDBETA = np.sqrt(-1.0/D2LDB2)
 		B = BETA / np.log(10)
 		STDB = STDBETA / np.log(10)
-		FNGTMO = NKNOUT * SUMEXP / SUMTEX
-		STDFNGTMO = np.sqrt(FNGTMO/NKNOUT)
-		#A = np.log10(FNGTMO) + B*bins_Mag[0]
-		A = np.log10(FNGTMO) + B*(bins_Mag[0] - dM/2.0)
-		STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
-		#STDA = np.sqrt(abs(A)/NKNOUT)
+		FNGTMO = NKOUNT * SUMEXP / SUMTEX
+		FN0 = FNGTMO * np.exp(BETA * bins_Mag[0] - dM/2.0)
+		FLGN0 = np.log10(FN0)
+		A = FLGN0
+		#A = np.log10(FNGTMO) + B*(bins_Mag[0] - dM/2.0)
+		#STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
+		#STDA = np.sqrt(abs(A)/NKOUNT)
+		"""
 		ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
-		STDALPHA = ALPHA / np.sqrt(NKNOUT)
+		print ALPHA, BETA
+		STDALPHA = ALPHA / np.sqrt(NKOUNT)
 		if Mc !=None:
 			LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
-			STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKNOUT)
+			STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
 		if verbose:
 			print "Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)" % (A, STDA, B, STDB, BETA, STDBETA)
 		if Mc != None:
 			return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
 		else:
 			return (A, B, BETA, STDA, STDB, STDBETA)
+		"""
+		return A, B, STDB
 
 	def plot_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", cumul=True, discrete=False, completeness=Completeness_Rosset, Mrange=(), Freq_range=(), fixed_beta=None, num_sigma=0, lang="en", color=True, want_lsq=True, want_completeness_limits=False, want_exponential=False, title=None, fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
