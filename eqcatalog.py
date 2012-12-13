@@ -171,6 +171,11 @@ class EQCatalog:
 			return self.eq_list.__getitem__(item)
 		elif isinstance(item, slice):
 			return EQCatalog(self.eq_list.__getitem__(item), name=self.name + " %s" % item)
+		elif isinstance(item, (list, numpy.ndarray)):
+			eq_list = []
+			for index in item:
+				eq_list.append(self.eq_list[index])
+			return EQCatalog(eq_list, name=self.name + " %s" % item)
 
 	def timespan(self):
 		"""
@@ -1867,6 +1872,15 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
+
+		:return:
+			Tuple mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
+			mainshock_catalog: instance of class:`EQCatalog` containing main shocks
+			foreshock_catalog: instance of class:`EQCatalog` containing foreshocks
+			aftershock_catalog: instance of class:`EQCatalog` containing aftershocks
+			cluster_catalog: list with instances of class:`EQCatalog` containing
+				earthquakes belonging to the different clusters. The first element
+				in this list represents earthquakes that do not belong to any cluster
 		"""
 		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.declustering import afteran_decluster, gardner_knopoff_decluster
 
@@ -1881,17 +1895,23 @@ class EQCatalog:
 		for i, eq in enumerate(self):
 			M = eq.get_M(Mtype, Mrelation)
 			eq_matrix[i,:] = (eq.datetime.year, eq.datetime.month, eq.datetime.day, eq.lon, eq.lat, M)
-		cluster_vector, main_shock_catalog, flag_vector = decluster_func(eq_matrix, window_opt, decluster_param)
+		cluster_vector, mainshock_matrix, flag_vector = decluster_func(eq_matrix, window_opt, decluster_param)
 
-		# TODO: return value should be EQCatalog with declustered catalog, and
-		# EQCatalog with clustered events (either all together, or one for each
-		# cluster.
-		print len(eq_matrix)
-		print len(cluster_vector), len(main_shock_catalog), len(flag_vector)
-		print len(np.where(cluster_vector != 0.)[0]), len(np.where(flag_vector != 0.)[0])
-		for i in range(len(eq_matrix)):
-			if flag_vector[i] != 0:
-				print i, cluster_vector[i], flag_vector[i]
+		## cluster_vector: cluster number of each earthquake
+		## main_shock_matrix: 2-D matrix containing only mainshocks
+		## flag_vector: -1 = foreshock, 0 = mainshock, 1 = aftershock
+
+		mainshock_catalog = self.__getitem__(numpy.where(flag_vector == 0)[0])
+		foreshock_catalog = self.__getitem__(numpy.where(flag_vector == -1)[0])
+		aftershock_catalog = self.__getitem__(numpy.where(flag_vector == 1)[0])
+		cluster_catalogs = []
+		cluster_IDs = set(cluster_vector)
+		for cluster_ID in cluster_IDs:
+			cluster_catalog = self.__getitem__(numpy.where(cluster_vector == cluster_ID)[0])
+			cluster_catalogs.append(cluster_catalog)
+
+		return mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
+
 
 	def plot_3d(self, limits=None, Mtype=None, relation=None):
 		"""
@@ -1929,6 +1949,7 @@ class EQCatalog:
 		fig.colorbar(p)
 		## plot
 		plt.show()
+
 
 EQCollection = EQCatalog
 
@@ -2105,7 +2126,7 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MS", Mrelation=None):
 	"""
 	Read ROB local earthquake catalog from txt file.
-	
+
 	:param filespec:
 		String, defining filespec of a txt file with columns defining at least
 		the attributes id, year, month, day, hours, minutes, seconds, longitude,
@@ -2116,7 +2137,7 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	:param skiprows:
 		Integer, defining number of lines to skip at top of file (default: 0).
 		To be used when header is present.
-	
+
 	See method EQCatalog.read_catalogSQL for other params.
 	"""
 	eq_list_txt = np.loadtxt(filespec, skiprows=skiprows)
