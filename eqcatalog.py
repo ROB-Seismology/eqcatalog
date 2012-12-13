@@ -171,7 +171,7 @@ class EQCatalog:
 			return self.eq_list.__getitem__(item)
 		elif isinstance(item, slice):
 			return EQCatalog(self.eq_list.__getitem__(item), name=self.name + " %s" % item)
-		elif isinstance(item, (list, numpy.ndarray)):
+		elif isinstance(item, (list, np.ndarray)):
 			eq_list = []
 			for index in item:
 				eq_list.append(self.eq_list[index])
@@ -226,6 +226,20 @@ class EQCatalog:
 		elif Mtype.upper() == "MW":
 			Mags = [eq.get_MW(relation=relation) for eq in self]
 		return np.array(Mags)
+
+	def get_magnitude_uncertainties(self, min_uncertainty=0.3):
+		"""
+		Return array with magnitude uncertainties
+
+		:param min_uncertainty:
+			Float, minimum uncertainty that will be used to replace zero values
+
+		:return:
+			1-D numpy float array, magnitude uncertainties
+		"""
+		Mag_uncertainties = np.array([eq.errM for eq in self])
+		Mag_uncertainties[np.where(Mag_uncertainties == 0)] = min_uncertainty
+		return Mag_uncertainties
 
 	def get_depths(self):
 		"""
@@ -339,6 +353,15 @@ class EQCatalog:
 		"""
 		return self.lon_minmax() + self.lat_minmax()
 
+	def get_Mmax(self, Mtype="MS", relation=None):
+		"""
+		Compute maximum magnitude in catalog
+
+		:return:
+			Float, maximum observed magnitude
+		"""
+		return self.get_magnitudes(Mtype, relation).max()
+
 	def get_M0(self, Mrelation={"MS": "bungum", "ML": "hinzen"}):
 		"""
 		Compute total seismic moment.
@@ -437,7 +460,7 @@ class EQCatalog:
 
 		return EQCollection(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (subselect)")
 
-	def subselect_completeness(self, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None):
+	def subselect_completeness(self, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		completeness criterion.
@@ -450,6 +473,8 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
+		:param verbose:
+			Bool, whether or not some info should be printed (default: True)
 
 		:return:
 			instance of :class:`EQCatalog`
@@ -464,9 +489,12 @@ class EQCatalog:
 			if M >= completeness.get_completeness_magnitude(eq.datetime.year):
 				eq_list.append(eq)
 
+		if verbose:
+			print "Number of events constrained by completeness criteria: %d out of %d" % (len(eq_list), len(self.eq_list))
+
 		return EQCollection(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (completeness-constrained)")
 
-	def bin_mag(self, Mmin, Mmax, dM=0.2, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, trim=False, verbose=False):
+	def bin_mag(self, Mmin, Mmax, dM=0.2, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None):
 		"""
 		Bin all earthquake magnitudes in catalog according to specified magnitude interval.
 
@@ -486,22 +514,14 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param trim:
-			Bool, whether empty bins at start and end should be trimmed
-			(default: False)
 		#:param large_eq_correction: (M, corr_factor) tuple, with M the lower magnitude for which to apply corr_factor
 		#	This is to correct the frequency of large earthquakes having a return period which is longer
 		#	than the catalog length
-		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
 
 		:return:
-			Tuple (bins_N, bins_Mag, bins_Years, num_events, Mmax_obs)
+			Tuple (bins_N, bins_Mag)
 			bins_N: array containing number of earthquakes for each magnitude interval
 			bins_Mag: array containing lower magnitude of each interval
-			bins_timespans: array containing time span (in years) for each magnitude interval
-			num_events: total number of events selected
-			Mmax_obs: maximum observed magnitude in analyzed collection
 		"""
 		## Set lower magnitude to lowermost threshold magnitude possible
 		if completeness:
@@ -520,62 +540,160 @@ class EQCatalog:
 		else:
 			Mags = self.get_magnitudes(Mtype, Mrelation)
 		num_events = len(Mags)
-		if num_events > 0:
-			Mmax_obs = max(Mags)
-		else:
-			Mmax_obs = 0
-		if verbose:
-			print "Number of events constrained by completeness criteria: %d out of %d" % (num_events, len(self.eq_list))
-			print "Mmax observed: %.1f" % Mmax_obs
 
 		## Compute number of earthquakes per magnitude bin
 		bins_N, bins_Mag = np.histogram(Mags, bins_Mag)
 		bins_Mag = bins_Mag[:-1]
 
+		return bins_N, bins_Mag
+
+	def get_completeness_years(self, magnitudes, completeness=Completeness_Rosset):
+		"""
+		Compute year of completeness for list of magnitudes
+
+		:param magnitudes:
+			list or numpy array, magnitudes
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes. If None, use start year of
+			catalog (default: completeness_Rosset)
+
+		:return:
+			numpy float array, completeness years
+		"""
 		## Calculate year of completeness for each magnitude interval
 		if completeness:
-			bins_Years = []
-			for M in bins_Mag:
+			completeness_years = []
+			for M in magnitudes:
 				start_year = max(self.start_date.year, completeness.get_completeness_year(M))
-				bins_Years.append(start_year)
+				completeness_years.append(start_year)
 		else:
-			bins_Years = [self.start_date.year] * len(bins_Mag)
-		bins_Years = np.array(bins_Years, 'd')
-		#for M, year in zip(bins_Mag, bins_Years):
-		#	print M, year
+			completeness_years = [self.start_date.year] * len(magnitudes)
+		completeness_years = np.array(completeness_years, 'f')
+		return completeness_years
 
-		## Compute time spans for each magnitude bin
-		bins_timespans = np.array([(self.end_date - datetime.date(int(start_year),1,1)).days / 365.25 + 1 for start_year in bins_Years])
+	def get_completeness_timespans(self, magnitudes, completeness=Completeness_Rosset):
 		"""
-		## Correction factor for large magnitudes with return period > catalog duration
-		if large_eq_correction:
-			Mcorr, corr_factor = large_eq_correction
-			try:
-				corr_index = list(bins_Mag).index(float(Mcorr))
-			except:
-				print "Magnitude for frequency correction must be multiple of binning interval (%.1f)" % dM
-			else:
-				for i in range (corr_index, len(bins_Years)):
-					bins_timespans[i] *= corr_factor
-		"""
+		Compute completeness timespans for list of magnitudes
 
-		## Optionally, trim empty leading and trailing intervals
+		:param magnitudes:
+			list or numpy array, magnitudes
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes. If None, use start year of
+			catalog (default: completeness_Rosset)
+
+		:return:
+			numpy float array, completeness timespans (fractional years)
+		"""
+		completeness_years = self.get_completeness_years(magnitudes, completeness)
+		completeness_timespans = [(self.end_date - datetime.date(int(start_year),1,1)).days / 365.25 + 1 for start_year in completeness_years]
+		return np.array(completeness_timespans)
+
+	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+		"""
+		Compute incremental magnitude-frequency distribution.
+
+		:param Mmin:
+			Float, minimum magnitude to bin
+		:param Mmax:
+			Float, maximum magnitude to bin
+		:param dM:
+			Float, magnitude interval
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: Completeness_Rosset)
+		:param trim:
+			Bool, whether empty bins at start and end should be trimmed
+			(default: False)
+
+		:return:
+			Tuple (bins_N_incremental, bins_Mag)
+			bins_N_incremental: incremental annual occurrence rates
+			bins_Mag: left edges of magnitude bins
+		"""
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness)
+		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
+
+		bins_N_incremental = bins_N / bins_timespans
+
+		## Optionally, trim empty trailing intervals
 		if trim:
-			non_zero_indexes = np.where(bins_N > 0)[0]
-			start = non_zero_indexes[0]
-			end = non_zero_indexes[-1] + 1
-			bins_N = bins_N[start:end]
-			bins_Mag = bins_Mag[start:end]
-			bins_Years = bins_Years[start:end]
-			bins_timespans = bins_timespans[start:end]
+			last_non_zero_index = np.where(bins_N > 0)[0][-1]
+			bins_N_incremental = bins_N_incremental[:last_non_zero_index+1]
+			bins_Mag = bins_Mag[:last_non_zero_index+1]
 
-		if verbose:
-			print "Mmin   N   Ncumul  Years"
-			for M, N, Ncumul, Years in zip (bins_Mag, bins_N, np.add.accumulate(bins_N[::-1])[::-1], bins_Years):
-				print "%.2f  %3d   %3d   %4d" % (M, N, Ncumul, Years)
-			print
+		return bins_N_incremental, bins_Mag
 
-		return (bins_N, bins_Mag, bins_timespans, num_events, Mmax_obs)
+	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+		"""
+		Compute incremental magnitude-frequency distribution.
+
+		:param Mmin:
+			Float, minimum magnitude to bin
+		:param Mmax:
+			Float, maximum magnitude to bin
+		:param dM:
+			Float, magnitude interval
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: Completeness_Rosset)
+		:param trim:
+			Bool, whether empty bins at start and end should be trimmed
+			(default: False)
+
+		:return:
+			instance of nhlib :class:`EvenlyDiscretizedMFD`
+		"""
+		import nhlib
+		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
+		return nhlib.mfd.EvenlyDiscretizedMFD(Mmin, dM, list(bins_N_incremental))
+
+	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+		"""
+		Compute cumulative magnitude-frequency distribution.
+
+		:param Mmin:
+			Float, minimum magnitude to bin
+		:param Mmax:
+			Float, maximum magnitude to bin
+		:param dM:
+			Float, magnitude interval
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: Completeness_Rosset)
+		:param trim:
+			Bool, whether empty bins at start and end should be trimmed
+			(default: False)
+
+		:return:
+			Tuple (bins_N_cumulative, bins_Mag)
+			bins_N_incremental: cumulative annual occurrence rates
+			bins_Mag: left edges of magnitude bins
+		"""
+		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim)
+		## Reverse arrays for calculating cumulative number of events
+		bins_N_incremental = bins_N_incremental[::-1]
+		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
+		return bins_N_cumulative[::-1], bins_Mag
 
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, fig_filespec=None, verbose=False):
 		"""
@@ -602,7 +720,7 @@ class EQCatalog:
 		:param verbose:
 			Bool, whether or not to print binning information (default: False)
 		"""
-		bins_N, bins_Mag, bins_timespans, num_events, Mmax_obs = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
 		pylab.bar(bins_Mag, bins_N, width=dM)
 		pylab.xlabel("Magnitude (%s)" % Mtype)
 		pylab.ylabel("Number of events")
@@ -922,7 +1040,7 @@ class EQCatalog:
 		"""
 		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		hours = np.array([eq.get_fractional_hour() for eq in subcatalog])
-		bins_Hr = numpy.arange(25)
+		bins_Hr = np.arange(25)
 		bins_N, junk = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
@@ -1125,7 +1243,7 @@ class EQCatalog:
 			Mmax_obs: maximum observed magnitude in analyzed collection
 			Note that order of arrays is reversed with respect to Mbin !
 		"""
-		bins_N, bins_Mag, bins_Years, num_events, Mmax_obs = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
 		## Chop off last element of bins_Mag, as it is not a lower bin value
 		bins_Mag = bins_Mag[:-1]
 		## We need to normalize n values to maximum time span !
@@ -1184,11 +1302,11 @@ class EQCatalog:
 		"""
 		Compute exponential form of truncated GR
 		"""
-		#beta = b * math.log(10)
+		#beta = b * np.log(10)
 		#bins_N_cumul_log = a - b * bins_Mag
 		#bins_N_cumul = 10 ** bins_N_cumul_log
 		#bins_N_cumul_mle_ln = np.log(bins_N_cumul * np.exp(-beta * bins_Mag) * (1. - np.exp(-(Mmax - bins_Mag))))
-		#return bins_N_cumul_mle_ln / math.log(10)
+		#return bins_N_cumul_mle_ln / np.log(10)
 		Mmin = min(bins_Mag)
 		alpha, beta, lamda = alphabetalambda(a, b, Mmin)
 		bins_N_cumul_mle = lamda * (np.exp(-beta*bins_Mag) - np.exp(-beta*Mmax)) / (np.exp(-beta*Mmin) - np.exp(-beta*Mmax))
@@ -1224,7 +1342,7 @@ class EQCatalog:
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation (mle).
 		Adapted from calB.m and calBfixe.m Matlab modules written by Philippe Rosset (ROB, 2004),
-		which is based on the method by Weichert, 1980 (BSSA, 70, N°4, 1337-1346).
+		which is based on the method by Weichert, 1980 (BSSA, 70, Nr 4, 1337-1346).
 		Parameters:
 			Required:
 				Mmin: minimum magnitude to use for binning
@@ -1254,7 +1372,8 @@ class EQCatalog:
 			This regression depends very strongly on the Mmax specified. Empty bins are taken into account.
 			It is therefore important to specify Mmax not larger than the evaluated Mmax for the specific area.
 		"""
-		bins_N, bins_Mag, bins_Years, num_events, Mmax_obs = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=False, verbose=verbose)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness)
+		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 		bins_Mag += dM/2.0
 
 		if not beta:
@@ -1274,9 +1393,9 @@ class EQCatalog:
 			for k in range(len(bins_N)):
 				SNM += bins_N[k] * bins_Mag[k]
 				NKNOUT += bins_N[k]
-				TJEXP = bins_Years[k] * math.exp(-BETA * bins_Mag[k])
+				TJEXP = bins_timespans[k] * np.exp(-BETA * bins_Mag[k])
 				TMEXP = TJEXP * bins_Mag[k]
-				SUMEXP += math.exp(-BETA * bins_Mag[k])
+				SUMEXP += np.exp(-BETA * bins_Mag[k])
 				STMEX += TMEXP
 				SUMTEX += TJEXP
 				STM2X += bins_Mag[k] * TMEXP
@@ -1294,20 +1413,20 @@ class EQCatalog:
 					BETA -= DLDB/D2LDB2
 			#i += 1
 
-		STDBETA = math.sqrt(-1.0/D2LDB2)
-		B = BETA / math.log(10)
-		STDB = STDBETA / math.log(10)
+		STDBETA = np.sqrt(-1.0/D2LDB2)
+		B = BETA / np.log(10)
+		STDB = STDBETA / np.log(10)
 		FNGTMO = NKNOUT * SUMEXP / SUMTEX
-		STDFNGTMO = math.sqrt(FNGTMO/NKNOUT)
-		#A = math.log10(FNGTMO) + B*bins_Mag[0]
-		A = math.log10(FNGTMO) + B*(bins_Mag[0] - dM/2.0)
-		STDA = math.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((math.log(10)**2 * math.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*math.log(10))))))
-		#STDA = math.sqrt(abs(A)/NKNOUT)
-		ALPHA = FNGTMO * math.exp(-BETA * (bins_Mag[0] - dM/2.0))
-		STDALPHA = ALPHA / math.sqrt(NKNOUT)
+		STDFNGTMO = np.sqrt(FNGTMO/NKNOUT)
+		#A = np.log10(FNGTMO) + B*bins_Mag[0]
+		A = np.log10(FNGTMO) + B*(bins_Mag[0] - dM/2.0)
+		STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
+		#STDA = np.sqrt(abs(A)/NKNOUT)
+		ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
+		STDALPHA = ALPHA / np.sqrt(NKNOUT)
 		if Mc !=None:
-			LAMBDA_Mc = FNGTMO * math.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
-			STD_LAMBDA_Mc = math.sqrt(LAMBDA_Mc / NKNOUT)
+			LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
+			STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKNOUT)
 		if verbose:
 			print "Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)" % (A, STDA, B, STDB, BETA, STDBETA)
 		if Mc != None:
@@ -1840,6 +1959,8 @@ class EQCatalog:
 		:return:
 			instance of :class:`Completeness`
 		"""
+		# TODO: determine sensible default values for dt and ttol
+
 		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.completeness import stepp_analysis
 		subcatalog = self.subselect(Mmin=Mmin, Mtype=Mtype, Mrelation=Mrelation)
 		years = self.get_years()
@@ -1901,16 +2022,56 @@ class EQCatalog:
 		## main_shock_matrix: 2-D matrix containing only mainshocks
 		## flag_vector: -1 = foreshock, 0 = mainshock, 1 = aftershock
 
-		mainshock_catalog = self.__getitem__(numpy.where(flag_vector == 0)[0])
-		foreshock_catalog = self.__getitem__(numpy.where(flag_vector == -1)[0])
-		aftershock_catalog = self.__getitem__(numpy.where(flag_vector == 1)[0])
+		mainshock_catalog = self.__getitem__(np.where(flag_vector == 0)[0])
+		foreshock_catalog = self.__getitem__(np.where(flag_vector == -1)[0])
+		aftershock_catalog = self.__getitem__(np.where(flag_vector == 1)[0])
 		cluster_catalogs = []
 		cluster_IDs = set(cluster_vector)
 		for cluster_ID in cluster_IDs:
-			cluster_catalog = self.__getitem__(numpy.where(cluster_vector == cluster_ID)[0])
+			cluster_catalog = self.__getitem__(np.where(cluster_vector == cluster_ID)[0])
 			cluster_catalogs.append(cluster_catalog)
 
 		return mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
+
+	def analyse_Mmax(self, method='Cumulative_Moment', num_bootstraps=100, iteration_tolerance=None, maximum_iterations=100, num_samples=20, Mtype="MW", Mrelation=None):
+		"""
+		Statistical analysis of maximum magnitude.
+		This method is a wrapper for meth:`maximum_magnitude_analysis`
+		in the OQhazard modeller's toolkit.
+
+		:param method:
+			String, either 'Kijko_Npg' or 'Cumulative_Moment'
+			(default: 'Cumulative_Moment')
+		:param num_bootstraps:
+			Int, number of samples for bootstrapping (only applies to
+			'Cumulative_Moment' method) (default: 100)
+		:param iteration_tolerance:
+			Float, integral tolerance (only applies to 'Kijko_Npg' method)
+			(default: None)
+		:param maximum_iterations:
+			Int, maximum number of iterations (only applies to 'Kijko_Npg' method)
+			(default: 100)
+		:param num_samples:
+			Int, number of sampling points of integral function (only applies to
+			'Kijko_Npg' method) (default: 20)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			Tuple (Mmax, Mmax_sigma)
+		"""
+		# TODO: determine sensible default values
+		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.maximum_magnitude import maximum_magnitude_analysis
+
+		years = self.get_years()
+		Mags = self.get_magnitudes(Mtype, Mrelation)
+		Mag_uncertainties = self.get_magnitude_uncertainties(min_uncertainty=0.3)
+		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
+		return Mmax, Mmax_sigma
 
 
 	def plot_3d(self, limits=None, Mtype=None, relation=None):
@@ -2286,9 +2447,9 @@ def alphabetalambda(a, b, M0):
 	Return value:
 		(alpha, beta, lambda) tuple
 	"""
-	alpha = a * math.log(10)
-	beta = b * math.log(10)
-	lambda0 = math.exp(alpha - beta*M0)
+	alpha = a * np.log(10)
+	beta = b * np.log(10)
+	lambda0 = np.exp(alpha - beta*M0)
 	# This is identical
 	# lambda0 = 10**(a - b*M0)
 	return (alpha, beta, lambda0)
@@ -2313,7 +2474,7 @@ def distribute_avalues(zones, catalog, M=0):
 	weights = [weight / sum_weights for weight in weights]
 
 	for zone, weight in zip(zones, weights):
-		zone.a_new = math.log10(10**zone.a + weight*N_diff)
+		zone.a_new = np.log10(10**zone.a + weight*N_diff)
 		print "%s - a: %.3f  ->  %.3f" % (zone.name, zone.a, zone.a_new)
 
 	N_zones = 0
@@ -2326,7 +2487,7 @@ def split_avalues(a, weights):
 	N = 10**a
 	avalues = []
 	for w in weights:
-		aw = math.log10(w*N)
+		aw = np.log10(w*N)
 		avalues.append(aw)
 	return avalues
 

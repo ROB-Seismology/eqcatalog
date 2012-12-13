@@ -43,7 +43,7 @@ class LocalEarthquake:
 	:param name:
 		String, name of location
 	"""
-	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None):
+	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0.):
 		self.ID = ID
 		self.datetime = datetime.datetime.combine(date, time)
 		self.lon = lon
@@ -82,6 +82,10 @@ class LocalEarthquake:
 		self.name = name
 		self.intensity_max = intensity_max
 		self.macro_radius = macro_radius
+		self.errh = errh
+		self.errz = errz
+		self.errt = errt
+		self.errM = errM
 
 	def get_ML(self, relation=None):
 		"""

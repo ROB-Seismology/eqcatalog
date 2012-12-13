@@ -112,7 +112,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 	query = 'SELECT id_earth, DATE_FORMAT(date, "%Y-%m-%d") as date, TIME_FORMAT(time, "%H:%i:%s") as time,'
 	query += ' longitude, latitude, depth, ML, MS, MW,'
 	query += ' IF(MW, MW, IF(MS, MS, ML)) as M,'
-	query += ' intensity_max, macro_radius,'
+	query += ' intensity_max, macro_radius, errh, errz, errt, errM,'
 	query += ' name from earthquakes'
 	query += ' Where '
 	if id_earth:
@@ -166,6 +166,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		depth = rec["depth"]
 		ML, MS, MW, M = rec["ML"], rec["MS"], rec["MW"], rec["M"]
 		intensity_max, macro_radius = rec["intensity_max"], rec["macro_radius"]
+		errh, errz, errt, errM = rec["errh"], rec["errz"], rec["errt"], rec["errM"]
 
 		if name == lon == lat == depth == ML == None:
 			continue
@@ -198,8 +199,16 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 				intensity_max = 0
 			if macro_radius == None:
 				macro_radius = 0
+			if errh == None:
+				errh = 0.
+			if errz == None:
+				errz = 0.
+			if errt == None:
+				errt = 0.
+			if errM == None:
+				errM = 0.
 
-		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, ML, MS, MW, name, intensity_max, macro_radius)
+		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, ML, MS, MW, name, intensity_max, macro_radius, errh, errz, errt, errM)
 		eq_list.append(eq)
 
 	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
