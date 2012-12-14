@@ -77,6 +77,9 @@ class Completeness:
 		self.min_years = np.array(min_years)
 		self.min_mags = np.array(min_mags)
 
+	def __len__(self):
+		return len(self.min_years)
+
 	def __str__(self):
 		s = "\n".join(["%d, %.2f" % (year, mag) for (year, mag) in zip(self.min_years, self.min_mags)])
 		return s
@@ -115,6 +118,21 @@ class Completeness:
 			return None
 		else:
 			return self.min_years[index]
+
+	def to_table(self, Mmax=None):
+		"""
+		Convert to a 2-D completeness table
+		"""
+		n = len(self)
+		if Mmax and Mmax > self.min_mags.max():
+			n += 1
+		table = np.zeros((n, 2), 'f')
+		table[:len(self),0] = self.min_years[::-1]
+		table[:len(self),1] = self.min_mags[::-1]
+		if Mmax and Mmax > self.min_mags.max():
+			table[-1,0] = self.min_years.min()
+			table[-1,1] = Mmax
+		return table
 
 
 ## NOTE: I think threshold magnitudes should be a multiple of dM (or dM/2)!
@@ -657,9 +675,9 @@ class EQCatalog:
 		:return:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
-		import nhlib
+		import mfd
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
-		return nhlib.mfd.EvenlyDiscretizedMFD(Mmin, dM, list(bins_N_incremental))
+		return mfd.EvenlyDiscretizedMFD(Mmin, dM, list(bins_N_incremental))
 
 	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
 		"""
@@ -1331,6 +1349,8 @@ class EQCatalog:
 			b: b value (slope, taken positive)
 			r: correlation coefficient
 		"""
+		# TODO: constrained regression with fixed b
+		# TODO: see also numpy.linalg.lstsq
 		bins_N_cumul_log, bins_N_disc_log, bins_Mag, bins_Years, num_events, Mmax_obs = self.LogMagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=False)
 		b, a, r, ttprob, stderr = stats.linregress(bins_Mag, bins_N_cumul_log)
 		## stderr = standard error on b?
@@ -1338,39 +1358,73 @@ class EQCatalog:
 			print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
 		return (a, -b, r)
 
-	def calcGR_mle(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
+	def calcGR_MLE(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
 		"""
-		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation (mle).
+		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning (ignored)
+		:param Mmax:
+			Float, maximum magnitude to use for binning (ignored)
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: Completeness_Rosset)
+		:param bval:
+			Float, fixed b value to constrain MLE estimation (ignored)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
+		:return:
+			Tuple (a, b, stdb)
+			- a: a value
+			- b: b value
+			- stdb: standard deviation on b value
+		"""
+		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+
+	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
+		"""
+		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
+		for variable observation periods for different magnitude increments.
 		Adapted from calB.m and calBfixe.m Matlab modules written by Philippe Rosset (ROB, 2004),
 		which is based on the method by Weichert, 1980 (BSSA, 70, Nr 4, 1337-1346).
-		Parameters:
-			Required:
-				Mmin: minimum magnitude to use for binning
-				Mmax: maximum magnitude to use for binning
-				dM: magnitude interval to use for binning
-			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MS"
-				completeness: Completeness object with initial years of completeness and corresponding
-					minimum magnitudes, defaults to Completeness_Rosset
-				beta: fixed beta (= b * ln(10)) value to use for calculating a, defaults to None
-				Mc: cutoff magnitude = magnitude for which to calculate lambda (defaults to None)
-				verbose: boolean indicating whether some messages should be printed or not, defaults to False
-		Return value:
-			if Mc == None:
-				(A, B, BETA, STDA, STDB, STDBETA) tuple
-			else:
-				(A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc) tuple
-			A: a value (intercept)
-			B: b value (slope, taken positive)
-			BETA: beta value (= b * ln(10))
-			LAMBDA_Mc : lambda for cutoff magnitude Mc
-			STDA: standard error on a value
-			STDB: standard error on b value
-			STDBETA: standard error on beta value
-			STD_LAMBDA_Mc: standard error on lambda_Mc
-		IMPORTANT NOTE:
-			This regression depends very strongly on the Mmax specified. Empty bins are taken into account.
-			It is therefore important to specify Mmax not larger than the evaluated Mmax for the specific area.
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: Completeness_Rosset)
+		:param bval:
+			Float, fixed b value to constrain MLE estimation (default: None)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
+		:return:
+			Tuple (a, b, stdb)
+			- a: a value
+			- b: b value
+			- stdb: standard deviation on b value
+
+		Note:
+		This regression depends on the Mmax specified, as empty magnitude bins
+		are taken into account. It is therefore important to specify Mmax as
+		the evaluated Mmax for the specific region or source.
 		"""
 		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
@@ -1383,7 +1437,7 @@ class EQCatalog:
 			## Fixed beta
 			BETA = bval * np.log(10)
 		BETL = 0
-		while(abs(BETA-BETL)) >= 0.0001:
+		while(np.abs(BETA-BETL)) >= 0.0001:
 			#print BETA
 
 			SNM = 0.0
@@ -1407,7 +1461,6 @@ class EQCatalog:
 
 			try:
 				DLDB = STMEX / SUMTEX
-			#if np.isnan(DLDB):
 			except:
 				break
 			else:
@@ -1421,26 +1474,43 @@ class EQCatalog:
 		B = BETA / np.log(10)
 		STDB = STDBETA / np.log(10)
 		FNGTMO = NKOUNT * SUMEXP / SUMTEX
+		## Note: Not sure if the sign for BETA in Weichert's formula for FN0 is correct
 		FN0 = FNGTMO * np.exp(BETA * bins_Mag[0] - dM/2.0)
 		FLGN0 = np.log10(FN0)
-		A = FLGN0
-		#A = np.log10(FNGTMO) + B*(bins_Mag[0] - dM/2.0)
+		## Note: I would expect that the a value corresponds to FLGN0
+		## but it does not seem to be entirely correct
+		## (checked by computing 10 ** (A - B * 5.), which should correspond to FN5
+		## So, either FLGN0 or FN5 is incorrect...
+		#A = FLGN0
+		## Note: the following formula comes from Philippe Rosset's program
+		A = np.log10(FNGTMO) + B * (bins_Mag[0] - dM/2.0)
+
+		if verbose:
+			FN5 = FNGTMO * np.exp(-BETA * (5. - (bins_Mag[0] - dM/2.0)))
+			STDFN5 = FN5 / np.sqrt(NKOUNT)
+			print("Maximum-likelihood estimation (Weichert)")
+			print("BETA=%.3f +/- %.3f; B=%.3f +/- %.3f" % (BETA, STDBETA, B, STDB))
+			print("Total number of events: %d" % NKOUNT)
+			print("LOG(annual rate above M0): %.3f" % FLGN0)
+			print("Annual rate above M5: %.3f +/- %.3f" % (FN5, STDFN5))
+
+		## Other parameters computed in previous versions of this method
 		#STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
 		#STDA = np.sqrt(abs(A)/NKOUNT)
-		"""
 		ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
-		print ALPHA, BETA
-		STDALPHA = ALPHA / np.sqrt(NKOUNT)
-		if Mc !=None:
-			LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
-			STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
-		if verbose:
-			print "Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)" % (A, STDA, B, STDB, BETA, STDBETA)
-		if Mc != None:
-			return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
-		else:
-			return (A, B, BETA, STDA, STDB, STDBETA)
-		"""
+		print ALPHA
+		#print ALPHA, BETA
+		#STDALPHA = ALPHA / np.sqrt(NKOUNT)
+		#if Mc !=None:
+		#	LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
+		#	STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
+		#if verbose:
+		#	print "Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)" % (A, STDA, B, STDB, BETA, STDBETA)
+		#if Mc != None:
+		#	return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
+		#else:
+		#	return (A, B, BETA, STDA, STDB, STDBETA)
+
 		return A, B, STDB
 
 	def plot_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", cumul=True, discrete=False, completeness=Completeness_Rosset, Mrange=(), Freq_range=(), fixed_beta=None, num_sigma=0, lang="en", color=True, want_lsq=True, want_completeness_limits=False, want_exponential=False, title=None, fig_filespec=None, fig_width=0, dpi=300, verbose=False):
@@ -1604,7 +1674,7 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def export_ZMAP(self, filespec, Mtype="MS"):
+	def export_ZMAP(self, filespec, Mtype="MS", Mrelation=None):
 		"""
 		Export earthquake list to ZMAP format (ETH Zürich).
 		Parameters:
@@ -1615,12 +1685,7 @@ class EQCatalog:
 		"""
 		f = open(filespec, "w")
 		for eq in self.eq_list:
-			if Mtype.upper() == "ML":
-				M = eq.ML
-			elif Mtype.upper() == "MS":
-				M = eq.get_MS()
-			elif Mtype.upper() == "MW":
-				M = eq.get_MW()
+			M = self.get_M(Mtype, Mrelation)
 			f.write("%f  %f  %d  %d  %d  %.1f %.2f %d %d\n" % (eq.lon, eq.lat, eq.datetime.year, eq.datetime.month, eq.datetime.day, M, eq.depth, eq.datetime.hour, eq.datetime.minute))
 		f.close()
 
@@ -2082,6 +2147,55 @@ class EQCatalog:
 		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
 		return Mmax, Mmax_sigma
 
+	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MS", Mrelation=None, completeness=Completeness_Rosset):
+		"""
+		Analyse magnitude-frequency.
+		This method is a wrapper for meth:`recurrence_analysis` in the
+		OQhazard modeller's toolkit.
+
+		:param dM:
+			Float, magnitude bin width (default: 0.1)
+		:param method:
+			String, either "MLE" or "Weichert" (default: "MLE")
+		:param aM:
+			Float, reference magnitude for which a value should be computed
+			(default: 0.)
+		:param dt:
+			Float, time bin width in number of years. Only applies to "Weichert"
+			method (default: 1.)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: Completeness_Rosset)
+
+		:return:
+			Tuple (a, b, stdb)
+			a: a value
+			b: b value
+			stdb: standard deviation on b value
+
+		Note:
+		There seem to be problems with the "Weichert" method:
+		- result does not depend on maximum magnitude (i.e., empty magnitude bins
+			do not influence the result)
+		- the a value computed for aM=0 appears to be wrong (partly fixed by
+			replacing with aM = 0.5)
+		"""
+		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.recurrence import recurrence_analysis
+
+		subcatalog = self.subselect_completeness(completeness, Mtype=Mtype, Mrelation=Mrelation)
+		years = subcatalog.get_years()
+		Mags = subcatalog.get_magnitudes(Mtype, Mrelation)
+		completeness_table = completeness.to_table(Mmax=None)
+		if method == "Weichert" and aM == 0.:
+			aM = dM / 2.
+		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table, dM, method, aM, dt)
+		return np.log10(a), b, stdb
+
 
 	def plot_3d(self, limits=None, Mtype=None, relation=None):
 		"""
@@ -2445,23 +2559,6 @@ def format_zones_CRISIS(zone_model, Mc=3.5, smooth=False, fixed_depth=None):
 		zonetab.Revert()
 	app.SetCoordsys(coordsys)
 
-
-def alphabetalambda(a, b, M0):
-	"""
-	Calculate alpha, beta, lambda from a, b, and M0.
-	Parameters:
-		a: a value of Gutenberg-Richter relation
-		b: b value of Gutenberg-Richter relation
-		M0: threshold magnitude
-	Return value:
-		(alpha, beta, lambda) tuple
-	"""
-	alpha = a * np.log(10)
-	beta = b * np.log(10)
-	lambda0 = np.exp(alpha - beta*M0)
-	# This is identical
-	# lambda0 = 10**(a - b*M0)
-	return (alpha, beta, lambda0)
 
 
 def distribute_avalues(zones, catalog, M=0):
