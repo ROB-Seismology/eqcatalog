@@ -46,7 +46,7 @@ import osr
 
 ## Import ROB modules
 import seismodb
-from thirdparty.recipes.dummyclass import *
+import mfd
 from thirdparty.recipes.my_arange import *
 
 
@@ -76,6 +76,10 @@ class Completeness:
 	def __init__(self, min_years, min_mags):
 		self.min_years = np.array(min_years)
 		self.min_mags = np.array(min_mags)
+		## Make sure ordering is chronologcal
+		if self.min_years[0] > self.min_years[1]:
+			self.min_years = self.min_years[::-1]
+			self.min_mags = self.min_mags[::-1]
 
 	def __len__(self):
 		return len(self.min_years)
@@ -512,7 +516,7 @@ class EQCatalog:
 
 		return EQCollection(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (completeness-constrained)")
 
-	def bin_mag(self, Mmin, Mmax, dM=0.2, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None):
+	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=None):
 		"""
 		Bin all earthquake magnitudes in catalog according to specified magnitude interval.
 
@@ -522,16 +526,16 @@ class EQCatalog:
 			Float, maximum magnitude to bin
 		:param dM:
 			Float, magnitude interval
-
-		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_Rosset)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: None)
+
 		#:param large_eq_correction: (M, corr_factor) tuple, with M the lower magnitude for which to apply corr_factor
 		#	This is to correct the frequency of large earthquakes having a return period which is longer
 		#	than the catalog length
@@ -636,7 +640,7 @@ class EQCatalog:
 			bins_N_incremental: incremental annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 
 		bins_N_incremental = bins_N / bins_timespans
@@ -675,9 +679,8 @@ class EQCatalog:
 		:return:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
-		import mfd
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
-		return mfd.EvenlyDiscretizedMFD(Mmin, dM, list(bins_N_incremental))
+		return mfd.EvenlyDiscretizedMFD(Mmin, dM, list(bins_N_incremental), Mtype=Mtype)
 
 	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
 		"""
@@ -1470,9 +1473,12 @@ class EQCatalog:
 				if not bval:
 					BETA -= DLDB/D2LDB2
 
-		STDBETA = np.sqrt(-1.0/D2LDB2)
 		B = BETA / np.log(10)
-		STDB = STDBETA / np.log(10)
+		if not bval:
+			STDBETA = np.sqrt(-1.0/D2LDB2)
+			STDB = STDBETA / np.log(10)
+		else:
+			STDB = 0
 		FNGTMO = NKOUNT * SUMEXP / SUMTEX
 		## Note: Not sure if the sign for BETA in Weichert's formula for FN0 is correct
 		FN0 = FNGTMO * np.exp(BETA * bins_Mag[0] - dM/2.0)
@@ -1512,6 +1518,72 @@ class EQCatalog:
 		#	return (A, B, BETA, STDA, STDB, STDBETA)
 
 		return A, B, STDB
+
+	def get_estimated_MFD(self, Mmin=None, Mmax=None, dM=0.1, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
+		"""
+		Compute a and b values of Gutenberg Richter relation, and return
+		as TruncatedGRMFD object.
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param method:
+			String, computation method, either "Weichert", "MLE" or "LSQ"
+			(default: "Weichert")
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: Completeness_Rosset)
+		:param bval:
+			Float, fixed b value to constrain MLE estimation (default: None)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
+		:return:
+			instance of :class:`mfd.TruncatedGRMFD`
+		"""
+		calcGR_func = {"Weichert": self.calcGR_Weichert, "MLE": self.calcGR_MLE}[method]
+		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=bval, verbose=verbose)
+		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
+
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, method=None, num_sigma=0, bval=None, verbose=False):
+		mfd_list, labels, colors, styles = [], [], [], []
+		observed_mfd = self.get_incremental_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		mfd_list.append(observed_mfd)
+		labels.append("Observed")
+		colors.append('b')
+		styles.append('o')
+		if method:
+			estimated_mfd = self.get_estimated_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=bval, verbose=verbose)
+			mfd_list.append(estimated_mfd)
+			a, b, stdb = estimated_mfd.a_val, estimated_mfd.b_val, estimated_mfd.b_sigma
+			label = "Estimated (%s): " % method
+			label += "a=%.3f, b=%.3f" % (a, b)
+			if not bval:
+				label += " ($\pm$%.3f)" % stdb
+			labels.append(label)
+			colors.append('r')
+			styles.append('-')
+			if num_sigma and method == "Weichert":
+				sigma_mfd1 = self.get_estimated_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=b+num_sigma*stdb, verbose=verbose)
+				mfd_list.append(sigma_mfd1)
+				labels.append("Estimated $\pm$ %d sigma" % num_sigma)
+				colors.append('r')
+				styles.append('--')
+				sigma_mfd2 = self.get_estimated_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=b-num_sigma*stdb, verbose=verbose)
+				mfd_list.append(sigma_mfd2)
+				labels.append("_nolegend_")
+				colors.append('r')
+				styles.append('--')
+
+		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness)
 
 	def plot_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", cumul=True, discrete=False, completeness=Completeness_Rosset, Mrange=(), Freq_range=(), fixed_beta=None, num_sigma=0, lang="en", color=True, want_lsq=True, want_completeness_limits=False, want_exponential=False, title=None, fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
