@@ -1,3 +1,7 @@
+"""
+This module extends functionality of nhlib.mfd
+"""
+
 import datetime
 import numpy as np
 import pylab
@@ -17,8 +21,23 @@ class MFD:
 
 class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 	def __init__(self, min_mag, bin_width, occurrence_rates, Mtype="MW"):
-		nhlib.mfd.EvenlyDiscretizedMFD.__init__(self, min_mag, bin_width, occurrence_rates)
+		nhlib.mfd.EvenlyDiscretizedMFD.__init__(self, min_mag, bin_width, list(occurrence_rates))
+		self.occurrence_rates = np.array(self.occurrence_rates)
 		self.Mtype = Mtype
+
+	def __div__(self, other):
+		if isinstance(other, (int, float)):
+			occurrence_rates = np.array(self.occurrence_rates) / other
+			return EvenlyDiscretizedMFD(self.min_mag, self.bin_width, list(occurrence_rates), self.Mtype)
+		else:
+			raise TypeError("Divisor must be integer or float")
+
+	def __mul__(self, other):
+		if isinstance(other, (int, float)):
+			occurrence_rates = np.array(self.occurrence_rates) * other
+			return EvenlyDiscretizedMFD(self.min_mag, self.bin_width, list(occurrence_rates), self.Mtype)
+		else:
+			raise TypeError("Divisor must be integer or float")
 
 	@property
 	def max_mag(self):
@@ -33,6 +52,16 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 	def get_cumulative_rates(self):
 		return np.add.accumulate(self.occurrence_rates[::-1])[::-1]
 
+	def divide(self, weights):
+		weights = np.array(weights, dtype='f')
+		weights /= np.add.reduce(weights)
+		mfd_list = []
+		for w in weights:
+			occurrence_rates = np.array(self.occurrence_rates) * w
+			mfd = EvenlyDiscretizedMFD(self.min_mag, self.bin_width, list(occurrence_rates), self.Mtype)
+			mfd_list.append(mfd)
+		return mfd_list
+
 	def plot(self, color='k', label="", completeness=None, title=""):
 		plot_MFD([self], colors=[color], labels=[label], completeness=completeness, title=title)
 
@@ -42,6 +71,22 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		nhlib.mfd.TruncatedGRMFD.__init__(self, min_mag, max_mag, bin_width, a_val, b_val)
 		self.b_sigma = b_sigma
 		self.Mtype = Mtype
+
+	def __div__(self, other):
+		if isinstance(other, (int, float)):
+			N = 10**self.a_val
+			a_val = np.log10(N / float(other))
+			return TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, a_val, self.b_val, self.b_sigma, self.Mtype)
+		else:
+			raise TypeError("Divisor must be integer or float")
+
+	def __mul__(self, other):
+		if isinstance(other, (int, float)):
+			N = 10**self.a_val
+			a_val = np.log10(N * float(other))
+			return TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, a_val, self.b_val, self.b_sigma, self.Mtype)
+		else:
+			raise TypeError("Multiplier must be integer or float")
 
 	@property
 	def occurrence_rates(self):
@@ -66,8 +111,29 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 	def to_evenly_discretized_mfd(self):
 		return EvenlyDiscretizedMFD(self.min_mag, self.bin_width, list(self.occurrence_rates))
 
+	def divide(self, weights):
+		weights = np.array(weights, dtype='f')
+		weights /= np.add.reduce(weights)
+		N = 10**self.a_val
+		avalues = np.log10(weights * N)
+		return [TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, aw, self.b_val, self.b_sigma, self.Mtype) for aw in avalues]
+
 	def plot(self, color='k', label="", completeness=None, title=""):
 		plot_MFD([self], colors=[color], labels=[label], completeness=completeness, title=title)
+
+
+def sum_MFDs(mfd_list, weights=[]):
+	bin_width = min([mfd.bin_width for mfd in mfd_list])
+	for mfd in mfd_list:
+		if mfd.bin_width != bin_width:
+			if isinstance(mfd, TruncatedGRMFD):
+				mfd.bin_width = bin_width
+			else:
+				raise Exception("Bin widths not compatible!")
+	min_mag = min([mfd.min_mag for mfd in mfd_list])
+	max_mag = max([mfd.max_mag for mfd in mfd_list])
+	## If all MFD's are TruncatedGR, and have same min_mag and max_mag,
+	## return TrucatedGR, else return EvenlyDiscretized
 
 
 def plot_MFD(mfd_list, colors=[], styles=[], labels=[], cumul=True, discrete=False, completeness=None, Mrange=(), Freq_range=(), lang="en", want_exponential=False, title="", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
