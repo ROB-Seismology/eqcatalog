@@ -39,6 +39,12 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		else:
 			raise TypeError("Divisor must be integer or float")
 
+	def __add__(self, other):
+		if isinstance(other, (TruncatedGRMFD, EvenlyDiscretizedMFD)):
+			return sum_MFDs([self, other])
+		else:
+			raise TypeError("Operand must be MFD")
+
 	@property
 	def max_mag(self):
 		return self.min_mag + (len(self.occurrence_rates) + 1) * self.bin_width
@@ -61,6 +67,18 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 			mfd = EvenlyDiscretizedMFD(self.min_mag, self.bin_width, list(occurrence_rates), self.Mtype)
 			mfd_list.append(mfd)
 		return mfd_list
+
+	def split(self, M):
+		# TODO: check that M is multiple of bin_width
+		if self.min_mag < M < self.max_mag:
+			index = int(round((M - self.min_mag) / self.bin_width))
+			occurrence_rates1 = list(self.occurrence_rates[:index])
+			occurrence_rates2 = list(self.occurrence_rates[index:])
+			mfd1 = EvenlyDiscretizedMFD(self.min_mag, self.bin_width, occurrence_rates1, self.Mtype)
+			mfd2 = EvenlyDiscretizedMFD(M, self.bin_width, occurrence_rates2, self.Mtype)
+			return [mfd1, mfd2]
+		else:
+			raise Exception("Split magnitude not in valid range!")
 
 	def plot(self, color='k', label="", completeness=None, title=""):
 		plot_MFD([self], colors=[color], labels=[label], completeness=completeness, title=title)
@@ -87,6 +105,12 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 			return TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, a_val, self.b_val, self.b_sigma, self.Mtype)
 		else:
 			raise TypeError("Multiplier must be integer or float")
+
+	def __add__(self, other):
+		if isinstance(other, (TruncatedGRMFD, EvenlyDiscretizedMFD)):
+			return sum_MFDs([self, other])
+		else:
+			raise TypeError("Operand must be MFD")
 
 	@property
 	def occurrence_rates(self):
@@ -118,28 +142,63 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		avalues = np.log10(weights * N)
 		return [TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, aw, self.b_val, self.b_sigma, self.Mtype) for aw in avalues]
 
+	def split(self, M):
+		# TODO: check that M is multiple of bin_width
+		if self.min_mag < M < self.max_mag:
+			mfd1 = TruncatedGRMFD(self.min_mag, M, self.bin_width, self.a_val, self.b_val, self.b_sigma, self.Mtype)
+			mfd2 = TruncatedGRMFD(M, self.max_mag, self.bin_width, self.a_val, self.b_val, self.b_sigma, self.Mtype)
+			return [mfd1, mfd2]
+		else:
+			raise Exception("Split magnitude not in valid range!")
+
 	def plot(self, color='k', label="", completeness=None, title=""):
 		plot_MFD([self], colors=[color], labels=[label], completeness=completeness, title=title)
 
 
 def sum_MFDs(mfd_list, weights=[]):
+	## Note: take care with renormalized weights !
+	if weights in ([], None):
+		weights = np.ones(len(mfd_list), 'f')
+	weights = np.array(weights) / len(mfd_list)
 	bin_width = min([mfd.bin_width for mfd in mfd_list])
+	Mtype = mfd_list[0].Mtype
 	for mfd in mfd_list:
 		if mfd.bin_width != bin_width:
 			if isinstance(mfd, TruncatedGRMFD):
 				mfd.bin_width = bin_width
 			else:
 				raise Exception("Bin widths not compatible!")
-	min_mag = min([mfd.min_mag for mfd in mfd_list])
-	max_mag = max([mfd.max_mag for mfd in mfd_list])
-	## If all MFD's are TruncatedGR, and have same min_mag and max_mag,
+		if mfd.Mtype != Mtype:
+			raise Exception("Magnitude types not compatible!")
+	all_min_mags = set([mfd.min_mag for mfd in mfd_list])
+	all_max_mags = set([mfd.max_mag for mfd in mfd_list])
+	is_truncated = np.array([isinstance(mfd, TruncatedGRMFD) for mfd in mfd_list])
+	## If all MFD's are TruncatedGR, and have same min_mag, max_mag, and b_val
 	## return TrucatedGR, else return EvenlyDiscretized
+	if is_truncated.all():
+		all_bvals = set([mfd.b_val for mfd in mfd_list])
+		all_Mtypes = set([mfd.Mtype for mfd in mfd_list])
+		if len(all_min_mags) == len(all_max_mags) == len(all_bvals) == len(all_Mtypes) == 1:
+			all_avals = np.array([mfd.a_val for mfd in mfd_list])
+			a = np.log10(np.add.reduce(10**all_avals * weights))
+			mfd = mfd_list[0]
+			return TruncatedGRMFD(mfd.min_mag, mfd.max_mag, mfd.bin_width, a, mfd.b_val, mfd.b_sigma, mfd.Mtype)
+	else:
+		min_mag = min(all_min_mags)
+		max_mag = max(all_max_mags)
+		num_bins = int(round((max_mag - min_mag) / bin_width))
+		occurrence_rates = np.zeros(num_bins, 'd')
+		for i, mfd in enumerate(mfd_list):
+			start_index = int(round((mfd.min_mag - min_mag) / bin_width))
+			end_index = start_index + len(mfd.occurrence_rates)
+			occurrence_rates[start_index:end_index] += (mfd.occurrence_rates * weights[i])
+		return EvenlyDiscretizedMFD(min_mag, bin_width, list(occurrence_rates), Mtype)
 
-
-def plot_MFD(mfd_list, colors=[], styles=[], labels=[], cumul=True, discrete=False, completeness=None, Mrange=(), Freq_range=(), lang="en", want_exponential=False, title="", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+def plot_MFD(mfd_list, colors=[], styles=[], labels=[], cumul=True, discrete=False, completeness=None, Mrange=(), Freq_range=(), want_exponential=False, title="", lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 	"""
 	Plot one or more magnitude-frequency distributions
 	"""
+	# TODO: add option to plot discrete / continuous and incremental / cumulative for each MFD
 	if not colors:
 		colors = ("r", "g", "b", "c", "m", "k")
 
