@@ -80,8 +80,64 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		else:
 			raise Exception("Split magnitude not in valid range!")
 
-	def plot(self, color='k', label="", completeness=None, title=""):
-		plot_MFD([self], colors=[color], labels=[label], completeness=completeness, title=title)
+	def extend(self, magnitude_bin_edges, occurrence_rates):
+		"""
+		Extend MFD, e.g. with frequency/ies of characteristic earthquake(s)
+
+		:param magnitude_bin_edges:
+			numpy array, lower magnitudes of each bin
+		:param occurrence_rates:
+			numpy array, annual frequencies (incremental!)
+		"""
+		if len(magnitude_bin_edges) > 1:
+			if magnitude_bin_edges[1] - magnitude_bin_edges[0] != self.bin_width:
+				raise Exception("Bin width not compatible!")
+
+		num_empty_bins = int(round((magnitude_bin_edges[0] - self.max_mag) / self.bin_width)) + 1
+		if num_empty_bins >= 0:
+			self.occurrence_rates = np.concatenate([self.occurrence_rates, np.zeros(num_empty_bins, dtype='d'), occurrence_rates])
+		else:
+			raise Exception("Magnitudes must not overlap with MFD magnitude range")
+
+	def plot(self, color='k', style="o", label="", discrete=True, cumul_or_inc="both", completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
+		"""
+		Plot magnitude-frequency distribution
+
+		:param color:
+			matplotlib color specification (default: 'k')
+		:param style:
+			matplotlib symbol style or line style (default: 'o')
+		:param label:
+			String, plot labels (default: "")
+		:param discrete:
+			Bool, whether or not to plot discrete MFD (default: True)
+		:param cumul_or_inc:
+			String, either "cumul", "inc" or "both", indicating
+			whether to plot cumulative MFD, incremental MFD or both
+			(default: "both")
+		:param completeness:
+			instance of :class:`Completeness`, used to plot completeness
+			limits (default: None)
+		:param Mrange:
+			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
+			(default: ())
+		:param Freq_range:
+			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
+			(Y) axis (default: ())
+		:param title:
+			String, plot title (default: "")
+		:param lang:
+			String, language of plot axis labels (default: "en")
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
+		"""
+		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, title=title)
 
 
 class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
@@ -151,8 +207,50 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		else:
 			raise Exception("Split magnitude not in valid range!")
 
-	def plot(self, color='k', label="", completeness=None, title=""):
-		plot_MFD([self], colors=[color], labels=[label], completeness=completeness, title=title)
+	def extend(self, magnitude_bin_edges, occurrence_rates):
+		mfd = self.to_evenly_discretized_mfd()
+		mfd.extend(magnitude_bin_edges, occurrence_rates)
+		return mfd
+
+	def plot(self, color='k', style="-", label="", discrete=False, cumul_or_inc="cumul", completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
+		"""
+		Plot magnitude-frequency distribution
+
+		:param color:
+			matplotlib color specification (default: 'k')
+		:param style:
+			matplotlib symbol style or line style (default: '-')
+		:param label:
+			String, plot labels (default: "")
+		:param discrete:
+			Bool, whether or not to plot discrete MFD (default: False)
+		:param cumul_or_inc:
+			String, either "cumul", "inc" or "both", indicating
+			whether to plot cumulative MFD, incremental MFD or both
+			(default: "cumul")
+		:param completeness:
+			instance of :class:`Completeness`, used to plot completeness
+			limits (default: None)
+		:param Mrange:
+			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
+			(default: ())
+		:param Freq_range:
+			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
+			(Y) axis (default: ())
+		:param title:
+			String, plot title (default: "")
+		:param lang:
+			String, language of plot axis labels (default: "en")
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
+		"""
+		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, title=title)
 
 
 def sum_MFDs(mfd_list, weights=[]):
@@ -194,11 +292,48 @@ def sum_MFDs(mfd_list, weights=[]):
 			occurrence_rates[start_index:end_index] += (mfd.occurrence_rates * weights[i])
 		return EvenlyDiscretizedMFD(min_mag, bin_width, list(occurrence_rates), Mtype)
 
-def plot_MFD(mfd_list, colors=[], styles=[], labels=[], cumul=True, discrete=False, completeness=None, Mrange=(), Freq_range=(), want_exponential=False, title="", lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_inc=[], completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot one or more magnitude-frequency distributions
+
+	:param mfd_list:
+		List with instance of :class:`EvenlyDiscretizedMFD` or :class:`TruncatedGRMFD`
+	:param colors:
+		List with matplotlib color specifications, one for each mfd
+		(default: [])
+	:param styles:
+		List with matplotlib symbol styles or line styles, one for each mfd
+		(default: [])
+	:param labels:
+		List with plot labels, one for each mfd (default: [])
+	:param discrete:
+		List of bools, whether or not to plot discrete MFD's (default: [])
+	:param cumul_or_inc:
+		List of strings, either "cumul", "inc" or "both", indicating
+		whether to plot cumulative MFD, incremental MFD or both
+		(default: [])
+	:param completeness:
+		instance of :class:`Completeness`, used to plot completeness
+		limits (default: None)
+	:param Mrange:
+		(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
+		(default: ())
+	:param Freq_range:
+		(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
+		(Y) axis (default: ())
+	:param title:
+		String, plot title (default: "")
+	:param lang:
+		String, language of plot axis labels (default: "en")
+	:param fig_filespec:
+		String, full path to output image file, if None plot to screen
+		(default: None)
+	:param fig_width:
+		Float, figure width in cm, used to recompute :param:`dpi` with
+		respect to default figure width (default: 0)
+	:param dpi:
+		Int, image resolution in dots per inch (default: 300)
 	"""
-	# TODO: add option to plot discrete / continuous and incremental / cumulative for each MFD
 	if not colors:
 		colors = ("r", "g", "b", "c", "m", "k")
 
@@ -211,30 +346,79 @@ def plot_MFD(mfd_list, colors=[], styles=[], labels=[], cumul=True, discrete=Fal
 	for i, mfd in enumerate(mfd_list):
 		color = colors[i % len(colors)]
 
-		if isinstance(mfd, EvenlyDiscretizedMFD):
-			## Incremental
-			label = labels[i] + " (incremental)"
+		try:
+			want_discrete = discrete[i]
+		except:
+			if isinstance(mfd, EvenlyDiscretizedMFD):
+				want_discrete = True
+			elif isinstance(mfd, TruncatedGRMFD):
+				want_discrete = False
+
+		try:
+			cumul_or_inc[i]
+		except:
+			if isinstance(mfd, EvenlyDiscretizedMFD):
+				want_cumulative = True
+				want_incremental = True
+			elif isinstance(mfd, TruncatedGRMFD):
+				want_cumulative = True
+				want_incremental = False
+		else:
+			if cumul_or_inc[i] == "cumul":
+				want_cumulative = True
+				want_incremental = False
+			elif cumul_or_inc[i] == "inc":
+				want_cumulative = False
+				want_incremental = True
+			else:
+				want_cumulative = True
+				want_incremental = True
+
+		## Discrete MFD
+		if want_discrete:
 			try:
 				symbol = styles[i]
-			except IndexError:
+			except:
 				symbol = 'o'
-			ax = pylab.semilogy(mfd.get_magnitude_bin_centers(), mfd.occurrence_rates, symbol, label=label)
-			pylab.setp(ax, markersize=10.0, markeredgewidth=1.0, markeredgecolor=color, markerfacecolor="None")
+			else:
+				if symbol in ("", None, "-", "--", ":", ":."):
+					symbol = "o"
 
 			## Cumulative
-			label = labels[i] + " (cumulative)"
-			ax = pylab.semilogy(mfd.get_magnitude_bin_edges(), mfd.get_cumulative_rates(), symbol, label=label)
-			pylab.setp(ax, markersize=10.0, markeredgewidth=1.0, markeredgecolor='k', markerfacecolor=color)
+			if want_cumulative:
+				label = labels[i]
+				if want_incremental:
+					label += " (cumul.)"
+				ax = pylab.semilogy(mfd.get_magnitude_bin_edges(), mfd.get_cumulative_rates(), symbol, label=label)
+				pylab.setp(ax, markersize=10.0, markeredgewidth=1.0, markeredgecolor='k', markerfacecolor=color)
 
-		elif isinstance(mfd, TruncatedGRMFD):
 			## Incremental
-			label = labels[i]
+			if want_incremental:
+				label = labels[i] + " (inc.)"
+				ax = pylab.semilogy(mfd.get_magnitude_bin_centers(), mfd.occurrence_rates, symbol, label=label)
+				pylab.setp(ax, markersize=10.0, markeredgewidth=1.0, markeredgecolor=color, markerfacecolor="None")
+
+		## Continuous MFD
+		else:
 			try:
 				linestyle = styles[i]
 			except:
 				linestyle = "-"
+			else:
+				if linestyle in ("", None) or not linestyle in ("-", "--", ":", ":."):
+					linestyle = "-"
 
-			ax = pylab.semilogy(mfd.get_magnitude_bin_edges(), mfd.get_cumulative_rates(exponentially_tapered=True), color, linestyle=linestyle, lw=2, label=label)
+			## Cumulative
+			if want_cumulative:
+				label = labels[i]
+				if want_incremental:
+					label += " (cumul.)"
+				ax = pylab.semilogy(mfd.get_magnitude_bin_edges(), mfd.get_cumulative_rates(), color, linestyle=linestyle, lw=3, label=label)
+
+			## Incremental
+			if want_incremental:
+				label = labels[i] + " (inc.)"
+				ax = pylab.semilogy(mfd.get_magnitude_bin_centers(), mfd.occurrence_rates, color, linestyle=linestyle, lw=1, label=label)
 
 	if not Mrange:
 		Mrange = pylab.axis()[:2]
