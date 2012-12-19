@@ -90,8 +90,12 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 			numpy array, annual frequencies (incremental!)
 		"""
 		if len(magnitude_bin_edges) > 1:
-			if magnitude_bin_edges[1] - magnitude_bin_edges[0] != self.bin_width:
+			if not np.allclose(magnitude_bin_edges[1] - magnitude_bin_edges[0], self.bin_width):
 				raise Exception("Bin width not compatible!")
+		fgap = (magnitude_bin_edges[0] - self.max_mag) / self.bin_width
+		gap = int(round(fgap))
+		if not np.allclose(fgap, gap):
+			raise Exception("Bin width not compatible!")
 
 		num_empty_bins = int(round((magnitude_bin_edges[0] - self.max_mag) / self.bin_width)) + 1
 		if num_empty_bins >= 0:
