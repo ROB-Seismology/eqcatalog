@@ -199,6 +199,19 @@ class EQCatalog:
 				eq_list.append(self.eq_list[index])
 			return EQCatalog(eq_list, name=self.name + " %s" % item)
 
+	def get_record(self, ID):
+		"""
+		Fetch record with given ID
+
+		:return:
+			instance of :class:`LocalEarthquake`
+		"""
+		events = [rec for rec in self if rec.ID == ID]
+		if len(events) == 1:
+			return events[0]
+		else:
+			return None
+
 	def timespan(self):
 		"""
 		Return total time span of catalog as number of years (not fractional).
@@ -379,6 +392,13 @@ class EQCatalog:
 		"""
 		Compute maximum magnitude in catalog
 
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
 		:return:
 			Float, maximum observed magnitude
 		"""
@@ -501,15 +521,21 @@ class EQCatalog:
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		start_date = datetime.date(min(completeness.min_years), 1, 1)
+		if completeness:
+			start_date = datetime.date(min(completeness.min_years), 1, 1)
+		else:
+			start_date = self.start_date
 		end_date = self.end_date
 
 		## Select magnitudes according to completeness criteria
-		eq_list = []
-		for eq in self.eq_list:
-			M = eq.get_M(Mtype, Mrelation)
-			if M >= completeness.get_completeness_magnitude(eq.datetime.year):
-				eq_list.append(eq)
+		if completeness:
+			eq_list = []
+			for eq in self.eq_list:
+				M = eq.get_M(Mtype, Mrelation)
+				if M >= completeness.get_completeness_magnitude(eq.datetime.year):
+					eq_list.append(eq)
+		else:
+			eq_list = self.eq_list
 
 		if verbose:
 			print "Number of events constrained by completeness criteria: %d out of %d" % (len(eq_list), len(self.eq_list))
@@ -680,7 +706,7 @@ class EQCatalog:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
-		return mfd.EvenlyDiscretizedMFD(Mmin, dM, list(bins_N_incremental), Mtype=Mtype)
+		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
 	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
 		"""
@@ -1553,15 +1579,69 @@ class EQCatalog:
 		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=bval, verbose=verbose)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
 
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, method=None, num_sigma=0, bval=None, verbose=False):
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+		"""
+		Compute GR MFD from observed MFD, and plot result
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param method:
+			String, computation method, either "Weichert", "MLE" or "LSQ"
+			(default: "Weichert")
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: Completeness_Rosset)
+		:param bval:
+			Float, fixed b value to constrain Weichert estimation (default: None)
+		:param num_sigma:
+			Int, number of standard deviations to consider for plotting uncertainty
+			(default: 0)
+		:param color_observed:
+			matplotlib color specification for observed MFD
+		:param color_estimated:
+			matplotlib color specification for estimated MFD
+		:param plot_completeness_limits:
+			Bool, whether or not to plot completeness limits (default: True)
+		:param Mrange:
+			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
+			(default: ())
+		:param Freq_range:
+			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
+			(Y) axis (default: ())
+		:param title:
+			String, plot title (default: "")
+		:param lang:
+			String, language of plot axis labels (default: "en")
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+		"""
 		mfd_list, labels, colors, styles = [], [], [], []
-		observed_mfd = self.get_incremental_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
+		observed_mfd = cc_catalog.get_incremental_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=None)
 		mfd_list.append(observed_mfd)
 		labels.append("Observed")
-		colors.append('b')
+		colors.append(color_observed)
+
 		styles.append('o')
 		if method:
-			estimated_mfd = self.get_estimated_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=bval, verbose=verbose)
+			estimated_mfd = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=None, bval=bval, verbose=verbose)
 			mfd_list.append(estimated_mfd)
 			a, b, stdb = estimated_mfd.a_val, estimated_mfd.b_val, estimated_mfd.b_sigma
 			label = "Estimated (%s): " % method
@@ -1569,21 +1649,26 @@ class EQCatalog:
 			if not bval:
 				label += " ($\pm$%.3f)" % stdb
 			labels.append(label)
-			colors.append('r')
+			colors.append(color_estimated)
 			styles.append('-')
 			if num_sigma and method == "Weichert":
-				sigma_mfd1 = self.get_estimated_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=b+num_sigma*stdb, verbose=verbose)
+				sigma_mfd1 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=None, bval=b+num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd1)
 				labels.append("Estimated $\pm$ %d sigma" % num_sigma)
-				colors.append('r')
-				styles.append('--')
-				sigma_mfd2 = self.get_estimated_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=b-num_sigma*stdb, verbose=verbose)
+				colors.append(color_estimated)
+				styles.append(':')
+				sigma_mfd2 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=None, bval=b-num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd2)
 				labels.append("_nolegend_")
-				colors.append('r')
+				colors.append(color_estimated)
 				styles.append('--')
 
-		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness)
+		if not title:
+			num_events = len(cc_catalog)
+			Mmax_obs = cc_catalog.get_Mmax(Mtype, Mrelation)
+			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
+		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
+		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def plot_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", cumul=True, discrete=False, completeness=Completeness_Rosset, Mrange=(), Freq_range=(), fixed_beta=None, num_sigma=0, lang="en", color=True, want_lsq=True, want_completeness_limits=False, want_exponential=False, title=None, fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""

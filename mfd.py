@@ -18,18 +18,60 @@ class MFD:
 	def __init__(self):
 		pass
 
+	def __len__(self):
+		return int(round((self.max_mag - self.get_min_mag_edge()) / self.bin_width))
+
+	def get_magnitude_bin_centers(self):
+		"""
+		Return center values of magnitude bins
+
+		:return:
+			numpy float array
+		"""
+		return np.array(zip(*self.get_annual_occurrence_rates())[0])
+
+	def get_magnitude_bin_edges(self):
+		"""
+		Return left edge value of magnitude bins
+
+		:return:
+			numpy float array
+		"""
+		return self.get_magnitude_bin_centers() - self.bin_width / 2
+
+	def get_magnitude_index(self, M):
+		"""
+		Determine index of given magnitude (edge) value
+
+		:param M:
+			Float, magnitude value (left edge of bin)
+
+		:return:
+			Int, index
+		"""
+		return int(round((M - self.get_min_mag()) / self.bin_width))
+
+	def get_cumulative_rates(self):
+		"""
+		Return cumulative annual occurrence rates
+
+		:return:
+			numpy float array
+		"""
+		return np.add.accumulate(self.occurrence_rates[::-1])[::-1]
+
 	def is_magnitude_compatible(self, M):
 		"""
-		Determine whether a particular magnitude value is compatible
+		Determine whether a particular magnitude (edge) value is compatible
 		with bin width of MFD
 
 		:param M:
-			Float, magnitude value
+			Float, magnitude value (left edge of bin)
 
 		:return:
 			Bool
 		"""
-		foffset = (M - self.min_mag) / self.bin_width
+		foffset = (M - self.get_min_mag_edge()) / self.bin_width
 		offset = int(round(foffset))
 		if not np.allclose(foffset, offset):
 			return False
@@ -53,13 +95,28 @@ class MFD:
 			return False
 		if not np.allclose(other_mfd.bin_width, self.bin_width):
 			return False
-		elif not self.is_magnitude_compatible(other_mfd.min_mag):
+		elif not self.is_magnitude_compatible(other_mfd.get_min_mag_edge()):
 			return False
 		else:
 			return True
 
 
 class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
+	"""
+	Evenly Discretized Magnitude-Frequency Distribution
+
+	:param min_mag:
+		Positive float value representing the middle point of the first
+		bin in the histogram.
+	:param bin_width:
+		A positive float value -- the width of a single histogram bin.
+	:param occurrence_rates:
+		The list of non-negative float values representing the actual
+		annual occurrence rates. The resulting histogram has as many bins
+		as this list length.
+	:param Mtype:
+		String, magnitude type, either "MW" or "MS" (default: "MW")
+	"""
 	def __init__(self, min_mag, bin_width, occurrence_rates, Mtype="MW"):
 		nhlib.mfd.EvenlyDiscretizedMFD.__init__(self, min_mag, bin_width, list(occurrence_rates))
 		self.occurrence_rates = np.array(self.occurrence_rates)
@@ -85,21 +142,64 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		else:
 			raise TypeError("Operand must be MFD")
 
+	def __sub__(self, other):
+		if isinstance(other, (TruncatedGRMFD, EvenlyDiscretizedMFD)):
+			if not self.is_compatible(other):
+				raise Exception("MFD's not compatible")
+			if self.get_min_mag() <= other.get_min_mag() and self.max_mag >= other.max_mag:
+				occurrence_rates = self.occurrence_rates.copy()
+				start_index = self.get_magnitude_index(other.get_min_mag())
+				occurrence_rates[start_index:start_index+len(other)] -= other.occurrence_rates
+				# Replace negative values with zeros
+				occurrence_rates[np.where(occurrence_rates <0)] = 0
+				return EvenlyDiscretizedMFD(self.min_mag, self.bin_width, occurrence_rates)
+			else:
+				raise Exception("Second MFD must fully overlap with first one!")
+		else:
+			raise TypeError("Operand must be MFD")
+
 	@property
 	def max_mag(self):
-		return self.min_mag + (len(self.occurrence_rates) + 1) * self.bin_width
+		return self.get_min_mag_edge() + (len(self.occurrence_rates) + 1) * self.bin_width
 
-	def get_magnitude_bin_edges(self):
-		return np.array(zip(*self.get_annual_occurrence_rates())[0])
+	def get_min_mag_edge(self):
+		"""
+		Return left edge of minimum magnitude bin
 
-	def get_magnitude_bin_centers(self):
-		return self.get_magnitude_bin_edges() + self.bin_width / 2
+		:return:
+			Float
+		"""
+		return self.min_mag - self.bin_width / 2
 
-	def get_cumulative_rates(self):
-		return np.add.accumulate(self.occurrence_rates[::-1])[::-1]
+	def get_min_mag_center(self):
+		"""
+		Return center value of minimum magnitude bin
+
+		:return:
+			Float
+		"""
+		return self.min_mag
+
+	#def get_magnitude_bin_edges(self):
+	#	return np.array(zip(*self.get_annual_occurrence_rates())[0])
+
+	#def get_magnitude_bin_centers(self):
+	#	return self.get_magnitude_bin_edges() + self.bin_width / 2
+
+	#def get_cumulative_rates(self):
+	#	return np.add.accumulate(self.occurrence_rates[::-1])[::-1]
 
 	def divide(self, weights):
-		weights = np.array(weights, dtype='f')
+		"""
+		Divide MFD into a number of MFD's that together sum up to the original MFD
+
+		:param weights:
+			list or array containing weight of each sub-MFD
+
+		:return:
+			List containing instances of :class:`EvenlyDiscretizedMFD`
+		"""
+		weights = np.array(weights, dtype='d')
 		weights /= np.add.reduce(weights)
 		mfd_list = []
 		for w in weights:
@@ -120,12 +220,12 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		"""
 		if not self.is_magnitude_compatible(M):
 			raise Exception("Magnitude value not compatible!")
-		elif self.min_mag < M < self.max_mag:
-			index = int(round((M - self.min_mag) / self.bin_width))
+		elif self.get_min_mag_edge() < M < self.max_mag:
+			index = int(round((M - self.get_min_mag_edge()) / self.bin_width))
 			occurrence_rates1 = list(self.occurrence_rates[:index])
 			occurrence_rates2 = list(self.occurrence_rates[index:])
 			mfd1 = EvenlyDiscretizedMFD(self.min_mag, self.bin_width, occurrence_rates1, self.Mtype)
-			mfd2 = EvenlyDiscretizedMFD(M, self.bin_width, occurrence_rates2, self.Mtype)
+			mfd2 = EvenlyDiscretizedMFD(M+self.bin_width/2, self.bin_width, occurrence_rates2, self.Mtype)
 			return [mfd1, mfd2]
 		else:
 			raise Exception("Split magnitude not in valid range!")
@@ -212,6 +312,38 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 
 
 class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
+	"""
+	Truncated or modified Gutenberg-Richter MFD
+
+	:param min_mag:
+		The lowest possible magnitude for this MFD. The first bin in the
+		:meth:`result histogram <get_annual_occurrence_rates>` will be aligned
+		to make its left border match this value.
+	:param max_mag:
+		The highest possible magnitude. The same as for ``min_mag``: the last
+		bin in the histogram will correspond to the magnitude value equal to
+		``max_mag - bin_width / 2``.
+	:param bin_width:
+		A positive float value -- the width of a single histogram bin.
+	:param a_val:
+		Float, the cumulative ``a`` value (``10 ** a`` is the number
+		of earthquakes per year with magnitude greater than or equal to 0),
+	:param b_val:
+		Float, Gutenberg-Richter ``b`` value -- the decay rate
+		of exponential distribution. It describes the relative size distribution
+		of earthquakes: a higher ``b`` value indicates a relatively larger
+		proportion of small events and vice versa.
+	:param b_sigma:
+		Float, standard deviation on the b value.
+	:param Mtype:
+		String, magnitude type, either "MW" or "MS" (default: "MW")
+
+	Note:
+		Values for ``min_mag`` and ``max_mag`` don't have to be aligned with
+		respect to ``bin_width``. They get rounded accordingly anyway so that
+		both are divisible by ``bin_width`` just before converting a function
+		to a histogram. See :meth:`_get_min_mag_and_num_bins`.
+	"""
 	def __init__(self, min_mag, max_mag, bin_width, a_val, b_val, b_sigma, Mtype="MW"):
 		nhlib.mfd.TruncatedGRMFD.__init__(self, min_mag, max_mag, bin_width, a_val, b_val)
 		self.b_sigma = b_sigma
@@ -219,16 +351,16 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 
 	def __div__(self, other):
 		if isinstance(other, (int, float)):
-			N = 10**self.a_val
-			a_val = np.log10(N / float(other))
+			N0 = 10**self.a_val
+			a_val = np.log10(N0 / float(other))
 			return TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, a_val, self.b_val, self.b_sigma, self.Mtype)
 		else:
 			raise TypeError("Divisor must be integer or float")
 
 	def __mul__(self, other):
 		if isinstance(other, (int, float)):
-			N = 10**self.a_val
-			a_val = np.log10(N * float(other))
+			N0 = 10**self.a_val
+			a_val = np.log10(N0 * float(other))
 			return TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, a_val, self.b_val, self.b_sigma, self.Mtype)
 		else:
 			raise TypeError("Multiplier must be integer or float")
@@ -239,34 +371,77 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		else:
 			raise TypeError("Operand must be MFD")
 
+	def __sub__(self, other):
+		if isinstance(other, TruncatedGRMFD):
+			if self.min_mag == other.min_mag and self.max_mag == other.max_mag and self.b_val == other.b_val and self.Mtype == other.Mtype:
+				## Note: bin width does not have to be the same here
+				N0 = 10 ** self.a_val - 10 ** other.a_val
+				a_val = np.log10(N0)
+				return TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, a_val, self.b_val, self.b_sigma, self.Mtype)
+		elif isinstance(other, EvenlyDiscretizedMFD):
+			return self.to_evenly_discretized_mfd().__sub__(other)
+		else:
+			raise TypeError("Operand must be MFD")
+
 	@property
 	def occurrence_rates(self):
 		return np.array(zip(*self.get_annual_occurrence_rates())[1])
 
-	def get_magnitude_bin_centers(self):
-		return np.array(zip(*self.get_annual_occurrence_rates())[0])
+	def get_min_mag_edge(self):
+		"""
+		Return left edge of minimum magnitude bin
 
-	def get_magnitude_bin_edges(self):
-		return self.get_magnitude_bin_centers() - self.bin_width / 2
+		:return:
+			Float
+		"""
+		return self.min_mag
 
-	def get_cumulative_rates(self, exponentially_tapered=True):
-		if exponentially_tapered:
-			#a, b = self.a_val, self.b_val
-			#min_mag, max_mag = self.min_mag, self.max_mag
-			#mags = self.get_magnitude_bin_edges()
-			#return (10**(a-b*min_mag))*((10**(-1*b*mags)-10**(-1*b*max_mag))/(10**(-1*b*min_mag)-10**(-1*b*max_mag)))
-			return np.add.accumulate(self.occurrence_rates[::-1])[::-1]
-		else:
-			return 10 ** (self.a_val - self.b_val * self.get_magnitude_bin_edges())
+	def get_min_mag_center(self):
+		"""
+		Return center value of minimum magnitude bin
+
+		:return:
+			Float
+		"""
+		return self.min_mag + self.bin_width / 2
+
+	def get_cumulative_rates(self):
+		"""
+		Return cumulative annual occurrence rates
+
+		:return:
+			numpy float array
+		"""
+		a, b = self.a_val, self.b_val
+		min_mag, max_mag = self.get_min_mag_edge(), self.max_mag
+		mags = self.get_magnitude_bin_edges()
+		return (10**(a-b*min_mag))*((10**(-1*b*mags)-10**(-1*b*max_mag))/(10**(-1*b*min_mag)-10**(-1*b*max_mag)))
+		## Note: the following is identical
+		#return np.add.accumulate(self.occurrence_rates[::-1])[::-1]
 
 	def to_evenly_discretized_mfd(self):
-		return EvenlyDiscretizedMFD(self.min_mag, self.bin_width, list(self.occurrence_rates))
+		"""
+		Convert to an EvenlyDiscretizedMFD
+
+		:return:
+			instance of :class:`EvenlyDiscretizedMFD`
+		"""
+		return EvenlyDiscretizedMFD(self.get_min_mag_center(), self.bin_width, list(self.occurrence_rates))
 
 	def divide(self, weights):
-		weights = np.array(weights, dtype='f')
+		"""
+		Divide MFD into a number of MFD's that together sum up to the original MFD
+
+		:param weights:
+			list or array containing weight of each sub-MFD
+
+		:return:
+			List containing instances of :class:`TruncatedGRMFD`
+		"""
+		weights = np.array(weights, dtype='d')
 		weights /= np.add.reduce(weights)
-		N = 10**self.a_val
-		avalues = np.log10(weights * N)
+		N0 = 10**self.a_val
+		avalues = np.log10(weights * N0)
 		return [TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, aw, self.b_val, self.b_sigma, self.Mtype) for aw in avalues]
 
 	def split(self, M):
@@ -281,7 +456,7 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		"""
 		if not self.is_magnitude_compatible(M):
 			raise Exception("Magnitude value not compatible!")
-		elif self.min_mag < M < self.max_mag:
+		elif self.get_min_mag_edge() < M < self.max_mag:
 			mfd1 = TruncatedGRMFD(self.min_mag, M, self.bin_width, self.a_val, self.b_val, self.b_sigma, self.Mtype)
 			mfd2 = TruncatedGRMFD(M, self.max_mag, self.bin_width, self.a_val, self.b_val, self.b_sigma, self.Mtype)
 			return [mfd1, mfd2]
@@ -376,17 +551,14 @@ def sum_MFDs(mfd_list, weights=[]):
 	Mtype = mfd_list[0].Mtype
 	for mfd in mfd_list:
 		if mfd.bin_width != bin_width:
-			if isinstance(mfd, TruncatedGRMFD):
-				mfd.bin_width = bin_width
-			else:
-				raise Exception("Bin widths not compatible!")
+			raise Exception("Bin widths not compatible!")
 		if mfd.Mtype != Mtype:
 			raise Exception("Magnitude types not compatible!")
-	all_min_mags = set([mfd.min_mag for mfd in mfd_list])
+	all_min_mags = set([mfd.get_min_mag_edge() for mfd in mfd_list])
 	all_max_mags = set([mfd.max_mag for mfd in mfd_list])
-	is_truncated = np.array([isinstance(mfd, TruncatedGRMFD) for mfd in mfd_list])
 	## If all MFD's are TruncatedGR, and have same min_mag, max_mag, and b_val
 	## return TrucatedGR, else return EvenlyDiscretized
+	is_truncated = np.array([isinstance(mfd, TruncatedGRMFD) for mfd in mfd_list])
 	if is_truncated.all():
 		all_bvals = set([mfd.b_val for mfd in mfd_list])
 		all_Mtypes = set([mfd.Mtype for mfd in mfd_list])
@@ -401,10 +573,10 @@ def sum_MFDs(mfd_list, weights=[]):
 		num_bins = int(round((max_mag - min_mag) / bin_width))
 		occurrence_rates = np.zeros(num_bins, 'd')
 		for i, mfd in enumerate(mfd_list):
-			start_index = int(round((mfd.min_mag - min_mag) / bin_width))
+			start_index = int(round((mfd.get_min_mag() - min_mag) / bin_width))
 			end_index = start_index + len(mfd.occurrence_rates)
 			occurrence_rates[start_index:end_index] += (mfd.occurrence_rates * weights[i])
-		return EvenlyDiscretizedMFD(min_mag, bin_width, list(occurrence_rates), Mtype)
+		return EvenlyDiscretizedMFD(min_mag+bin_width/2, bin_width, list(occurrence_rates), Mtype)
 
 
 def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_inc=[], completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
