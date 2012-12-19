@@ -11,12 +11,52 @@ import nhlib.mfd
 
 
 class MFD:
-	## Probably not necessary
+	"""
+	Generic class containing methods that are common for
+	:class:`EvenlyDiscretizedMFD` and :class:`TruncatedGRMFD`
+	"""
 	def __init__(self):
 		pass
 
-	def plot(self, completeness=None):
-		print("Not yet implemented")
+	def is_magnitude_compatible(self, M):
+		"""
+		Determine whether a particular magnitude value is compatible
+		with bin width of MFD
+
+		:param M:
+			Float, magnitude value
+
+		:return:
+			Bool
+		"""
+		foffset = (M - self.min_mag) / self.bin_width
+		offset = int(round(foffset))
+		if not np.allclose(foffset, offset):
+			return False
+		else:
+			return True
+
+	def is_compatible(self, other_mfd):
+		"""
+		Determine if MFD is compatible with another one, in terms of
+		bin width, modulus of magnitude, and magnitude type
+
+		:param other_mfd:
+			instance of :class:`EvenlyDiscretizedMFD` or :clas:`TruncatedGRMFD`
+
+		:return:
+			Bool
+		"""
+		magnitude_bin_edges = other_mfd.get_magnitude_bin_edges()
+		occurrence_rates = other_mfd.occurrence_rates
+		if other_mfd.Mtype != self.Mtype:
+			return False
+		if not np.allclose(other_mfd.bin_width, self.bin_width):
+			return False
+		elif not self.is_magnitude_compatible(other_mfd.min_mag):
+			return False
+		else:
+			return True
 
 
 class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
@@ -69,8 +109,18 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		return mfd_list
 
 	def split(self, M):
-		# TODO: check that M is multiple of bin_width
-		if self.min_mag < M < self.max_mag:
+		"""
+		Split MFD at a particular magnitude
+
+		:param M:
+			Float, magnitude value where MFD should be split
+
+		:return:
+			List containing 2 instances of :class:`EvenlyDiscretizedMFD`
+		"""
+		if not self.is_magnitude_compatible(M):
+			raise Exception("Magnitude value not compatible!")
+		elif self.min_mag < M < self.max_mag:
 			index = int(round((M - self.min_mag) / self.bin_width))
 			occurrence_rates1 = list(self.occurrence_rates[:index])
 			occurrence_rates2 = list(self.occurrence_rates[index:])
@@ -80,18 +130,23 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		else:
 			raise Exception("Split magnitude not in valid range!")
 
-	def extend(self, magnitude_bin_edges, occurrence_rates):
+	def extend(self, other_mfd):
 		"""
-		Extend MFD, e.g. with frequency/ies of characteristic earthquake(s)
+		Extend MFD with another one that covers larger magnitudes.
 
-		:param magnitude_bin_edges:
-			numpy array, lower magnitudes of each bin
-		:param occurrence_rates:
-			numpy array, annual frequencies (incremental!)
+		:param other_mfd:
+			instance of :class:`EvenlyDiscretizedMFD` or :class:`TruncatedGRMFD`
+			The minimum magnitude of other_mfd should be equal to or larger than
+			the maximum magnitude of this MFD.
+
+		Note:
+			Bins between both MFD's will be filled with zero incremental
+			occurrence rates!
 		"""
-		if len(magnitude_bin_edges) > 1:
-			if not np.allclose(magnitude_bin_edges[1] - magnitude_bin_edges[0], self.bin_width):
-				raise Exception("Bin width not compatible!")
+		magnitude_bin_edges = other_mfd.get_magnitude_bin_edges()
+		occurrence_rates = other_mfd.occurrence_rates
+		if not np.allclose(other_mfd.bin_width, self.bin_width):
+			raise Exception("Bin width not compatible!")
 		fgap = (magnitude_bin_edges[0] - self.max_mag) / self.bin_width
 		gap = int(round(fgap))
 		if not np.allclose(fgap, gap):
@@ -102,6 +157,18 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 			self.occurrence_rates = np.concatenate([self.occurrence_rates, np.zeros(num_empty_bins, dtype='d'), occurrence_rates])
 		else:
 			raise Exception("Magnitudes must not overlap with MFD magnitude range")
+
+	def append_characteristic_eq(self, Mc, return_period):
+		"""
+		Append magnitude-frequency of a characteristic earthquake
+
+		:param Mc:
+			Float, magnitude of characteristic earthquake
+		:param return_period:
+			Float, return period in yr of characteristic earthquake
+		"""
+		characteristic_mfd = EvenlyDiscretizedMFD(Mc, self.bin_width, [1./return_period])
+		self.extend(characteristic_mfd)
 
 	def plot(self, color='k', style="o", label="", discrete=True, cumul_or_inc="both", completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 		"""
@@ -203,18 +270,43 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		return [TruncatedGRMFD(self.min_mag, self.max_mag, self.bin_width, aw, self.b_val, self.b_sigma, self.Mtype) for aw in avalues]
 
 	def split(self, M):
-		# TODO: check that M is multiple of bin_width
-		if self.min_mag < M < self.max_mag:
+		"""
+		Split MFD at a particular magnitude
+
+		:param M:
+			Float, magnitude value where MFD should be split
+
+		:return:
+			List containing 2 instances of :class:`TruncatedGRMFD`
+		"""
+		if not self.is_magnitude_compatible(M):
+			raise Exception("Magnitude value not compatible!")
+		elif self.min_mag < M < self.max_mag:
 			mfd1 = TruncatedGRMFD(self.min_mag, M, self.bin_width, self.a_val, self.b_val, self.b_sigma, self.Mtype)
 			mfd2 = TruncatedGRMFD(M, self.max_mag, self.bin_width, self.a_val, self.b_val, self.b_sigma, self.Mtype)
 			return [mfd1, mfd2]
 		else:
 			raise Exception("Split magnitude not in valid range!")
 
-	def extend(self, magnitude_bin_edges, occurrence_rates):
-		mfd = self.to_evenly_discretized_mfd()
-		mfd.extend(magnitude_bin_edges, occurrence_rates)
-		return mfd
+	def extend(self, other_mfd):
+		"""
+		Extend MFD with another one that covers larger magnitudes.
+
+		:param other_mfd:
+			instance of :class:`TruncatedGRMFD`
+			The minimum magnitude of other_mfd should be equal to the
+			maximum magnitude of this MFD.
+
+		Note:
+			If other_mfd is instance of :class:`EvenlyDiscretizedGRMFD`
+			or if its min_mag is larger than max_mag of this MFD, an
+			exception will be raised, prompting to convert to an instance
+			of :class:`EvenlyDiscretizedGRMFD` first.
+		"""
+		if isinstance(other_mfd, TruncatedGRMFD) and other_mfd.b_val == self.bval and other_mfd.min_mag == self.max_mag:
+			self.max_mag = other_mfd.max_mag
+		else:
+			raise Exception("MFD objects not compatible. Convert to EvenlyDiscretizedMFD")
 
 	def plot(self, color='k', style="-", label="", discrete=False, cumul_or_inc="cumul", completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 		"""
@@ -258,10 +350,28 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 
 
 def sum_MFDs(mfd_list, weights=[]):
-	## Note: take care with renormalized weights !
+	"""
+	Sum two or more MFD's
+
+	:param mfd_list:
+		List containing instances of :class:`EvenlyDiscretizedMFD` or
+		:class:`TruncatedGRMFD`
+
+	:param weights:
+		List or array containing weights of each MFD (default: [])
+
+	:return:
+		instance of :class:`TruncatedGRMFD` (if all MFD's in list are
+		TruncatedGR, and have same min_mag, max_mag, and b_val) or else
+		instance of :class:`EvenlyDiscretizedMFD`
+
+	Note:
+		Weights will be normalized!
+	"""
 	if weights in ([], None):
-		weights = np.ones(len(mfd_list), 'f')
-	weights = np.array(weights) / len(mfd_list)
+		weights = np.ones(len(mfd_list), 'd')
+	total_weight = np.add.reduce(weights)
+	weights = (np.array(weights) / total_weight) * len(mfd_list)
 	bin_width = min([mfd.bin_width for mfd in mfd_list])
 	Mtype = mfd_list[0].Mtype
 	for mfd in mfd_list:
@@ -295,6 +405,7 @@ def sum_MFDs(mfd_list, weights=[]):
 			end_index = start_index + len(mfd.occurrence_rates)
 			occurrence_rates[start_index:end_index] += (mfd.occurrence_rates * weights[i])
 		return EvenlyDiscretizedMFD(min_mag, bin_width, list(occurrence_rates), Mtype)
+
 
 def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_inc=[], completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 	"""
