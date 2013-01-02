@@ -2192,7 +2192,7 @@ class EQCatalog:
 		"""
 		# TODO: determine sensible default values for dt and ttol
 
-		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.completeness import stepp_analysis
+		from mtoolkit.scientific.completeness import stepp_analysis
 		subcatalog = self.subselect(Mmin=Mmin, Mtype=Mtype, Mrelation=Mrelation)
 		years = self.get_years()
 		Mags = self.get_magnitudes(Mtype, Mrelation)
@@ -2234,7 +2234,7 @@ class EQCatalog:
 				earthquakes belonging to the different clusters. The first element
 				in this list represents earthquakes that do not belong to any cluster
 		"""
-		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.declustering import afteran_decluster, gardner_knopoff_decluster
+		from mtoolkit.scientific.declustering import afteran_decluster, gardner_knopoff_decluster
 
 		if method == "afteran":
 			decluster_func = afteran_decluster
@@ -2296,7 +2296,7 @@ class EQCatalog:
 			Tuple (Mmax, Mmax_sigma)
 		"""
 		# TODO: determine sensible default values
-		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.maximum_magnitude import maximum_magnitude_analysis
+		from mtoolkit.scientific.maximum_magnitude import maximum_magnitude_analysis
 
 		years = self.get_years()
 		Mags = self.get_magnitudes(Mtype, Mrelation)
@@ -2342,7 +2342,7 @@ class EQCatalog:
 		- the a value computed for aM=0 appears to be wrong (partly fixed by
 			replacing with aM = 0.5)
 		"""
-		from thirdparty.oq_hazard_modeller.mtoolkit.scientific.recurrence import recurrence_analysis
+		from mtoolkit.scientific.recurrence import recurrence_analysis
 
 		subcatalog = self.subselect_completeness(completeness, Mtype=Mtype, Mrelation=Mrelation)
 		years = subcatalog.get_years()
