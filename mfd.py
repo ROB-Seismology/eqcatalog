@@ -160,7 +160,7 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 
 	@property
 	def max_mag(self):
-		return self.get_min_mag_edge() + (len(self.occurrence_rates) + 1) * self.bin_width
+		return self.get_min_mag_edge() + len(self.occurrence_rates) * self.bin_width
 
 	def get_min_mag_edge(self):
 		"""
@@ -179,6 +179,20 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 			Float
 		"""
 		return self.min_mag
+
+	def _get_total_moment_rate(self):
+		"""
+		Calculate total moment rate
+
+		:return:
+			Float, total moment rate in N.m/yr
+		"""
+		magnitudes, occurrence_rates = zip(*self.get_annual_occurrence_rates())
+		magnitudes, occurrence_rates = np.array(magnitudes), np.array(occurrence_rates)
+		moments = 10 ** (1.5 * (magnitudes + 6.06))
+		moment_rates = moments * occurrence_rates
+		return np.add.reduce(moment_rates)
+
 
 	#def get_magnitude_bin_edges(self):
 	#	return np.array(zip(*self.get_annual_occurrence_rates())[0])
@@ -334,7 +348,7 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		of earthquakes: a higher ``b`` value indicates a relatively larger
 		proportion of small events and vice versa.
 	:param b_sigma:
-		Float, standard deviation on the b value.
+		Float, standard deviation on the b value (default: 0).
 	:param Mtype:
 		String, magnitude type, either "MW" or "MS" (default: "MW")
 
@@ -344,7 +358,7 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		both are divisible by ``bin_width`` just before converting a function
 		to a histogram. See :meth:`_get_min_mag_and_num_bins`.
 	"""
-	def __init__(self, min_mag, max_mag, bin_width, a_val, b_val, b_sigma, Mtype="MW"):
+	def __init__(self, min_mag, max_mag, bin_width, a_val, b_val, b_sigma=0, Mtype="MW"):
 		nhlib.mfd.TruncatedGRMFD.__init__(self, min_mag, max_mag, bin_width, a_val, b_val)
 		self.b_sigma = b_sigma
 		self.Mtype = Mtype
