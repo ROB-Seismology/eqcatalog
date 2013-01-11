@@ -86,7 +86,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		File object, where to print errors
 
 	:return:
-		list of LocalEarthquake objects
+		instance of :class:`EQCatalog`
 	"""
 	## Convert input arguments, if necessary
 	if isinstance(id_earth, (int, long)):

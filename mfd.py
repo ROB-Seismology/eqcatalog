@@ -193,7 +193,6 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		moment_rates = moments * occurrence_rates
 		return np.add.reduce(moment_rates)
 
-
 	#def get_magnitude_bin_edges(self):
 	#	return np.array(zip(*self.get_annual_occurrence_rates())[0])
 
@@ -281,6 +280,7 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		:param return_period:
 			Float, return period in yr of characteristic earthquake
 		"""
+		Mc = np.floor(Mc / self.bin_width) * self.bin_width
 		characteristic_mfd = EvenlyDiscretizedMFD(Mc, self.bin_width, [1./return_period])
 		self.extend(characteristic_mfd)
 
@@ -593,7 +593,7 @@ def sum_MFDs(mfd_list, weights=[]):
 		return EvenlyDiscretizedMFD(min_mag+bin_width/2, bin_width, list(occurrence_rates), Mtype)
 
 
-def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_inc=[], completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
+def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_inc=[], completeness=None, end_year=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot one or more magnitude-frequency distributions
 
@@ -616,6 +616,9 @@ def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_in
 	:param completeness:
 		instance of :class:`Completeness`, used to plot completeness
 		limits (default: None)
+	:param end_year:
+		Int, end year of catalog (used when plotting completeness limits)
+		(default: None, will use current year)
 	:param Mrange:
 		(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
 		(default: ())
@@ -734,7 +737,8 @@ def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_in
 		## Make sure min_mags is not sorted in place,
 		## otherwise completeness object may misbehave
 		min_mags = np.sort(completeness.min_mags)
-		end_year = datetime.date.today().year
+		if not end_year:
+			end_year = datetime.date.today().year
 		for i in range(1, len(min_mags)):
 			pylab.plot([min_mags[i], min_mags[i]], Freq_range, 'k--', lw=1, label="_nolegend_")
 			ax.annotate("", xy=(min_mags[i-1], annoty), xycoords='data', xytext=(min_mags[i], annoty), textcoords='data', arrowprops=dict(arrowstyle="<->"),)

@@ -5,7 +5,7 @@
 ## Import standard python modules
 import datetime
 import time
-import math
+import numpy as np
 
 
 ## Import ROB modules
@@ -115,15 +115,16 @@ class LocalEarthquake:
 			relation={"ML": "ambraseys"}
 
 		if not self.MS:
-			if relation["ML"].lower() == "ambraseys" and self.ML:
-				return 0.09 + 0.93 * self.ML
+			if self.ML and relation.has_key("ML"):
+				if relation["ML"].lower() == "ambraseys":
+					return 0.09 + 0.93 * self.ML
 			# TODO: add relation for MW
 			else:
 				return 0.
 		else:
 			return self.MS
 
-	def get_MW(self, relation={"MS": "bungum", "ML": "hinzen"}):
+	def get_MW(self, relation={"MS": "geller", "ML": "hinzen"}):
 		"""
 		Return MW.
 		If MW is None or zero, calculate it using the specified
@@ -138,7 +139,7 @@ class LocalEarthquake:
 				- "bungum": calculate MW from MS using formulae by Bungum
 					et al. (2003)
 				- "geller": calculate MW from MS assuming a stress drop of
-					50 bars (only valid for MS < 6.76);
+					50 bars (only valid for MS < 8.22);
 			- ML --> MW:
 				- "ahorner": caculate MW from ML using relation by Ahorner (1983)
 				- "hinzen": calculate MW from ML using relation by Hinzen (2004)
@@ -150,13 +151,20 @@ class LocalEarthquake:
 			Float, moment magnitude
 		"""
 		if relation is None:
-			relation={"MS": "bungum", "ML": "hinzen"}
+			relation={"MS": "geller", "ML": "hinzen"}
 
 		if not self.MW:
-			if self.MS:
+			if self.MS and relation.has_key("MS"):
 				## Conversion MS -> MW (Geller, 1976)
 				if relation["MS"].lower() == "geller":
-					log_Mo_dyncm = self.MS + 18.89
+					if self.MS < 6.76:
+						log_Mo_dyncm = self.MS + 18.89
+					elif 6.76 <= self.MS < 8.12:
+						log_Mo_dyncm = (3./2) * self.MS + 15.51
+					elif 8.12 <= self.MS < 8.22:
+						log_Mo_dyncm = 3 * self.MS + 3.33
+					else:
+						return np.NaN
 					MW = (2.0/3) * log_Mo_dyncm - 10.73
 				## Conversion MS -> MW (Bungum  et al., 2003)
 				elif relation["MS"].lower() == "bungum":
@@ -164,7 +172,7 @@ class LocalEarthquake:
 						MW = 0.585 * self.MS + 2.422
 					else:
 						MW = 0.769 * self.MS + 1.280
-			elif self.ML:
+			elif self.ML and relation.has_key("ML"):
 				## Relation with ML by Ahorner (1983)
 				if relation["ML"].lower() == "ahorner":
 					log_Mo_dyncm = 17.4 + 1.1 * self.ML
@@ -274,7 +282,7 @@ class LocalEarthquake:
 			Float, hypocentral distance in km
 		"""
 		d_epi = self.epicentral_distance(pt)
-		d_hypo = math.sqrt(d_epi**2 + self.depth**2)
+		d_hypo = np.sqrt(d_epi**2 + self.depth**2)
 		return d_hypo
 
 	def azimuth_to(self, pt):

@@ -88,6 +88,10 @@ class Completeness:
 		s = "\n".join(["%d, %.2f" % (year, mag) for (year, mag) in zip(self.min_years, self.min_mags)])
 		return s
 
+	@property
+	def start_year(self):
+		return self.min_years.min()
+
 	def get_completeness_magnitude(self, year):
 		"""
 		Return completeness magnitude for given year, this is the lowest
@@ -143,6 +147,7 @@ class Completeness:
 Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.7, 3.3, 1.8])
 #Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.75, 3.25, 1.75])
 Completeness_Rosset = Completeness([1350, 1926, 1960, 1985], [5.0, 4.0, 3.0, 1.8])
+Completeness_Rosset_MW = Completeness([1350, 1926, 1960, 1985], [5.2, 4.5, 3.9, 3.1])
 
 
 class EQCatalog:
@@ -616,6 +621,7 @@ class EQCatalog:
 				start_year = max(self.start_date.year, completeness.get_completeness_year(M))
 				completeness_years.append(start_year)
 		else:
+			print("Warning: no completeness object provided. Using catalog length!")
 			completeness_years = [self.start_date.year] * len(magnitudes)
 		completeness_years = np.array(completeness_years, 'f')
 		return completeness_years
@@ -635,7 +641,7 @@ class EQCatalog:
 			numpy float array, completeness timespans (fractional years)
 		"""
 		completeness_years = self.get_completeness_years(magnitudes, completeness)
-		completeness_timespans = [(self.end_date - datetime.date(int(start_year),1,1)).days / 365.25 + 1 for start_year in completeness_years]
+		completeness_timespans = [((self.end_date - datetime.date(int(start_year),1,1)).days + 1) / 365.25 for start_year in completeness_years]
 		return np.array(completeness_timespans)
 
 	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
@@ -1359,7 +1365,7 @@ class EQCatalog:
 		bins_N_cumul_mle = lamda * (np.exp(-beta*bins_Mag) - np.exp(-beta*Mmax)) / (np.exp(-beta*Mmin) - np.exp(-beta*Mmax))
 		return np.log10(bins_N_cumul_mle)
 
-	def calcGR_lsq(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 		Parameters:
@@ -1387,9 +1393,10 @@ class EQCatalog:
 			print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
 		return (a, -b, r)
 
-	def calcGR_MLE(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
+	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
 		"""
-		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
+		Calculate a and b values of Gutenberg-Richter relation using original
+		maximum likelihood estimation by Aki (1965)
 
 		:param Mmin:
 			Float, minimum magnitude to use for binning (ignored)
@@ -1405,7 +1412,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` (default: Completeness_Rosset)
-		:param bval:
+		:param b_val:
 			Float, fixed b value to constrain MLE estimation (ignored)
 		:param verbose:
 			Bool, whether some messages should be printed or not (default: False)
@@ -1418,7 +1425,7 @@ class EQCatalog:
 		"""
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 
-	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
+	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
 		for variable observation periods for different magnitude increments.
@@ -1439,7 +1446,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` (default: Completeness_Rosset)
-		:param bval:
+		:param b_val:
 			Float, fixed b value to constrain MLE estimation (default: None)
 		:param verbose:
 			Bool, whether some messages should be printed or not (default: False)
@@ -1459,12 +1466,12 @@ class EQCatalog:
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 		bins_Mag += dM/2.0
 
-		if not bval:
+		if not b_val:
 			## Initial trial value
 			BETA = 1.5
 		else:
 			## Fixed beta
-			BETA = bval * np.log(10)
+			BETA = b_val * np.log(10)
 		BETL = 0
 		while(np.abs(BETA-BETL)) >= 0.0001:
 			#print BETA
@@ -1496,26 +1503,28 @@ class EQCatalog:
 				D2LDB2 = NKOUNT * (DLDB*DLDB - STM2X/SUMTEX)
 				DLDB = DLDB * NKOUNT - SNM
 				BETL = BETA
-				if not bval:
+				if not b_val:
 					BETA -= DLDB/D2LDB2
 
 		B = BETA / np.log(10)
-		if not bval:
+		if not b_val:
 			STDBETA = np.sqrt(-1.0/D2LDB2)
 			STDB = STDBETA / np.log(10)
 		else:
 			STDB = 0
+			STDBETA = 0
 		FNGTMO = NKOUNT * SUMEXP / SUMTEX
-		## Note: Not sure if the sign for BETA in Weichert's formula for FN0 is correct
-		FN0 = FNGTMO * np.exp(BETA * bins_Mag[0] - dM/2.0)
+		FN0 = FNGTMO * np.exp(BETA * (bins_Mag[0] - dM/2.0))
 		FLGN0 = np.log10(FN0)
-		## Note: I would expect that the a value corresponds to FLGN0
-		## but it does not seem to be entirely correct
-		## (checked by computing 10 ** (A - B * 5.), which should correspond to FN5
-		## So, either FLGN0 or FN5 is incorrect...
-		#A = FLGN0
-		## Note: the following formula comes from Philippe Rosset's program
-		A = np.log10(FNGTMO) + B * (bins_Mag[0] - dM/2.0)
+		A = FLGN0
+		STDFN0 = FN0 / np.sqrt(NKOUNT)
+		## Applying error propogation for base-10 logarithm
+		STDA = STDFN0 / (2.303 * FN0)
+		#print STDA
+		## Note: the following formula in Philippe Rosset's program is equivalent
+		#A = np.log10(FNGTMO) + B * (bins_Mag[0] - dM/2.0)
+		## This is also equivalent to:
+		#A = np.log10(FNGTMO * np.exp(-BETA * (0. - (bins_Mag[0] - (dM/2.0)))))
 
 		if verbose:
 			FN5 = FNGTMO * np.exp(-BETA * (5. - (bins_Mag[0] - dM/2.0)))
@@ -1526,12 +1535,10 @@ class EQCatalog:
 			print("LOG(annual rate above M0): %.3f" % FLGN0)
 			print("Annual rate above M5: %.3f +/- %.3f" % (FN5, STDFN5))
 
-		## Other parameters computed in previous versions of this method
+		## Other parameters computed in Philippe Rosset's version
 		#STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
 		#STDA = np.sqrt(abs(A)/NKOUNT)
-		ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
-		print ALPHA
-		#print ALPHA, BETA
+		#ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
 		#STDALPHA = ALPHA / np.sqrt(NKOUNT)
 		#if Mc !=None:
 		#	LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
@@ -1545,7 +1552,9 @@ class EQCatalog:
 
 		return A, B, STDB
 
-	def get_estimated_MFD(self, Mmin=None, Mmax=None, dM=0.1, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, verbose=False):
+	#TODO: averaged Weichert method
+
+	def get_estimated_MFD(self, Mmin=None, Mmax=None, dM=0.1, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
 		"""
 		Compute a and b values of Gutenberg Richter relation, and return
 		as TruncatedGRMFD object.
@@ -1557,7 +1566,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "MLE" or "LSQ"
+			String, computation method, either "Weichert", "Aki" or "LSQ"
 			(default: "Weichert")
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
@@ -1567,19 +1576,20 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` (default: Completeness_Rosset)
-		:param bval:
-			Float, fixed b value to constrain MLE estimation (default: None)
+		:param b_val:
+			Float, fixed b value to constrain MLE estimation
+			Currently only supported by Weichert method (default: None)
 		:param verbose:
 			Bool, whether some messages should be printed or not (default: False)
 
 		:return:
 			instance of :class:`mfd.TruncatedGRMFD`
 		"""
-		calcGR_func = {"Weichert": self.calcGR_Weichert, "MLE": self.calcGR_MLE}[method]
-		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, bval=bval, verbose=verbose)
+		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
+		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
 
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, bval=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
 		Compute GR MFD from observed MFD, and plot result
 
@@ -1600,7 +1610,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` (default: Completeness_Rosset)
-		:param bval:
+		:param b_val:
 			Float, fixed b value to constrain Weichert estimation (default: None)
 		:param num_sigma:
 			Int, number of standard deviations to consider for plotting uncertainty
@@ -1634,30 +1644,34 @@ class EQCatalog:
 		"""
 		mfd_list, labels, colors, styles = [], [], [], []
 		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
-		observed_mfd = cc_catalog.get_incremental_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=None)
+		observed_mfd = cc_catalog.get_incremental_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		mfd_list.append(observed_mfd)
-		labels.append("Observed")
+		label = {"en": "Observed", "nl": "Waargenomen"}[lang]
+		labels.append(label)
 		colors.append(color_observed)
 
 		styles.append('o')
 		if method:
-			estimated_mfd = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=None, bval=bval, verbose=verbose)
+			estimated_mfd = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 			mfd_list.append(estimated_mfd)
 			a, b, stdb = estimated_mfd.a_val, estimated_mfd.b_val, estimated_mfd.b_sigma
-			label = "Estimated (%s): " % method
+			label = {"en": "Computed", "nl": "Berekend"}[lang]
+			label += " (%s): " % method
 			label += "a=%.3f, b=%.3f" % (a, b)
-			if not bval:
+			if not b_val:
 				label += " ($\pm$%.3f)" % stdb
 			labels.append(label)
 			colors.append(color_estimated)
 			styles.append('-')
 			if num_sigma and method == "Weichert":
-				sigma_mfd1 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=None, bval=b+num_sigma*stdb, verbose=verbose)
+				sigma_mfd1 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b+num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd1)
-				labels.append("Estimated $\pm$ %d sigma" % num_sigma)
+				label = {"en": "Computed", "nl": "Berekend"}[lang]
+				label += " $\pm$ %d sigma" % num_sigma
+				labels.append(label)
 				colors.append(color_estimated)
 				styles.append(':')
-				sigma_mfd2 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=None, bval=b-num_sigma*stdb, verbose=verbose)
+				sigma_mfd2 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b-num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd2)
 				labels.append("_nolegend_")
 				colors.append(color_estimated)
@@ -1668,7 +1682,8 @@ class EQCatalog:
 			Mmax_obs = cc_catalog.get_Mmax(Mtype, Mrelation)
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
-		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		end_year = self.end_date.year
+		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def plot_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", cumul=True, discrete=False, completeness=Completeness_Rosset, Mrange=(), Freq_range=(), fixed_beta=None, num_sigma=0, lang="en", color=True, want_lsq=True, want_completeness_limits=False, want_exponential=False, title=None, fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
@@ -2098,8 +2113,10 @@ class EQCatalog:
 		wgs84.SetWellKnownGeogCS("WGS84")
 
 		## Read zone model from MapInfo file
-		source_model_table = ZoneModelTables[source_model_name.lower()]
-		tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
+		#source_model_table = ZoneModelTables[source_model_name.lower()]
+		#tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
+		from hazard.psha.openquake.rob_sourceModels import rob_source_models_dict
+		tab_filespec = rob_source_models_dict[source_model_name]["tab_filespec"]
 		mi = ogr.GetDriverByName("MapInfo File")
 		ds = mi.Open(tab_filespec)
 		if verbose:
@@ -2532,36 +2549,53 @@ def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_
 		return zone_catalogs
 
 
-def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, verbose=False):
+def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", convert_NULL=True, verbose=False, errf=None):
 	"""
 	Query ROB local earthquake catalog through the online database.
-	Parameters:
-		region: (w, e, s, n) tuple specifying rectangular region of interest
-		start_date: date (date object or year) specifying start of time window of interest
-		end_date: date (date object or year) specifying end of time window of interest
-		Mmin: minimum magnitude to extract
-		Mmax: minimum magnitude to extract
-		verbose: bool, if True the query string will be echoed to standard output
+
+	Notes:
 	Magnitude used for selection is based on MW first, then MS, then ML.
-	Note that NULL values in the database are converted to 0.0 (this may change in the future)
-	Return value:
-		EQCollection object
+	NULL values in the database are converted to 0.0 (this may change in the future)
+	Only real earthquakes are extracted (type = "ke" and is_true = 1).
+
+	:param region:
+		(w, e, s, n) tuple specifying rectangular region of interest in
+		geographic coordinates (default: None)
+	:param start_date:
+		Int or date or datetime object specifying start of time window of interest
+		If integer, start_date is interpreted as start year
+		(default: None)
+	:param end_date:
+		Int or date or datetime object specifying end of time window of interest
+		If integer, end_date is interpreted as end year
+		(default: None)
+	:param Mmin:
+		Float, minimum magnitude to extract (default: None)
+	:param Mmax:
+		Float, maximum magnitude to extract (default: None)
+	:param min_depth:
+		Float, minimum depth in km to extract (default: None)
+	:param max_depth:
+		Float, maximum depth in km to extract (default: None)
+	:param id_earth:
+		Int or List, ID(s) of event to extract (default: None)
+	:param sort_key":
+		String, property name to sort results with: "date" (= "time")
+		or "mag" (= "size") (default: "date")
+	:param sort_order:
+		String, sort order, either "asc" or "desc" (default: "asc")
+	:param convert_NULL:
+		Bool, whether or not to convert NULL values to zero values
+		(default: True)
+	:param verbose:
+		Bool, if True the query string will be echoed to standard output
+	:param errf:
+		File object, where to print errors
+
+	:return:
+		instance of :class:`EQCatalog`
 	"""
-	if type(start_date) == type(0):
-		start_date = datetime.date(start_date, 1, 1)
-	elif isinstance(start_date, datetime.datetime):
-		start_date = start_date.date()
-	if type(end_date) == type(0):
-		end_date = datetime.date(end_date, 12, 31)
-	elif isinstance(end_date, datetime.datetime):
-		end_date = end_date.date()
-	if not end_date:
-		end_date = datetime.datetime.now().date()
-	if not start_date:
-		start_date = datetime.date(100, 1, 1)
-	catalog = seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, verbose=verbose)
-	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
-	return EQCollection(catalog, start_date, end_date, name=name)
+	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
 def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MS", Mrelation=None):
