@@ -276,13 +276,17 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		Append magnitude-frequency of a characteristic earthquake
 
 		:param Mc:
-			Float, magnitude of characteristic earthquake
+			Float, magnitude of characteristic earthquake, must be multiple
+			of current bin width
 		:param return_period:
 			Float, return period in yr of characteristic earthquake
 		"""
 		Mc = np.floor(Mc / self.bin_width) * self.bin_width
-		characteristic_mfd = EvenlyDiscretizedMFD(Mc, self.bin_width, [1./return_period])
-		self.extend(characteristic_mfd)
+		if self.is_magnitude_compatible(Mc):
+			characteristic_mfd = CharacteristicMFD(Mc, return_period, self.bin_width, Mtype=self.Mtype)
+			self.extend(characteristic_mfd)
+		else:
+			raise Exception("Characteristic magnitude should be multiple of bin width!")
 
 	def plot(self, color='k', style="o", label="", discrete=True, cumul_or_inc="both", completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 		"""
@@ -323,6 +327,23 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 			Int, image resolution in dots per inch (default: 300)
 		"""
 		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, title=title)
+
+
+class CharacteristicMFD(EvenlyDiscretizedMFD):
+	"""
+	MFD representing a characteristic earthquake, implemented as an
+	evenly discretized MFD with one magnitude bin. The characteristic
+	magnitde is taken to correspond to the left edge of the bin.
+
+	:param M:
+		Float, magnitude of characteristic earthquake
+	:param return_period:
+		Float, return period of characteristic earthquake in year
+	:param bin_width:
+		Float, magnitude bin width
+	"""
+	def __init__(self, M, return_period, bin_width, Mtype="MW"):
+		EvenlyDiscretizedMFD.__init__(self, M+bin_width/2, bin_width, [1./return_period], Mtype=Mtype)
 
 
 class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
