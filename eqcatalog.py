@@ -853,6 +853,8 @@ class EQCatalog:
 		"""
 		from matplotlib.patches import FancyArrowPatch
 		catalog_start_year = self.start_date.year // dYear * dYear
+		if start_year <= catalog_start_year:
+			start_year = catalog_start_year
 		bins_N, bins_Years = self.bin_year(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		bins_N_cumul = np.add.accumulate(bins_N)
 		start_year_index = np.where(bins_Years == start_year)[0][0]
