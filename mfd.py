@@ -260,16 +260,16 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		occurrence_rates = other_mfd.occurrence_rates
 		if not np.allclose(other_mfd.bin_width, self.bin_width):
 			raise Exception("Bin width not compatible!")
-		fgap = (magnitude_bin_edges[0] - self.max_mag) / self.bin_width
+		fgap = ((magnitude_bin_edges[0] - self.max_mag) / self.bin_width)
 		gap = int(round(fgap))
 		if not np.allclose(fgap, gap):
 			raise Exception("Bin width not compatible!")
 
-		num_empty_bins = int(round((magnitude_bin_edges[0] - self.max_mag) / self.bin_width)) + 1
+		num_empty_bins = gap + 1
 		if num_empty_bins >= 0:
 			self.occurrence_rates = np.concatenate([self.occurrence_rates, np.zeros(num_empty_bins, dtype='d'), occurrence_rates])
 		else:
-			raise Exception("Magnitudes must not overlap with MFD magnitude range")
+			raise Exception("Magnitudes must not overlap with MFD magnitude range. Sum MFD's instead")
 
 	def append_characteristic_eq(self, Mc, return_period):
 		"""
@@ -597,22 +597,25 @@ def sum_MFDs(mfd_list, weights=[]):
 	is_truncated = np.array([isinstance(mfd, TruncatedGRMFD) for mfd in mfd_list])
 	if is_truncated.all():
 		all_bvals = set([mfd.b_val for mfd in mfd_list])
-		all_Mtypes = set([mfd.Mtype for mfd in mfd_list])
-		if len(all_min_mags) == len(all_max_mags) == len(all_bvals) == len(all_Mtypes) == 1:
+		if len(all_min_mags) == len(all_max_mags) == len(all_bvals) == 1:
+			## TruncatedGR's can be summed into another TruncatedGR object
 			all_avals = np.array([mfd.a_val for mfd in mfd_list])
 			a = np.log10(np.add.reduce(10**all_avals * weights))
 			mfd = mfd_list[0]
 			return TruncatedGRMFD(mfd.min_mag, mfd.max_mag, mfd.bin_width, a, mfd.b_val, mfd.b_sigma, mfd.Mtype)
-	else:
-		min_mag = min(all_min_mags)
-		max_mag = max(all_max_mags)
-		num_bins = int(round((max_mag - min_mag) / bin_width))
-		occurrence_rates = np.zeros(num_bins, 'd')
-		for i, mfd in enumerate(mfd_list):
-			start_index = int(round((mfd.get_min_mag() - min_mag) / bin_width))
-			end_index = start_index + len(mfd.occurrence_rates)
-			occurrence_rates[start_index:end_index] += (mfd.occurrence_rates * weights[i])
-		return EvenlyDiscretizedMFD(min_mag+bin_width/2, bin_width, list(occurrence_rates), Mtype)
+		else:
+			## TruncatedGR's can be summed after conversion to EvenlyDiscretized
+			pass
+
+	min_mag = min(all_min_mags)
+	max_mag = max(all_max_mags)
+	num_bins = int(round((max_mag - min_mag) / bin_width))
+	occurrence_rates = np.zeros(num_bins, 'd')
+	for i, mfd in enumerate(mfd_list):
+		start_index = int(round((mfd.get_min_mag_edge() - min_mag) / bin_width))
+		end_index = start_index + len(mfd.occurrence_rates)
+		occurrence_rates[start_index:end_index] += (mfd.occurrence_rates * weights[i])
+	return EvenlyDiscretizedMFD(min_mag+bin_width/2, bin_width, list(occurrence_rates), Mtype)
 
 
 def plot_MFD(mfd_list, colors=[], styles=[], labels=[], discrete=[], cumul_or_inc=[], completeness=None, end_year=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
