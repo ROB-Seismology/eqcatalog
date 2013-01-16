@@ -342,7 +342,8 @@ class CharacteristicMFD(EvenlyDiscretizedMFD):
 	:param bin_width:
 		Float, magnitude bin width
 	"""
-	def __init__(self, M, return_period, bin_width, Mtype="MW"):
+	# TODO: sigma, num_sigma
+	def __init__(self, M, return_period, bin_width, Mtype="MW", sigma=0, num_sigma=0):
 		EvenlyDiscretizedMFD.__init__(self, M+bin_width/2, bin_width, [1./return_period], Mtype=Mtype)
 
 

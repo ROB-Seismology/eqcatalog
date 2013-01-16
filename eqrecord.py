@@ -87,6 +87,14 @@ class LocalEarthquake:
 		self.errt = errt
 		self.errM = errM
 
+	@property
+	def date(self):
+		return self.datetime.date()
+
+	@property
+	def time(self):
+		return self.datetime.time()
+
 	def get_ML(self, relation=None):
 		"""
 		Return ML

@@ -813,7 +813,7 @@ class EQCatalog:
 		"""
 		bins_Years = np.arange(start_year, end_year+dYear, dYear)
 		## Select years according to magnitude criteria
-		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		Years = subcatalog.get_years()
 		bins_N, bins_Years = np.histogram(Years, bins_Years)
 		return (bins_N, bins_Years[:-1])
