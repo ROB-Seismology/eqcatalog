@@ -2217,7 +2217,7 @@ class EQCatalog:
 		Mags = self.get_magnitudes(Mtype, Mrelation)
 		result = stepp_analysis(years, Mags, dM, dt, ttol, iloc=True)
 		Min_Years, Min_Mags = result[:,0].astype('i'), result[:,1]
-		return Completeness(Min_Years, Min_Mags)
+		return Completeness(Min_Years[::-1], Min_Mags[::-1])
 
 	def decluster(self, method="afteran", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
 		"""
