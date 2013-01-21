@@ -2218,6 +2218,35 @@ class EQCatalog:
 		result = stepp_analysis(years, Mags, dM, dt, ttol, iloc=True)
 		Min_Years, Min_Mags = result[:,0].astype('i'), result[:,1]
 		return Completeness(Min_Years[::-1], Min_Mags[::-1])
+	
+	def analyse_completeness_Stepp_new(self, dM=1.0, Mtype="MS", Mrelation=None, dt=5.0, increment_lock=True):
+		"""
+		"""
+		from hmtk.seismicity.catalogue import Catalogue
+		from hmtk.seismicity.completeness.comp_stepp_1971 import Stepp1971
+		
+		ec = Catalogue()
+		keys_int = ['year', 'month', 'day', 'hour', 'minute']
+		keys_flt = ['second', 'magnitude']
+		data_int, data_flt = [], []
+		for eq in self:
+			data_int.append([
+				int(eq.datetime.year),
+				int(eq.datetime.month),
+				int(eq.datetime.day),
+				int(eq.datetime.hour),
+				int(eq.datetime.minute),
+			])
+			data_flt.append([
+				float(eq.datetime.second),
+				float(eq.get_M(Mtype, Mrelation)),
+			])
+		ec.load_from_array(keys_int, np.array(data_int, dtype=np.int16))
+		ec.load_from_array(keys_flt, np.array(data_flt, dtype=np.float64))
+		stepp = Stepp1971()
+		result = stepp.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
+		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
+		return Completeness(Min_Years, Min_Mags)
 
 	def decluster(self, method="afteran", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
 		"""
