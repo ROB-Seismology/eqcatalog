@@ -2187,9 +2187,9 @@ class EQCatalog:
 
 	def analyse_completeness_Stepp(self, Mmin=1.8, dM=1.0, Mtype="MS", Mrelation=None, dt=5, ttol=0.2):
 		"""
-		Analyze catalog completeness with the Stepp algorithm.
-		This method is a wrapper for :meth:`stepp_analysis` in the OQ
-		hazard modeller's toolkit.
+		Analyze catalog completeness with the Stepp method algorithm from GEM (old
+		implementation). This method is a wrapper for :meth:`stepp_analysis` in
+		the OQ hazard modeller's toolkit.
 
 		:param Mmin:
 			Float, minimum magnitude (default: 1.8)
@@ -2202,7 +2202,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param dt:
-			Int, time interval (in years?) (default: 5)
+			Int, time interval (in years) (default: 5)
 		:param ttol:
 			Positive float, tolerance threshold (default: 0.2)
 
@@ -2219,8 +2219,27 @@ class EQCatalog:
 		Min_Years, Min_Mags = result[:,0].astype('i'), result[:,1]
 		return Completeness(Min_Years[::-1], Min_Mags[::-1])
 	
-	def analyse_completeness_Stepp_new(self, dM=1.0, Mtype="MS", Mrelation=None, dt=5.0, increment_lock=True):
+	def analyse_completeness_Stepp_new(self, dM=0.1, Mtype="MS", Mrelation=None, dt=5.0, increment_lock=True):
 		"""
+		Analyze catalog completeness with the Stepp method algorithm from GEM (new
+		implementation). This method is a wrapper for :meth:`Step1971.completeness`
+		in the OQ hazard modeller's toolkit.
+		
+		:param dM:
+			Float, magnitude bin width (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param dt:
+			Float, time interval (in years) (default: 5)
+		:param increment_lock:
+			Boolean, ensure completeness magnitudes always decrease with more
+			recent bins (default: True).
+		:return:
+			instance of :class:`Completeness`
 		"""
 		from hmtk.seismicity.catalogue import Catalogue
 		from hmtk.seismicity.completeness.comp_stepp_1971 import Stepp1971
