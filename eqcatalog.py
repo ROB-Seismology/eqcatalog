@@ -2266,6 +2266,18 @@ class EQCatalog:
 		result = stepp.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
 		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
 		return Completeness(Min_Years, Min_Mags)
+	
+	def completeness_Stepp(self, start_year=None, mags=[2.], dt=5, Mtype="MS", Mrelation=None):
+		"""
+		"""
+		for mag in mags:
+			eqc_m = self.subselect(start_date=start_year, Mmin=mag, Mtype=Mtype, Mrelation=Mrelation)
+			bin_year = self.end_date.year - dt
+			while bin_year > eqc_m.start_date.year:
+				eqc_t = eqc_m.subselect(start_date=bin_year)
+				N = len(eqc_t)/(eqc_t.timespan())
+				print '%s-%s: %s' % (bin_year, self.end_date.year, N)
+				bin_year -= dt
 
 	def decluster(self, method="afteran", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
 		"""
