@@ -38,7 +38,7 @@ if platform.uname()[1] == "seissrv3":
 import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
-from matplotlib.ticker import MultipleLocator
+from matplotlib.ticker import MultipleLocator, MaxNLocator
 from scipy import stats
 import ogr
 import osr
@@ -245,13 +245,13 @@ class EQCatalog:
 		#years = [eq.datetime.year + (eq.datetime.month - 1.0) /12 + ((eq.datetime.day - 1.0) / 31) / 12 for eq in self]
 		return years
 
-	def get_magnitudes(self, Mtype="MS", relation=None):
+	def get_magnitudes(self, Mtype="MS", Mrelation=None):
 		"""
 		Return array of magnitudes for all earthquakes in catalog
 
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
-		:param relation:
+		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
@@ -260,11 +260,11 @@ class EQCatalog:
 			1-D numpy float array, earthquake magnitudes
 		"""
 		if Mtype.upper() == "ML":
-			Mags = [eq.get_ML(relation=relation) for eq in self]
+			Mags = [eq.get_ML(Mrelation=Mrelation) for eq in self]
 		elif Mtype.upper() == "MS":
-			Mags = [eq.get_MS(relation=relation) for eq in self]
+			Mags = [eq.get_MS(Mrelation=Mrelation) for eq in self]
 		elif Mtype.upper() == "MW":
-			Mags = [eq.get_MW(relation=relation) for eq in self]
+			Mags = [eq.get_MW(Mrelation=Mrelation) for eq in self]
 		return np.array(Mags)
 
 	def get_magnitude_uncertainties(self, min_uncertainty=0.3):
@@ -342,7 +342,7 @@ class EQCatalog:
 		DateTimes = self.get_datetimes()
 		if Mmax != None:
 			filtered_DateTimes = []
-			Mags = self.get_magnitudes(Mtype=Mtype, relation=Mrelation)
+			Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
 			for M, dt in zip(Mags, DateTimes):
 				if M < Mmax:
 					filtered_DateTimes.append(dt)
@@ -352,18 +352,18 @@ class EQCatalog:
 		else:
 			return (None, None)
 
-	def Mminmax(self, Mtype="MS", relation=None):
+	def Mminmax(self, Mtype="MS", Mrelation=None):
 		"""
 		Return tuple with minimum and maximum magnitude in catalog.
 
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
-		:param relation:
+		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		"""
-		Mags = self.get_magnitudes(Mtype=Mtype, relation=relation)
+		Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
 		return (Mags.min(), Mags.max())
 
 	def depth_minmax(self):
@@ -393,7 +393,7 @@ class EQCatalog:
 		"""
 		return self.lon_minmax() + self.lat_minmax()
 
-	def get_Mmax(self, Mtype="MS", relation=None):
+	def get_Mmax(self, Mtype="MS", Mrelation=None):
 		"""
 		Compute maximum magnitude in catalog
 
@@ -407,7 +407,7 @@ class EQCatalog:
 		:return:
 			Float, maximum observed magnitude
 		"""
-		return self.get_magnitudes(Mtype, relation).max()
+		return self.get_magnitudes(Mtype, Mrelation).max()
 
 	def get_M0(self, Mrelation={"MS": "bungum", "ML": "hinzen"}):
 		"""
@@ -421,9 +421,9 @@ class EQCatalog:
 		:return:
 			Float, total seismic moment in N.m
 		"""
-		return np.add.reduce(np.array([eq.get_M0(relation=Mrelation) for eq in self]))
+		return np.add.reduce(np.array([eq.get_M0(Mrelation=Mrelation) for eq in self]))
 
-	def get_M0rate(self, relation="Hinzen"):
+	def get_M0rate(self, Mrelation="Hinzen"):
 		"""
 		Compute seismic moment rate.
 
@@ -916,13 +916,13 @@ class EQCatalog:
 		if ddate_spec.lower()[:4] == "year":
 			for j, eq in enumerate(self):
 				i = list(eq.datetime.year < bins_Dates).index(True) - 1
-				bins_M0[i] += eq.get_M0(relation=Mrelation)
-				M0[j] = eq.get_M0(relation=Mrelation)
+				bins_M0[i] += eq.get_M0(Mrelation=Mrelation)
+				M0[j] = eq.get_M0(Mrelation=Mrelation)
 		elif ddate_spec.lower()[:3] == "day":
 			for j, eq in enumerate(self):
 				i = (eq.datetime.date() - start_date).days
-				bins_M0[i] += eq.get_M0(relation=Mrelation)
-				M0[j] = eq.get_M0(relation=Mrelation)
+				bins_M0[i] += eq.get_M0(Mrelation=Mrelation)
+				M0[j] = eq.get_M0(Mrelation=Mrelation)
 		bins_M0_cumul = np.add.accumulate(bins_M0)
 		M0_cumul = np.add.accumulate(M0)
 
@@ -1068,6 +1068,60 @@ class EQCatalog:
 		pylab.ylabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
 		pylab.grid(True)
 		pylab.show()
+	
+	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, completeness=None, declustering=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
+		"""
+		Plot time versus magnitude
+
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param lang:
+			String, language of plot labels (default: "en")
+		"""
+		x = self.get_fractional_years()
+		y = self.get_magnitudes(Mtype, Mrelation)
+		plt.scatter(x, y, s=50, color="k", marker="s", facecolors='none')
+		xmin, xmax, ymin, ymax = plt.axis()
+		xmin, xmax = self.start_date.year, self.end_date.year+1
+		plt.axis((xmin, xmax, ymin, ymax))
+		
+		## plot vlines
+		if vlines:
+			plt.vlines(x, ymin=ymin, ymax=y)
+
+		## plot ticks
+		if major_ticks:
+			majorLocator = MultipleLocator(major_ticks)
+		else:
+			majorLocator = MaxNLocator(integer=True)
+		minorLocator = MultipleLocator(minor_ticks)
+		ax = plt.gca()
+		ax.xaxis.set_major_locator(majorLocator)
+		ax.xaxis.set_minor_locator(minorLocator)
+		
+		## plot labels
+		plt.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
+		plt.ylabel("Magnitude (%s)" % Mtype)
+
+		## plot declustering
+		if declustering:
+			x = declustering.get_fractional_years()
+			y = declustering.get_magnitudes(Mtype, Mrelation)
+			plt.scatter(x, y, s=50, color="r", marker="s", facecolors='none')
+
+		## plot completeness
+		if completeness:
+			x, y = completeness.min_years, completeness.min_mags
+			x = np.append(x, xmax)
+			plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors='r')
+			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r')
+		
+		plt.title(title)
+		plt.show()
 
 	def bin_hour(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
 		"""
@@ -1215,7 +1269,7 @@ class EQCatalog:
 					## These are earthquakes that are deeper
 					pass
 				else:
-					bins_M0[bin_id] += eq.get_M0(relation=Mrelation)
+					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_depth
 
 	def plot_DepthHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2, color='b', want_title=True, fig_filespec="", fig_width=0, dpi=300):
@@ -2433,7 +2487,7 @@ class EQCatalog:
 		return np.log10(a), b, stdb
 
 
-	def plot_3d(self, limits=None, Mtype=None, relation=None):
+	def plot_3d(self, limits=None, Mtype=None, Mrelation=None):
 		"""
 		Plot catalog in 3D. Points are colored by magnitude.
 
@@ -2444,7 +2498,7 @@ class EQCatalog:
 			should be used to create plots with identical scales.
 		:param Mtype:
 			See :method: get_magnitudes.
-		:param relation:
+		:param Mrelation:
 			See :method: get_magnitudes.
 		"""
 		from mpl_toolkits.mplot3d.axes3d import Axes3D
@@ -2453,8 +2507,8 @@ class EQCatalog:
 		kwargs = {}
 		if Mtype:
 			kwargs['Mtype'] = Mtype
-		if relation:
-			kwargs['relation'] = relation
+		if Mrelation:
+			kwargs['Mrelation'] = Mrelation
 		p = ax.scatter(self.get_longitudes(), self.get_latitudes(), self.get_depths()*-1, c=self.get_magnitudes(**kwargs), cmap=plt.cm.jet)
 		## set labels
 		ax.set_xlabel('longitude')
@@ -3003,11 +3057,11 @@ if __name__ == "__main__":
 	## Report total seismic moment
 	#historical_catalog = catalog.subselect(end_date=datetime.date(1909, 12, 31))
 	#instrumental_catalog = catalog.subselect(start_date = datetime.date(1910, 1, 1))
-	#M0_historical = historical_catalog.get_M0rate(relation="geller")
-	#M0_instrumental = instrumental_catalog.get_M0rate(relation="hinzen")
+	#M0_historical = historical_catalog.get_M0rate(Mrelation="geller")
+	#M0_instrumental = instrumental_catalog.get_M0rate(Mrelation="hinzen")
 	#M0_total = M0_historical + M0_instrumental
 	#print "Total seismic moment: %.2E (historical) + %.2E (instrumental) = %.2E N.m" % (M0_historical, M0_instrumental, M0_total)
-	#catalog.plot_CumulatedM0(ddate=10, ddate_spec="years", relation=None)
+	#catalog.plot_CumulatedM0(ddate=10, ddate_spec="years", Mrelation=None)
 
 	## Read full catalog from database, calculate a and b values, and store these for later use
 	"""

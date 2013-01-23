@@ -95,20 +95,20 @@ class LocalEarthquake:
 	def time(self):
 		return self.datetime.time()
 
-	def get_ML(self, relation=None):
+	def get_ML(self, Mrelation=None):
 		"""
 		Return ML
 		Not yet implemented!
 		"""
 		return self.ML
 
-	def get_MS(self, relation={"ML": "ambraseys"}):
+	def get_MS(self, Mrelation={"ML": "ambraseys"}):
 		"""
 		Return MS.
 		If MS is None or zero, calculate it using the specified
 		magnitude conversion relation
 
-		:param relation:
+		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MS" or "ML").
 			Only one relation is currently supported:
@@ -119,12 +119,12 @@ class LocalEarthquake:
 		:return:
 			Float, surface-wave magnitude
 		"""
-		if relation is None:
-			relation={"ML": "ambraseys"}
+		if Mrelation is None:
+			Mrelation={"ML": "ambraseys"}
 
 		if not self.MS:
-			if self.ML and relation.has_key("ML"):
-				if relation["ML"].lower() == "ambraseys":
+			if self.ML and Mrelation.has_key("ML"):
+				if Mrelation["ML"].lower() == "ambraseys":
 					return 0.09 + 0.93 * self.ML
 			# TODO: add relation for MW
 			else:
@@ -132,13 +132,13 @@ class LocalEarthquake:
 		else:
 			return self.MS
 
-	def get_MW(self, relation={"MS": "geller", "ML": "hinzen"}):
+	def get_MW(self, Mrelation={"MS": "geller", "ML": "hinzen"}):
 		"""
 		Return MW.
 		If MW is None or zero, calculate it using the specified
 		magnitude conversion relation
 
-		:param relation:
+		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MS" or "ML"). Note that MS takes precedence
 			over ML.
@@ -158,13 +158,13 @@ class LocalEarthquake:
 		:return:
 			Float, moment magnitude
 		"""
-		if relation is None:
-			relation={"MS": "geller", "ML": "hinzen"}
+		if Mrelation is None:
+			Mrelation={"MS": "geller", "ML": "hinzen"}
 
 		if not self.MW:
-			if self.MS and relation.has_key("MS"):
+			if self.MS and Mrelation.has_key("MS"):
 				## Conversion MS -> MW (Geller, 1976)
-				if relation["MS"].lower() == "geller":
+				if Mrelation["MS"].lower() == "geller":
 					if self.MS < 6.76:
 						log_Mo_dyncm = self.MS + 18.89
 					elif 6.76 <= self.MS < 8.12:
@@ -175,22 +175,22 @@ class LocalEarthquake:
 						return np.NaN
 					MW = (2.0/3) * log_Mo_dyncm - 10.73
 				## Conversion MS -> MW (Bungum  et al., 2003)
-				elif relation["MS"].lower() == "bungum":
+				elif Mrelation["MS"].lower() == "bungum":
 					if self.MS < 5.4:
 						MW = 0.585 * self.MS + 2.422
 					else:
 						MW = 0.769 * self.MS + 1.280
-			elif self.ML and relation.has_key("ML"):
+			elif self.ML and Mrelation.has_key("ML"):
 				## Relation with ML by Ahorner (1983)
-				if relation["ML"].lower() == "ahorner":
+				if Mrelation["ML"].lower() == "ahorner":
 					log_Mo_dyncm = 17.4 + 1.1 * self.ML
 					MW = (2.0/3) * log_Mo_dyncm - 10.73
 				## Relation with ML by Hinzen (2004)
-				elif relation["ML"].lower() == "hinzen":
+				elif Mrelation["ML"].lower() == "hinzen":
 					log_Mo = 1.083 * self.ML + 10.215
 					MW = (2.0/ 3) * log_Mo - 6.06
 				## Relation with ML by Gruenthal & Wahlstrom (2003)
-				elif relation["ML"].lower() == "gruenthal":
+				elif Mrelation["ML"].lower() == "gruenthal":
 					MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
 			else:
 				MW = 0.
@@ -198,13 +198,13 @@ class LocalEarthquake:
 			MW = self.MW
 		return MW
 
-	def get_M(self, Mtype, relation=None):
+	def get_M(self, Mtype, Mrelation=None):
 		"""
 		Wrapper for get_ML, get_MS, and get_MW functions
 
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
-		:param relation:
+		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
@@ -212,15 +212,15 @@ class LocalEarthquake:
 		:return:
 			Float, magnitude
 		"""
-		return getattr(self, "get_"+Mtype)(relation=relation)
+		return getattr(self, "get_"+Mtype)(Mrelation=Mrelation)
 
-	def get_M0(self, relation=None):
+	def get_M0(self, Mrelation=None):
 		"""
 		Compute seismic moment.
 		If MW is None or zero, it will be computed using the specified
 		magntiude conversion relation.
 
-		:param relation:
+		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type.
 			See :meth:`get_MW`
@@ -228,7 +228,7 @@ class LocalEarthquake:
 		:return:
 			Float, scalar seismic moment in N.m
 		"""
-		return 10**((self.get_MW(relation=relation) + 6.06) * 3.0 / 2.0)
+		return 10**((self.get_MW(Mrelation=Mrelation) + 6.06) * 3.0 / 2.0)
 
 	def get_fractional_year(self):
 		"""
