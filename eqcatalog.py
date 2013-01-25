@@ -1069,7 +1069,7 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 	
-	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, completeness=None, declustering=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
+	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, declustering=None, completeness=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
 		"""
 		Plot time versus magnitude
 
@@ -1079,6 +1079,19 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
+		:param declustering:
+			class:`EQCatalog` instance, (default: None)
+		:param completeness:
+			class:`Completeness` instance, (default: None)
+		:param vlines:
+			Boolean, plot vertical lines from data point to x-axis (default: False)
+		:param major_ticks:
+			Int, interval in years for major ticks (default: None). If none, a
+			maximum number of ticks at nice locations will be used.
+		:param minor_ticks:
+			Int, interval in years for minor ticks (default: 1)
+		:param title:
+			Str, title of plot (default: "")
 		:param lang:
 			String, language of plot labels (default: "en")
 		"""
@@ -1087,17 +1100,17 @@ class EQCatalog:
 		plt.scatter(x, y, s=50, color="k", marker="s", facecolors='none')
 		xmin, xmax, ymin, ymax = plt.axis()
 		xmin, xmax = self.start_date.year, self.end_date.year+1
-		plt.axis((xmin, xmax, ymin, ymax))
+		plt.axis((xmin, xmax, 0, ymax))
 		
 		## plot vlines
 		if vlines:
 			plt.vlines(x, ymin=ymin, ymax=y)
-
+		
 		## plot ticks
 		if major_ticks:
 			majorLocator = MultipleLocator(major_ticks)
 		else:
-			majorLocator = MaxNLocator(integer=True)
+			majorLocator = MaxNLocator()
 		minorLocator = MultipleLocator(minor_ticks)
 		ax = plt.gca()
 		ax.xaxis.set_major_locator(majorLocator)
@@ -1106,13 +1119,13 @@ class EQCatalog:
 		## plot labels
 		plt.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
 		plt.ylabel("Magnitude (%s)" % Mtype)
-
+		
 		## plot declustering
 		if declustering:
 			x = declustering.get_fractional_years()
 			y = declustering.get_magnitudes(Mtype, Mrelation)
 			plt.scatter(x, y, s=50, color="r", marker="s", facecolors='none')
-
+		
 		## plot completeness
 		if completeness:
 			x, y = completeness.min_years, completeness.min_mags
@@ -1610,7 +1623,7 @@ class EQCatalog:
 
 	#TODO: averaged Weichert method
 
-	def get_estimated_MFD(self, Mmin=None, Mmax=None, dM=0.1, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
+	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
 		"""
 		Compute a and b values of Gutenberg Richter relation, and return
 		as TruncatedGRMFD object.
