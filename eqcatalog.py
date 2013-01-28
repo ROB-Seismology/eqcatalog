@@ -51,8 +51,6 @@ from thirdparty.recipes.my_arange import *
 
 
 
-__all__ = ["ZoneModelTables", "Completeness", "Completeness_Leynaud", "Completeness_Rosset", "EQCollection", "read_catalogMI", "read_catalogSQL", "read_zonesMI", "read_zonesTXT", "format_zones_CRISIS", "alphabetalambda", "distribute_avalues", "split_avalues"]
-
 GIS_root = r"D:\GIS-data"
 
 ZoneModelTables =	{"leynaud": "ROB Seismic Source Model (Leynaud, 2000)",
@@ -68,7 +66,8 @@ class Completeness:
 	Class defining completeness of earthquake catalog.
 
 	:param min_years:
-		list or array containing initial years of completeness
+		list or array containing initial years of completeness, in
+		chronological order (= from small to large)
 	:param min_mags:
 		list or array with corresponding lower magnitude for which
 		catalog is assumed to be complete
@@ -207,6 +206,9 @@ class EQCatalog:
 	def get_record(self, ID):
 		"""
 		Fetch record with given ID
+
+		:param ID:
+			Int, ID of earthquake in ROB database
 
 		:return:
 			instance of :class:`LocalEarthquake`
@@ -430,7 +432,7 @@ class EQCatalog:
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MS" or "ML")
-			(default: {"MS": "bungum", "ML": "hinzen"})
+			(default: {"MS": "geller", "ML": "hinzen"})
 
 		:return:
 			Float, seismic moment rate in N.m/yr
@@ -505,7 +507,7 @@ class EQCatalog:
 							if min_depth <= eq.depth <= max_depth:
 								eq_list.append(eq)
 
-		return EQCollection(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (subselect)")
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (subselect)")
 
 	def subselect_completeness(self, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, verbose=True):
 		"""
@@ -545,7 +547,7 @@ class EQCatalog:
 		if verbose:
 			print "Number of events constrained by completeness criteria: %d out of %d" % (len(eq_list), len(self.eq_list))
 
-		return EQCollection(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (completeness-constrained)")
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (completeness-constrained)")
 
 	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=None):
 		"""
@@ -748,6 +750,149 @@ class EQCatalog:
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
+	def bin_year(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MS", Mrelation=None):
+		"""
+		Bin earthquakes into year intervals
+
+		:param start_year:
+			Int, lower year to bin (left edge of first bin)
+		:param end_year:
+			Int, upper year to bin (right edge of last bin)
+		:param dYear:
+			Int, bin interval in years
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			tuple (bins_N, bins_Years)
+			bins_N: array containing number of earthquakes for each bin
+			bins_Years: array containing lower year of each interval
+		"""
+		bins_Years = np.arange(start_year, end_year+dYear, dYear)
+		## Select years according to magnitude criteria
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		Years = subcatalog.get_years()
+		bins_N, bins_Years = np.histogram(Years, bins_Years)
+		return (bins_N, bins_Years[:-1])
+
+	def bin_hour(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+		"""
+		Bin earthquakes into hour intervals
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+
+		:return:
+			tuple (bins_N, bins_Hours)
+			bins_N: array containing number of earthquakes for each bin
+			bins_Hours: array containing lower limit of each hour interval
+		"""
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		hours = np.array([eq.get_fractional_hour() for eq in subcatalog])
+		bins_Hr = np.arange(25)
+		bins_N, junk = np.histogram(hours, bins_Hr)
+		return bins_N, bins_Hr[:-1]
+
+	def bin_depth(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+		"""
+		Bin earthquakes into depth bins
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param min_depth:
+			Int, minimum depth in km (default: 0)
+		:param max_depth:
+			Int, maximum depth in km (default: 30)
+		:param bin_width:
+			Int, bin width in km (default: 2)
+
+		:return:
+			tuple (bins_N, bins_depth)
+			bins_N: array containing number of earthquakes for each bin
+			bins_depth: array containing lower depth value of each interval
+		"""
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
+		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
+		bins_N, junk = np.histogram(depths, bins_depth)
+		return bins_N, bins_depth[:-1]
+
+	def bin_depth_by_M0(self, Mmin, Mmax, Mtype="MW", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+		"""
+		Bin earthquake moments into depth bins
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param min_depth:
+			Int, minimum depth in km (default: 0)
+		:param max_depth:
+			Int, maximum depth in km (default: 30)
+		:param bin_width:
+			Int, bin width in km (default: 2)
+
+		:return:
+			tuple (bins_M0, bins_depth)
+			bins_M0: array containing summed seismic moment in each bin
+			bins_depth: array containing lower depth value of each interval
+		"""
+		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
+		bins_M0 = np.zeros(len(bins_depth))
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		for eq in subcatalog:
+			if eq.depth not in (None, 0):
+				try:
+					bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
+				except:
+					## These are earthquakes that are deeper
+					pass
+				else:
+					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
+		return bins_M0, bins_depth
+
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, fig_filespec=None, verbose=False):
 		"""
 		Plot magnitude histogram of earthquakes in collection.
@@ -784,39 +929,6 @@ class EQCatalog:
 			pylab.clf()
 		else:
 			pylab.show()
-
-	def bin_year(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MS", Mrelation=None):
-		"""
-		Bin earthquakes into year intervals
-
-		:param start_year:
-			Int, lower year to bin (left edge of first bin)
-		:param end_year:
-			Int, upper year to bin (right edge of last bin)
-		:param dYear:
-			Int, bin interval in years
-		:param Mmin:
-			Float, minimum magnitude (inclusive)
-		:param Mmax:
-			Float, maximum magnitude (inclusive)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-
-		:return:
-			tuple (bins_N, bins_Years)
-			bins_N: array containing number of earthquakes for each bin
-			bins_Years: array containing lower year of each interval
-		"""
-		bins_Years = np.arange(start_year, end_year+dYear, dYear)
-		## Select years according to magnitude criteria
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		Years = subcatalog.get_years()
-		bins_N, bins_Years = np.histogram(Years, bins_Years)
-		return (bins_N, bins_Years[:-1])
 
 	def plot_CumulativeYearHistogram(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MS", Mrelation=None, major_ticks=10, minor_ticks=1, completeness_year=None, regression_range=[], lang="en"):
 		"""
@@ -1068,7 +1180,7 @@ class EQCatalog:
 		pylab.ylabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
 		pylab.grid(True)
 		pylab.show()
-	
+
 	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, declustering=None, completeness=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
 		"""
 		Plot time versus magnitude
@@ -1101,7 +1213,7 @@ class EQCatalog:
 		xmin, xmax, ymin, ymax = plt.axis()
 		xmin, xmax = self.start_date.year, self.end_date.year+1
 		plt.axis((xmin, xmax, 0, ymax))
-		
+
 		## plot vlines
 		if vlines:
 			plt.vlines(x, ymin=ymin, ymax=y)
@@ -1115,7 +1227,7 @@ class EQCatalog:
 		ax = plt.gca()
 		ax.xaxis.set_major_locator(majorLocator)
 		ax.xaxis.set_minor_locator(minorLocator)
-		
+
 		## plot labels
 		plt.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
 		plt.ylabel("Magnitude (%s)" % Mtype)
@@ -1132,39 +1244,9 @@ class EQCatalog:
 			x = np.append(x, xmax)
 			plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors='r')
 			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r')
-		
+
 		plt.title(title)
 		plt.show()
-
-	def bin_hour(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
-		"""
-		Bin earthquakes into hour intervals
-
-		:param Mmin:
-			Float, minimum magnitude (inclusive)
-		:param Mmax:
-			Float, maximum magnitude (inclusive)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param start_year:
-			Int, lower year to bin (default: None)
-		:param end_year:
-			Int, upper year to bin (default: None)
-
-		:return:
-			tuple (bins_N, bins_Hours)
-			bins_N: array containing number of earthquakes for each bin
-			bins_Hours: array containing lower limit of each hour interval
-		"""
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		hours = np.array([eq.get_fractional_hour() for eq in subcatalog])
-		bins_Hr = np.arange(25)
-		bins_N, junk = np.histogram(hours, bins_Hr)
-		return bins_N, bins_Hr[:-1]
 
 	def HourlyMean(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, day=(10, 17), night=(19, 7)):
 		bins_N, bins_Hr = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
@@ -1204,86 +1286,6 @@ class EQCatalog:
 			end_year = self.end_date.year
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
-
-	def bin_depth(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
-		"""
-		Bin earthquakes into depth bins
-
-		:param Mmin:
-			Float, minimum magnitude (inclusive)
-		:param Mmax:
-			Float, maximum magnitude (inclusive)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param start_year:
-			Int, lower year to bin (default: None)
-		:param end_year:
-			Int, upper year to bin (default: None)
-		:param min_depth:
-			Int, minimum depth in km (default: 0)
-		:param max_depth:
-			Int, maximum depth in km (default: 30)
-		:param bin_width:
-			Int, bin width in km (default: 2)
-
-		:return:
-			tuple (bins_N, bins_depth)
-			bins_N: array containing number of earthquakes for each bin
-			bins_depth: array containing lower depth value of each interval
-		"""
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
-		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
-		bins_N, junk = np.histogram(depths, bins_depth)
-		return bins_N, bins_depth[:-1]
-
-	def bin_depth_by_M0(self, Mmin, Mmax, Mtype="MW", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
-		"""
-		Bin earthquake moments into depth bins
-
-		:param Mmin:
-			Float, minimum magnitude (inclusive)
-		:param Mmax:
-			Float, maximum magnitude (inclusive)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param start_year:
-			Int, lower year to bin (default: None)
-		:param end_year:
-			Int, upper year to bin (default: None)
-		:param min_depth:
-			Int, minimum depth in km (default: 0)
-		:param max_depth:
-			Int, maximum depth in km (default: 30)
-		:param bin_width:
-			Int, bin width in km (default: 2)
-
-		:return:
-			tuple (bins_M0, bins_depth)
-			bins_M0: array containing summed seismic moment in each bin
-			bins_depth: array containing lower depth value of each interval
-		"""
-		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
-		bins_M0 = np.zeros(len(bins_depth))
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		for eq in subcatalog:
-			if eq.depth not in (None, 0):
-				try:
-					bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
-				except:
-					## These are earthquakes that are deeper
-					pass
-				else:
-					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
-		return bins_M0, bins_depth
 
 	def plot_DepthHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2, color='b', want_title=True, fig_filespec="", fig_width=0, dpi=300):
 		bins_N, bins_depth = self.bin_depth(Mmin, Mmax, Mtype, start_year, end_year, min_depth, max_depth, bin_width)
@@ -1340,99 +1342,6 @@ class EQCatalog:
 			pylab.clf()
 		else:
 			pylab.show()
-
-	def MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, trim=False, verbose=False):
-		"""
-		Calculate cumulative and discrete magnitude / frequency for binned magnitude intervals.
-		Parameters:
-			Required:
-				Mmin: minimum magnitude to bin
-				Mmax: maximum magnitude to bin
-				dM: magnitude interval
-			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MS"
-				completeness: Completeness object with initial years of completeness and corresponding
-					minimum magnitudes, defaults to Completeness_Leynaud
-				trim: boolean indicating whether empty bins at start and end should be trimmed, defaults to False
-				verbose: boolean indicating whether some messages should be printed or not, defaults to False
-		Return value:
-			(bins_N_cumulative, bins_N_discrete, bins_Mag, bins_Years, num_events, Mmax_obs) tuple
-			bins_N_cumulative: array with cumulative frequency of M higher than or equal to minimum magnitude in each magnitude interval
-			bins_N_discrete: array with discrete frequency for each magnitude interval
-			bins_Mag: array containing lower magnitude of each interval
-			bins_Years: array containing time span (in years) for each magnitude interval
-			num_events: total number of events selected
-			Mmax_obs: maximum observed magnitude in analyzed collection
-			Note that order of arrays is reversed with respect to Mbin !
-		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
-		## Chop off last element of bins_Mag, as it is not a lower bin value
-		bins_Mag = bins_Mag[:-1]
-		## We need to normalize n values to maximum time span !
-		max_span = bins_Years[-1] * 1.0
-		bins_N_discrete = np.array([n * max_span / span for (n, span) in zip(bins_N, bins_Years)])
-		## Reverse arrays for calculating cumulative number of events
-		bins_N_discrete = bins_N_discrete[::-1]
-		bins_Mag = bins_Mag[::-1]
-		bins_Years = bins_Years[::-1]
-		bins_N_cumulative = np.add.accumulate(bins_N_discrete)
-
-		if verbose:
-			print "Mmin   N   Ncumul"
-			for Mag, N_disc, N_cumul in zip (bins_Mag, bins_N_discrete, bins_N_cumulative):
-				print "%.2f  %3d   %3d" % (Mag, N_disc, N_cumul)
-			print
-
-		return (bins_N_cumulative/max_span, bins_N_discrete/max_span, bins_Mag, bins_Years, num_events, Mmax_obs)
-
-	def LogMagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, verbose=False):
-		"""
-		Calculate log10 of cumulative and discrete magnitude / frequency for binned magnitude intervals.
-		Parameters:
-			Required:
-				Mmin: minimum magnitude to bin
-				Mmax: maximum magnitude to bin
-				dM: magnitude interval
-			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MS"
-				completeness: Completeness object with initial years of completeness and corresponding
-					minimum magnitudes, defaults to Completeness_Leynaud
-				verbose: boolean indicating whether some messages should be printed or not, defaults to False
-		Return value:
-			(bins_N_cumul_log, bins_N_disc_log, bins_Mag, bins_Years, num_events, Mmax_obs) tuple
-			bins_N_cumulative: array with log10 of cumulative frequency of M higher than or equal to minimum magnitude in each magnitude interval
-			bins_N_discrete: array with log10 of discrete frequency for each magnitude interval
-			bins_Mag: array containing lower magnitude of each interval
-			bins_Years: array containing time span (in years) for each magnitude interval
-			num_events: total number of events selected
-			Mmax_obs: maximum observed magnitude in analyzed collection
-			Note that order of arrays is reversed with respect to Mbin !
-		"""
-		bins_N_cumulative, bins_N_discrete, bins_Mag, bins_Years, num_events, Mmax_obs = self.MagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=True, verbose=verbose)
-		bins_N_disc_log = np.log10(bins_N_discrete)
-		bins_N_cumul_log = np.log10(bins_N_cumulative)
-
-		if verbose:
-			print "Mmin   Ncumul/yr   log(Ncumul/yr)"
-			for Mag, Ncumul, logNcumul in zip(bins_Mag, bins_N_cumulative, bins_N_cumul_log):
-				print "%.2f   %.6f   %.3f" % (Mag, Ncumul, logNcumul)
-			print
-
-		return (bins_N_cumul_log, bins_N_disc_log, bins_Mag, bins_Years, num_events, Mmax_obs)
-
-	def LogMagFreqExp(self, bins_Mag, a, b, Mmax):
-		"""
-		Compute exponential form of truncated GR
-		"""
-		#beta = b * np.log(10)
-		#bins_N_cumul_log = a - b * bins_Mag
-		#bins_N_cumul = 10 ** bins_N_cumul_log
-		#bins_N_cumul_mle_ln = np.log(bins_N_cumul * np.exp(-beta * bins_Mag) * (1. - np.exp(-(Mmax - bins_Mag))))
-		#return bins_N_cumul_mle_ln / np.log(10)
-		Mmin = min(bins_Mag)
-		alpha, beta, lamda = alphabetalambda(a, b, Mmin)
-		bins_N_cumul_mle = lamda * (np.exp(-beta*bins_Mag) - np.exp(-beta*Mmax)) / (np.exp(-beta*Mmin) - np.exp(-beta*Mmax))
-		return np.log10(bins_N_cumul_mle)
 
 	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, verbose=False):
 		"""
@@ -1754,167 +1663,6 @@ class EQCatalog:
 		end_year = self.end_date.year
 		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def plot_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", cumul=True, discrete=False, completeness=Completeness_Rosset, Mrange=(), Freq_range=(), fixed_beta=None, num_sigma=0, lang="en", color=True, want_lsq=True, want_completeness_limits=False, want_exponential=False, title=None, fig_filespec=None, fig_width=0, dpi=300, verbose=False):
-		"""
-		Plot magnitude / log10(frequency) diagram for collection.
-		Parameters:
-			Required:
-				Mmin: minimum magnitude to use for binning
-				Mmax: maximum magnitude to use for binning
-				dM: magnitude interval to use for binning
-			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MS"
-				completeness: Completeness object with initial years of completeness and corresponding
-					minimum magnitudes, defaults to Completeness_Leynaud
-				cumul: boolean indicating whether cumulative frequency should be plotted, defaults to True
-				discrete: boolean indicating whether discrete frequency should be plotted, defaults to False
-				verbose: boolean indicating whether some messages should be printed or not, defaults to False
-				fig_filespec: filespec of image to be saved. If None (default), diagram is displayed on screen.
-				Mrange: (Mmin, Mmax) tuple of magnitude range in plot, defaults to ()
-				Freq_range: (Freq_min, Freq_max) tuple of frequency range in plot, defaults to ()
-				fixed_beta: fixed beta value to use for maximum-likelihood estimation
-				color: boolean indicating whether or not color should be used
-				want_lsq: boolean indicating whether or not least-squares regression should be shown
-				want_completeness_limits: boolean indicating whether or not completeness limits should be plotted.
-				want_exponential: boolean indicating whether or not to plot the exponential form of the GR
-				fig_filespec:
-				fig_width:
-				dpi:
-		"""
-		bins_N_cumul_log, bins_N_disc_log, bins_Mag, bins_Years, num_events, Mmax_obs = self.LogMagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=verbose)
-
-		## Remove values that are infinite (log(0)), pylab can't cope with it
-		for i in range(len(bins_N_disc_log)):
-			if abs(bins_N_disc_log[i]) == np.infty:
-				bins_N_disc_log[i] = -12.0
-
-		## Plot
-		fig = pylab.figure()
-
-		if discrete:
-			label = {"en": "Observed (incremental)", "nl": "Waargenomen (incrementeel)", "fr": "Observe (incremental)"}[lang.lower()]
-			symbol = 's'
-			symbol_color = 'r'
-			if not color:
-				symbol_color = 'w'
-			ax = pylab.semilogy(bins_Mag, 10**bins_N_disc_log, symbol, label=label)
-			pylab.setp(ax, markersize=10.0, markeredgewidth=1.0, markeredgecolor="k", markerfacecolor=symbol_color)
-		if cumul:
-			label = {"en": "Observed (cumulative)", "nl" :"Waargenomen (cumulatief)", "fr": "Observe (cumulatif)"}[lang.lower()]
-			symbol = 'bo'
-			if not color:
-				symbol = 'ko'
-			pylab.semilogy(bins_Mag, 10**bins_N_cumul_log, symbol, label=label)
-
-		#xmin, xmax = bins_Mag[0], bins_Mag[-1]
-		xmin, xmax = Mmin, Mmax
-		## Linear Regression
-		if want_lsq:
-			line_style = 'g--'
-			if not color:
-				line_style = 'k:'
-			a, b, r = self.calcGR_lsq(Mmin, Mmax, dM, Mtype, completeness, verbose=verbose)
-			plot_label="LSQ: a=%.3f, b=%.3f (r=%.2f)" % (a, b, r)
-			ymin = a - b * xmin
-			ymax = a - b * xmax
-			pylab.semilogy([xmin, xmax], [10**ymin, 10**ymax], line_style, lw=2, label=plot_label)
-
-		## Maximum likelihood
-		try:
-			a, b, beta, stda, stdb, stdbeta = self.calcGR_mle(Mmin, Mmax, dM, Mtype, completeness, beta=None, verbose=verbose)
-		except:
-			print "Failed calculating MLE regression for %s" % self.name
-		else:
-			ymin, ymax = a - b * xmin, a - b * xmax
-			if num_sigma:
-				betamin, betamax = beta - num_sigma*stdbeta, beta + num_sigma*stdbeta
-				amin, bmin = self.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, beta=betamin, verbose=verbose)[0:2]
-				amax, bmax = self.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, beta=betamax, verbose=verbose)[0:2]
-				ymin_min, ymax_min = amin - bmin * xmin, amin - bmin * xmax
-				ymin_max, ymax_max = amax - bmax * xmin, amax - bmax * xmax
-
-			line_color = 'b'
-			if not color:
-				line_color = 'k'
-			plot_label="MLE: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f)" % (a, stda, b, stdb)
-			if want_exponential:
-				bins_Mag_full = np.arange(Mmin, Mmax + dM, dM)
-				bins_N_cumul_mle_log = self.LogMagFreqExp(bins_Mag_full, a, b, Mmax)
-				pylab.semilogy(bins_Mag_full, 10**bins_N_cumul_mle_log, '%c--' % line_color, lw=3, label=plot_label)
-			else:
-				pylab.semilogy([xmin, xmax], [10**ymin, 10**ymax], '%c--' % line_color, lw=3, label=plot_label)
-			if num_sigma:
-				pylab.semilogy([xmin, xmax], [10**ymin_min, 10**ymax_min], '%c:' % line_color, lw=2, label="MLE: $\pm$ %d sigma" % num_sigma)
-				pylab.semilogy([xmin, xmax], [10**ymin_max, 10**ymax_max], '%c:' % line_color, lw=2, label="_nolegend_")
-
-		## Maximum likelihood with fixed beta
-		if fixed_beta:
-			try:
-				a, b, beta, stda, stdb, stdbeta = self.calcGR_mle(Mmin, Mmax, dM, Mtype, completeness, beta=fixed_beta, verbose=verbose)
-			except:
-				print "Failed calculating MLE regression for %s" % self.name
-			else:
-				ymin = a - b * xmin
-				ymax = a - b * xmax
-				label = {"en": "MLE w. fixed beta: ", "nl": "MLE (b vast): "}[lang.lower()]
-				plot_label=label + "a=%.3f ($\pm$ %.3f), b=%.3f" % (a, stda, b)
-				if want_exponential:
-					bins_Mag_full = np.arange(Mmin, Mmax + dM, dM)
-					bins_N_cumul_mle_log = self.LogMagFreqExp(bins_Mag_full, a, b, Mmax)
-					pylab.semilogy(bins_Mag_full, 10**bins_N_cumul_mle_log, 'm--', lw=3, label=plot_label)
-				else:
-					pylab.semilogy([xmin, xmax], [10**ymin, 10**ymax], 'm--', lw=3, label=plot_label)
-
-		if not Mrange:
-			Mrange = pylab.axis()[:2]
-		if not Freq_range:
-			Freq_range = pylab.axis()[2:]
-
-		## Plot limits of completeness
-		if want_completeness_limits:
-			annoty = Freq_range[0] * 10**0.5
-			bbox_props = dict(boxstyle="round,pad=0.4", fc="w", ec="k", lw=1)
-			ax = pylab.gca()
-			min_mags = completeness.Min_Mags[:]
-			min_mags.sort()
-			for i in range(1, len(min_mags)):
-				pylab.plot([min_mags[i], min_mags[i]], Freq_range, 'k--', lw=1, label="_nolegend_")
-				ax.annotate("", xy=(min_mags[i-1], annoty), xycoords='data', xytext=(min_mags[i], annoty), textcoords='data', arrowprops=dict(arrowstyle="<->"),)
-				label = "%s - %s" % (completeness.get_completeness_year(min_mags[i-1]), self.end_date.year)
-				ax.text(np.mean([min_mags[i-1], min_mags[i]]), annoty*10**-0.25, label, ha="center", va="center", size=12, bbox=bbox_props)
-			ax.annotate("", xy=(min_mags[i], annoty), xycoords='data', xytext=(min(Mmax, Mrange[1]), annoty), textcoords='data', arrowprops=dict(arrowstyle="<->"),)
-			label = "%s - %s" % (completeness.get_completeness_year(min_mags[i]), self.end_date.year)
-			ax.text(np.mean([min_mags[i], Mmax]), annoty*10**-0.25, label, ha="center", va="center", size=12, bbox=bbox_props)
-
-		## Apply plot limits
-		pylab.axis((Mrange[0], Mrange[1], Freq_range[0], Freq_range[1]))
-
-		pylab.xlabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
-		label = {"en": "Number of earthquakes per year", "nl": "Aantal aardbevingen per jaar", "fr": "Nombre de seismes par annee"}[lang.lower()]
-		pylab.ylabel(label, fontsize="x-large")
-		if title is None:
-			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
-		#pylab.title("%s (%d events, Mmax=%.2f)" % (unicode(self.name, errors="replace"), num_events, Mmax_obs))
-		pylab.title(title, fontsize='x-large')
-		pylab.grid(True)
-		font = FontProperties(size='medium')
-		pylab.legend(loc=1, prop=font)
-		ax = pylab.gca()
-		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('large')
-
-		if fig_filespec:
-			default_figsize = pylab.rcParams['figure.figsize']
-			default_dpi = pylab.rcParams['figure.dpi']
-			if fig_width:
-				fig_width /= 2.54
-				dpi = dpi * (fig_width / default_figsize[0])
-
-			pylab.savefig(fig_filespec, dpi=dpi)
-			pylab.clf()
-		else:
-			pylab.show()
-
 	def export_ZMAP(self, filespec, Mtype="MS", Mrelation=None):
 		"""
 		Export earthquake list to ZMAP format (ETH Zürich).
@@ -2162,7 +1910,6 @@ class EQCatalog:
 		cPickle.dump(self, f)
 		f.close()
 
-
 	def split_into_zones(self, source_model_name, verbose=True):
 		"""
 		Split catalog into subcatalogs according to a
@@ -2234,7 +1981,7 @@ class EQCatalog:
 			N: number of random synthetic catalogs to generate
 			sigma: magnitude uncertainty (considered uniform for the entire catalog).
 		Return value:
-			list of EQCollection objects
+			list of EQCatalog objects
 		"""
 		import copy
 		M_list = []
@@ -2248,7 +1995,7 @@ class EQCatalog:
 				new_eq = copy.deepcopy(eq)
 				new_eq.MS = Mrange[i]
 				eq_list.append(new_eq)
-			synthetic_catalogs.append(EQCollection(eq_list, self.start_date, self.end_date))
+			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date, self.end_date))
 
 		return synthetic_catalogs
 
@@ -2285,13 +2032,13 @@ class EQCatalog:
 		result = stepp_analysis(years, Mags, dM, dt, ttol, iloc=True)
 		Min_Years, Min_Mags = result[:,0].astype('i'), result[:,1]
 		return Completeness(Min_Years[::-1], Min_Mags[::-1])
-	
+
 	def analyse_completeness_Stepp_new(self, dM=0.1, Mtype="MS", Mrelation=None, dt=5.0, increment_lock=True):
 		"""
 		Analyze catalog completeness with the Stepp method algorithm from GEM (new
 		implementation). This method is a wrapper for :meth:`Step1971.completeness`
 		in the OQ hazard modeller's toolkit.
-		
+
 		:param dM:
 			Float, magnitude bin width (default: 0.1)
 		:param Mtype:
@@ -2310,7 +2057,7 @@ class EQCatalog:
 		"""
 		from hmtk.seismicity.catalogue import Catalogue
 		from hmtk.seismicity.completeness.comp_stepp_1971 import Stepp1971
-		
+
 		ec = Catalogue()
 		keys_int = ['year', 'month', 'day', 'hour', 'minute']
 		keys_flt = ['second', 'magnitude']
@@ -2333,7 +2080,7 @@ class EQCatalog:
 		result = stepp.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
 		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
 		return Completeness(Min_Years, Min_Mags)
-	
+
 	def completeness_Stepp(self, start_year=None, mags=[2.], dt=5, Mtype="MS", Mrelation=None):
 		"""
 		"""
@@ -2593,7 +2340,7 @@ def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_
 		verbose: bool, if True the query string will be echoed to standard output
 	Magnitude for selection is based on ML only!
 	Return value:
-		EQCollection object, or dictionary of EQCollection objects if a zone model is specified.
+		EQCatalog object, or dictionary of EQCatalog objects if a zone model is specified.
 	"""
 	import mapping.MIPython as MI
 	app = MI.Application(maximize=False)
@@ -2659,7 +2406,7 @@ def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_
 			time = datetime.time(h, m, s)
 			eq = seismodb.LocalEarthquake(values["id_earth"], values["date"], time, values["longitude"], values["latitude"], values["depth"], values["ML"], values["MS"], values["MW"], values["name"])
 			catalog.append(eq)
-		catalog = EQCollection(catalog, start_date, end_date, name=name)
+		catalog = EQCatalog(catalog, start_date, end_date, name=name)
 		try:
 			zone = zones[zone_name]
 		except:
@@ -2880,7 +2627,6 @@ def format_zones_CRISIS(zone_model, Mc=3.5, smooth=False, fixed_depth=None):
 	app.SetCoordsys(coordsys)
 
 
-
 def distribute_avalues(zones, catalog, M=0):
 	"""
 	Distribute a values for a number of zones such that it is consistent with the a value
@@ -2907,15 +2653,6 @@ def distribute_avalues(zones, catalog, M=0):
 	for zone in zones:
 		N_zones += 10 ** zone.a_new
 	N_diff = 10 ** catalog.a - N_zones
-
-
-def split_avalues(a, weights):
-	N = 10**a
-	avalues = []
-	for w in weights:
-		aw = np.log10(w*N)
-		avalues.append(aw)
-	return avalues
 
 
 def Poisson(life_time=None, return_period=None, prob=None):
