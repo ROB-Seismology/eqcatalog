@@ -1181,7 +1181,7 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, declustering=None, completeness=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
+	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, declustering=None, completeness=None, color="k", label=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
 		"""
 		Plot time versus magnitude
 
@@ -1195,6 +1195,10 @@ class EQCatalog:
 			class:`EQCatalog` instance, (default: None)
 		:param completeness:
 			class:`Completeness` instance, (default: None)
+		:param color:
+			Str, color to plot data points with (default: "k")
+		:param label:
+			Str, label of data points (default: None)
 		:param vlines:
 			Boolean, plot vertical lines from data point to x-axis (default: False)
 		:param major_ticks:
@@ -1209,11 +1213,11 @@ class EQCatalog:
 		"""
 		x = self.get_fractional_years()
 		y = self.get_magnitudes(Mtype, Mrelation)
-		plt.scatter(x, y, s=50, color="k", marker="s", facecolors='none')
+		plt.scatter(x, y, s=50, color=color, label=label, marker="s", facecolors='none')
 		xmin, xmax, ymin, ymax = plt.axis()
 		xmin, xmax = self.start_date.year, self.end_date.year+1
-		plt.axis((xmin, xmax, 0, ymax))
-
+		plt.axis((xmin, xmax, 0, max(y)*1.1))
+		
 		## plot vlines
 		if vlines:
 			plt.vlines(x, ymin=ymin, ymax=y)
@@ -1227,7 +1231,8 @@ class EQCatalog:
 		ax = plt.gca()
 		ax.xaxis.set_major_locator(majorLocator)
 		ax.xaxis.set_minor_locator(minorLocator)
-
+		ax.yaxis.set_minor_locator(MultipleLocator(0.1))
+		
 		## plot labels
 		plt.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
 		plt.ylabel("Magnitude (%s)" % Mtype)
@@ -1244,8 +1249,10 @@ class EQCatalog:
 			x = np.append(x, xmax)
 			plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors='r')
 			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r')
-
+		
 		plt.title(title)
+		if label:
+			plt.legend()
 		plt.show()
 
 	def HourlyMean(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, day=(10, 17), night=(19, 7)):
@@ -2093,11 +2100,11 @@ class EQCatalog:
 				print '%s-%s: %s' % (bin_year, self.end_date.year, N)
 				bin_year -= dt
 
-	def decluster(self, method="afteran", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
+	def decluster(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
 		"""
 		Decluster catalog.
 		This method is a wrapper for the declustering methods in the OQ
-		hazard modeller's toolkit.
+		hazard modeller's toolkit (old implementation).
 
 		:param method:
 			String, method name: "afteran" or "gardner-knopoff" (default: "afteran")
@@ -2156,6 +2163,84 @@ class EQCatalog:
 			cluster_catalogs.append(cluster_catalog)
 
 		return mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
+
+	def decluster_new(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
+		"""
+		Decluster catalog.
+		This method is a wrapper for the declustering methods in the OQ
+		hazard modeller's toolkit (new implementation).
+
+		:param method:
+			String, method name: "afteran" or "gardner-knopoff" (default: "afteran")
+		:param window_opt:
+			String, declustering window type: "GardnerKnopoff", "Gruenthal" or "Uhrhammer"
+			(default: "GardnerKnopoff")
+		:param fs_time_prop:
+			Positive float, foreshock time window as a proportion of
+			aftershock time window. Only applies to gardner_knopoff method
+			(default: 0.)
+		:param time_window:
+			Positive float, length (in days) of moving time window.
+			Only applies to afteran method (default: 60.)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:return:
+			Tuple mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
+			mainshock_catalog: instance of class:`EQCatalog` containing main shocks
+			foreshock_catalog: instance of class:`EQCatalog` containing foreshocks
+			aftershock_catalog: instance of class:`EQCatalog` containing aftershocks
+			cluster_catalog: list with instances of class:`EQCatalog` containing
+				earthquakes belonging to the different clusters. The first element
+				in this list represents earthquakes that do not belong to any cluster
+		"""
+		from hmtk.seismicity.declusterer.dec_gardner_knopoff import GardnerKnopoffType1
+		from hmtk.seismicity.declusterer.dec_afteran import Afteran
+		from hmtk.seismicity.declusterer.distance_time_windows import GardnerKnopoffWindow, GruenthalWindow, UhrhammerWindow
+		from hmtk.seismicity.catalogue import Catalogue
+
+		windows = {"GardnerKnopoff": GardnerKnopoffWindow, "Gruenthal": GruenthalWindow, "Uhrhammer": UhrhammerWindow}
+
+		if method == "gardner-knopoff":
+			decluster_func = GardnerKnopoffType1()
+			decluster_param_name = "fs_time_prop"
+			decluster_param = fs_time_prop
+		elif method == "afteran":
+			decluster_func = Afteran()
+			decluster_param_name = "time_window"
+			decluster_param = time_window
+			
+		ec = Catalogue()
+		keys_int = ["year", "month", "day", "hour", "minute"]
+		keys_flt = ["second", "magnitude", "longitude", "latitude"]
+		data_int, data_flt = [], []
+		for eq in self:
+			data_int.append([
+				int(eq.datetime.year),
+				int(eq.datetime.month),
+				int(eq.datetime.day),
+				int(eq.datetime.hour),
+				int(eq.datetime.minute),
+			])
+			data_flt.append([
+				float(eq.datetime.second),
+				float(eq.get_M(Mtype, Mrelation)),
+				float(eq.lon),
+				float(eq.lat),
+			])
+		ec.load_from_array(keys_int, np.array(data_int, dtype=np.int16))
+		ec.load_from_array(keys_flt, np.array(data_flt, dtype=np.float64))
+		
+		vcl, flag_vector = decluster_func.decluster(ec, {"time_distance_window": windows[window_opt](), decluster_param_name: decluster_param})
+		
+		mainshock_catalog = self.__getitem__(np.where(flag_vector == 0)[0])
+		foreshock_catalog = self.__getitem__(np.where(flag_vector == -1)[0])
+		aftershock_catalog = self.__getitem__(np.where(flag_vector == 1)[0])
+		
+		return mainshock_catalog, foreshock_catalog, aftershock_catalog
 
 	def analyse_Mmax(self, method='Cumulative_Moment', num_bootstraps=100, iteration_tolerance=None, maximum_iterations=100, num_samples=20, Mtype="MW", Mrelation=None):
 		"""
