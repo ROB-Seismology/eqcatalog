@@ -1181,7 +1181,7 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, declustering=None, completeness=None, color="k", label=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
+	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, triggered_catalog=None, completeness=None, color="k", label=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
 		"""
 		Plot time versus magnitude
 
@@ -1191,10 +1191,10 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param declustering:
-			class:`EQCatalog` instance, (default: None)
+		:param triggered_catalog:
+			class:`EQCatalog` instance, plot triggered earthquakes (default: None)
 		:param completeness:
-			class:`Completeness` instance, (default: None)
+			class:`Completeness` instance, plot completeness (default: None)
 		:param color:
 			Str, color to plot data points with (default: "k")
 		:param label:
@@ -1238,9 +1238,9 @@ class EQCatalog:
 		plt.ylabel("Magnitude (%s)" % Mtype)
 		
 		## plot declustering
-		if declustering:
-			x = declustering.get_fractional_years()
-			y = declustering.get_magnitudes(Mtype, Mrelation)
+		if triggered_catalog:
+			x = triggered_catalog.get_fractional_years()
+			y = triggered_catalog.get_magnitudes(Mtype, Mrelation)
 			plt.scatter(x, y, s=50, color="r", marker="s", facecolors='none')
 		
 		## plot completeness
