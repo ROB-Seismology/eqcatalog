@@ -509,6 +509,45 @@ class EQCatalog:
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (subselect)")
 
+	def subselect_declustering(self, method, params=None, Mtype="MS", Mrelation=None, return_triggered_catalog=False):
+		"""
+		Subselect earthquakes in the catalog that conform with the specified
+		declustering method and params.
+		
+		:param method:
+			instance of :class:`DeclusteringMethod`
+		:param params:
+			dict, mapping name of params needed for method to their value
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MS"). Note: some
+			methods use params that are specified for a certain magnitude scale.
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param return_triggered_catalog:
+			Boolean, return also triggered catalog (default: False)
+		
+		:return:
+			instance of :class:`EQCatalog`
+			if return_triggered_catalog = False also an triggered catalog is
+			returned as instance of :class:`EQCatalog`
+		"""
+		magnitudes = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
+		datetimes = np.array(self.get_datetimes())
+		lons = self.get_longitudes()
+		lats = self.get_latitudes()
+		
+		d_index = method.decluster(magnitudes, datetimes, lons, lats, **params)
+	
+		dc = self.__getitem__(np.where(d_index == 1)[0])
+		tc = self.__getitem__(np.where(d_index == 0)[0])
+		
+		if return_triggered_catalog:
+			return dc, tc
+		else:
+			return dc
+
 	def subselect_completeness(self, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
@@ -1181,7 +1220,7 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, triggered_catalog=None, completeness=None, color="k", label=None, vlines=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
+	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, triggered_catalog=None, completeness=None, color="k", label=None, vlines=False, grid=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
 		"""
 		Plot time versus magnitude
 
@@ -1201,6 +1240,8 @@ class EQCatalog:
 			Str, label of data points (default: None)
 		:param vlines:
 			Boolean, plot vertical lines from data point to x-axis (default: False)
+		:param grid:
+			Boolean, plot grid (default: False)
 		:param major_ticks:
 			Int, interval in years for major ticks (default: None). If none, a
 			maximum number of ticks at nice locations will be used.
@@ -1249,6 +1290,9 @@ class EQCatalog:
 			x = np.append(x, xmax)
 			plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors='r')
 			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r')
+		
+		if grid:
+			plt.grid()
 		
 		plt.title(title)
 		if label:
@@ -2331,6 +2375,15 @@ class EQCatalog:
 		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table, dM, method, aM, dt)
 		return np.log10(a), b, stdb
 
+	def plot_2d(self):
+		"""
+		"""
+		x = self.get_longitudes()
+		y = self.get_latitudes()
+		plt.scatter(x, y)
+		for eq in self.eq_list:
+			plt.text(eq.lon, eq.lat, '%s - %s' % (eq.datetime.month, eq.datetime.day), fontsize=10)
+		plt.show()
 
 	def plot_3d(self, limits=None, Mtype=None, Mrelation=None):
 		"""
