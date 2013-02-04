@@ -513,7 +513,7 @@ class EQCatalog:
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		declustering method and params.
-		
+
 		:param method:
 			instance of :class:`DeclusteringMethod`
 		:param params:
@@ -527,7 +527,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param return_triggered_catalog:
 			Boolean, return also triggered catalog (default: False)
-		
+
 		:return:
 			instance of :class:`EQCatalog`
 			if return_triggered_catalog = False also an triggered catalog is
@@ -537,12 +537,12 @@ class EQCatalog:
 		datetimes = np.array(self.get_datetimes())
 		lons = self.get_longitudes()
 		lats = self.get_latitudes()
-		
+
 		d_index = method.decluster(magnitudes, datetimes, lons, lats, **params)
-	
+
 		dc = self.__getitem__(np.where(d_index == 1)[0])
 		tc = self.__getitem__(np.where(d_index == 0)[0])
-		
+
 		if return_triggered_catalog:
 			return dc, tc
 		else:
@@ -1258,11 +1258,11 @@ class EQCatalog:
 		xmin, xmax, ymin, ymax = plt.axis()
 		xmin, xmax = self.start_date.year, self.end_date.year+1
 		plt.axis((xmin, xmax, 0, max(y)*1.1))
-		
+
 		## plot vlines
 		if vlines:
 			plt.vlines(x, ymin=ymin, ymax=y)
-		
+
 		## plot ticks
 		if major_ticks:
 			majorLocator = MultipleLocator(major_ticks)
@@ -1273,27 +1273,27 @@ class EQCatalog:
 		ax.xaxis.set_major_locator(majorLocator)
 		ax.xaxis.set_minor_locator(minorLocator)
 		ax.yaxis.set_minor_locator(MultipleLocator(0.1))
-		
+
 		## plot labels
 		plt.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
 		plt.ylabel("Magnitude (%s)" % Mtype)
-		
+
 		## plot declustering
 		if triggered_catalog:
 			x = triggered_catalog.get_fractional_years()
 			y = triggered_catalog.get_magnitudes(Mtype, Mrelation)
 			plt.scatter(x, y, s=50, color="r", marker="s", facecolors='none')
-		
+
 		## plot completeness
 		if completeness:
 			x, y = completeness.min_years, completeness.min_mags
 			x = np.append(x, xmax)
 			plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors='r')
 			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r')
-		
+
 		if grid:
 			plt.grid()
-		
+
 		plt.title(title)
 		if label:
 			plt.legend()
@@ -1393,6 +1393,46 @@ class EQCatalog:
 			pylab.clf()
 		else:
 			pylab.show()
+
+	def plot_map(self, region=None, symbol='o', edge_color='r', fill_color=None, symbol_size=10, symbol_size_inc=3, Mtype="MW", Mrelation=None, dlon=1., dlat=1., fig_filespec=None):
+		from mpl_toolkits.basemap import Basemap
+		if edge_color is None:
+			edge_color = "None"
+		if fill_color is None:
+			fill_color = "None"
+		if not region:
+			region = list(self.get_region())
+			lon_range = region[1] - region[0]
+			lat_range = region[3] - region[2]
+			region[0] -= lon_range / 5.
+			region[1] += lon_range / 5.
+			region[2] -= lat_range / 5.
+			region[3] += lat_range / 5.
+		else:
+			region = list(region)
+		lon_0 = (region[0] + region[1]) / 2.
+		lat_0 = (region[2] + region[3]) / 2.
+
+		map = Basemap(projection="cyl", resolution="i", llcrnrlon=region[0], llcrnrlat=region[2], urcrnrlon=region[1], urcrnrlat=region[3], lon_0=lon_0, lat_0=lat_0)
+		map.drawcoastlines()
+		map.drawcountries()
+		first_meridian = numpy.ceil(region[0] / dlon) * dlon
+		last_meridian = numpy.floor(region[1] / dlon) * dlon + dlon
+		meridians = numpy.arange(first_meridian, last_meridian, dlon)
+		map.drawmeridians(meridians, labels=[0,1,0,1])
+		first_parallel = numpy.ceil(region[2] / dlat) * dlat
+		last_parallel = numpy.floor(region[3] / dlat) * dlat + dlat
+		parallels = numpy.arange(first_parallel, last_parallel, dlat)
+		map.drawparallels(parallels, labels=[0,1,0,1])
+		if not symbol_size_inc:
+			symbol_sizes = symbol_size ** 2
+		else:
+			magnitudes = self.get_magnitudes(Mtype, Mrelation)
+			symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
+			symbol_sizes = symbol_sizes ** 2
+			print symbol_sizes.min(), symbol_sizes.max()
+		map.scatter(self.get_longitudes(), self.get_latitudes(), s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color)
+		map.drawmapboundary()
 
 	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, verbose=False):
 		"""
@@ -2256,7 +2296,7 @@ class EQCatalog:
 			decluster_func = Afteran()
 			decluster_param_name = "time_window"
 			decluster_param = time_window
-			
+
 		ec = Catalogue()
 		keys_int = ["year", "month", "day", "hour", "minute"]
 		keys_flt = ["second", "magnitude", "longitude", "latitude"]
@@ -2277,13 +2317,13 @@ class EQCatalog:
 			])
 		ec.load_from_array(keys_int, np.array(data_int, dtype=np.int16))
 		ec.load_from_array(keys_flt, np.array(data_flt, dtype=np.float64))
-		
+
 		vcl, flag_vector = decluster_func.decluster(ec, {"time_distance_window": windows[window_opt](), decluster_param_name: decluster_param})
-		
+
 		mainshock_catalog = self.__getitem__(np.where(flag_vector == 0)[0])
 		foreshock_catalog = self.__getitem__(np.where(flag_vector == -1)[0])
 		aftershock_catalog = self.__getitem__(np.where(flag_vector == 1)[0])
-		
+
 		return mainshock_catalog, foreshock_catalog, aftershock_catalog
 
 	def analyse_Mmax(self, method='Cumulative_Moment', num_bootstraps=100, iteration_tolerance=None, maximum_iterations=100, num_samples=20, Mtype="MW", Mrelation=None):
