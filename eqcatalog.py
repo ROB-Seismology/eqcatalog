@@ -164,7 +164,7 @@ class EQCatalog:
 	:param name:
 		String, catalog name (default: "")
 	"""
-	def __init__(self, eq_list, start_date=None, end_date=None, name=""):
+	def __init__(self, eq_list, start_date=None, end_date=None, region=None, name=""):
 		self.eq_list = eq_list[:]
 		Tmin, Tmax = self.Tminmax()
 		self.start_date = start_date
@@ -177,6 +177,7 @@ class EQCatalog:
 			self.start_date = self.start_date.date()
 		if isinstance(self.end_date, datetime.datetime):
 			self.end_date = self.end_date.date()
+		self.region = region
 		self.name = name
 
 	def __len__(self):
@@ -474,7 +475,10 @@ class EQCatalog:
 		"""
 		## Set default parameters
 		if region is None:
-			region = self.get_region()
+			if self.region:
+				region = self.region
+			else:
+				region = self.get_region()
 		if isinstance(start_date, int):
 			start_date = datetime.date(start_date, 1, 1)
 		elif isinstance(start_date, datetime.datetime):
@@ -507,7 +511,7 @@ class EQCatalog:
 							if min_depth <= eq.depth <= max_depth:
 								eq_list.append(eq)
 
-		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (subselect)")
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region, name=self.name + " (subselect)")
 
 	def subselect_declustering(self, method, params=None, Mtype="MS", Mrelation=None, return_triggered_catalog=False):
 		"""
@@ -586,7 +590,7 @@ class EQCatalog:
 		if verbose:
 			print "Number of events constrained by completeness criteria: %d out of %d" % (len(eq_list), len(self.eq_list))
 
-		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, name=self.name + " (completeness-constrained)")
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=self.region, name=self.name + " (completeness-constrained)")
 
 	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=None):
 		"""
@@ -1394,45 +1398,81 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_map(self, region=None, symbol='o', edge_color='r', fill_color=None, symbol_size=10, symbol_size_inc=3, Mtype="MW", Mrelation=None, dlon=1., dlat=1., fig_filespec=None):
-		from mpl_toolkits.basemap import Basemap
-		if edge_color is None:
-			edge_color = "None"
-		if fill_color is None:
-			fill_color = "None"
-		if not region:
-			region = list(self.get_region())
-			lon_range = region[1] - region[0]
-			lat_range = region[3] - region[2]
-			region[0] -= lon_range / 5.
-			region[1] += lon_range / 5.
-			region[2] -= lat_range / 5.
-			region[3] += lat_range / 5.
-		else:
-			region = list(region)
-		lon_0 = (region[0] + region[1]) / 2.
-		lat_0 = (region[2] + region[3]) / 2.
+	def plot_map(self, symbol='o', edge_color='r', fill_color=None, label="Epicenters", symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, title=None, legend_location=0, fig_filespec=None):
+		"""
+		Plot map of catalog
 
-		map = Basemap(projection="cyl", resolution="i", llcrnrlon=region[0], llcrnrlat=region[2], urcrnrlon=region[1], urcrnrlat=region[3], lon_0=lon_0, lat_0=lat_0)
-		map.drawcoastlines()
-		map.drawcountries()
-		first_meridian = numpy.ceil(region[0] / dlon) * dlon
-		last_meridian = numpy.floor(region[1] / dlon) * dlon + dlon
-		meridians = numpy.arange(first_meridian, last_meridian, dlon)
-		map.drawmeridians(meridians, labels=[0,1,0,1])
-		first_parallel = numpy.ceil(region[2] / dlat) * dlat
-		last_parallel = numpy.floor(region[3] / dlat) * dlat + dlat
-		parallels = numpy.arange(first_parallel, last_parallel, dlat)
-		map.drawparallels(parallels, labels=[0,1,0,1])
-		if not symbol_size_inc:
-			symbol_sizes = symbol_size ** 2
-		else:
-			magnitudes = self.get_magnitudes(Mtype, Mrelation)
-			symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
-			symbol_sizes = symbol_sizes ** 2
-			print symbol_sizes.min(), symbol_sizes.max()
-		map.scatter(self.get_longitudes(), self.get_latitudes(), s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color)
-		map.drawmapboundary()
+		:param symbol:
+			matplotlib marker specification, earthquake marker symbol
+			(default: 'o')
+		:param edge_color:
+			matplotlib color specification, earthquake marker edge color
+			(default: 'r')
+		:param fill_color:
+			matplotlib color specification, earthquake marker fill color
+			(default: None)
+		:param label:
+			String, legend label for earthquake epicenters
+			(default: "Epicenters")
+		:param symbol_size:
+			Int or Float, symbol size in points (default: 9)
+		:param symbol_size_inc:
+			Int or Float, symbol size increment per magnitude relative to M=3
+			(default: 4)
+		:param Mtype:
+			String, magnitude type for magnitude scaling (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param region:
+			(w, e, s, n) tuple specifying rectangular region to plot in
+			geographic coordinates (default: None)
+		:param projection:
+			String, map projection. See Basemap documentation
+			(default: "merc")
+		:param resolution:
+			String, map resolution (coastlines and country borders):
+			'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
+			(default: 'i')
+		:param dlon:
+			Float, meridian interval in degrees (default: 1.)
+		:param dlat:
+			Float, parallel interval in degrees (default: 1.)
+		:param source_model:
+			String, name of source model to overlay on the plot
+			(default: None)
+		:param sm_color:
+			matplotlib color specification to plot source model
+			(default: 'k')
+		:param sm_line_style:
+			String, line style to plot source model (default: '-')
+		:param sm_line_width:
+			Int, line width to plot source model (default: 2)
+		:param title:
+			String, plot title (default: None)
+		:param legend_location:
+			String or Int: location of legend (matplotlib location code):
+				"best" 	0
+				"upper right" 	1
+				"upper left" 	2
+				"lower left" 	3
+				"lower right" 	4
+				"right" 	5
+				"center left" 	6
+				"center right" 	7
+				"lower center" 	8
+				"upper center" 	9
+				"center" 	10
+			(default: 0)
+		:param fig_filespec:
+			String, full path of image to be saved.
+			If None (default), map is displayed on screen.
+		"""
+		if title is None:
+			title = self.name
+
+		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec)
 
 	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, verbose=False):
 		"""
@@ -2020,35 +2060,7 @@ class EQCatalog:
 		wgs84.SetWellKnownGeogCS("WGS84")
 
 		## Read zone model from MapInfo file
-		#source_model_table = ZoneModelTables[source_model_name.lower()]
-		#tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
-		from hazard.psha.openquake.rob_sourceModels import rob_source_models_dict
-		tab_filespec = rob_source_models_dict[source_model_name]["tab_filespec"]
-		mi = ogr.GetDriverByName("MapInfo File")
-		ds = mi.Open(tab_filespec)
-		if verbose:
-			print("Number of layers: %d" % ds.GetLayerCount())
-		layer = ds.GetLayer(0)
-		## Set up transformation between table coordsys and wgs84
-		tab_sr = layer.GetSpatialRef()
-		coordTrans = osr.CoordinateTransformation(tab_sr, wgs84)
-		## Loop over features in layer 1
-		if verbose:
-			print("Number of features in layer 1: %d" % layer.GetFeatureCount())
-		zone_polygons = OrderedDict()
-		for i in range(layer.GetFeatureCount()):
-			feature = layer.GetNextFeature()
-			zoneID = feature.GetField("ShortName")
-			if verbose:
-				print feature.GetField("Name")
-			## Note: we need to clone the geometry returned by GetGeometryRef(),
-			## otherwise python will crash
-			## See http://trac.osgeo.org/gdal/wiki/PythonGotchas
-			poly = feature.GetGeometryRef().Clone()
-			poly.AssignSpatialReference(tab_sr)
-			poly.Transform(coordTrans)
-			poly.CloseRings()
-			zone_polygons[zoneID] = poly
+		zone_polygons = read_source_model(source_model_name, verbose=verbose)
 
 		## Point object that will be used to test if earthquake is inside zone
 		point = ogr.Geometry(ogr.wkbPoint)
@@ -2061,7 +2073,11 @@ class EQCatalog:
 				point.SetPoint(0, eq.lon, eq.lat)
 				if point.Within(zone_poly):
 					zone_eq_list.append(eq)
-			zone_catalogs[zoneID] = EQCatalog(zone_eq_list, self.start_date, self.end_date, zoneID)
+			linear_ring = zone_poly.GetGeometryRef(0)
+			points = linear_ring.GetPoints()
+			lons, lats = zip(*points)
+			region = (min(lons), max(lons), min(lats), max(lats))
+			zone_catalogs[zoneID] = EQCatalog(zone_eq_list, self.start_date, self.end_date, region, zoneID)
 
 		return zone_catalogs
 
@@ -2086,7 +2102,7 @@ class EQCatalog:
 				new_eq = copy.deepcopy(eq)
 				new_eq.MS = Mrange[i]
 				eq_list.append(new_eq)
-			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date, self.end_date))
+			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date, self.end_date, region=self.region))
 
 		return synthetic_catalogs
 
@@ -2703,6 +2719,231 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	eqc = eqc.subselect(region, start_date, end_date, Mmin, Mmax, min_depth,
 		max_depth, Mtype, Mrelation)
 	return eqc
+
+
+def read_source_model(source_model_name, verbose=True):
+	"""
+	Read source-zone model stored in a GIS (MapInfo) table.
+
+	:param source_model_name:
+		String, name of source-zone model containing area sources
+	:param verbose:
+		Boolean, whether or not to print information while reading
+		GIS table (default: True)
+
+	:return:
+		ordered dict {String sourceID: instande of :class:`osgeo.ogr.Geometry`}
+	"""
+	## Construct WGS84 projection system corresponding to earthquake coordinates
+	wgs84 = osr.SpatialReference()
+	wgs84.SetWellKnownGeogCS("WGS84")
+
+	## Read zone model from MapInfo file
+	#source_model_table = ZoneModelTables[source_model_name.lower()]
+	#tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
+	from hazard.psha.openquake.rob_sourceModels import rob_source_models_dict
+	tab_filespec = rob_source_models_dict[source_model_name]["tab_filespec"]
+	mi = ogr.GetDriverByName("MapInfo File")
+	ds = mi.Open(tab_filespec)
+	if verbose:
+		print("Number of layers: %d" % ds.GetLayerCount())
+	layer = ds.GetLayer(0)
+	## Set up transformation between table coordsys and wgs84
+	tab_sr = layer.GetSpatialRef()
+	coordTrans = osr.CoordinateTransformation(tab_sr, wgs84)
+	## Loop over features in layer 1
+	if verbose:
+		print("Number of features in layer 1: %d" % layer.GetFeatureCount())
+	zone_polygons = OrderedDict()
+	for i in range(layer.GetFeatureCount()):
+		feature = layer.GetNextFeature()
+		zoneID = feature.GetField("ShortName")
+		if verbose:
+			print feature.GetField("Name")
+		## Note: we need to clone the geometry returned by GetGeometryRef(),
+		## otherwise python will crash
+		## See http://trac.osgeo.org/gdal/wiki/PythonGotchas
+		poly = feature.GetGeometryRef().Clone()
+		poly.AssignSpatialReference(tab_sr)
+		poly.Transform(coordTrans)
+		poly.CloseRings()
+		zone_polygons[zoneID] = poly
+	return zone_polygons
+
+
+def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, title=None, legend_location=0, fig_filespec=None):
+	"""
+	Plot multiple catalogs on a map
+
+	:param catalogs:
+		List containing instances of :class:`EQCatalog`
+	:param symbols:
+		List containing earthquake symbols for each catalog
+		(matplotlib marker specifications)
+	:param edge_colors:
+		List containing symbol edge colors for each catalog
+		(matplotlib color specifications)
+		(default: [])
+	:param fill_colors:
+		List containing symbol fill colors for each catalog
+		(matplotlib color specifications)
+		(default: [])
+	:param labels:
+		List containing plot labels, one for each catalog (default: [])
+	:param symbol_size:
+		Int or Float, symbol size in points (default: 9)
+	:param symbol_size_inc:
+		Int or Float, symbol size increment per magnitude relative to M=3
+		(default: 4)
+	:param Mtype:
+		String, magnitude type for magnitude scaling (default: "MW")
+	:param Mrelation:
+		{str: str} dict, mapping name of magnitude conversion relation
+		to magnitude type ("MW", "MS" or "ML") (default: None, will
+		select the default relation for the given Mtype)
+	:param region:
+		(w, e, s, n) tuple specifying rectangular region to plot in
+		geographic coordinates (default: None)
+	:param projection:
+		String, map projection. See Basemap documentation
+		(default: "merc")
+	:param resolution:
+		String, map resolution (coastlines and country borders):
+		'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
+		(default: 'i')
+	:param dlon:
+		Float, meridian interval in degrees (default: 1.)
+	:param dlat:
+		Float, parallel interval in degrees (default: 1.)
+	:param source_model:
+		String, name of source model to overlay on the plot
+		(default: None)
+	:param sm_color:
+		matplotlib color specification to plot source model
+		(default: 'k')
+	:param sm_line_style:
+		String, line style to plot source model (default: '-')
+	:param sm_line_width:
+		Int, line width to plot source model (default: 2)
+	:param title:
+		String, plot title (default: None)
+	:param legend_location:
+		String or Int: location of legend (matplotlib location code):
+			"best" 	0
+			"upper right" 	1
+			"upper left" 	2
+			"lower left" 	3
+			"lower right" 	4
+			"right" 	5
+			"center left" 	6
+			"center right" 	7
+			"lower center" 	8
+			"upper center" 	9
+			"center" 	10
+		(default: 0)
+	:param fig_filespec:
+		String, full path of image to be saved.
+		If None (default), map is displayed on screen.
+	"""
+	from mpl_toolkits.basemap import Basemap
+
+	## Symbols, colors, and labels
+	if not symbols:
+		symbols = ["o"]
+	if not edge_colors:
+		edge_colors = ("r", "g", "b", "c", "m", "k")
+	if not fill_colors:
+		fill_colors = ["None"]
+	if not labels:
+		labels = [None]
+
+	## Determine map extent and center
+	if not region:
+		if catalogs[0].region:
+			region = list(catalogs[0].region)
+		else:
+			region = list(catalogs[0].get_region())
+			lon_range = region[1] - region[0]
+			lat_range = region[3] - region[2]
+			region[0] -= lon_range / 5.
+			region[1] += lon_range / 5.
+			region[2] -= lat_range / 5.
+			region[3] += lat_range / 5.
+	else:
+		region = list(region)
+	lon_0 = (region[0] + region[1]) / 2.
+	lat_0 = (region[2] + region[3]) / 2.
+
+	## Base map
+	map = Basemap(projection=projection, resolution=resolution, llcrnrlon=region[0], llcrnrlat=region[2], urcrnrlon=region[1], urcrnrlat=region[3], lon_0=lon_0, lat_0=lat_0)
+	map.drawcoastlines()
+	map.drawcountries()
+
+	## Meridians and parallels
+	if dlon:
+		first_meridian = numpy.ceil(region[0] / dlon) * dlon
+		last_meridian = numpy.floor(region[1] / dlon) * dlon + dlon
+		meridians = numpy.arange(first_meridian, last_meridian, dlon)
+		map.drawmeridians(meridians, labels=[0,1,0,1])
+	if dlat:
+		first_parallel = numpy.ceil(region[2] / dlat) * dlat
+		last_parallel = numpy.floor(region[3] / dlat) * dlat + dlat
+		parallels = numpy.arange(first_parallel, last_parallel, dlat)
+		map.drawparallels(parallels, labels=[0,1,0,1])
+
+	## Source model
+	if source_model:
+		zone_polygons = read_source_model(source_model)
+		for i, polygon in enumerate(zone_polygons.values()):
+			for linear_ring in polygon:
+				points = linear_ring.GetPoints()
+				lons, lats = zip(*points)
+				x, y = map(lons, lats)
+				if i == 0:
+					label = source_model
+				else:
+					label = "_nolegend_"
+				map.plot(x, y, ls=sm_line_style, lw=sm_line_width, color=sm_color, label=label)
+
+	## Catalogs
+	for i, catalog in enumerate(catalogs):
+		symbol = symbols[i%len(symbols)]
+		edge_color = edge_colors[i%len(edge_colors)]
+		if edge_color is None:
+			edge_color = "None"
+		fill_color = fill_colors[i%len(fill_colors)]
+		if fill_color is None:
+			fill_color = "None"
+		label = labels[i%len(labels)]
+		if label is None:
+			label = catalog.name
+
+		## Earthquake symbol size varying with magnitude
+		if not symbol_size_inc:
+			symbol_sizes = symbol_size ** 2
+		else:
+			magnitudes = catalog.get_magnitudes(Mtype, Mrelation)
+			symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
+			symbol_sizes = symbol_sizes ** 2
+			#print symbol_sizes.min(), symbol_sizes.max()
+
+		## Earthquake epicenters
+		if len(catalog.eq_list) > 0:
+			lons, lats = catalog.get_longitudes(), catalog.get_latitudes()
+			x, y = map(lons, lats)
+			map.scatter(x, y, s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color, label=label)
+
+	## Map border and title
+	map.drawmapboundary()
+	pylab.title(title)
+	pylab.legend(loc=legend_location)
+	if fig_filespec:
+		pylab.savefig(fig_filespec, dpi=dpi)
+		pylab.clf()
+	else:
+		pylab.show()
+
+
 
 
 def read_zonesMI(tabname):

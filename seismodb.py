@@ -212,7 +212,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		eq_list.append(eq)
 
 	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
-	return EQCatalog(eq_list, start_date, end_date, name=name)
+	return EQCatalog(eq_list, start_date, end_date, region=region, name=name)
 
 
 def query_ROB_LocalEQCatalogByID(id_earth, verbose=False, errf=None):
