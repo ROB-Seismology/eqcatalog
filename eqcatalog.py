@@ -2431,16 +2431,6 @@ class EQCatalog:
 		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table, dM, method, aM, dt)
 		return np.log10(a), b, stdb
 
-	def plot_2d(self):
-		"""
-		"""
-		x = self.get_longitudes()
-		y = self.get_latitudes()
-		plt.scatter(x, y)
-		for eq in self.eq_list:
-			plt.text(eq.lon, eq.lat, '%s - %s' % (eq.datetime.month, eq.datetime.day), fontsize=10)
-		plt.show()
-
 	def plot_3d(self, limits=None, Mtype=None, Mrelation=None):
 		"""
 		Plot catalog in 3D. Points are colored by magnitude.
