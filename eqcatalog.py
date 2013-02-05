@@ -2747,9 +2747,15 @@ def read_source_model(source_model_name, verbose=True):
 	zone_polygons = OrderedDict()
 	for i in range(layer.GetFeatureCount()):
 		feature = layer.GetNextFeature()
-		zoneID = feature.GetField("ShortName")
+		try:
+			sourceID = feature.GetField("ShortName")
+		except:
+			sourceID = feature.GetField("IDSource")
 		if verbose:
-			print feature.GetField("Name")
+			try:
+				print feature.GetField("Name")
+			except:
+				print feature.GetField("SourceName")
 		## Note: we need to clone the geometry returned by GetGeometryRef(),
 		## otherwise python will crash
 		## See http://trac.osgeo.org/gdal/wiki/PythonGotchas
@@ -2757,7 +2763,7 @@ def read_source_model(source_model_name, verbose=True):
 		poly.AssignSpatialReference(tab_sr)
 		poly.Transform(coordTrans)
 		poly.CloseRings()
-		zone_polygons[zoneID] = poly
+		zone_polygons[sourceID] = poly
 	return zone_polygons
 
 
@@ -2884,10 +2890,15 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 	## Source model
 	if source_model:
 		zone_polygons = read_source_model(source_model)
-		for i, polygon in enumerate(zone_polygons.values()):
-			for linear_ring in polygon:
-				points = linear_ring.GetPoints()
-				lons, lats = zip(*points)
+		for i, geom in enumerate(zone_polygons.values()):
+			lines = []
+			if geom.GetGeometryName() == "LINESTRING":
+				lines.append(geom.GetPoints())
+			elif geom.GetGeometryName() == "POLYGON":
+				for linear_ring in polygon:
+					lines.append(linear_ring.GetPoints())
+			for line in lines:
+				lons, lats = zip(*line)
 				x, y = map(lons, lats)
 				if i == 0:
 					label = source_model
