@@ -150,7 +150,7 @@ class LocalEarthquake:
 					50 bars (only valid for MS < 8.22);
 			- ML --> MW:
 				- "ahorner": caculate MW from ML using relation by Ahorner (1983)
-				- "hinzen": calculate MW from ML using relation by Hinzen (2004)
+				- "hinzen": calculate MW from ML using relation by Reamer & Hinzen (2004)
 				- "gruenthal": calculate MW from ML using chi-square maximum
 					likelihood regression of Gruenthal and Wahlstrom (2003)
 			(default: {"MS": "bungum", "ML": "hinzen"})
