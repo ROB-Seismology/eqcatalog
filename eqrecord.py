@@ -10,6 +10,7 @@ import numpy as np
 
 ## Import ROB modules
 import mapping.geo.geodetic as geodetic
+import seismodb
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
@@ -332,6 +333,22 @@ class LocalEarthquake:
 			Float, azimuth in decimal degrees
 		"""
 		return geodetic.get_point_at((self.lon, self.lat), distance, azimuth)
+
+	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", sort_key="intensity", sort_order="asc", verbose=False):
+		return seismodb.query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, sort_key=sort_key, sort_order=sort_order, verbose=verbose)
+
+	def get_macroseismic_data_aggregated_official(self, Imax=True, min_val=1, group_by_main_village=False, agg_function="maximum", verbose=False):
+		return seismodb.query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, verbose=verbose)
+
+	def get_focal_mechanism(self, verbose=False):
+		try:
+			return seismodb.query_ROB_FocalMechanisms(id_earth=self.ID, verbose=verbose)[0]
+		except IndexError:
+			return None
+
+
+class MacroseismicDataPoint:
+	pass
 
 
 class MacroseismicRecord:

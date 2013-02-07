@@ -180,6 +180,17 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		"""
 		return self.min_mag
 
+	def get_center_magnitudes(self):
+		"""
+		Return array with center magnitudes of each bin
+
+		:return:
+			ndarray, magnitudes
+		"""
+		magnitudes = np.arange(len(self.occurrence_rates), dtype='f')
+		magnitudes = self.get_min_mag_center() + magnitudes * self.bin_width
+		return magnitudes
+
 	def _get_total_moment_rate(self):
 		"""
 		Calculate total moment rate
@@ -440,6 +451,16 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 			Float
 		"""
 		return self.min_mag + self.bin_width / 2
+
+	def get_center_magnitudes(self):
+		"""
+		Return array with center magnitudes of each bin
+
+		:return:
+			ndarray, magnitudes
+		"""
+		magnitudes = np.arange(self.get_min_mag_center(), self.max_mag, self.bin_width)
+		return magnitudes
 
 	def get_cumulative_rates(self):
 		"""
