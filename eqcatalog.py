@@ -2895,7 +2895,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			if geom.GetGeometryName() == "LINESTRING":
 				lines.append(geom.GetPoints())
 			elif geom.GetGeometryName() == "POLYGON":
-				for linear_ring in polygon:
+				for linear_ring in geom:
 					lines.append(linear_ring.GetPoints())
 			for line in lines:
 				lons, lats = zip(*line)
