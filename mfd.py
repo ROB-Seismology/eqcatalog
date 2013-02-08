@@ -843,8 +843,8 @@ def alphabetalambda(a, b, M=0):
 	"""
 	alpha = a * np.log(10)
 	beta = b * np.log(10)
-	lambda0 = np.exp(alpha - beta*M0)
+	lambda0 = np.exp(alpha - beta*M)
 	# This is identical
-	# lambda0 = 10**(a - b*M0)
+	# lambda0 = 10**(a - b*M)
 	return (alpha, beta, lambda0)
 
