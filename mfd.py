@@ -299,7 +299,7 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		else:
 			raise Exception("Characteristic magnitude should be multiple of bin width!")
 
-	def plot(self, color='k', style="o", label="", discrete=True, cumul_or_inc="both", completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
+	def plot(self, color='k', style="o", label="", discrete=True, cumul_or_inc="both", completeness=None, end_year=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 		"""
 		Plot magnitude-frequency distribution
 
@@ -318,6 +318,9 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		:param completeness:
 			instance of :class:`Completeness`, used to plot completeness
 			limits (default: None)
+		:param end_year:
+			Int, end year of catalog (used when plotting completeness limits)
+			(default: None, will use current year)
 		:param Mrange:
 			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
 			(default: ())
@@ -337,7 +340,7 @@ class EvenlyDiscretizedMFD(nhlib.mfd.EvenlyDiscretizedMFD, MFD):
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, title=title)
+		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 
 class CharacteristicMFD(EvenlyDiscretizedMFD):
@@ -540,7 +543,7 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		else:
 			raise Exception("MFD objects not compatible. Convert to EvenlyDiscretizedMFD")
 
-	def plot(self, color='k', style="-", label="", discrete=False, cumul_or_inc="cumul", completeness=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
+	def plot(self, color='k', style="-", label="", discrete=False, cumul_or_inc="cumul", completeness=None, end_year=None, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300):
 		"""
 		Plot magnitude-frequency distribution
 
@@ -559,6 +562,9 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		:param completeness:
 			instance of :class:`Completeness`, used to plot completeness
 			limits (default: None)
+		:param end_year:
+			Int, end year of catalog (used when plotting completeness limits)
+			(default: None, will use current year)
 		:param Mrange:
 			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
 			(default: ())
@@ -578,7 +584,7 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 
 def sum_MFDs(mfd_list, weights=[]):
