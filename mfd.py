@@ -578,7 +578,7 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, title=title)
+		plot_MFD([self], colors=[color], styles=[style], labels=[label], discrete=[discrete], cumul_or_inc=[cumul_or_inc], completeness=completeness, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 
 def sum_MFDs(mfd_list, weights=[]):
