@@ -47,7 +47,7 @@ import osr
 ## Import ROB modules
 import seismodb
 import mfd
-from thirdparty.recipes.my_arange import *
+#from thirdparty.recipes.my_arange import *
 
 
 
@@ -426,7 +426,7 @@ class EQCatalog:
 		"""
 		return np.add.reduce(np.array([eq.get_M0(Mrelation=Mrelation) for eq in self]))
 
-	def get_M0rate(self, Mrelation="Hinzen"):
+	def get_M0rate(self, Mrelation={"ML": "Hinzen", "MS": "geller"}):
 		"""
 		Compute seismic moment rate.
 
@@ -1494,7 +1494,7 @@ class EQCatalog:
 			r: correlation coefficient
 		"""
 		# TODO: constrained regression with fixed b
-		# TODO: see also numpy.linalg.lstsq
+		# TODO: see also np.linalg.lstsq
 		bins_N_cumul_log, bins_N_disc_log, bins_Mag, bins_Years, num_events, Mmax_obs = self.LogMagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=False)
 		b, a, r, ttprob, stderr = stats.linregress(bins_Mag, bins_N_cumul_log)
 		## stderr = standard error on b?
@@ -1709,7 +1709,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "MLE" or "LSQ"
+			String, computation method, either "Weichert", "Aki" or "LSQ"
 			(default: "Weichert")
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
@@ -2877,14 +2877,14 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 
 	## Meridians and parallels
 	if dlon:
-		first_meridian = numpy.ceil(region[0] / dlon) * dlon
-		last_meridian = numpy.floor(region[1] / dlon) * dlon + dlon
-		meridians = numpy.arange(first_meridian, last_meridian, dlon)
+		first_meridian = np.ceil(region[0] / dlon) * dlon
+		last_meridian = np.floor(region[1] / dlon) * dlon + dlon
+		meridians = np.arange(first_meridian, last_meridian, dlon)
 		map.drawmeridians(meridians, labels=[0,1,0,1])
 	if dlat:
-		first_parallel = numpy.ceil(region[2] / dlat) * dlat
-		last_parallel = numpy.floor(region[3] / dlat) * dlat + dlat
-		parallels = numpy.arange(first_parallel, last_parallel, dlat)
+		first_parallel = np.ceil(region[2] / dlat) * dlat
+		last_parallel = np.floor(region[3] / dlat) * dlat + dlat
+		parallels = np.arange(first_parallel, last_parallel, dlat)
 		map.drawparallels(parallels, labels=[0,1,0,1])
 
 	## Source model
