@@ -30,7 +30,7 @@ from collections import OrderedDict
 
 
 ## Import third-party modules
-## Kludge because matplotlib is broken on seissrv3. Sigh...
+## Kludge because matplotlib is broken on seissrv3.
 import numpy as np
 if platform.uname()[1] == "seissrv3":
 	import matplotlib
@@ -40,8 +40,6 @@ import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
 from scipy import stats
-import ogr
-import osr
 
 
 ## Import ROB modules
@@ -2055,6 +2053,8 @@ class EQCatalog:
 		:return:
 			ordered dict {String sourceID: EQCatalog}
 		"""
+		import osr, ogr
+
 		## Construct WGS84 projection system corresponding to earthquake coordinates
 		wgs84 = osr.SpatialReference()
 		wgs84.SetWellKnownGeogCS("WGS84")
@@ -2504,111 +2504,6 @@ class CompositeEQCatalog:
 		pass
 
 
-
-def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, zone_model=None, zone_names=[], verbose=False):
-	"""
-	Read ROB local earthquake catalog through a running instance of MapInfo.
-	Optional parameters:
-		tabname: name of MapInfo table containing catalog, defaults to "KSB_ORB_Catalog".
-			This table must be open in MapInfo.
-		region: (w, e, s, n) tuple specifying rectangular region of interest
-		start_date: date (date object or year) specifying start of time window of interest
-		end_date: date (date object or year) specifying end of time window of interest
-		Mmin: minimum magnitude to extract
-		Mmax: minimum magnitude to extract
-		zone_model: name of zone model to use for splitting catalog into subcollections, defaults to None
-			The table corresponding to the zone model must also be open in MapInfo.
-			Available zone models: "Leynaud", "SLZ+RVG", and "Seismotectonic"
-		zone_names: list with names of zones to extract if a zone model is specified, defaults to [],
-			which will extract all zones.
-		verbose: bool, if True the query string will be echoed to standard output
-	Magnitude for selection is based on ML only!
-	Return value:
-		EQCatalog object, or dictionary of EQCatalog objects if a zone model is specified.
-	"""
-	import mapping.MIPython as MI
-	app = MI.Application(maximize=False)
-	if type(start_date) == type(0):
-		start_date = datetime.date(start_date, 1, 1)
-	elif isinstance(start_date, datetime.datetime):
-		start_date = start_date.date()
-	if type(end_date) == type(0):
-		end_date = datetime.date(end_date, 12, 31)
-	elif isinstance(end_date, datetime.datetime):
-		end_date = end_date.date()
-	if not end_date:
-		end_date = datetime.datetime.now().date()
-	if not start_date:
-		start_date = datetime.date(100, 1, 1)
-
-	if zone_model:
-		zonetab_name = ZoneModelTables[zone_model.lower()]
-		zones = read_zonesMI(zonetab_name)
-		if not zone_names:
-			zone_names = zones.keys()
-	else:
-		zone_names = []
-
-	tab_filespec = os.path.join(GIS_root, "KSB-ORB", os.path.splitext(tabname)[0] + ".TAB")
-	tab = app.OpenTable(tab_filespec)
-	tabname = tab.GetName()
-
-	queries = []
-	query = 'Select id_earth, date, time, longitude, latitude, depth, ML, MS, MW, name from %s' % tabname
-	query += ' Where type = "ke" and is_true = 1'
-	if start_date:
-		query += ' and date >= "%02d/%02d/%04d"' % (start_date.day, start_date.month, start_date.year)
-	if end_date:
-		query += ' and date <= "%02d/%02d/%04d"' % (end_date.day, end_date.month, end_date.year)
-	if region:
-		query += ' and longitude >= %f and longitude <= %f and latitude >= %f and latitude <= %f' % region
-	if Mmin:
-		query += ' and ML >= %f' % Mmin
-	if Mmax:
-		query += ' and ML <= %f' % Mmax
-	if zone_names:
-		for zone_name in zone_names:
-			queries.append(query + ' and obj Within Any(Select obj from %s where Name = "%s") into CatalogQuery Order By date,time asc noselect' % (app.GetTableName(zonetab_name), zone_name))
-	else:
-		queries.append(query + ' into CatalogQuery Order By date,time asc noselect')
-		zone_names = ["ROB Catalog"]
-
-	zone_catalogs = OrderedDict()
-	for zone_name, query in zip(zone_names, queries):
-		## Important: we loop over zone_names instead of zones, because the former is a function
-		## argument, and can be specified by the caller
-		name = "%s %s - %s" % (zone_name, start_date.isoformat(), end_date.isoformat())
-		if verbose:
-			print query
-		app.Do(query)
-		catalog_table = app.GetTable("CatalogQuery")
-		catalog = []
-		col_info = catalog_table.GetColumnInfo()
-		for rec in catalog_table:
-			values = rec.GetValues(col_info)
-			h, m, s = [int(s) for s in values["time"].split(':')]
-			time = datetime.time(h, m, s)
-			eq = seismodb.LocalEarthquake(values["id_earth"], values["date"], time, values["longitude"], values["latitude"], values["depth"], values["ML"], values["MS"], values["MW"], values["name"])
-			catalog.append(eq)
-		catalog = EQCatalog(catalog, start_date, end_date, name=name)
-		try:
-			zone = zones[zone_name]
-		except:
-			pass
-		else:
-			catalog.Mmax_evaluated = float(zone.MS_max_evaluated)
-		if zone_model:
-			catalog.ID = int(zone.ID)
-		zone_catalogs[zone_name] = catalog
-
-	tab.Close()
-
-	if not zone_model:
-		return zone_catalogs.values()[0]
-	else:
-		return zone_catalogs
-
-
 def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", convert_NULL=True, verbose=False, errf=None):
 	"""
 	Query ROB local earthquake catalog through the online database.
@@ -2724,6 +2619,8 @@ def read_source_model(source_model_name, verbose=True):
 	:return:
 		ordered dict {String sourceID: instande of :class:`osgeo.ogr.Geometry`}
 	"""
+	import osr, ogr
+
 	## Construct WGS84 projection system corresponding to earthquake coordinates
 	wgs84 = osr.SpatialReference()
 	wgs84.SetWellKnownGeogCS("WGS84")
@@ -2731,7 +2628,7 @@ def read_source_model(source_model_name, verbose=True):
 	## Read zone model from MapInfo file
 	#source_model_table = ZoneModelTables[source_model_name.lower()]
 	#tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
-	from hazard.psha.openquake.rob_sourceModels import rob_source_models_dict
+	from source_models import rob_source_models_dict
 	tab_filespec = rob_source_models_dict[source_model_name]["tab_filespec"]
 	mi = ogr.GetDriverByName("MapInfo File")
 	ds = mi.Open(tab_filespec)
@@ -2945,6 +2842,110 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		pylab.show()
 
 
+# TODO: revise the following two functions
+
+def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, zone_model=None, zone_names=[], verbose=False):
+	"""
+	Read ROB local earthquake catalog through a running instance of MapInfo.
+	Optional parameters:
+		tabname: name of MapInfo table containing catalog, defaults to "KSB_ORB_Catalog".
+			This table must be open in MapInfo.
+		region: (w, e, s, n) tuple specifying rectangular region of interest
+		start_date: date (date object or year) specifying start of time window of interest
+		end_date: date (date object or year) specifying end of time window of interest
+		Mmin: minimum magnitude to extract
+		Mmax: minimum magnitude to extract
+		zone_model: name of zone model to use for splitting catalog into subcollections, defaults to None
+			The table corresponding to the zone model must also be open in MapInfo.
+			Available zone models: "Leynaud", "SLZ+RVG", and "Seismotectonic"
+		zone_names: list with names of zones to extract if a zone model is specified, defaults to [],
+			which will extract all zones.
+		verbose: bool, if True the query string will be echoed to standard output
+	Magnitude for selection is based on ML only!
+	Return value:
+		EQCatalog object, or dictionary of EQCatalog objects if a zone model is specified.
+	"""
+	import mapping.MIPython as MI
+	app = MI.Application(maximize=False)
+	if type(start_date) == type(0):
+		start_date = datetime.date(start_date, 1, 1)
+	elif isinstance(start_date, datetime.datetime):
+		start_date = start_date.date()
+	if type(end_date) == type(0):
+		end_date = datetime.date(end_date, 12, 31)
+	elif isinstance(end_date, datetime.datetime):
+		end_date = end_date.date()
+	if not end_date:
+		end_date = datetime.datetime.now().date()
+	if not start_date:
+		start_date = datetime.date(100, 1, 1)
+
+	if zone_model:
+		zonetab_name = ZoneModelTables[zone_model.lower()]
+		zones = read_zonesMI(zonetab_name)
+		if not zone_names:
+			zone_names = zones.keys()
+	else:
+		zone_names = []
+
+	tab_filespec = os.path.join(GIS_root, "KSB-ORB", os.path.splitext(tabname)[0] + ".TAB")
+	tab = app.OpenTable(tab_filespec)
+	tabname = tab.GetName()
+
+	queries = []
+	query = 'Select id_earth, date, time, longitude, latitude, depth, ML, MS, MW, name from %s' % tabname
+	query += ' Where type = "ke" and is_true = 1'
+	if start_date:
+		query += ' and date >= "%02d/%02d/%04d"' % (start_date.day, start_date.month, start_date.year)
+	if end_date:
+		query += ' and date <= "%02d/%02d/%04d"' % (end_date.day, end_date.month, end_date.year)
+	if region:
+		query += ' and longitude >= %f and longitude <= %f and latitude >= %f and latitude <= %f' % region
+	if Mmin:
+		query += ' and ML >= %f' % Mmin
+	if Mmax:
+		query += ' and ML <= %f' % Mmax
+	if zone_names:
+		for zone_name in zone_names:
+			queries.append(query + ' and obj Within Any(Select obj from %s where Name = "%s") into CatalogQuery Order By date,time asc noselect' % (app.GetTableName(zonetab_name), zone_name))
+	else:
+		queries.append(query + ' into CatalogQuery Order By date,time asc noselect')
+		zone_names = ["ROB Catalog"]
+
+	zone_catalogs = OrderedDict()
+	for zone_name, query in zip(zone_names, queries):
+		## Important: we loop over zone_names instead of zones, because the former is a function
+		## argument, and can be specified by the caller
+		name = "%s %s - %s" % (zone_name, start_date.isoformat(), end_date.isoformat())
+		if verbose:
+			print query
+		app.Do(query)
+		catalog_table = app.GetTable("CatalogQuery")
+		catalog = []
+		col_info = catalog_table.GetColumnInfo()
+		for rec in catalog_table:
+			values = rec.GetValues(col_info)
+			h, m, s = [int(s) for s in values["time"].split(':')]
+			time = datetime.time(h, m, s)
+			eq = seismodb.LocalEarthquake(values["id_earth"], values["date"], time, values["longitude"], values["latitude"], values["depth"], values["ML"], values["MS"], values["MW"], values["name"])
+			catalog.append(eq)
+		catalog = EQCatalog(catalog, start_date, end_date, name=name)
+		try:
+			zone = zones[zone_name]
+		except:
+			pass
+		else:
+			catalog.Mmax_evaluated = float(zone.MS_max_evaluated)
+		if zone_model:
+			catalog.ID = int(zone.ID)
+		zone_catalogs[zone_name] = catalog
+
+	tab.Close()
+
+	if not zone_model:
+		return zone_catalogs.values()[0]
+	else:
+		return zone_catalogs
 
 
 def read_zonesMI(tabname):
@@ -2996,6 +2997,8 @@ def read_zonesTXT(filespec, fixed_depth=None):
 				coords.append((x, y, z))
 	return zones
 
+
+### The following functions are obsolete or have moved to other modules
 
 def format_zones_CRISIS(zone_model, Mc=3.5, smooth=False, fixed_depth=None):
 	import mapping.MIPython as MI
