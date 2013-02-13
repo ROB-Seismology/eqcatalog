@@ -353,6 +353,16 @@ class EQCatalog:
 		else:
 			return (None, None)
 
+	def get_time_delta(self):
+		"""
+		Return duration of catalog as datetime.timedelta object
+
+		:return:
+			instance of datetime.timedelta
+		"""
+		Tmin, Tmax = self.Tminmax()
+		return Tmax - Tmin
+
 	def Mminmax(self, Mtype="MS", Mrelation=None):
 		"""
 		Return tuple with minimum and maximum magnitude in catalog.
@@ -394,6 +404,22 @@ class EQCatalog:
 		"""
 		return self.lon_minmax() + self.lat_minmax()
 
+	def get_Mmin(self, Mtype="MS", Mrelation=None):
+		"""
+		Compute minimum magnitude in catalog
+
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			Float, maximum observed magnitude
+		"""
+		return self.get_magnitudes(Mtype, Mrelation).min()
+
 	def get_Mmax(self, Mtype="MS", Mrelation=None):
 		"""
 		Compute maximum magnitude in catalog
@@ -412,6 +438,20 @@ class EQCatalog:
 
 	def get_M0(self, Mrelation={"MS": "bungum", "ML": "hinzen"}):
 		"""
+		Return array with seismic moments for all earthquakes in catalog.
+
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			1-D numpy float array, earthquake moments
+		"""
+		return np.array([eq.get_M0(Mrelation=Mrelation) for eq in self])
+
+	def get_M0_total(self, Mrelation={"MS": "bungum", "ML": "hinzen"}):
+		"""
 		Compute total seismic moment.
 
 		:param Mrelation:
@@ -422,7 +462,7 @@ class EQCatalog:
 		:return:
 			Float, total seismic moment in N.m
 		"""
-		return np.add.reduce(np.array([eq.get_M0(Mrelation=Mrelation) for eq in self]))
+		return np.add.reduce(self.get_M0(Mrelation=Mrelation))
 
 	def get_M0rate(self, Mrelation={"ML": "Hinzen", "MS": "geller"}):
 		"""
@@ -436,7 +476,7 @@ class EQCatalog:
 		:return:
 			Float, seismic moment rate in N.m/yr
 		"""
-		return self.get_M0(Mrelation=Mrelation) / self.timespan()
+		return self.get_M0_total(Mrelation=Mrelation) / self.timespan()
 
 	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MS", Mrelation=None):
 		"""
@@ -791,7 +831,7 @@ class EQCatalog:
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def bin_year(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MS", Mrelation=None):
+	def bin_year(self, start_year, end_year, dYear, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None):
 		"""
 		Bin earthquakes into year intervals
 
@@ -802,9 +842,9 @@ class EQCatalog:
 		:param dYear:
 			Int, bin interval in years
 		:param Mmin:
-			Float, minimum magnitude (inclusive)
+			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
-			Float, maximum magnitude (inclusive)
+			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
@@ -824,14 +864,129 @@ class EQCatalog:
 		bins_N, bins_Years = np.histogram(Years, bins_Years)
 		return (bins_N, bins_Years[:-1])
 
-	def bin_hour(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+	def bin_year_by_M0(self, start_year, end_year, dYear, Mmin=None, Mmax=None, Mrelation=None):
 		"""
-		Bin earthquakes into hour intervals
+		Bin earthquakes moments into year intervals
 
+		:param start_year:
+			Int, lower year to bin (left edge of first bin)
+		:param end_year:
+			Int, upper year to bin (right edge of last bin)
+		:param dYear:
+			Int, bin interval in years
+		:param Mmin:
+			Float, minimum magnitude (inclusive) (default: None)
+		:param Mmax:
+			Float, maximum magnitude (inclusive) (default: None)
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			tuple (bins_M0, bins_Years)
+			bins_M0: array containing summed seismic moment in each bin
+			bins_Years: array containing lower year of each interval
+		"""
+		bins_Years = np.arange(start_year, end_year+dYear, dYear)
+		bins_M0 = np.zeros(len(bins_Years))
+		## Select years according to magnitude criteria
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation)
+
+		for eq in subcatalog:
+			try:
+				bin_id = np.where(bins_Years < eq.datetime.year)[0][-1]
+			except IndexError:
+				## These are earthquakes that are younger
+				pass
+			else:
+				bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
+		return bins_M0, bins_Years
+
+
+	def bin_day(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None):
+		"""
+		Bin earthquakes into day intervals
+
+		:param start_date:
+			instance of datetime.date, start date
+		:param end_date:
+			instance of datetime.date, end date
+		:param dday:
+			Int, bin interval in days
 		:param Mmin:
 			Float, minimum magnitude (inclusive)
 		:param Mmax:
 			Float, maximum magnitude (inclusive)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			tuple (bins_N, bins_Days)
+			bins_N: array containing number of earthquakes for each bin
+			bins_Days: array containing lower day of each interval
+				(relative to first day)
+		"""
+		bins_Days = np.arange(0, (end_date - start_date).days + dday, dday)
+		## Select years according to magnitude criteria
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		Days = [(eq.date - start_date).days + (eq.date - start_date).seconds / 86400.0 for eq in subcatalog]
+		bins_N, bins_Days = np.histogram(Days, bins_Days)
+		return (bins_N, bins_Days[:-1])
+
+	def bin_day_by_M0(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mrelation=None):
+		"""
+		Bin earthquake moments into day intervals
+
+		:param start_date:
+			instance of datetime.date, start date
+		:param end_date:
+			instance of datetime.date, end date
+		:param dday:
+			Int, bin interval in days
+		:param Mmin:
+			Float, minimum magnitude (inclusive)
+		:param Mmax:
+			Float, maximum magnitude (inclusive)
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			tuple (bins_M0, bins_Days)
+			bins_M0: array containing summed seismic moment in each bin
+			bins_Days: array containing lower day of each interval
+				(relative to first day)
+		"""
+		bins_Days = np.arange(0, (end_date - start_date).days + dday, dday)
+		bins_M0 = np.zeros(len(bins_Days))
+		## Select years according to magnitude criteria
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation)
+
+		for eq in subcatalog:
+			try:
+				bin_id = np.where(bins_Days < (eq.date - start_date).days)[0][-1]
+			except IndexError:
+				## These are earthquakes that are younger
+				pass
+			else:
+				bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
+		return bins_M0, bins_Days
+
+
+	def bin_hour(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+		"""
+		Bin earthquakes into hour intervals
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive) (default: None)
+		:param Mmax:
+			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
@@ -854,14 +1009,14 @@ class EQCatalog:
 		bins_N, junk = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
-	def bin_depth(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+	def bin_depth(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
 		"""
 		Bin earthquakes into depth bins
 
 		:param Mmin:
-			Float, minimum magnitude (inclusive)
+			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
-			Float, maximum magnitude (inclusive)
+			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
@@ -890,7 +1045,7 @@ class EQCatalog:
 		bins_N, junk = np.histogram(depths, bins_depth)
 		return bins_N, bins_depth[:-1]
 
-	def bin_depth_by_M0(self, Mmin, Mmax, Mtype="MW", Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
+	def bin_depth_by_M0(self, Mmin, Mmax, Mrelation=None, start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2):
 		"""
 		Bin earthquake moments into depth bins
 
@@ -898,8 +1053,6 @@ class EQCatalog:
 			Float, minimum magnitude (inclusive)
 		:param Mmax:
 			Float, maximum magnitude (inclusive)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -922,11 +1075,12 @@ class EQCatalog:
 		"""
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_M0 = np.zeros(len(bins_depth))
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation, min_depth=min_depth, max_depth=max_depth)
 		for eq in subcatalog:
 			if eq.depth not in (None, 0):
 				try:
-					bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
+					#bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
+					bin_id = np.where(bins_depth < eq.depth)[0][-1]
 				except:
 					## These are earthquakes that are deeper
 					pass
@@ -934,7 +1088,7 @@ class EQCatalog:
 					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_depth
 
-	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, fig_filespec=None, verbose=False):
+	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MS", Mrelation=None, title=None, fig_filespec=None, verbose=False):
 		"""
 		Plot magnitude histogram of earthquakes in collection.
 		:param Mmin:
@@ -943,27 +1097,33 @@ class EQCatalog:
 			Float, maximum magnitude to bin
 		:param dM:
 			Float, magnitude interval
-
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_Rosset)
+			and corresponding minimum magnitudes (default: None)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
+		:param title:
+			String, plot title (None = default title, "" = no title)
+			(default: None)
 		:param fig_filespec:
 			String, full path of image to be saved.
 			If None (default), histogram is displayed on screen.
-		:param verbose:
-			Bool, whether or not to print binning information (default: False)
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation)
 		pylab.bar(bins_Mag, bins_N, width=dM)
-		pylab.xlabel("Magnitude (%s)" % Mtype)
-		pylab.ylabel("Number of events")
-		pylab.title("%s (%d events)" % (self.name, num_events))
+		pylab.xlabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
+		pylab.ylabel("Number of events", fontsize="x-large")
+		ax = pylab.gca()
+		for label in ax.get_xticklabels() + ax.get_yticklabels():
+			label.set_size('large')
+		if title is None:
+			num_events = pylab.add.reduce(bins_N)
+			title = "%s (%d events)" % (self.name, num_events)
+		pylab.title(title, fontsize="large")
 
 		if fig_filespec:
 			pylab.savefig(fig_filespec)
@@ -1051,56 +1211,56 @@ class EQCatalog:
 		pylab.axis((start_year, end_year, 0, ymax))
 		pylab.show()
 
-	def plot_CumulatedM0(self, start_date=None, end_date=None, ddate=10, ddate_spec="years", Mrelation=None, M0max=None, fig_filespec=None):
+	def plot_CumulatedM0(self, start_date=None, end_date=None, ddate=10, ddate_spec="years", Mrelation=None, M0max=None, binned=False, histogram=True, fig_filespec=None):
 		if start_date == None:
 			start_date = self.start_date
 		if end_date == None:
 			end_date = self.end_date
 
 		if ddate_spec.lower()[:4] == "year":
-			bins_Dates = my_arange(start_date.year, end_date.year+ddate, ddate, decimals=1)
-			Dates = [eq.datetime.year for eq in self]
+			bins_M0, bins_Dates = self.bin_year_by_M0(start_date.year, end_date.year, ddate, Mrelation=Mrelation)
+			#bins_Dates = np.arange(start_date.year, end_date.year+ddate, ddate)
+			subcatalog = self.subselect(start_date=start_date.year, end_date=end_date.year)
+			Dates = [eq.datetime.year for eq in subcatalog]
 		elif ddate_spec.lower()[:3] == "day":
-			bins_Dates = my_arange((end_date - start_date).days + 1)
-			Dates = [(eq.datetime - start_dt).days + (eq.datetime - start_dt).seconds / 86400.0 for eq in self]
-		bins_M0 = np.zeros(len(bins_Dates), 'd')
-		start_dt = datetime.datetime.combine(start_date, datetime.time(0))
-		M0 = np.zeros(len(self), 'd')
-		if ddate_spec.lower()[:4] == "year":
-			for j, eq in enumerate(self):
-				i = list(eq.datetime.year < bins_Dates).index(True) - 1
-				bins_M0[i] += eq.get_M0(Mrelation=Mrelation)
-				M0[j] = eq.get_M0(Mrelation=Mrelation)
-		elif ddate_spec.lower()[:3] == "day":
-			for j, eq in enumerate(self):
-				i = (eq.datetime.date() - start_date).days
-				bins_M0[i] += eq.get_M0(Mrelation=Mrelation)
-				M0[j] = eq.get_M0(Mrelation=Mrelation)
+			bins_M0, bins_Dates = self.bin_day_by_M0(start_date, end_date, ddate, Mrelation=Mrelation)
+			#bins_Dates = np.arange((end_date - start_date).days + 1)
+			subcatalog = self.subselect(start_date=start_date, end_date=end_date)
+			Dates = [(eq.datetime - start_dt).days + (eq.datetime - start_dt).seconds / 86400.0 for eq in subcatalog]
 		bins_M0_cumul = np.add.accumulate(bins_M0)
-		M0_cumul = np.add.accumulate(M0)
+		unbinned_M0 = subcatalog.get_M0(Mrelation=Mrelation)
+		M0_cumul = np.add.accumulate(unbinned_M0)
 
-		#bins_M02 = np.array(zip(np.concatenate([np.zeros(1, 'd'), bins_M0[:-1]]), bins_M0)).flatten()
+		## Construct arrays with duplicate points in order to plot horizontal
+		## lines between subsequent points
 		bins_M0_cumul2 = np.array(zip(np.concatenate([np.zeros(1, 'd'), bins_M0_cumul[:-1]]), bins_M0_cumul)).flatten()
 		M0_cumul2 = np.array(zip(np.concatenate([np.zeros(1, 'd'), M0_cumul[:-1]]), M0_cumul)).flatten()
 		bins_Dates2 = np.array(zip(bins_Dates, bins_Dates)).flatten()
 		Dates2 = np.array(zip(Dates, Dates)).flatten()
 
-		pylab.plot(bins_Dates2, bins_M0_cumul2, 'r', label="Cumulative")
-		pylab.plot(bins_Dates, bins_M0_cumul, 'ro', label=" ")
-		pylab.plot(Dates2, M0_cumul2, 'g', label="Cumulative (unbinned)")
-		#pylab.plot(Dates, M0_cumul, 'go', label="")
-		font = FontProperties(size='small')
+		## Plot
+		if binned:
+			pylab.plot(bins_Dates2, bins_M0_cumul2, 'r', label="Cumulative")
+			pylab.plot(bins_Dates, bins_M0_cumul, 'ro', label="")
+		else:
+			pylab.plot(Dates2, M0_cumul2, 'g', label="Cumulative")
+			pylab.plot(Dates, M0_cumul, 'go', label="")
+		if histogram:
+			pylab.bar(bins_Dates, bins_M0, width=ddate, label="Binned")
+
+		font = FontProperties(size='large')
 		pylab.legend(loc=0, prop=font)
-		#pylab.plot(bins_Dates2, bins_M02, 'b', label=" ")
-		#pylab.plot(bins_Dates, bins_M0, 'bo', label="By date bin")
-		pylab.bar(bins_Dates, bins_M0, width=ddate)
-		pylab.xlabel("Time (%s)" % ddate_spec)
-		pylab.ylabel("Seismic Moment (N.m)")
+		pylab.xlabel("Time (%s)" % ddate_spec, fontsize="x-large")
+		pylab.ylabel("Seismic Moment (N.m)", fontsize="x-large")
 		pylab.title(self.name)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		if M0max:
 			ymax = M0max
 		pylab.axis((bins_Dates[0], bins_Dates[-1], ymin, ymax))
+
+		ax = pylab.gca()
+		for label in ax.get_xticklabels() + ax.get_yticklabels():
+			label.set_size('large')
 
 		if fig_filespec:
 			pylab.savefig(fig_filespec)
@@ -1110,7 +1270,8 @@ class EQCatalog:
 
 	def plot_DateHistogram(self, start_date=None, end_date=None, ddate=1, ddate_spec="year", mag_limits=[2,3], Mtype="ML", Mrelation=None):
 		"""
-		Plot histogram with number of earthqukes versus date.
+		Plot histogram with number of earthqukes versus date
+		for different magnitude ranges.
 
 		:param start_date:
 			Int or date or datetime object specifying start of time window to plot
@@ -1177,30 +1338,6 @@ class EQCatalog:
 		pylab.xlabel("Time (%s)" % ddate_spec)
 		pylab.show()
 
-	def plot_Magnitude_Date(self, Mtype="MS", Mrelation=None):
-		"""
-		Plot magnitude versus date
-		"""
-		dates = self.get_datetimes()
-		magnitudes = self.get_magnitudes(Mtype, Mrelation)
-
-		days = pylab.DayLocator()
-		weeks = pylab.WeekdayLocator()
-		months = pylab.MonthLocator()
-
-		fig = pylab.figure()
-		ax = fig.add_subplot(111)
-		pylab.plot_date(pylab.date2num(dates), magnitudes)
-		pylab.xlabel("Date")
-		pylab.ylabel("Magnitude")
-		ax.xaxis.set_major_locator(weeks)
-		ax.xaxis.set_minor_locator(days)
-		for label in ax.get_xticklabels():
-			label.set_horizontalalignment('right')
-			label.set_rotation(30)
-		#ax.set(labels, rotation=30, fontsize=10)
-		pylab.show()
-
 	def plot_Magnitude_Time(self, Mtype="MS", Mrelation=None, lang="en"):
 		"""
 		Plot magnitude versus time
@@ -1222,7 +1359,7 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, triggered_catalog=None, completeness=None, color="k", label=None, vlines=False, grid=False, major_ticks=None, minor_ticks=1, title="", lang="en"):
+	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, overlay_catalog=None, completeness=None, color="k", symbol='s', label=None, vlines=False, grid=False, major_tick_interval=None, minor_tick_interval=1, plot_date=False, title=None, lang="en"):
 		"""
 		Plot time versus magnitude
 
@@ -1232,90 +1369,137 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param triggered_catalog:
-			class:`EQCatalog` instance, plot triggered earthquakes (default: None)
+		:param overlay_catalog:
+			class:`EQCatalog` instance, second catalog to overlay on plot,
+			e.g., a declustered catalog (default: None)
 		:param completeness:
 			class:`Completeness` instance, plot completeness (default: None)
 		:param color:
 			Str, color to plot data points with (default: "k")
+		:param symbol:
+			Str, Matplotlib marker specification (default: 's')
 		:param label:
 			Str, label of data points (default: None)
 		:param vlines:
 			Boolean, plot vertical lines from data point to x-axis (default: False)
 		:param grid:
 			Boolean, plot grid (default: False)
-		:param major_ticks:
+		:param major_tick_interval:
 			Int, interval in years for major ticks (default: None). If none, a
 			maximum number of ticks at nice locations will be used.
-		:param minor_ticks:
+		:param minor_tick_interval:
 			Int, interval in years for minor ticks (default: 1)
+		:param plot_date:
+			Boolean, whether or not to plot time axis as dates instead of
+			fractional years (default: False)
 		:param title:
-			Str, title of plot (default: "")
+			Str, title of plot (None = default title, "" = no title)
+			(default: None)
 		:param lang:
 			String, language of plot labels (default: "en")
 		"""
-		x = self.get_fractional_years()
 		y = self.get_magnitudes(Mtype, Mrelation)
-		plt.scatter(x, y, s=50, color=color, label=label, marker="s", facecolors='none')
-		xmin, xmax, ymin, ymax = plt.axis()
-		xmin, xmax = self.start_date.year, self.end_date.year+1
-		plt.axis((xmin, xmax, 0, max(y)*1.1))
+		if not plot_date:
+			x = self.get_fractional_years()
+			plt.scatter(x, y, s=50, color=color, label=label, marker=symbol, facecolors='none')
+			xmin, xmax, ymin, ymax = plt.axis()
+			xmin, xmax = self.start_date.year, self.end_date.year+1
+			plt.axis((xmin, xmax, 0, max(y)*1.1))
+		else:
+			x = pylab.date2num(self.get_datetimes())
+			plt.plot_date(x, y, ms=np.sqrt(50), color=color, label=label, marker=symbol, markerfacecolor='none')
 
 		## plot vlines
-		if vlines:
+		if vlines and not plot_date:
 			plt.vlines(x, ymin=ymin, ymax=y)
 
 		## plot ticks
-		if major_ticks:
-			majorLocator = MultipleLocator(major_ticks)
-		else:
-			majorLocator = MaxNLocator()
-		minorLocator = MultipleLocator(minor_ticks)
 		ax = plt.gca()
-		ax.xaxis.set_major_locator(majorLocator)
-		ax.xaxis.set_minor_locator(minorLocator)
-		ax.yaxis.set_minor_locator(MultipleLocator(0.1))
+		if not plot_date:
+			if major_tick_interval:
+				majorLocator = MultipleLocator(major_tick_interval)
+			else:
+				majorLocator = MaxNLocator()
+			minorLocator = MultipleLocator(minor_tick_interval)
+			ax.xaxis.set_major_locator(majorLocator)
+			ax.xaxis.set_minor_locator(minorLocator)
+			ax.yaxis.set_minor_locator(MultipleLocator(0.1))
+		for label in ax.get_xticklabels() + ax.get_yticklabels():
+			label.set_size('large')
+		if plot_date:
+			for label in ax.get_xticklabels():
+				label.set_horizontalalignment('right')
+				label.set_rotation(30)
 
 		## plot labels
-		plt.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
-		plt.ylabel("Magnitude (%s)" % Mtype)
+		plt.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang], fontsize="x-large")
+		plt.ylabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
 
-		## plot declustering
-		if triggered_catalog:
-			x = triggered_catalog.get_fractional_years()
-			y = triggered_catalog.get_magnitudes(Mtype, Mrelation)
-			plt.scatter(x, y, s=50, color="r", marker="s", facecolors='none')
+		## plot overlay catalog
+		if overlay_catalog:
+			x = overlay_catalog.get_fractional_years()
+			if not plot_date:
+				y = overlay_catalog.get_magnitudes(Mtype, Mrelation)
+				plt.scatter(x, y, s=50, color="r", marker=symbol, facecolors='none')
+			else:
+				x = pylab.date2num(self.get_datetimes())
+				plt.plot_date(x, y, ms=np.sqrt(50), color="r", marker=symbol, markerfacecolors='none')
 
 		## plot completeness
-		if completeness:
+		if completeness and not plot_date:
 			x, y = completeness.min_years, completeness.min_mags
-			x = np.append(x, xmax)
+			x = np.append(x, self.end_date.year+1)
 			plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors='r')
-			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r')
+			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r', lw=2)
 
 		if grid:
 			plt.grid()
 
-		plt.title(title)
+		if title is None:
+			title = "%s (%d events)" % (self.name, len(self))
+		plt.title(title, fontsize="x-large")
 		if label:
 			plt.legend()
 		plt.show()
 
-	def HourlyMean(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None, day=(10, 17), night=(19, 7)):
+	def DailyNightlyMean(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None, day=(7, 19)):
+		"""
+		Report mean number of earthquakes for different times of day
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive) (default: None)
+		:param Mmax:
+			Float, maximum magnitude (inclusive) (default: None)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param day:
+			Tuple (min_hour, max_hour), default: (7, 19)
+
+		:return:
+			Tuple (mean, daily mean, nightly mean)
+		"""
 		bins_N, bins_Hr = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		mean = np.mean(bins_N)
 		mean_day = np.mean(bins_N[day[0]:day[1]])
-		mean_night = np.mean(np.concatenate((bins_N[:night[1]], bins_N[night[0]-24:])))
+		mean_night = np.mean(np.concatenate([bins_N[:day[0]], bins_N[day[1]:]]))
 		return (mean, mean_day, mean_night)
 
-	def plot_HourHistogram(self, Mmin, Mmax, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+	def plot_HourHistogram(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
 		"""
 		Plot histogram with number of earthquakes per hour of the day.
 
 		:param Mmin:
-			Float, minimum magnitude (inclusive)
+			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
-			Float, maximum magnitude (inclusive)
+			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
@@ -1331,31 +1515,85 @@ class EQCatalog:
 		pylab.bar(bins_Hr, bins_N)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((0, 24, ymin, ymax))
-		pylab.xlabel("Hour of day")
-		pylab.ylabel("Number of events")
+		pylab.xlabel("Hour of day", fontsize='x-large')
+		pylab.ylabel("Number of events", fontsize='x-large')
+		ax = pylab.gca()
+		ax.invert_yaxis()
+		for label in ax.get_xticklabels() + ax.get_yticklabels():
+			label.set_size('large')
+
 		if not start_year:
 			start_year = self.start_date.year
 		if not end_year:
 			end_year = self.end_date.year
+		if Mmin is None:
+			Mmin = self.get_Mmin()
+		if Mmax is None:
+			Mmax = self.get_Mmax()
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
-	def plot_DepthHistogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2, color='b', want_title=True, fig_filespec="", fig_width=0, dpi=300):
-		bins_N, bins_depth = self.bin_depth(Mmin, Mmax, Mtype, start_year, end_year, min_depth, max_depth, bin_width)
-		pylab.bar(bins_depth, bins_N, orientation="vertical", width=bin_width, color=color)
+	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
+		"""
+		Plot histogram with number of earthquakes versus depth.
+
+		:param min_depth:
+			Float, minimum depth in km (default: 0)
+		:param max_depth:
+			Float, maximum depth in km (default: 30)
+		:param bin_width:
+			Float, bin width in km (default: 2)
+		:param Mmin:
+			Float, minimum magnitude (inclusive) (default: None)
+		:param Mmax:
+			Float, maximum magnitude (inclusive) (default: None)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param color:
+			String, matplotlib color specification for histogram bars
+			(default: 'b')
+		:param title:
+			String, title (None = default title, empty string = no title)
+			(default: None)
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
+		"""
+		bins_N, bins_depth = self.bin_depth(Mmin, Mmax, Mtype, Mrelation, start_year, end_year, min_depth, max_depth, bin_width)
+		pylab.barh(bins_depth, bins_N, height=bin_width, color=color)
 		xmin, xmax, ymin, ymax = pylab.axis()
-		pylab.axis((min_depth, max_depth, ymin, ymax))
-		pylab.xlabel("Depth (km)", fontsize='x-large')
-		pylab.ylabel("Number of events", fontsize='x-large')
+		pylab.axis((xmin, xmax, min_depth, max_depth))
+		pylab.ylabel("Depth (km)", fontsize='x-large')
+		pylab.xlabel("Number of events", fontsize='x-large')
 		ax = pylab.gca()
+		ax.invert_yaxis()
 		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('x-large')
-		if not start_year:
-			start_year = self.start_date.year
-		if not end_year:
-			end_year = self.end_date.year
-		if want_title:
-			pylab.title("Depth Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
+			label.set_size('large')
+
+		if title is None:
+			if not start_year:
+				start_year = self.start_date.year
+			if not end_year:
+				end_year = self.end_date.year
+			if Mmin is None:
+				Mmin = self.get_Mmin()
+			if Mmax is None:
+				Mmax = self.get_Mmax()
+			title = "Depth Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax)
+		pylab.title(title)
 
 		if fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
@@ -1368,22 +1606,66 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_Depth_M0_Histogram(self, Mmin, Mmax, Mtype="MS", start_year=None, end_year=None, min_depth=0, max_depth=30, bin_width=2, color='b', want_title=True, log=True, fig_filespec="", fig_width=0, dpi=300):
-		bins_M0, bins_depth = self.bin_depth_by_M0(Mmin, Mmax, Mtype, start_year, end_year, min_depth, max_depth, bin_width)
-		pylab.bar(bins_depth, bins_M0, orientation="vertical", width=bin_width, log=log, color=color)
+	def plot_Depth_M0_Histogram(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mrelation=None, start_year=None, end_year=None, color='b', title=None, log=True, fig_filespec="", fig_width=0, dpi=300):
+		"""
+		Plot histogram with seismic moment versus depth.
+
+		:param min_depth:
+			Float, minimum depth in km (default: 0)
+		:param max_depth:
+			Float, maximum depth in km (default: 30)
+		:param bin_width:
+			Float, bin width in km (default: 2)
+		:param Mmin:
+			Float, minimum magnitude (inclusive) (default: None)
+		:param Mmax:
+			Float, maximum magnitude (inclusive) (default: None)
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param color:
+			String, matplotlib color specification for histogram bars
+			(default: 'b')
+		:param log:
+			Boolean, whether or not log of seismic moment should be plotted
+		:param title:
+			String, title (None = default title, empty string = no title)
+			(default: None)
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
+		"""
+		bins_M0, bins_depth = self.bin_depth_by_M0(Mmin, Mmax, Mrelation, start_year, end_year, min_depth, max_depth, bin_width)
+		pylab.barh(bins_depth, bins_M0, height=bin_width, log=log, color=color)
 		xmin, xmax, ymin, ymax = pylab.axis()
-		pylab.axis((min_depth, max_depth, ymin, ymax))
-		pylab.xlabel("Depth (km)", fontsize='x-large')
-		pylab.ylabel("Cumulated seismic moment (N.m)", fontsize='x-large')
+		pylab.axis((xmin, xmax, min_depth, max_depth))
+		pylab.ylabel("Depth (km)", fontsize='x-large')
+		pylab.xlabel("Cumulated seismic moment (N.m)", fontsize='x-large')
 		ax = pylab.gca()
+		ax.invert_yaxis()
 		for label in ax.get_xticklabels() + ax.get_yticklabels():
 			label.set_size('x-large')
-		if not start_year:
-			start_year = self.start_date.year
-		if not end_year:
-			end_year = self.end_date.year
-		if want_title:
-			pylab.title("Depth Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
+		if title is None:
+			if not start_year:
+				start_year = self.start_date.year
+			if not end_year:
+				end_year = self.end_date.year
+			if Mmin is None:
+				Mmin = self.get_Mmin()
+			if Mmax is None:
+				Mmax = self.get_Mmax()
+			title = "Depth Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax)
+		pylab.title(title)
 
 		if fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
