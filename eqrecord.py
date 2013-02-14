@@ -18,8 +18,8 @@ __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
 
 
 def json_handler(obj):
-	if hasattr(obj, 'isoformat'):
-		return obj.isoformat()
+	if isinstance(obj, 'datetime.date'):
+		return obj.toordinal()
 	else:
 		return obj.__dict__
 
