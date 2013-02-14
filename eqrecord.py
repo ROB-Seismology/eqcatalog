@@ -5,6 +5,7 @@
 ## Import standard python modules
 import datetime
 import time
+import json
 import numpy as np
 
 
@@ -14,6 +15,13 @@ import seismodb
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
+
+
+def json_handler(obj):
+	if hasattr(obj, 'isoformat'):
+		return obj.isoformat()
+	else:
+		return obj.__dict__
 
 
 class LocalEarthquake:
@@ -46,7 +54,8 @@ class LocalEarthquake:
 	"""
 	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0.):
 		self.ID = ID
-		self.datetime = datetime.datetime.combine(date, time)
+		self.date = date
+		self.time = time
 		self.lon = lon
 		self.lat = lat
 		self.depth = depth
@@ -88,13 +97,13 @@ class LocalEarthquake:
 		self.errt = errt
 		self.errM = errM
 
-	@property
-	def date(self):
-		return self.datetime.date()
+	@classmethod
+	def from_json(self, s):
+		return LocalEarthquake.__init__(self, **json.loads(s))
 
 	@property
-	def time(self):
-		return self.datetime.time()
+	def datetime(self):
+		return datetime.datetime.combine(self.date, self.time)
 
 	def get_ML(self, Mrelation=None):
 		"""
@@ -333,6 +342,9 @@ class LocalEarthquake:
 			Float, azimuth in decimal degrees
 		"""
 		return geodetic.get_point_at((self.lon, self.lat), distance, azimuth)
+
+	def dump_json(self):
+		return json.dumps(self, default=json_handler)
 
 	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", sort_key="intensity", sort_order="asc", verbose=False):
 		return seismodb.query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, sort_key=sort_key, sort_order=sort_order, verbose=verbose)
