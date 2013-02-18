@@ -16,12 +16,32 @@ import seismodb
 
 __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
 
+# TODO: allow nan values instead of zeros
 
-def json_handler(obj):
-	if isinstance(obj, 'datetime.date'):
-		return obj.toordinal()
-	else:
-		return obj.__dict__
+def json_repr(obj):
+	"""Represent instance of a class as JSON.
+	Arguments:
+	obj -- any object
+	Return:
+	String that reprent JSON-encoded object.
+	"""
+	def serialize(obj):
+		if isinstance(obj, (bool, int, long, float, basestring)):
+			return obj
+		elif isinstance(obj, dict):
+			obj = obj.copy()
+			for key in obj:
+				obj[key] = serialize(obj[key])
+			return obj
+		elif isinstance(obj, list):
+			return [serialize(item) for item in obj]
+		elif isinstance(obj, tuple):
+			return tuple(serialize([item for item in obj]))
+		elif hasattr(obj, '__dict__'):
+			return serialize(obj.__dict__)
+		else:
+			return repr(obj) # Don't know how to handle, convert to string
+	return json.dumps(serialize(obj))
 
 
 class LocalEarthquake:
@@ -54,8 +74,7 @@ class LocalEarthquake:
 	"""
 	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0.):
 		self.ID = ID
-		self.date = date
-		self.time = time
+		self.datetime = datetime.datetime.combine(date, time)
 		self.lon = lon
 		self.lat = lat
 		self.depth = depth
@@ -99,11 +118,54 @@ class LocalEarthquake:
 
 	@classmethod
 	def from_json(self, s):
-		return LocalEarthquake.__init__(self, **json.loads(s))
+		"""
+		Generate instance of :class:`LocalEarthquake` from a json string
+		"""
+		dct = json.loads(s)
+		if len(dct) == 1:
+			class_name = dct.keys()[0]
+			#if class_name == LocalEarthquake.__class__.__name__:
+			if class_name == "__LocalEarthquake__":
+				return self.from_dict(dct[class_name])
+		#return LocalEarthquake.__init__(self, **json.loads(s))
+
+	@classmethod
+	def from_dict(self, dct):
+		"""
+		Generate instance of :class:`LocalEarthquake` from a dictionary
+		"""
+		if 'time' in dct:
+			dct['time'] = datetime.time(*dct['time'])
+		if 'date' in dct:
+			dct['date'] = datetime.date(*dct['date'])
+		if 'datetime' in dct:
+			dt = eval(dct['datetime'])
+			dct['date'] = dt.date()
+			dct['time'] = dt.time()
+			del dct['datetime']
+		return LocalEarthquake(**dct)
+
+	def dump_json(self):
+		"""
+		Generate json string
+		"""
+		def json_handler(obj):
+			if isinstance(obj, datetime.datetime):
+				return repr(obj)
+			else:
+				return obj.__dict__
+
+		key = '__%s__' % self.__class__.__name__
+		dct = {key: self.__dict__}
+		return json.dumps(dct, default=json_handler)
 
 	@property
-	def datetime(self):
-		return datetime.datetime.combine(self.date, self.time)
+	def date(self):
+		return self.datetime.date()
+
+	@property
+	def time(self):
+		return self.datetime.time()
 
 	def get_ML(self, Mrelation=None):
 		"""
@@ -342,9 +404,6 @@ class LocalEarthquake:
 			Float, azimuth in decimal degrees
 		"""
 		return geodetic.get_point_at((self.lon, self.lat), distance, azimuth)
-
-	def dump_json(self):
-		return json.dumps(self, default=json_handler)
 
 	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", sort_key="intensity", sort_order="asc", verbose=False):
 		return seismodb.query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, sort_key=sort_key, sort_order=sort_order, verbose=verbose)

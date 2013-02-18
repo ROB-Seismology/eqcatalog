@@ -26,6 +26,7 @@ import os
 import platform
 import datetime
 import cPickle
+import json
 from collections import OrderedDict
 
 
@@ -45,7 +46,6 @@ from scipy import stats
 ## Import ROB modules
 import seismodb
 import mfd
-#from thirdparty.recipes.my_arange import *
 
 
 
@@ -217,6 +217,22 @@ class EQCatalog:
 			return events[0]
 		else:
 			return None
+
+	def dump_json(self):
+		"""
+		Generate json string
+		"""
+		def json_handler(obj):
+			if isinstance(obj, seismodb.LocalEarthquake):
+				return obj.dump_json()
+			elif isinstance(obj, datetime.date):
+				return repr(obj)
+			else:
+				return obj.__dict__
+
+		key = '__%s__' % self.__class__.__name__
+		dct = {key: self.__dict__}
+		return json.dumps(dct, default=json_handler)
 
 	def get_time_delta(self):
 		"""

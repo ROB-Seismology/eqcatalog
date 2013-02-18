@@ -437,6 +437,14 @@ class TruncatedGRMFD(nhlib.mfd.TruncatedGRMFD, MFD):
 	def occurrence_rates(self):
 		return np.array(zip(*self.get_annual_occurrence_rates())[1])
 
+	@property
+	def beta(self):
+		return np.log(10) * self.b_val
+
+	@property
+	def alpha(self):
+		return np.log(10) * self.a_val
+
 	def get_min_mag_edge(self):
 		"""
 		Return left edge of minimum magnitude bin
