@@ -1402,10 +1402,24 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_Time_Magnitude(self, Mtype="MS", Mrelation=None, overlay_catalog=None, completeness=None, color="k", symbol='s', label=None, vlines=False, grid=False, major_tick_interval=None, minor_tick_interval=1, plot_date=False, title=None, lang="en"):
+	def plot_Time_Magnitude(self, symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50, Mtype="MS", Mrelation=None, overlay_catalog=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 		"""
 		Plot time versus magnitude
 
+		:param symbol:
+			matplotlib marker specification, earthquake marker symbol
+			(default: 'o')
+		:param edge_color:
+			matplotlib color specification, earthquake marker edge color
+			(default: 'r')
+		:param fill_color:
+			matplotlib color specification, earthquake marker fill color
+			(default: None)
+		:param label:
+			String, legend label for earthquake epicenters
+			(default: None)
+		:param symbol_size:
+			Int or Float, symbol size in points (default: 50)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
@@ -1417,97 +1431,54 @@ class EQCatalog:
 			e.g., a declustered catalog (default: None)
 		:param completeness:
 			class:`Completeness` instance, plot completeness (default: None)
-		:param color:
-			Str, color to plot data points with (default: "k")
-		:param symbol:
-			Str, Matplotlib marker specification (default: 's')
-		:param label:
-			Str, label of data points (default: None)
+		:param completeness_color:
+			Str, color to plot completeness line (default: "r")
 		:param vlines:
 			Boolean, plot vertical lines from data point to x-axis (default: False)
 		:param grid:
 			Boolean, plot grid (default: False)
+		:param plot_date:
+			Boolean, whether or not to plot time axis as dates instead of
+			fractional years (default: False)
 		:param major_tick_interval:
 			Int, interval in years for major ticks (default: None). If none, a
 			maximum number of ticks at nice locations will be used.
 		:param minor_tick_interval:
 			Int, interval in years for minor ticks (default: 1)
-		:param plot_date:
-			Boolean, whether or not to plot time axis as dates instead of
-			fractional years (default: False)
-		:param title:
-			Str, title of plot (None = default title, "" = no title)
-			(default: None)
 		:param lang:
 			String, language of plot labels (default: "en")
+		:param title:
+			String, plot title (default: None)
+		:param legend_location:
+			String or Int: location of legend (matplotlib location code):
+				"best" 	0
+				"upper right" 	1
+				"upper left" 	2
+				"lower left" 	3
+				"lower right" 	4
+				"right" 		5
+				"center left" 	6
+				"center right" 	7
+				"lower center" 	8
+				"upper center" 	9
+				"center" 		10
+			(default: 0)
+		:param fig_filespec:
+			String, full path of image to be saved.
+			If None (default), map is displayed on screen.
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
 		"""
-		y = self.get_magnitudes(Mtype, Mrelation)
-		if not plot_date:
-			x = self.get_fractional_years()
-			plt.scatter(x, y, s=50, color=color, label=label, marker=symbol, facecolors='none')
-			xmin, xmax, ymin, ymax = plt.axis()
-			xmin, xmax = self.start_date.year, self.end_date.year+1
-			plt.axis((xmin, xmax, 0, max(y)*1.1))
-		else:
-			x = pylab.date2num(self.get_datetimes())
-			plt.plot_date(x, y, ms=np.sqrt(50), color=color, label=label, marker=symbol, markerfacecolor='none')
-
-		## plot vlines
-		if vlines and not plot_date:
-			plt.vlines(x, ymin=ymin, ymax=y)
-
-		## plot ticks
-		ax = plt.gca()
-		if not plot_date:
-			if major_tick_interval:
-				majorLocator = MultipleLocator(major_tick_interval)
-			else:
-				majorLocator = MaxNLocator()
-			minorLocator = MultipleLocator(minor_tick_interval)
-			ax.xaxis.set_major_locator(majorLocator)
-			ax.xaxis.set_minor_locator(minorLocator)
-			ax.yaxis.set_minor_locator(MultipleLocator(0.1))
-		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('large')
-		if plot_date:
-			for label in ax.get_xticklabels():
-				label.set_horizontalalignment('right')
-				label.set_rotation(30)
-
-		## plot labels
-		if not plot_date:
-			xlabel = {"en": "Time (years)", "nl": "Tijd (jaar)"}[lang]
-		else:
-			xlabel = {"en": "Date", "nl": "Datum"}[lang]
-		plt.xlabel(xlabel, fontsize="x-large")
-		plt.ylabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
-
-		## plot overlay catalog
+		# TODO: check plot_dates, style parameters and labels from decluster names
+		catalogs = [self]
+		edge_colors=[edge_color]
 		if overlay_catalog:
-			x = overlay_catalog.get_fractional_years()
-			if not plot_date:
-				y = overlay_catalog.get_magnitudes(Mtype, Mrelation)
-				plt.scatter(x, y, s=50, color="r", marker=symbol, facecolors='none')
-			else:
-				x = pylab.date2num(self.get_datetimes())
-				plt.plot_date(x, y, ms=np.sqrt(50), color="r", marker=symbol, markerfacecolors='none')
-
-		## plot completeness
-		if completeness and not plot_date:
-			x, y = completeness.min_years, completeness.min_mags
-			x = np.append(x, self.end_date.year+1)
-			plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors='r')
-			plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors='r', lw=2)
-
-		if grid:
-			plt.grid()
-
-		if title is None:
-			title = "%s (%d events)" % (self.name, len(self))
-		plt.title(title, fontsize="x-large")
-		if label:
-			plt.legend()
-		plt.show()
+			catalogs.append(overlay_catalog)
+			edge_colors.append('r')
+		plot_catalogs_time_magnitude(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, completeness_color="r", vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def DailyNightlyMean(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None, day=(7, 19)):
 		"""
@@ -3178,6 +3149,165 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 	if fig_filespec:
 		default_figsize = pylab.rcParams['figure.figsize']
 		default_dpi = pylab.rcParams['figure.dpi']
+		if fig_width:
+			fig_width /= 2.54
+			dpi = dpi * (fig_width / default_figsize[0])
+		pylab.savefig(fig_filespec, dpi=dpi)
+		pylab.clf()
+	else:
+		pylab.show()
+
+
+def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=50, Mtype="MS", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+	"""
+	:param catalogs:
+		List containing instances of :class:`EQCatalog`
+	:param symbols:
+		List containing earthquake symbols for each catalog
+		(matplotlib marker specifications)
+	:param edge_colors:
+		List containing symbol edge colors for each catalog
+		(matplotlib color specifications)
+		(default: [])
+	:param fill_colors:
+		List containing symbol fill colors for each catalog
+		(matplotlib color specifications)
+		(default: [])
+	:param labels:
+		List containing plot labels, one for each catalog (default: [])
+	:param symbol_size:
+		Int or Float, symbol size in points (default: 50)
+	:param Mtype:
+		String, magnitude type for magnitude scaling (default: "MW")
+	:param Mrelation:
+		{str: str} dict, mapping name of magnitude conversion relation
+		to magnitude type ("MW", "MS" or "ML") (default: None, will
+		select the default relation for the given Mtype)
+	:param completeness:
+		class:`Completeness` instance, plot completeness (default: None)
+	:param completeness_color:
+		Str, color to plot completeness line (default: "r")
+	:param vlines:
+		Boolean, plot vertical lines from data point to x-axis (default: False)
+	:param grid:
+		Boolean, plot grid (default: False)
+	:param plot_date:
+		Boolean, whether or not to plot time axis as dates instead of
+		fractional years (default: False)
+	:param major_tick_interval:
+		Int, interval in years for major ticks (default: None). If none, a
+		maximum number of ticks at nice locations will be used.
+	:param minor_tick_interval:
+		Int, interval in years for minor ticks (default: 1)
+	:param lang:
+		String, language of plot labels (default: "en")
+	:param title:
+		String, plot title (default: None)
+	:param legend_location:
+		String or Int: location of legend (matplotlib location code):
+			"best" 	0
+			"upper right" 	1
+			"upper left" 	2
+			"lower left" 	3
+			"lower right" 	4
+			"right" 		5
+			"center left" 	6
+			"center right" 	7
+			"lower center" 	8
+			"upper center" 	9
+			"center" 		10
+		(default: 0)
+	:param fig_filespec:
+		String, full path of image to be saved.
+		If None (default), map is displayed on screen.
+	:param fig_width:
+		Float, figure width in cm, used to recompute :param:`dpi` with
+		respect to default figure width (default: 0)
+	:param dpi:
+		Int, image resolution in dots per inch (default: 300)
+	"""
+	## Symbols, colors, and labels
+	if not symbols:
+		symbols = ["o"]
+	if not edge_colors:
+		edge_colors = ("r", "g", "b", "c", "m", "k")
+	if not fill_colors:
+		fill_colors = ["None"]
+	if not labels:
+		labels = [None]
+
+	for i, catalog in enumerate(catalogs):
+
+		symbol = symbols[i%len(symbols)]
+		edge_color = edge_colors[i%len(edge_colors)]
+		if edge_color is None:
+			edge_color = "None"
+		fill_color = fill_colors[i%len(fill_colors)]
+		if fill_color is None:
+			fill_color = "None"
+		label = labels[i%len(labels)]
+		if label is None:
+			label = catalog.name
+
+		y = catalog.get_magnitudes(Mtype, Mrelation)
+		if not plot_date:
+			x = catalog.get_fractional_years()
+			plt.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color)
+			xmin, xmax, ymin, ymax = plt.axis()
+			xmin, xmax = catalog.start_date.year, catalog.end_date.year+1
+			plt.axis((xmin, xmax, 0, max(y)*1.1))
+		else:
+			x = pylab.date2num(catalog.get_datetimes())
+			plt.plot_date(x, y, ms=np.sqrt(symbol_size), mec=edge_color, color=fill_color, label=label, marker=symbol, mfc=fill_color)
+
+		## plot vlines
+		if vlines and not plot_date:
+			plt.vlines(x, ymin=ymin, ymax=y)
+
+	## plot ticks
+	ax = plt.gca()
+	if not plot_date:
+		if major_tick_interval:
+			majorLocator = MultipleLocator(major_tick_interval)
+		else:
+			majorLocator = MaxNLocator()
+		minorLocator = MultipleLocator(minor_tick_interval)
+		ax.xaxis.set_major_locator(majorLocator)
+		ax.xaxis.set_minor_locator(minorLocator)
+		ax.yaxis.set_minor_locator(MultipleLocator(0.1))
+	for label in ax.get_xticklabels() + ax.get_yticklabels():
+		label.set_size('large')
+	if plot_date:
+		for label in ax.get_xticklabels():
+			label.set_horizontalalignment('right')
+			label.set_rotation(30)
+
+	## plot x and y labels
+	if not plot_date:
+		xlabel = {"en": "Time (years)", "nl": "Tijd (jaar)"}[lang]
+	else:
+		xlabel = {"en": "Date", "nl": "Datum"}[lang]
+	plt.xlabel(xlabel, fontsize="x-large")
+	plt.ylabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
+
+	## plot completeness
+	if completeness and not plot_date:
+		x, y = completeness.min_years, completeness.min_mags
+		x = np.append(x, max([catalog.end_date for catalog in catalogs]).year+1)
+		plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors=completeness_color)
+		plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors=completeness_color, lw=2)
+
+	if grid:
+		plt.grid()
+
+	if title:
+		plt.title(title)
+		
+	plt.legend(loc=legend_location)
+	
+	if fig_filespec:
+		default_figsize = plt.rcParams['figure.figsize']
+		default_dpi = plt.rcParams['figure.dpi']
 		if fig_width:
 			fig_width /= 2.54
 			dpi = dpi * (fig_width / default_figsize[0])
