@@ -107,7 +107,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		end_date = datetime.datetime.now().date()
 
 	## Construct SQL query
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port, cursorclass=MySQLdb.cursors.DictCursor)
+	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port, cursorclass=MySQLdb.cursors.DictCursor, use_unicode=True)
 	c = db.cursor()
 	query = 'SELECT id_earth, DATE_FORMAT(date, "%Y-%m-%d") as date, TIME_FORMAT(time, "%H:%i:%s") as time,'
 	query += ' longitude, latitude, depth, ML, MS, MW,'

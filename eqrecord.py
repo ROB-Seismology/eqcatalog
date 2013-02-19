@@ -18,31 +18,6 @@ __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
 
 # TODO: allow nan values instead of zeros
 
-def json_repr(obj):
-	"""Represent instance of a class as JSON.
-	Arguments:
-	obj -- any object
-	Return:
-	String that reprent JSON-encoded object.
-	"""
-	def serialize(obj):
-		if isinstance(obj, (bool, int, long, float, basestring)):
-			return obj
-		elif isinstance(obj, dict):
-			obj = obj.copy()
-			for key in obj:
-				obj[key] = serialize(obj[key])
-			return obj
-		elif isinstance(obj, list):
-			return [serialize(item) for item in obj]
-		elif isinstance(obj, tuple):
-			return tuple(serialize([item for item in obj]))
-		elif hasattr(obj, '__dict__'):
-			return serialize(obj.__dict__)
-		else:
-			return repr(obj) # Don't know how to handle, convert to string
-	return json.dumps(serialize(obj))
-
 
 class LocalEarthquake:
 	"""
@@ -120,6 +95,9 @@ class LocalEarthquake:
 	def from_json(self, s):
 		"""
 		Generate instance of :class:`LocalEarthquake` from a json string
+
+		:param s:
+			String, json format
 		"""
 		dct = json.loads(s)
 		if len(dct) == 1:
@@ -133,6 +111,9 @@ class LocalEarthquake:
 	def from_dict(self, dct):
 		"""
 		Generate instance of :class:`LocalEarthquake` from a dictionary
+
+		:param dct:
+			Dictionary
 		"""
 		if 'time' in dct:
 			dct['time'] = datetime.time(*dct['time'])
@@ -157,7 +138,7 @@ class LocalEarthquake:
 
 		key = '__%s__' % self.__class__.__name__
 		dct = {key: self.__dict__}
-		return json.dumps(dct, default=json_handler)
+		return json.dumps(dct, default=json_handler, encoding="latin1")
 
 	@property
 	def date(self):

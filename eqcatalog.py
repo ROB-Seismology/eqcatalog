@@ -218,14 +218,51 @@ class EQCatalog:
 		else:
 			return None
 
+	@classmethod
+	def from_json(self, s):
+		"""
+		Generate instance of :class:`EQCatalog` from a json string
+
+		:param s:
+			String, json format
+		"""
+		dct = json.loads(s)
+		if len(dct) == 1:
+			class_name = dct.keys()[0]
+			if class_name == "__EQCatalog__":
+				return self.from_dict(dct[class_name])
+
+	@classmethod
+	def from_dict(self, dct):
+		"""
+		Generate instance of :class:`EQCatalog` from a dictionary
+
+		:param dct:
+			Dictionary
+		"""
+		if 'time' in dct:
+			dct['time'] = datetime.time(*dct['time'])
+		if 'date' in dct:
+			dct['date'] = datetime.date(*dct['date'])
+		if 'datetime' in dct:
+			dt = eval(dct['datetime'])
+			dct['date'] = dt.date()
+			dct['time'] = dt.time()
+			del dct['datetime']
+		if 'eq_list' in dct:
+			dct['eq_list'] = [seismodb.LocalEarthquake.from_dict(d["__LocalEarthquake__"]) for d in dct['eq_list']]
+		return EQCatalog(**dct)
+
 	def dump_json(self):
 		"""
 		Generate json string
 		"""
 		def json_handler(obj):
 			if isinstance(obj, seismodb.LocalEarthquake):
-				return obj.dump_json()
-			elif isinstance(obj, datetime.date):
+				key = '__%s__' % obj.__class__.__name__
+				dct = {key: obj.__dict__}
+				return dct
+			elif isinstance(obj, (datetime.date, datetime.datetime)):
 				return repr(obj)
 			else:
 				return obj.__dict__
@@ -792,7 +829,6 @@ class EQCatalog:
 			else:
 				bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_Days
-
 
 	def bin_hour(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
 		"""
