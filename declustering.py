@@ -149,6 +149,21 @@ class GardnerKnopoff1974Window(DeclusteringWindow):
 		return t_window, s_window
 
 
+class Gruenthal1985Window():
+	"""
+	Class implementing Gruenthal (1985) declustering window
+	"""
+	def get(self, magnitude):
+		if magnitude >= 6.5:
+			t_window = 10**(2.8+0.024*magnitude)
+		else:
+			t_window = np.exp(-3.95+np.sqrt(0.62+17.32*magnitude))
+		
+		s_window = np.exp(1.77+np.sqrt(0.037+1.02*magnitude))
+		
+		return t_window, s_window
+
+
 class Uhrhammer1986Window(DeclusteringWindow):
 	"""
 	Class implementing Uhrhammer (1986) declustering window
