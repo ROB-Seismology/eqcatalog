@@ -604,7 +604,7 @@ class EQCatalog:
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region, name=self.name + " (subselect)")
 
-	def subselect_declustering(self, method, params=None, Mtype="MS", Mrelation=None, return_triggered_catalog=False):
+	def subselect_declustering(self, method="Cluster", window="GardnerKnopoff1974", fa_ratio=0.5, Mtype="MS", Mrelation=None, return_triggered_catalog=False):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		declustering method and params.
