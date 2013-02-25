@@ -610,9 +610,14 @@ class EQCatalog:
 		declustering method and params.
 
 		:param method:
-			instance of :class:`DeclusteringMethod`
-		:param params:
-			dict, mapping name of params needed for method to their value
+			String, declustering method: "Window" or "Cluster" (default: Cluster).
+			The window method uses only the mainshock to determine the size of a
+			cluster. The cluster method uses all earthquakes in a cluster.
+		:param window:
+			String, declustering window: "GardnerKnopoff1974", "Gruenthal1985"
+			or "Uhrhammer1986" (default: GardnerKnopoff1974).
+		:param fa_ratio:
+			Float, foreshock/aftershock time window ratio (default: 0.50)
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MS"). Note: some
 			methods use params that are specified for a certain magnitude scale.
@@ -628,12 +633,26 @@ class EQCatalog:
 			if return_triggered_catalog = False also an triggered catalog is
 			returned as instance of :class:`EQCatalog`
 		"""
+		from declustering import (WindowMethod, ClusterMethod,
+			GardnerKnopoff1974Window, Gruenthal1985Window, Uhrhammer1986Window)
+		
+		methods = {
+			"Window": WindowMethod(),
+			"Cluster": ClusterMethod(),
+			}
+		windows = {
+			"GardnerKnopoff1974": GardnerKnopoff1974Window(),
+			"Gruenthal1985": Gruenthal1985Window(),
+			"Uhrhammer1986": Uhrhammer1986Window(),
+			}
+		
 		magnitudes = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
 		datetimes = np.array(self.get_datetimes())
 		lons = self.get_longitudes()
 		lats = self.get_latitudes()
 
-		d_index = method.decluster(magnitudes, datetimes, lons, lats, **params)
+		d_index = methods[method].decluster(magnitudes, datetimes, lons, lats,
+			windows[window], fa_ratio)
 
 		dc = self.__getitem__(np.where(d_index == 1)[0])
 		tc = self.__getitem__(np.where(d_index == 0)[0])

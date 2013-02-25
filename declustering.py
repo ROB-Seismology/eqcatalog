@@ -1,5 +1,5 @@
 """
-Module containing declustering methods and windows
+Module containing declustering methods.
 """
 
 
@@ -7,8 +7,6 @@ import datetime
 import numpy as np
 
 from nhlib.geo.geodetic import geodetic_distance as distance
-
-from eqcatalog import EQCatalog
 
 
 class DeclusteringMethod():
