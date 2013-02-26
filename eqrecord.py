@@ -232,7 +232,7 @@ class LocalEarthquake:
 					if self.MS < 5.4:
 						MW = 0.585 * self.MS + 2.422
 					else:
-						MW = 0.769 * self.MS + 1.280
+						MW = 0.796 * self.MS + 1.280
 			elif self.ML and Mrelation.has_key("ML"):
 				## Relation with ML by Ahorner (1983)
 				if Mrelation["ML"].lower() == "ahorner":
