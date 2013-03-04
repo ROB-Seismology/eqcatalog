@@ -144,7 +144,7 @@ class Completeness:
 Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.7, 3.3, 1.8])
 #Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.75, 3.25, 1.75])
 Completeness_Rosset = Completeness([1350, 1926, 1960, 1985], [5.0, 4.0, 3.0, 1.8])
-Completeness_Rosset_MW = Completeness([1350, 1926, 1960, 1985], [5.2, 4.5, 3.9, 3.1])
+Completeness_MW_201303 = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.6, 4.0, 3.4, 2.6, 2.0])
 
 
 class EQCatalog:
