@@ -45,8 +45,8 @@ from scipy import stats
 
 ## Import ROB modules
 import seismodb
-import mfd
-
+#import mfd
+import hazard.rshalib.mfd as mfd
 
 
 GIS_root = r"D:\GIS-data"
@@ -69,10 +69,13 @@ class Completeness:
 	:param min_mags:
 		list or array with corresponding lower magnitude for which
 		catalog is assumed to be complete
+	:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW"
 	"""
-	def __init__(self, min_years, min_mags):
+	def __init__(self, min_years, min_mags, Mtype):
 		self.min_years = np.array(min_years)
 		self.min_mags = np.array(min_mags)
+		self.Mtype = Mtype
 		## Make sure ordering is chronologcal
 		if self.min_years[0] > self.min_years[1]:
 			self.min_years = self.min_years[::-1]
@@ -141,10 +144,10 @@ class Completeness:
 
 
 ## NOTE: I think threshold magnitudes should be a multiple of dM (or dM/2)!
-Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.7, 3.3, 1.8])
-#Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.75, 3.25, 1.75])
-Completeness_Rosset = Completeness([1350, 1926, 1960, 1985], [5.0, 4.0, 3.0, 1.8])
-Completeness_MW_201303 = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.6, 4.0, 3.4, 2.6, 2.0])
+Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.7, 3.3, 1.8], "MS")
+#Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.75, 3.25, 1.75], "MS")
+Completeness_Rosset = Completeness([1350, 1926, 1960, 1985], [5.0, 4.0, 3.0, 1.8], "MS")
+Completeness_MW_201303 = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.6, 4.0, 3.4, 2.6, 2.0], "MW")
 
 
 class EQCatalog:
@@ -159,6 +162,8 @@ class EQCatalog:
 	:param end_date:
 		datetime, end of catalog (default: None = datetime of youngest
 		earthquake in catalog)
+	:param region:
+
 	:param name:
 		String, catalog name (default: "")
 	"""
@@ -195,12 +200,12 @@ class EQCatalog:
 		if isinstance(item, int):
 			return self.eq_list.__getitem__(item)
 		elif isinstance(item, slice):
-			return EQCatalog(self.eq_list.__getitem__(item), name=self.name + " %s" % item)
+			return EQCatalog(self.eq_list.__getitem__(item), start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name + " %s" % item)
 		elif isinstance(item, (list, np.ndarray)):
 			eq_list = []
 			for index in item:
 				eq_list.append(self.eq_list[index])
-			return EQCatalog(eq_list, name=self.name + " %s" % item)
+			return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name + " %s" % item)
 
 	def get_record(self, ID):
 		"""
@@ -635,7 +640,7 @@ class EQCatalog:
 		"""
 		from declustering import (WindowMethod, ClusterMethod,
 			GardnerKnopoff1974Window, Gruenthal1985Window, Uhrhammer1986Window)
-		
+
 		methods = {
 			"Window": WindowMethod(),
 			"Cluster": ClusterMethod(),
@@ -645,7 +650,7 @@ class EQCatalog:
 			"Gruenthal1985": Gruenthal1985Window(),
 			"Uhrhammer1986": Uhrhammer1986Window(),
 			}
-		
+
 		magnitudes = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
 		datetimes = np.array(self.get_datetimes())
 		lons = self.get_longitudes()
@@ -683,6 +688,8 @@ class EQCatalog:
 		"""
 		if completeness:
 			start_date = datetime.date(min(completeness.min_years), 1, 1)
+			if completeness.Mtype != Mtype:
+				raise Exception("Magnitude type of completeness not compatible with specified Mtype!")
 		else:
 			start_date = self.start_date
 		end_date = self.end_date
@@ -1030,6 +1037,7 @@ class EQCatalog:
 			completeness_years = []
 			for M in magnitudes:
 				start_year = max(self.start_date.year, completeness.get_completeness_year(M))
+				#start_year = completeness.get_completeness_year(M)
 				completeness_years.append(start_year)
 		else:
 			print("Warning: no completeness object provided. Using catalog length!")
@@ -3357,9 +3365,9 @@ def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colo
 
 	if title:
 		plt.title(title)
-		
+
 	plt.legend(loc=legend_location)
-	
+
 	if fig_filespec:
 		default_figsize = plt.rcParams['figure.figsize']
 		default_dpi = plt.rcParams['figure.dpi']
