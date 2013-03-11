@@ -14,7 +14,7 @@ rob_source_model = {}
 rob_source_model['name'] = 'Seismotectonic'
 rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'seismotectonic zones 1.2.TAB')
 rob_source_model['column_map'] = {
-	'id': 'shortName',
+	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
 	'a_val': 'aMLE',
@@ -36,7 +36,7 @@ rob_source_model = {}
 rob_source_model['name'] = 'TwoZone'
 rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'SLZ+RVG.TAB')
 rob_source_model['column_map'] = {
-	'id': 'shortName',
+	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
 	'a_val': 'aMLE',
@@ -58,7 +58,7 @@ rob_source_model = {}
 rob_source_model['name'] = 'TwoZone_split'
 rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'SLZ+RVG_split.TAB')
 rob_source_model['column_map'] = {
-	'id': 'shortName',
+	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
 	'a_val': 'aMLE',
@@ -80,7 +80,7 @@ rob_source_model = {}
 rob_source_model['name'] = 'Leynaud'
 rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'ROB Seismic Source Model (Leynaud, 2000).TAB')
 rob_source_model['column_map'] = {
-	'id': 'shortName',
+	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
 	'a_val': 'a',
@@ -102,7 +102,7 @@ rob_source_model = {}
 rob_source_model['name'] = 'Leynaud_updated'
 rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'Leynaud updated.TAB')
 rob_source_model['column_map'] = {
-	'id': 'shortName',
+	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
 	'a_val': 'aMLEfix',

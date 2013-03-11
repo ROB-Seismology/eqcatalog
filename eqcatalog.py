@@ -2428,14 +2428,15 @@ class EQCatalog:
 		wgs84.SetWellKnownGeogCS("WGS84")
 
 		## Read zone model from MapInfo file
-		zone_polygons = read_source_model(source_model_name, verbose=verbose)
+		model_data = read_source_model(source_model_name, verbose=verbose)
 
 		## Point object that will be used to test if earthquake is inside zone
 		point = ogr.Geometry(ogr.wkbPoint)
 		point.AssignSpatialReference(wgs84)
 
 		zone_catalogs = OrderedDict()
-		for zoneID, zone_poly in zone_polygons.items():
+		for zoneID, zone_data in model_data.items():
+			zone_poly = zone_data['obj']
 			zone_eq_list = []
 			for i, eq in enumerate(self.eq_list):
 				point.SetPoint(0, eq.lon, eq.lat)
@@ -2987,49 +2988,27 @@ def read_source_model(source_model_name, verbose=True):
 	:return:
 		ordered dict {String sourceID: instande of :class:`osgeo.ogr.Geometry`}
 	"""
-	import osr, ogr
-
-	## Construct WGS84 projection system corresponding to earthquake coordinates
-	wgs84 = osr.SpatialReference()
-	wgs84.SetWellKnownGeogCS("WGS84")
+	from mapping.geo.readGIS import read_GIS_file
 
 	## Read zone model from MapInfo file
 	#source_model_table = ZoneModelTables[source_model_name.lower()]
 	#tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
 	from source_models import rob_source_models_dict
 	tab_filespec = rob_source_models_dict[source_model_name]["tab_filespec"]
-	mi = ogr.GetDriverByName("MapInfo File")
-	ds = mi.Open(tab_filespec)
-	if verbose:
-		print("Number of layers: %d" % ds.GetLayerCount())
-	layer = ds.GetLayer(0)
-	## Set up transformation between table coordsys and wgs84
-	tab_sr = layer.GetSpatialRef()
-	coordTrans = osr.CoordinateTransformation(tab_sr, wgs84)
-	## Loop over features in layer 1
-	if verbose:
-		print("Number of features in layer 1: %d" % layer.GetFeatureCount())
-	zone_polygons = OrderedDict()
-	for i in range(layer.GetFeatureCount()):
-		feature = layer.GetNextFeature()
-		try:
-			sourceID = feature.GetField("ShortName")
-		except:
-			sourceID = feature.GetField("IDSource")
-		if verbose:
-			try:
-				print feature.GetField("Name")
-			except:
-				print feature.GetField("SourceName")
-		## Note: we need to clone the geometry returned by GetGeometryRef(),
-		## otherwise python will crash
-		## See http://trac.osgeo.org/gdal/wiki/PythonGotchas
-		poly = feature.GetGeometryRef().Clone()
-		poly.AssignSpatialReference(tab_sr)
-		poly.Transform(coordTrans)
-		poly.CloseRings()
-		zone_polygons[sourceID] = poly
-	return zone_polygons
+
+	zone_records = read_GIS_file(tab_filespec, verbose=verbose)
+	try:
+		zone_ids = [rec["ShortName"] for rec in zone_records]
+	except:
+		zone_ids = [rec["IDSource"] for rec in zone_records]
+
+	zone_data = OrderedDict()
+	for id, rec in zip(zone_ids, zone_records):
+		if rec["obj"].GetGeometryName() == "POLYGON":
+			rec["obj"].CloseRings()
+		zone_data[id] = rec
+
+	return zone_data
 
 
 def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
@@ -3159,8 +3138,9 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 
 	## Source model
 	if source_model:
-		zone_polygons = read_source_model(source_model)
-		for i, geom in enumerate(zone_polygons.values()):
+		model_data = read_source_model(source_model)
+		for i, zone_data in enumerate(model_data.values()):
+			geom = zone_data['obj']
 			lines = []
 			if geom.GetGeometryName() == "LINESTRING":
 				lines.append(geom.GetPoints())
