@@ -45,18 +45,8 @@ from scipy import stats
 
 ## Import ROB modules
 import seismodb
-#import mfd
 import hazard.rshalib.mfd as mfd
-
-
-GIS_root = r"D:\GIS-data"
-
-ZoneModelTables =	{"leynaud": "ROB Seismic Source Model (Leynaud, 2000)",
-						"leynaud_updated": "Leynaud updated",
-						"slz+rvg": "SLZ+RVG",
-						"slz+rvg_split": "SLZ+RVG_split",
-						"seismotectonic": "seismotectonic zones 1.2",
-						"rvrs": "RVRS"}
+from source_models import read_source_model
 
 
 class Completeness:
@@ -661,6 +651,9 @@ class EQCatalog:
 
 		dc = self.__getitem__(np.where(d_index == 1)[0])
 		tc = self.__getitem__(np.where(d_index == 0)[0])
+
+		dc.name = self.name + " (Declustered)"
+		tc.name = self.name + " (Triggered)"
 
 		if return_triggered_catalog:
 			return dc, tc
@@ -2076,7 +2069,7 @@ class EQCatalog:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
 			String, computation method, either "Weichert", "Aki" or "LSQ"
-			(default: "Weichert")
+			(default: "Weichert"). If None, only observed MFD will be plotted.
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
 		:param Mrelation:
@@ -2975,42 +2968,6 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	return eqc
 
 
-def read_source_model(source_model_name, verbose=True):
-	"""
-	Read source-zone model stored in a GIS (MapInfo) table.
-
-	:param source_model_name:
-		String, name of source-zone model containing area sources
-	:param verbose:
-		Boolean, whether or not to print information while reading
-		GIS table (default: True)
-
-	:return:
-		ordered dict {String sourceID: instande of :class:`osgeo.ogr.Geometry`}
-	"""
-	from mapping.geo.readGIS import read_GIS_file
-
-	## Read zone model from MapInfo file
-	#source_model_table = ZoneModelTables[source_model_name.lower()]
-	#tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
-	from source_models import rob_source_models_dict
-	tab_filespec = rob_source_models_dict[source_model_name]["tab_filespec"]
-
-	zone_records = read_GIS_file(tab_filespec, verbose=verbose)
-	try:
-		zone_ids = [rec["ShortName"] for rec in zone_records]
-	except:
-		zone_ids = [rec["IDSource"] for rec in zone_records]
-
-	zone_data = OrderedDict()
-	for id, rec in zip(zone_ids, zone_records):
-		if rec["obj"].GetGeometryName() == "POLYGON":
-			rec["obj"].CloseRings()
-		zone_data[id] = rec
-
-	return zone_data
-
-
 def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot multiple catalogs on a map
@@ -3361,6 +3318,15 @@ def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colo
 
 
 # TODO: revise the following two functions
+
+GIS_root = r"D:\GIS-data"
+
+ZoneModelTables =	{"leynaud": "ROB Seismic Source Model (Leynaud, 2000)",
+						"leynaud_updated": "Leynaud updated",
+						"slz+rvg": "SLZ+RVG",
+						"slz+rvg_split": "SLZ+RVG_split",
+						"seismotectonic": "seismotectonic zones 1.2",
+						"rvrs": "RVRS"}
 
 def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, zone_model=None, zone_names=[], verbose=False):
 	"""
