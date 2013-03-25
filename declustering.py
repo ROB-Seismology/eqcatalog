@@ -147,7 +147,17 @@ class GardnerKnopoff1974Window(DeclusteringWindow):
 		return t_window, s_window
 
 
-class Gruenthal1985Window():
+class Uhrhammer1986Window(DeclusteringWindow):
+	"""
+	Class implementing Uhrhammer (1986) declustering window
+	"""
+	def get(self, magnitude):
+		t_window = np.exp(-2.870+1.235*magnitude)
+		s_window = np.exp(-1.024+0.804*magnitude)
+		return t_window, s_window
+
+
+class Gruenthal2009Window(DeclusteringWindow):
 	"""
 	Class implementing Gruenthal (1985) declustering window
 	"""
@@ -161,12 +171,3 @@ class Gruenthal1985Window():
 		
 		return t_window, s_window
 
-
-class Uhrhammer1986Window(DeclusteringWindow):
-	"""
-	Class implementing Uhrhammer (1986) declustering window
-	"""
-	def get(self, magnitude):
-		t_window = np.exp(-2.870+1.235*magnitude)
-		s_window = np.exp(-1.024+0.804*magnitude)
-		return t_window, s_window
