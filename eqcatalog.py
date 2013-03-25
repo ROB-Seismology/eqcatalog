@@ -609,7 +609,7 @@ class EQCatalog:
 			The window method uses only the mainshock to determine the size of a
 			cluster. The cluster method uses all earthquakes in a cluster.
 		:param window:
-			String, declustering window: "GardnerKnopoff1974", "Gruenthal1985"
+			String, declustering window: "GardnerKnopoff1974", "Gruenthal2009"
 			or "Uhrhammer1986" (default: GardnerKnopoff1974).
 		:param fa_ratio:
 			Float, foreshock/aftershock time window ratio (default: 0.50)
@@ -629,7 +629,7 @@ class EQCatalog:
 			returned as instance of :class:`EQCatalog`
 		"""
 		from declustering import (WindowMethod, ClusterMethod,
-			GardnerKnopoff1974Window, Gruenthal1985Window, Uhrhammer1986Window)
+			GardnerKnopoff1974Window, Gruenthal2009Window, Uhrhammer1986Window)
 
 		methods = {
 			"Window": WindowMethod(),
@@ -637,7 +637,7 @@ class EQCatalog:
 			}
 		windows = {
 			"GardnerKnopoff1974": GardnerKnopoff1974Window(),
-			"Gruenthal1985": Gruenthal1985Window(),
+			"Gruenthal1985": Gruenthal2009Window(),
 			"Uhrhammer1986": Uhrhammer1986Window(),
 			}
 
