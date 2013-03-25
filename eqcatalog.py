@@ -2057,7 +2057,7 @@ class EQCatalog:
 		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
 
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title="", lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
 		Compute GR MFD from observed MFD, and plot result
 
@@ -2096,7 +2096,8 @@ class EQCatalog:
 			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
 			(Y) axis (default: ())
 		:param title:
-			String, plot title (default: "")
+			String, plot title. If None, title will be automatically generated
+			(default: None)
 		:param lang:
 			String, language of plot axis labels (default: "en")
 		:param fig_filespec:
@@ -2145,7 +2146,7 @@ class EQCatalog:
 				colors.append(color_estimated)
 				styles.append('--')
 
-		if not title:
+		if title is None:
 			num_events = len(cc_catalog)
 			Mmax_obs = cc_catalog.get_Mmax(Mtype, Mrelation)
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
