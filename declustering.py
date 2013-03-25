@@ -3,16 +3,22 @@ Module containing declustering methods.
 """
 
 
+import abc
 import datetime
 import numpy as np
 
-from nhlib.geo.geodetic import geodetic_distance as distance
+from openquake.hazardlib.geo.geodetic import geodetic_distance as distance
 
 
 class DeclusteringMethod():
 	"""
-	Class implementing declustering method
+	Class implementing a declustering method, which splits earthquakes in
+	dependant and independant ones.
 	"""
+	
+	__metaclass__ = abc.ABCMeta
+	
+	@abc.abstractmethod
 	def decluster(self):
 		"""
 		:returns:
@@ -123,6 +129,10 @@ class DeclusteringWindow():
 	"""
 	Class implementing declustering window
 	"""
+	
+	__metaclass__ = abc.ABCMeta
+	
+	@abc.abstractmethod
 	def get(self, magnitude):
 		"""
 		:param magnitude:
