@@ -2969,7 +2969,7 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	return eqc
 
 
-def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot multiple catalogs on a map
 
@@ -3023,6 +3023,17 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		String, line style to plot source model (default: '-')
 	:param sm_line_width:
 		Int, line width to plot source model (default: 2)
+	:param sites:
+		List of (lon, lat) tuples or instance of :class:`PSHASite`
+	:param site_symbol:
+		matplotlib marker specifications for site symbols (default: 'o')
+	:param site_color:
+		matplotlib color specification for site symbols (default: 'b')
+	:param site_size:
+		Int, size to be used for site symbols (default: 10)
+	:param site_legend:
+		String, common text referring to all sites to be placed in legend
+		(default: "")
 	:param title:
 		String, plot title (default: None)
 	:param legend_location:
@@ -3105,10 +3116,10 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			elif geom.GetGeometryName() == "POLYGON":
 				for linear_ring in geom:
 					lines.append(linear_ring.GetPoints())
-			for line in lines:
+			for j, line in enumerate(lines):
 				lons, lats = zip(*line)
 				x, y = map(lons, lats)
-				if i == 0:
+				if i == 0 and j == 0:
 					label = source_model
 				else:
 					label = "_nolegend_"
@@ -3141,6 +3152,20 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			lons, lats = catalog.get_longitudes(), catalog.get_latitudes()
 			x, y = map(lons, lats)
 			map.scatter(x, y, s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color, label=label)
+
+	## Sites
+	for i, site in enumerate(sites):
+		try:
+			lon, lat = site.longitude, site.latitude
+			name = site.name
+		except:
+			lon, lat, name = site[:3]
+		x, y = map(lon, lat)
+		if i == 0:
+			label = site_legend
+		else:
+			label = None
+		map.plot(x, y, site_symbol, markerfacecolor=site_color, markeredgecolor='k', markersize=site_size, label=label)
 
 	## Map border and title
 	map.drawmapboundary()
