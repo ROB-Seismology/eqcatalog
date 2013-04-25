@@ -5,7 +5,11 @@ Module containing declustering methods.
 
 import abc
 import datetime
+import inspect
 import numpy as np
+import sys
+
+from collections import OrderedDict
 
 from openquake.hazardlib.geo.geodetic import geodetic_distance as distance
 
@@ -178,4 +182,19 @@ class Gruenthal2009Window(DeclusteringWindow):
 			t_window = np.exp(-3.95+np.sqrt(0.62+17.32*magnitude))
 		s_window = np.exp(1.77+np.sqrt(0.037+1.02*magnitude))
 		return t_window, s_window
+
+
+def get_all_windows():
+	"""
+	Function to get all declustering windows
+	"""
+	def is_window(member):
+		r_val = False
+		if inspect.isclass(member):
+			if issubclass(member, DeclusteringWindow) and member != DeclusteringWindow:
+				return True
+		return r_val
+	windows = inspect.getmembers(sys.modules[__name__], is_window)
+	windows = OrderedDict(windows)
+	return windows
 
