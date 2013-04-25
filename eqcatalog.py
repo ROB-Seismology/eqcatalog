@@ -1440,6 +1440,66 @@ class EQCatalog:
 		pylab.xlabel("Time (%s)" % ddate_spec)
 		pylab.show()
 
+	def plot_Magnitude_Depth(self, start_date=None, Mtype="MS", Mrelation=None, remove_undetermined=False, title=None, fig_filespec="", fig_width=0, dpi=300):
+		"""
+		Plot magnitude versus depth
+
+		:param start_date:
+			Int or date or datetime object specifying start of time window to plot
+			If integer, start_date is interpreted as start year
+			(default: None)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param remove_undetermined:
+			Boolean, remove the earthquake for which depth equals zero if true (default: False)
+		:param title:
+			String, plot title (None = default title, "" = no title)
+			(default: None)
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
+		"""
+		subcatalog = self.subselect(start_date=start_date)		
+		magnitudes = subcatalog.get_magnitudes(Mtype, Mrelation)
+		depths = subcatalog.get_depths()
+		
+		if remove_undetermined:
+			i=depths.nonzero()
+			depths=depths[i]
+			magnitudes=magnitudes[i]
+				
+		pylab.plot(magnitudes, depths, '.')
+		pylab.xlabel("Magnitude (%s)" % Mtype)
+		pylab.ylabel("Depth (km)")
+		ax = pylab.gca()
+		ax.invert_yaxis()
+		pylab.grid(True)
+		
+		if title is None:
+			title='Depth-Magnitude function {0}-{1}, {2} events'.format(subcatalog.start_date.year, subcatalog.end_date.year, len(magnitudes))
+		
+		pylab.title(title)
+		
+		if fig_filespec:
+			default_figsize = pylab.rcParams['figure.figsize']
+			default_dpi = pylab.rcParams['figure.dpi']
+			if fig_width:
+				fig_width /= 2.54
+				dpi = dpi * (fig_width / default_figsize[0])
+			pylab.savefig(fig_filespec, dpi=dpi)
+			pylab.clf()
+		else:
+			pylab.show()
+
 	def plot_Magnitude_Time(self, Mtype="MS", Mrelation=None, lang="en"):
 		"""
 		Plot magnitude versus time
