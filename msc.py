@@ -8,7 +8,15 @@ import numpy as np
 
 from matplotlib.ticker import MultipleLocator
 
-from eqcatalog.eqcatalog import read_catalogSQL
+from eqcatalog import read_catalogSQL
+
+
+datasets = [
+	{'name': 'roermond_aftershocks', 'ML': [2.4, 2.5, 2.5, 3.4, 2.6, 3.0, 3.2, 2.7, 2.7, 2.2, 2.0, 2.3, 2.8, 2.9, 1.9, 2.0, 2.3, 2.5], 'MW': [2.5, 2.6, 2.5, 3.2, 2.5, 2.9, 3.0, 2.6, 2.8, 2.3, 2.2, 2.5, 2.8, 2.8, 2.2, 2.2, 2.4, 2.5]},
+	{'name': 'liege', 'ML': 5.0, 'MS': 4.4, 'MW': 4.8},
+	{'name': '??', 'ML': 4.4, 'MS': 4.0, 'MW': 4.4},
+	{'name': '??', 'ML': 4.5, 'MS': 4.2, 'MW': 4.5},
+]
 
 
 class MSCE(object):
@@ -361,21 +369,21 @@ class Scordilis2006(MSCE_MS_MW):
 		return sigma
 
 
-class Utsu2002(MSCE_MS_MW):
-	"""
-	Conversion MS -> MW
-	Cited by Gruenthal et al. (2009), and used in CENEC catalog
-	Published in:
+#class Utsu2002(MSCE_MS_MW):
+#	"""
+#	Conversion MS -> MW
+#	Cited by Gruenthal et al. (2009), and used in CENEC catalog
+#	Published in:
 
-	Validity range: up to MS=7
-	Standard deviation not given (maybe in
-	"""
-	def get_mean(self, MS):
-		MW = 10.85 - np.sqrt(73.74 - 8.38 * MS)
-		return MW
+#	Validity range: up to MS=7
+#	Standard deviation not given (maybe in original publication)
+#	"""
+#	def get_mean(self, MS):
+#		MW = 10.85 - np.sqrt(73.74 - 8.38 * MS)
+#		return MW
 
-	def get_sigma(self, MS=None):
-		return None
+#	def get_sigma(self, MS=None):
+#		return None
 
 
 
@@ -391,14 +399,16 @@ def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=No
 	for msce in msces:
 		plt.plot(mags, msce().get_mean(mags), label=msce.__name__)
 
-	## plot data
-	for dataset in datasets:
-		plt.scatter(*dataset)
-
+	## plot data from catalog
 	ec = read_catalogSQL()
 	for e in ec:
 		if getattr(e, msce._FROM) and getattr(e, msce._TO):
 			plt.scatter(getattr(e, msce._FROM), getattr(e, msce._TO))
+	
+	## plot additional data
+	for dataset in datasets:
+		if msce._FROM in dataset and msce._TO in dataset:
+			plt.scatter(dataset[msce._FROM], dataset[msce._TO])
 
 	## plot 1:1 relation
 	plt.plot(mags, mags, color='0.75', label='1:1 relation')
@@ -441,11 +451,10 @@ if __name__ == '__main__':
 #	fig_filespec = r'D:\Temp\fig.png'
 	fig_filespec = None
 
-#	roermond_aftershocks = ([2.4, 2.5, 2.5, 3.4, 2.6, 3.0, 3.2, 2.7, 2.7, 2.2, 2.0, 2.3, 2.8, 2.9, 1.9, 2.0, 2.3, 2.5],
-#							[2.5, 2.6, 2.5, 3.2, 2.5, 2.9, 3.0, 2.6, 2.8, 2.3, 2.2, 2.5, 2.8, 2.8, 2.2, 2.2, 2.4, 2.5])
-
 #	plot(MSCE_ML_MW, datasets=[roermond_aftershocks], fig_filespec=fig_filespec)
 
 #	thierry_data = ([4.4, 4.5], [4.4, 4.5])
 
-	plot(MSCE_MS_MW, datasets=[], fig_filespec=fig_filespec)
+
+
+	plot(MSCE_MS_MW, datasets=datasets, fig_filespec=fig_filespec)
