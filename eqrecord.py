@@ -12,6 +12,7 @@ import numpy as np
 ## Import ROB modules
 import mapping.geo.geodetic as geodetic
 import seismodb
+import msc
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
@@ -163,29 +164,32 @@ class LocalEarthquake:
 
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MS" or "ML").
-			Only one relation is currently supported:
-			- "ambraseys": relation with ML by Ambraseys (1985) for
-				earthquakes in NW Europe (quoted in Leynaud et al., 2000).
-			(default: {"ML": "ambraseys"})
+			to magnitude type ("ML" or "MW").
+			The following relations are currently supported (see module msc):
+			- ML -> MS:
+				- "Ambraseys1985"
+			- MW -> MS:
+				None
+			(default: {"ML": "Ambraseys1985"})
 
 		:return:
 			Float, surface-wave magnitude
 		"""
+		## Set default conversion relation
 		if Mrelation is None:
-			Mrelation={"ML": "ambraseys"}
+			Mrelation={"ML": "Ambraseys1985"}
 
 		if not self.MS:
 			if self.ML and Mrelation.has_key("ML"):
-				if Mrelation["ML"].lower() == "ambraseys":
-					return 0.09 + 0.93 * self.ML
+				msce = getattr(msc, Mrelation["ML"])()
+				return msce.get_mean(self.ML)
 			# TODO: add relation for MW
 			else:
 				return 0.
 		else:
 			return self.MS
 
-	def get_MW(self, Mrelation={"MS": "geller", "ML": "hinzen"}):
+	def get_MW(self, Mrelation={"MS": "Geller1976", "ML": "ReamerHinzen2004Q"}):
 		"""
 		Return MW.
 		If MW is None or zero, calculate it using the specified
@@ -193,58 +197,42 @@ class LocalEarthquake:
 
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MS" or "ML"). Note that MS takes precedence
-			over ML.
+			to magnitude type ("MS" or "ML").
 			The following relations are supported:
 			- MS --> MW:
-				- "bungum": calculate MW from MS using formulae by Bungum
-					et al. (2003)
-				- "geller": calculate MW from MS assuming a stress drop of
-					50 bars (only valid for MS < 8.22);
+				- "AmbraseysFree1997"
+				- "BungumEtAl2003NCEurope"
+				- "BungumEtAl2003SEurope"
+				- "Geller1976"
+				- "ISC_GEM2013"
+				- "OkalRomanowicz1994"
+				- "Scordilis2006"
+				- "Utsu2002"
 			- ML --> MW:
-				- "ahorner": caculate MW from ML using relation by Ahorner (1983)
-				- "hinzen": calculate MW from ML using relation by Reamer & Hinzen (2004)
-				- "gruenthal": calculate MW from ML using chi-square maximum
-					likelihood regression of Gruenthal and Wahlstrom (2003)
-			(default: {"MS": "bungum", "ML": "hinzen"})
+				- "Ahorner1983"
+				- "Goutbeek2008"
+				- "GruenthalWahlstrom2003"
+				- "GruenthalEtAl2009"
+				- "ReamerHinzen2004L"
+				- "ReamerHinzen2004Q"
+
+			(default: {"MS": "Geller1976", "ML": "ReamerHinzen2004Q"})
+			Note that MS -> MW relations take precedence over ML -> MW relations
 
 		:return:
 			Float, moment magnitude
 		"""
+		## Set default conversion relation
 		if Mrelation is None:
-			Mrelation={"MS": "geller", "ML": "hinzen"}
+			Mrelation={"MS": "Geller1976", "ML": "ReamerHinzen2004Q"}
 
 		if not self.MW:
 			if self.MS and Mrelation.has_key("MS"):
-				## Conversion MS -> MW (Geller, 1976)
-				if Mrelation["MS"].lower() == "geller":
-					if self.MS < 6.76:
-						log_Mo_dyncm = self.MS + 18.89
-					elif 6.76 <= self.MS < 8.12:
-						log_Mo_dyncm = (3./2) * self.MS + 15.51
-					elif 8.12 <= self.MS < 8.22:
-						log_Mo_dyncm = 3 * self.MS + 3.33
-					else:
-						return np.NaN
-					MW = (2.0/3) * log_Mo_dyncm - 10.73
-				## Conversion MS -> MW (Bungum  et al., 2003)
-				elif Mrelation["MS"].lower() == "bungum":
-					if self.MS < 5.4:
-						MW = 0.585 * self.MS + 2.422
-					else:
-						MW = 0.796 * self.MS + 1.280
+				msce = getattr(msc, Mrelation["MS"])()
+				MW = msce.get_mean(self.MS)
 			elif self.ML and Mrelation.has_key("ML"):
-				## Relation with ML by Ahorner (1983)
-				if Mrelation["ML"].lower() == "ahorner":
-					log_Mo_dyncm = 17.4 + 1.1 * self.ML
-					MW = (2.0/3) * log_Mo_dyncm - 10.73
-				## Relation with ML by Hinzen (2004)
-				elif Mrelation["ML"].lower() == "hinzen":
-					log_Mo = 1.083 * self.ML + 10.215
-					MW = (2.0/ 3) * log_Mo - 6.06
-				## Relation with ML by Gruenthal & Wahlstrom (2003)
-				elif Mrelation["ML"].lower() == "gruenthal":
-					MW = 0.67 + 0.56 * self.ML + 0.046 * self.ML**2
+				msce = getattr(msc, Mrelation["ML"])()
+				MW = msce.get_mean(self.ML)
 			else:
 				MW = 0.
 		else:

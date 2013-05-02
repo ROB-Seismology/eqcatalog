@@ -487,7 +487,7 @@ class EQCatalog:
 		"""
 		return self.get_magnitudes(Mtype, Mrelation).max()
 
-	def get_M0(self, Mrelation={"MS": "bungum", "ML": "hinzen"}):
+	def get_M0(self, Mrelation=None):
 		"""
 		Return array with seismic moments for all earthquakes in catalog.
 
@@ -501,28 +501,28 @@ class EQCatalog:
 		"""
 		return np.array([eq.get_M0(Mrelation=Mrelation) for eq in self])
 
-	def get_M0_total(self, Mrelation={"MS": "bungum", "ML": "hinzen"}):
+	def get_M0_total(self, Mrelation=None):
 		"""
 		Compute total seismic moment.
 
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MS" or "ML")
-			(default: {"MS": "bungum", "ML": "hinzen"})
+			(default: None, will select the default relation for the given Mtype)
 
 		:return:
 			Float, total seismic moment in N.m
 		"""
 		return np.add.reduce(self.get_M0(Mrelation=Mrelation))
 
-	def get_M0rate(self, Mrelation={"ML": "Hinzen", "MS": "geller"}):
+	def get_M0rate(self, Mrelation=None):
 		"""
 		Compute seismic moment rate.
 
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MS" or "ML")
-			(default: {"MS": "geller", "ML": "hinzen"})
+			(default: None, will select the default relation for the given Mtype)
 
 		:return:
 			Float, seismic moment rate in N.m/yr
@@ -1468,27 +1468,27 @@ class EQCatalog:
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		subcatalog = self.subselect(start_date=start_date)		
+		subcatalog = self.subselect(start_date=start_date)
 		magnitudes = subcatalog.get_magnitudes(Mtype, Mrelation)
 		depths = subcatalog.get_depths()
-		
+
 		if remove_undetermined:
 			i=depths.nonzero()
 			depths=depths[i]
 			magnitudes=magnitudes[i]
-				
+
 		pylab.plot(magnitudes, depths, '.')
 		pylab.xlabel("Magnitude (%s)" % Mtype)
 		pylab.ylabel("Depth (km)")
 		ax = pylab.gca()
 		ax.invert_yaxis()
 		pylab.grid(True)
-		
+
 		if title is None:
 			title='Depth-Magnitude function {0}-{1}, {2} events'.format(subcatalog.start_date.year, subcatalog.end_date.year, len(magnitudes))
-		
+
 		pylab.title(title)
-		
+
 		if fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
 			default_dpi = pylab.rcParams['figure.dpi']

@@ -1,5 +1,5 @@
 """
-Magnitude Scale Conversion Equation (MSCE) module
+Magnitude Scale Conversion (MSC) module
 """
 
 
@@ -8,7 +8,7 @@ import numpy as np
 
 from matplotlib.ticker import MultipleLocator
 
-from eqcatalog import read_catalogSQL
+from seismodb import query_ROB_LocalEQCatalog
 
 
 datasets = [
@@ -23,12 +23,15 @@ datasets = [
 
 class MSCE(object):
 	"""
+	Base class for Magnitude Scale Conversion Equation
 	"""
-	pass
+	def __call__(self, val):
+		return self.get_mean(val)
 
 
 class MSCE_ML_MW(MSCE):
 	"""
+	Base class for ML -> MW MSCE's
 	"""
 	_FROM = 'ML'
 	_TO = 'MW'
@@ -36,9 +39,16 @@ class MSCE_ML_MW(MSCE):
 
 class MSCE_MS_MW(MSCE):
 	"""
+	Base class for MS -> MW MSCE's
 	"""
 	_FROM = 'MS'
 	_TO = 'MW'
+
+
+class MSCE_ML_MS(MSCE):
+	"""
+	Base class for ML -> MS MSCE's
+	"""
 
 
 class Ahorner1983(MSCE_ML_MW):
@@ -50,6 +60,7 @@ class Ahorner1983(MSCE_ML_MW):
 	H. Maelzer, H. Murawski, and A. Semmel (Eds.), Plateau Uplift (pp. 198-221).
 	Berlin, Heidelberg: Springer-Verlag.
 
+	Used by in Leynaud et al. (2000)
 	Validity range: ML 0.9 - 5.7
 	Region: Rhenish Massif
 	"""
@@ -88,6 +99,32 @@ class Ahorner1983(MSCE_ML_MW):
 			sigma = input_type(sigma)
 		return sigma
 
+
+class Ambraseys1985(MSCE_ML_MS):
+	"""
+	Conversion ML -> MS
+	Published in:
+	Ambraseys, N.N., 1985, Magnitude assessment of northwestern European
+	earthquakes: Earthquake Engineering and Structural Dynamics, v. 13,
+	p. 307–320.
+
+	Validity range: ML 1.5 - 5.7 (judging from their Fig. 6)
+	Region: NW Europe
+	"""
+	def get_mean(self, ML):
+		input_type = type(ML)
+		ML = np.array(ML, copy=False, ndmin=1)
+		MS = 0.09 + 0.93 * ML
+		if input_type != np.ndarray:
+			MS = input_type(MS)
+		return MS
+
+	def get_sigma(self, ML):
+		input_type = type(ML)
+		sigma = 0.3 * np.ones_like(ML)
+		if input_type != np.ndarray:
+			sigma = input_type(sigma)
+		return sigma
 
 
 class AmbraseysFree1997(MSCE_MS_MW):
@@ -209,7 +246,7 @@ class Goutbeek2008(MSCE_ML_MW):
 		return MW
 
 
-class Gruenthal2003(MSCE_ML_MW):
+class GruenthalWahlstrom2003(MSCE_ML_MW):
 	"""
 	Conversion ML -> MW, used in Gruenthal catalogue 2003
 	Published in:
@@ -402,11 +439,11 @@ def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=No
 		plt.plot(mags, msce().get_mean(mags), label=msce.__name__)
 
 	## plot data from catalog
-	ec = read_catalogSQL()
+	ec = query_ROB_LocalEQCatalog()
 	for e in ec:
 		if getattr(e, msce._FROM) and getattr(e, msce._TO):
 			plt.scatter(getattr(e, msce._FROM), getattr(e, msce._TO))
-	
+
 	## plot additional data
 	for dataset in datasets:
 		if msce._FROM in dataset and msce._TO in dataset:
