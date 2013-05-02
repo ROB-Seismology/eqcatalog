@@ -8,7 +8,7 @@ import numpy as np
 
 from matplotlib.ticker import MultipleLocator
 
-from seismodb import query_ROB_LocalEQCatalog
+import seismodb
 
 
 datasets = [
@@ -106,7 +106,7 @@ class Ambraseys1985(MSCE_ML_MS):
 	Published in:
 	Ambraseys, N.N., 1985, Magnitude assessment of northwestern European
 	earthquakes: Earthquake Engineering and Structural Dynamics, v. 13,
-	p. 307–320.
+	p. 307-320.
 
 	Validity range: ML 1.5 - 5.7 (judging from their Fig. 6)
 	Region: NW Europe
@@ -439,7 +439,7 @@ def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=No
 		plt.plot(mags, msce().get_mean(mags), label=msce.__name__)
 
 	## plot data from catalog
-	ec = query_ROB_LocalEQCatalog()
+	ec = seismodb.query_ROB_LocalEQCatalog()
 	for e in ec:
 		if getattr(e, msce._FROM) and getattr(e, msce._TO):
 			plt.scatter(getattr(e, msce._FROM), getattr(e, msce._TO))
