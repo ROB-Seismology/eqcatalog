@@ -11,16 +11,6 @@ from matplotlib.ticker import MultipleLocator
 import seismodb
 
 
-datasets = [
-	{'name': 'roermond_aftershocks', 'ML': [2.4, 2.5, 2.5, 3.4, 2.6, 3.0, 3.2, 2.7, 2.7, 2.2, 2.0, 2.3, 2.8, 2.9, 1.9, 2.0, 2.3, 2.5], 'MW': [2.5, 2.6, 2.5, 3.2, 2.5, 2.9, 3.0, 2.6, 2.8, 2.3, 2.2, 2.5, 2.8, 2.8, 2.2, 2.2, 2.4, 2.5]},
-	{'name': 'liege', 'ML': 5.0, 'MS': 4.4, 'MW': 4.8},
-	{'name': '15/12/1965', 'ML': 4.4, 'MS': 4.0, 'MW': 4.4},
-	{'name': '28/03/1967', 'ML': 4.5, 'MS': 4.2, 'MW': 4.5},
-	{'name': '13/08/1968 16h57', 'ML': 4.1, 'MS': 3.8, 'MW': 4.2},
-	{'name': '13/08/1968 16h17', 'ML': 3.6, 'MS': 3.2, 'MW': 3.9},
-]
-
-
 class MSCE(object):
 	"""
 	Base class for Magnitude Scale Conversion Equation
@@ -207,6 +197,25 @@ class BungumEtAl2003SEurope(MSCE_MS_MW):
 
 	def get_sigma(self, MS=None):
 		return None
+
+
+class Camelbeeck1985(MSCE_ML_MW):
+	"""
+	Conversion MS -> log seismic moment
+	Published in:
+	Camelbeek, T. (1985). Recent seismicity in Hainaut - Scaling laws from the
+	seismological stations in Belgium and Luxemburg. P. Melchior (ed.), Seismic
+	Activity in Western Europe, 109-126. D. Reidel Publishing Company.
+	
+	Validity tange: ML 2.6 - 4.4 (judging from their Table 1)
+	Region: Hainaut, Belgium
+	Standard deviation not given
+	"""
+	def get_mean(self, ML):
+		input_type = type(ML)
+		log_Mo_dyncm = 18.22 + 0.99 * ML
+		MW = seismic_moment_to_moment_magnitude_dyncm(10**log_Mo_dyncm)
+		return MW
 
 
 class Geller1976(MSCE_MS_MW):
@@ -425,6 +434,11 @@ class Utsu2002(MSCE_MS_MW):
 		return None
 
 
+def seismic_moment_to_moment_magnitude_dyncm(M0):
+	"""
+	"""
+	return (2./3.)*np.log10(M0)-10.73
+
 
 def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=None, fig_width=None):
 	"""
@@ -486,14 +500,14 @@ def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=No
 if __name__ == '__main__':
 	"""
 	"""
+	datasets = [
+		{'name': 'roermond_aftershocks', 'ML': [2.4, 2.5, 2.5, 3.4, 2.6, 3.0, 3.2, 2.7, 2.7, 2.2, 2.0, 2.3, 2.8, 2.9, 1.9, 2.0, 2.3, 2.5], 'MW': [2.5, 2.6, 2.5, 3.2, 2.5, 2.9, 3.0, 2.6, 2.8, 2.3, 2.2, 2.5, 2.8, 2.8, 2.2, 2.2, 2.4, 2.5]},
+		{'name': 'liege', 'ML': 5.0, 'MS': 4.4, 'MW': seismic_moment_to_moment_magnitude_dyncm(1.6*10**23)},
+		{'name': 'Camelbeeck (1985)', 'ML': [4.4, 3.4, 3.8, 4.4, 3.8, 3.3, 2.6, 3.7, 3.6, 2.8, 4.1, 3.0, 2.9, 2.8, 3.7, 3.0, 3.5], 'MW': seismic_moment_to_moment_magnitude_dyncm([3.6*10**22, 3.2*10**21, 6.9*10**21, 4.8*10**22, 7.2*10**21, 3.8*10**21, 7.2*10**20, 8.3*10**21, 7.7*10**21, 1.1*10**21, 2.2*10**22, 2.2*10**21, 1.1*10**21, 1.5*10**21, 8.5*10**21, 1.4*10**21, 2.9*10**21])},
+	]
 
 #	fig_filespec = r'D:\Temp\fig.png'
 	fig_filespec = None
 
-#	plot(MSCE_ML_MW, datasets=[roermond_aftershocks], fig_filespec=fig_filespec)
-
-#	thierry_data = ([4.4, 4.5], [4.4, 4.5])
-
-
-
-	plot(MSCE_MS_MW, datasets=datasets, fig_filespec=fig_filespec)
+	plot(MSCE_ML_MW, datasets=datasets, fig_filespec=fig_filespec)
+#	plot(MSCE_MS_MW, datasets=datasets, fig_filespec=fig_filespec)
