@@ -14,8 +14,10 @@ from eqcatalog import read_catalogSQL
 datasets = [
 	{'name': 'roermond_aftershocks', 'ML': [2.4, 2.5, 2.5, 3.4, 2.6, 3.0, 3.2, 2.7, 2.7, 2.2, 2.0, 2.3, 2.8, 2.9, 1.9, 2.0, 2.3, 2.5], 'MW': [2.5, 2.6, 2.5, 3.2, 2.5, 2.9, 3.0, 2.6, 2.8, 2.3, 2.2, 2.5, 2.8, 2.8, 2.2, 2.2, 2.4, 2.5]},
 	{'name': 'liege', 'ML': 5.0, 'MS': 4.4, 'MW': 4.8},
-	{'name': '??', 'ML': 4.4, 'MS': 4.0, 'MW': 4.4},
-	{'name': '??', 'ML': 4.5, 'MS': 4.2, 'MW': 4.5},
+	{'name': '15/12/1965', 'ML': 4.4, 'MS': 4.0, 'MW': 4.4},
+	{'name': '28/03/1967', 'ML': 4.5, 'MS': 4.2, 'MW': 4.5},
+	{'name': '13/08/1968 16h57', 'ML': 4.1, 'MS': 3.8, 'MW': 4.2},
+	{'name': '13/08/1968 16h17', 'ML': 3.6, 'MS': 3.2, 'MW': 3.9},
 ]
 
 
@@ -369,21 +371,21 @@ class Scordilis2006(MSCE_MS_MW):
 		return sigma
 
 
-#class Utsu2002(MSCE_MS_MW):
-#	"""
-#	Conversion MS -> MW
-#	Cited by Gruenthal et al. (2009), and used in CENEC catalog
-#	Published in:
+class Utsu2002(MSCE_MS_MW):
+	"""
+	Conversion MS -> MW
+	Cited by Gruenthal et al. (2009), and used in CENEC catalog
+	Published in:
 
-#	Validity range: up to MS=7
-#	Standard deviation not given (maybe in original publication)
-#	"""
-#	def get_mean(self, MS):
-#		MW = 10.85 - np.sqrt(73.74 - 8.38 * MS)
-#		return MW
+	Validity range: up to MS=7
+	Standard deviation not given (maybe in original publication)
+	"""
+	def get_mean(self, MS):
+		MW = 10.85 - np.sqrt(73.74 - 8.38 * MS)
+		return MW
 
-#	def get_sigma(self, MS=None):
-#		return None
+	def get_sigma(self, MS=None):
+		return None
 
 
 
