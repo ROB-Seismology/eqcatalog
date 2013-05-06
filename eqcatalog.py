@@ -41,6 +41,7 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
+from openquake.hazardlib.geo.geodetic import point_at
 from scipy import stats
 
 
@@ -308,12 +309,12 @@ class EQCatalog:
 		#years = [eq.datetime.year + (eq.datetime.month - 1.0) /12 + ((eq.datetime.day - 1.0) / 31) / 12 for eq in self]
 		return years
 
-	def get_magnitudes(self, Mtype="MS", Mrelation=None):
+	def get_magnitudes(self, Mtype="MW", Mrelation=None):
 		"""
 		Return array of magnitudes for all earthquakes in catalog
 
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -389,14 +390,14 @@ class EQCatalog:
 		elif proj == "utm31N":
 			return coordtrans.utm_to_lonlat(coord_list, proj)
 
-	def Tminmax(self, Mmax=None, Mtype="MS", Mrelation=None):
+	def Tminmax(self, Mmax=None, Mtype="MW", Mrelation=None):
 		"""
 		Return tuple with oldest date and youngest date in catalog.
 
 		:param Mmax:
 			Float, maximum magnitude. Useful to check completeness periods.
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -415,12 +416,12 @@ class EQCatalog:
 		else:
 			return (None, None)
 
-	def Mminmax(self, Mtype="MS", Mrelation=None):
+	def Mminmax(self, Mtype="MW", Mrelation=None):
 		"""
 		Return tuple with minimum and maximum magnitude in catalog.
 
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -456,12 +457,12 @@ class EQCatalog:
 		"""
 		return self.lon_minmax() + self.lat_minmax()
 
-	def get_Mmin(self, Mtype="MS", Mrelation=None):
+	def get_Mmin(self, Mtype="MW", Mrelation=None):
 		"""
 		Compute minimum magnitude in catalog
 
 		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation":
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -472,12 +473,12 @@ class EQCatalog:
 		"""
 		return self.get_magnitudes(Mtype, Mrelation).min()
 
-	def get_Mmax(self, Mtype="MS", Mrelation=None):
+	def get_Mmax(self, Mtype="MW", Mrelation=None):
 		"""
 		Compute maximum magnitude in catalog
 
 		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation":
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -530,7 +531,7 @@ class EQCatalog:
 		"""
 		return self.get_M0_total(Mrelation=Mrelation) / self.timespan()
 
-	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MS", Mrelation=None):
+	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MW", Mrelation=None):
 		"""
 		Make a subselection from the catalog.
 
@@ -554,7 +555,7 @@ class EQCatalog:
 		:param max_depth:
 			Float, maximum depth in km to extract (default: None)
 		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -603,7 +604,7 @@ class EQCatalog:
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region, name=self.name + " (subselect)")
 
-	def subselect_declustering(self, method="Cluster", window="GardnerKnopoff1974", fa_ratio=0.5, Mtype="MS", Mrelation=None, return_triggered_catalog=False):
+	def subselect_declustering(self, method="Cluster", window="GardnerKnopoff1974", fa_ratio=0.5, Mtype="MW", Mrelation=None, return_triggered_catalog=False):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		declustering method and params.
@@ -618,7 +619,7 @@ class EQCatalog:
 		:param fa_ratio:
 			Float, foreshock/aftershock time window ratio (default: 0.50)
 		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MS"). Note: some
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW"). Note: some
 			methods use params that are specified for a certain magnitude scale.
 		:param Mrelation":
 			{str: str} dict, mapping name of magnitude conversion relation
@@ -664,7 +665,7 @@ class EQCatalog:
 		else:
 			return dc
 
-	def subselect_completeness(self, completeness=Completeness_Rosset, Mtype="MS", Mrelation=None, verbose=True):
+	def subselect_completeness(self, completeness=Completeness_Rosset, Mtype="MW", Mrelation=None, verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		completeness criterion.
@@ -672,7 +673,7 @@ class EQCatalog:
 		:param completeness:
 			instance of :class:`Completeness` (default: Completeness_Rosset)
 		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation":
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -706,7 +707,7 @@ class EQCatalog:
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=self.region, name=self.name + " (completeness-constrained)")
 
-	def bin_year(self, start_year, end_year, dYear, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None):
+	def bin_year(self, start_year, end_year, dYear, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None):
 		"""
 		Bin earthquakes into year intervals
 
@@ -721,7 +722,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -779,7 +780,7 @@ class EQCatalog:
 		return bins_M0, bins_Years
 
 
-	def bin_day(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None):
+	def bin_day(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None):
 		"""
 		Bin earthquakes into day intervals
 
@@ -794,7 +795,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -853,7 +854,7 @@ class EQCatalog:
 				bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_Days
 
-	def bin_hour(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+	def bin_hour(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None):
 		"""
 		Bin earthquakes into hour intervals
 
@@ -862,7 +863,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -883,7 +884,7 @@ class EQCatalog:
 		bins_N, junk = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
-	def bin_depth(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+	def bin_depth(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None):
 		"""
 		Bin earthquakes into depth bins
 
@@ -898,7 +899,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -962,7 +963,7 @@ class EQCatalog:
 					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_depth
 
-	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=None):
+	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=None):
 		"""
 		Bin all earthquake magnitudes in catalog according to specified magnitude interval.
 
@@ -973,7 +974,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval (default: 0.2)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1060,7 +1061,7 @@ class EQCatalog:
 		completeness_timespans = [((self.end_date - datetime.date(int(start_year),1,1)).days + 1) / 365.25 for start_year in completeness_years]
 		return np.array(completeness_timespans)
 
-	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, trim=False):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1071,7 +1072,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1101,7 +1102,7 @@ class EQCatalog:
 
 		return bins_N_incremental, bins_Mag
 
-	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, trim=False):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1112,7 +1113,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1130,7 +1131,7 @@ class EQCatalog:
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
 		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, trim=False):
 		"""
 		Compute cumulative magnitude-frequency distribution.
 
@@ -1141,7 +1142,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1164,7 +1165,7 @@ class EQCatalog:
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MS", Mrelation=None, title=None, fig_filespec=None, verbose=False):
+	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW", Mrelation=None, title=None, fig_filespec=None, verbose=False):
 		"""
 		Plot magnitude histogram of earthquakes in collection.
 		:param Mmin:
@@ -1177,7 +1178,7 @@ class EQCatalog:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes (default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1207,7 +1208,7 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_CumulativeYearHistogram(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MS", Mrelation=None, major_ticks=10, minor_ticks=1, completeness_year=None, regression_range=[], lang="en"):
+	def plot_CumulativeYearHistogram(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MW", Mrelation=None, major_ticks=10, minor_ticks=1, completeness_year=None, regression_range=[], lang="en"):
 		"""
 		Plot cumulative number of earthquakes versus year
 
@@ -1222,7 +1223,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1371,7 +1372,7 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_DateHistogram(self, start_date=None, end_date=None, ddate=1, ddate_spec="year", mag_limits=[2,3], Mtype="ML", Mrelation=None):
+	def plot_DateHistogram(self, start_date=None, end_date=None, ddate=1, ddate_spec="year", mag_limits=[2,3], Mtype="MW", Mrelation=None):
 		"""
 		Plot histogram with number of earthqukes versus date
 		for different magnitude ranges.
@@ -1391,7 +1392,7 @@ class EQCatalog:
 		:param mag_limits:
 			List, magnitude limits
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "ML")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1441,7 +1442,7 @@ class EQCatalog:
 		pylab.xlabel("Time (%s)" % ddate_spec)
 		pylab.show()
 
-	def plot_Magnitude_Depth(self, start_date=None, Mtype="MS", Mrelation=None, remove_undetermined=False, title=None, fig_filespec="", fig_width=0, dpi=300):
+	def plot_Magnitude_Depth(self, start_date=None, Mtype="MW", Mrelation=None, remove_undetermined=False, title=None, fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Plot magnitude versus depth
 
@@ -1450,7 +1451,7 @@ class EQCatalog:
 			If integer, start_date is interpreted as start year
 			(default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1501,12 +1502,12 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_Magnitude_Time(self, Mtype="MS", Mrelation=None, lang="en"):
+	def plot_Magnitude_Time(self, Mtype="MW", Mrelation=None, lang="en"):
 		"""
 		Plot magnitude versus time
 
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1522,7 +1523,7 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_Time_Magnitude(self, symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50, Mtype="MS", Mrelation=None, overlay_catalog=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+	def plot_Time_Magnitude(self, symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50, Mtype="MW", Mrelation=None, overlay_catalog=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 		"""
 		Plot time versus magnitude
 
@@ -1541,7 +1542,7 @@ class EQCatalog:
 		:param symbol_size:
 			Int or Float, symbol size in points (default: 50)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1601,7 +1602,7 @@ class EQCatalog:
 			edge_colors.append('r')
 		plot_catalogs_time_magnitude(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, completeness_color="r", vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def DailyNightlyMean(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None, day=(7, 19)):
+	def DailyNightlyMean(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, day=(7, 19)):
 		"""
 		Report mean number of earthquakes for different times of day
 
@@ -1610,7 +1611,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1631,7 +1632,7 @@ class EQCatalog:
 		mean_night = np.mean(np.concatenate([bins_N[:day[0]], bins_N[day[1]:]]))
 		return (mean, mean_day, mean_night)
 
-	def plot_HourHistogram(self, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None):
+	def plot_HourHistogram(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None):
 		"""
 		Plot histogram with number of earthquakes per hour of the day.
 
@@ -1640,7 +1641,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1672,7 +1673,7 @@ class EQCatalog:
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
-	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mtype="MS", Mrelation=None, start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
+	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Plot histogram with number of earthquakes versus depth.
 
@@ -1687,7 +1688,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude (inclusive) (default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1898,7 +1899,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MS", completeness=Completeness_Rosset, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MW", completeness=Completeness_Rosset, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 		Parameters:
@@ -1907,7 +1908,7 @@ class EQCatalog:
 				Mmax: maximum magnitude to use for binning
 				dM: magnitude interval to use for binning
 			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MS"
+				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MW"
 				completeness: Completeness object with initial years of completeness and corresponding
 					minimum magnitudes, defaults to Completeness_Leynaud
 				verbose: boolean indicating whether some messages should be printed or not, defaults to False
@@ -1926,7 +1927,7 @@ class EQCatalog:
 			print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
 		return (a, -b, r)
 
-	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
+	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using original
 		maximum likelihood estimation by Aki (1965)
@@ -1938,7 +1939,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -1958,7 +1959,7 @@ class EQCatalog:
 		"""
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 
-	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
+	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
 		for variable observation periods for different magnitude increments.
@@ -1972,7 +1973,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2087,7 +2088,7 @@ class EQCatalog:
 
 	#TODO: averaged Weichert method
 
-	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
+	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
 		"""
 		Compute a and b values of Gutenberg Richter relation, and return
 		as TruncatedGRMFD object.
@@ -2102,7 +2103,7 @@ class EQCatalog:
 			String, computation method, either "Weichert", "Aki" or "LSQ"
 			(default: "Weichert")
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2122,7 +2123,7 @@ class EQCatalog:
 		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
 
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MS", Mrelation=None, completeness=Completeness_Rosset, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
 		Compute GR MFD from observed MFD, and plot result
 
@@ -2136,7 +2137,7 @@ class EQCatalog:
 			String, computation method, either "Weichert", "Aki" or "LSQ"
 			(default: "Weichert"). If None, only observed MFD will be plotted.
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2219,14 +2220,14 @@ class EQCatalog:
 		end_year = self.end_date.year
 		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def export_ZMAP(self, filespec, Mtype="MS", Mrelation=None):
+	def export_ZMAP(self, filespec, Mtype="MW", Mrelation=None):
 		"""
 		Export earthquake list to ZMAP format (ETH Zürich).
 		Parameters:
 			Required:
 				filespec: full path specification of output file
 			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MS"
+				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MW"
 		"""
 		f = open(filespec, "w")
 		for eq in self.eq_list:
@@ -2534,7 +2535,7 @@ class EQCatalog:
 
 		return synthetic_catalogs
 
-	def analyse_completeness_Stepp(self, Mmin=1.8, dM=1.0, Mtype="MS", Mrelation=None, dt=5, ttol=0.2):
+	def analyse_completeness_Stepp(self, Mmin=1.8, dM=1.0, Mtype="MW", Mrelation=None, dt=5, ttol=0.2):
 		"""
 		Analyze catalog completeness with the Stepp method algorithm from GEM (old
 		implementation). This method is a wrapper for :meth:`stepp_analysis` in
@@ -2545,7 +2546,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude bin width (default: 0.1)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2568,7 +2569,7 @@ class EQCatalog:
 		Min_Years, Min_Mags = result[:,0].astype('i'), result[:,1]
 		return Completeness(Min_Years[::-1], Min_Mags[::-1])
 
-	def analyse_completeness_Stepp_new(self, dM=0.1, Mtype="MS", Mrelation=None, dt=5.0, increment_lock=True):
+	def analyse_completeness_Stepp_new(self, dM=0.1, Mtype="MW", Mrelation=None, dt=5.0, increment_lock=True):
 		"""
 		Analyze catalog completeness with the Stepp method algorithm from GEM (new
 		implementation). This method is a wrapper for :meth:`Step1971.completeness`
@@ -2577,7 +2578,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude bin width (default: 0.1)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2616,7 +2617,7 @@ class EQCatalog:
 		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
 		return Completeness(Min_Years, Min_Mags)
 
-	def completeness_Stepp(self, start_year=None, mags=[2.], dt=5, Mtype="MS", Mrelation=None):
+	def completeness_Stepp(self, start_year=None, mags=[2.], dt=5, Mtype="MW", Mrelation=None):
 		"""
 		"""
 		for mag in mags:
@@ -2628,7 +2629,7 @@ class EQCatalog:
 				print '%s-%s: %s' % (bin_year, self.end_date.year, N)
 				bin_year -= dt
 
-	def decluster(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
+	def decluster(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MW", Mrelation=None):
 		"""
 		Decluster catalog.
 		This method is a wrapper for the declustering methods in the OQ
@@ -2647,7 +2648,7 @@ class EQCatalog:
 			Positive float, length (in days) of moving time window.
 			Only applies to afteran method (default: 60.)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2692,7 +2693,7 @@ class EQCatalog:
 
 		return mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
 
-	def decluster_new(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MS", Mrelation=None):
+	def decluster_new(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MW", Mrelation=None):
 		"""
 		Decluster catalog.
 		This method is a wrapper for the declustering methods in the OQ
@@ -2711,7 +2712,7 @@ class EQCatalog:
 			Positive float, length (in days) of moving time window.
 			Only applies to afteran method (default: 60.)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2792,7 +2793,7 @@ class EQCatalog:
 			Int, number of sampling points of integral function (only applies to
 			'Kijko_Npg' method) (default: 20)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2810,7 +2811,7 @@ class EQCatalog:
 		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
 		return Mmax, Mmax_sigma
 
-	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MS", Mrelation=None, completeness=Completeness_Rosset):
+	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation=None, completeness=Completeness_Rosset):
 		"""
 		Analyse magnitude-frequency.
 		This method is a wrapper for meth:`recurrence_analysis` in the
@@ -2827,7 +2828,7 @@ class EQCatalog:
 			Float, time bin width in number of years. Only applies to "Weichert"
 			method (default: 1.)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MS")
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
@@ -2981,7 +2982,7 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
-def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MS", Mrelation=None):
+def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MW", Mrelation=None):
 	"""
 	Read ROB local earthquake catalog from txt file.
 
@@ -3034,7 +3035,7 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	return eqc
 
 
-def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot multiple catalogs on a map
 
@@ -3064,6 +3065,9 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		{str: str} dict, mapping name of magnitude conversion relation
 		to magnitude type ("MW", "MS" or "ML") (default: None, will
 		select the default relation for the given Mtype)
+	:param circle:
+		((lon, lat), float, string), respectively defining center, radius (in
+		km) and color of circle to plot
 	:param region:
 		(w, e, s, n) tuple specifying rectangular region to plot in
 		geographic coordinates (default: None)
@@ -3232,6 +3236,19 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			label = None
 		map.plot(x, y, site_symbol, markerfacecolor=site_color, markeredgecolor='k', markersize=site_size, label=label)
 
+	## Circle
+	if circle:
+		center, radius, color = circle
+		x, y = [], []
+		for azimuth in range(0, 360):
+			lon, lat = point_at(center[0], center[1], azimuth, radius)
+			x.append(lon)
+			y.append(lat)
+		x.append(x[0])
+		y.append(y[0])
+		x, y = map(x,y)
+		map.plot(x, y, c=color)
+
 	## Map border and title
 	map.drawmapboundary()
 	if title:
@@ -3249,7 +3266,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		pylab.show()
 
 
-#def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=50, Mtype="MS", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+#def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 #	"""
 #	:param catalogs:
 #		List containing instances of :class:`EQCatalog`
@@ -3407,7 +3424,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 #	else:
 #		pylab.show()
 
-def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=50, Mtype="MS", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	:param catalogs:
 		List containing instances of :class:`EQCatalog`
@@ -3575,7 +3592,8 @@ def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colo
 	if title:
 		plt.title(title)
 
-	plt.legend(loc=legend_location)
+	if legend_location != None:
+		plt.legend(loc=legend_location)
 
 	plt.tight_layout()
 
