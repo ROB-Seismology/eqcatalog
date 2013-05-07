@@ -665,13 +665,13 @@ class EQCatalog:
 		else:
 			return dc
 
-	def subselect_completeness(self, completeness=Completeness_Rosset, Mtype="MW", Mrelation=None, verbose=True):
+	def subselect_completeness(self, completeness=Completeness_MW_201303a, Mtype="MW", Mrelation=None, verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		completeness criterion.
 
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_Rosset)
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation":
@@ -1016,7 +1016,7 @@ class EQCatalog:
 
 		return bins_N, bins_Mag
 
-	def get_completeness_years(self, magnitudes, completeness=Completeness_Rosset):
+	def get_completeness_years(self, magnitudes, completeness=Completeness_MW_201303a):
 		"""
 		Compute year of completeness for list of magnitudes
 
@@ -1025,7 +1025,7 @@ class EQCatalog:
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: completeness_Rosset)
+			catalog (default: Completeness_MW_201303a)
 
 		:return:
 			numpy float array, completeness years
@@ -1043,7 +1043,7 @@ class EQCatalog:
 		completeness_years = np.array(completeness_years, 'f')
 		return completeness_years
 
-	def get_completeness_timespans(self, magnitudes, completeness=Completeness_Rosset):
+	def get_completeness_timespans(self, magnitudes, completeness=Completeness_MW_201303a):
 		"""
 		Compute completeness timespans for list of magnitudes
 
@@ -1052,7 +1052,7 @@ class EQCatalog:
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: completeness_Rosset)
+			catalog (default: Completeness_MW_201303a)
 
 		:return:
 			numpy float array, completeness timespans (fractional years)
@@ -1061,7 +1061,7 @@ class EQCatalog:
 		completeness_timespans = [((self.end_date - datetime.date(int(start_year),1,1)).days + 1) / 365.25 for start_year in completeness_years]
 		return np.array(completeness_timespans)
 
-	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1079,7 +1079,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_Rosset)
+			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -1102,7 +1102,7 @@ class EQCatalog:
 
 		return bins_N_incremental, bins_Mag
 
-	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1120,7 +1120,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_Rosset)
+			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -1131,7 +1131,7 @@ class EQCatalog:
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
 		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, trim=False):
+	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
 		"""
 		Compute cumulative magnitude-frequency distribution.
 
@@ -1149,7 +1149,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_Rosset)
+			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -1899,7 +1899,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MW", completeness=Completeness_Rosset, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MW", completeness=Completeness_MW_201303a, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 		Parameters:
@@ -1910,7 +1910,7 @@ class EQCatalog:
 			Optional:
 				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MW"
 				completeness: Completeness object with initial years of completeness and corresponding
-					minimum magnitudes, defaults to Completeness_Leynaud
+					minimum magnitudes, defaults to Completeness_MW_201303a
 				verbose: boolean indicating whether some messages should be printed or not, defaults to False
 		Return value:
 			(a, b, r) tuple
@@ -1927,7 +1927,7 @@ class EQCatalog:
 			print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
 		return (a, -b, r)
 
-	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
+	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using original
 		maximum likelihood estimation by Aki (1965)
@@ -1945,7 +1945,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_Rosset)
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (ignored)
 		:param verbose:
@@ -1959,7 +1959,7 @@ class EQCatalog:
 		"""
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 
-	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
+	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
 		for variable observation periods for different magnitude increments.
@@ -1979,7 +1979,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_Rosset)
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (default: None)
 		:param verbose:
@@ -2088,7 +2088,7 @@ class EQCatalog:
 
 	#TODO: averaged Weichert method
 
-	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, verbose=False):
+	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
 		"""
 		Compute a and b values of Gutenberg Richter relation, and return
 		as TruncatedGRMFD object.
@@ -2109,7 +2109,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_Rosset)
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation
 			Currently only supported by Weichert method (default: None)
@@ -2123,7 +2123,7 @@ class EQCatalog:
 		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
 
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_Rosset, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
 		Compute GR MFD from observed MFD, and plot result
 
@@ -2143,7 +2143,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_Rosset)
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
 		:param b_val:
 			Float, fixed b value to constrain Weichert estimation (default: None)
 		:param num_sigma:
@@ -2811,7 +2811,7 @@ class EQCatalog:
 		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
 		return Mmax, Mmax_sigma
 
-	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation=None, completeness=Completeness_Rosset):
+	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a):
 		"""
 		Analyse magnitude-frequency.
 		This method is a wrapper for meth:`recurrence_analysis` in the
@@ -2834,7 +2834,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_Rosset)
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
 
 		:return:
 			Tuple (a, b, stdb)
