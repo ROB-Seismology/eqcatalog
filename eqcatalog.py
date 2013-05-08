@@ -642,7 +642,7 @@ class EQCatalog:
 			}
 		windows = {
 			"GardnerKnopoff1974": GardnerKnopoff1974Window(),
-			"Gruenthal1985": Gruenthal2009Window(),
+			"Gruenthal2009": Gruenthal2009Window(),
 			"Uhrhammer1986": Uhrhammer1986Window(),
 			}
 
