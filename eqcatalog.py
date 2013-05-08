@@ -1585,7 +1585,6 @@ class EQCatalog:
 				"upper center" 	9
 				"center" 		10
 			(default: 0)
-			If None, no legend will be shown.
 		:param fig_filespec:
 			String, full path of image to be saved.
 			If None (default), map is displayed on screen.
@@ -1889,7 +1888,6 @@ class EQCatalog:
 				"upper center" 	9
 				"center" 	10
 			(default: 0)
-			If None, no legend will be shown.
 		:param fig_filespec:
 			String, full path of image to be saved.
 			If None (default), map is displayed on screen.
@@ -3124,7 +3122,6 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			"upper center" 	9
 			"center" 	10
 		(default: 0)
-		If None, no legend will be shown.
 	:param fig_filespec:
 		String, full path of image to be saved.
 		If None (default), map is displayed on screen.
@@ -3259,8 +3256,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 	map.drawmapboundary()
 	if title:
 		pylab.title(title)
-	if legend_location != None:
-		plt.legend(loc=legend_location)
+	plt.legend(loc=legend_location)
 	if fig_filespec:
 		default_figsize = pylab.rcParams['figure.figsize']
 		default_dpi = pylab.rcParams['figure.dpi']
@@ -3501,7 +3497,6 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 			"upper center" 	9
 			"center" 		10
 		(default: 0)
-		If None, no legend will be shown.
 	:param fig_filespec:
 		String, full path of image to be saved.
 		If None (default), map is displayed on screen.
@@ -3618,8 +3613,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 	if title:
 		plt.title(title)
 
-	if legend_location != None:
-		plt.legend(loc=legend_location)
+	plt.legend(loc=legend_location)
 
 	plt.tight_layout()
 
