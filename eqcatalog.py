@@ -1585,6 +1585,7 @@ class EQCatalog:
 				"upper center" 	9
 				"center" 		10
 			(default: 0)
+			If None, no legend will be shown.
 		:param fig_filespec:
 			String, full path of image to be saved.
 			If None (default), map is displayed on screen.
@@ -1888,6 +1889,7 @@ class EQCatalog:
 				"upper center" 	9
 				"center" 	10
 			(default: 0)
+			If None, no legend will be shown.
 		:param fig_filespec:
 			String, full path of image to be saved.
 			If None (default), map is displayed on screen.
