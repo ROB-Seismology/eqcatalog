@@ -3038,7 +3038,7 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	return eqc
 
 
-def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_style=11, sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot multiple catalogs on a map
 
@@ -3095,6 +3095,9 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		String, line style to plot source model (default: '-')
 	:param sm_line_width:
 		Int, line width to plot source model (default: 2)
+	:param sm_label_size:
+		Int, font size of source labels. If 0 or None, no labels will
+		be plotted (default: 11)
 	:param sites:
 		List of (lon, lat) tuples or instance of :class:`PSHASite`
 	:param site_symbol:
@@ -3185,7 +3188,9 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			lines = []
 			if geom.GetGeometryName() == "LINESTRING":
 				lines.append(geom.GetPoints())
+				centroid = None
 			elif geom.GetGeometryName() == "POLYGON":
+				centroid = geom.Centroid()
 				for linear_ring in geom:
 					lines.append(linear_ring.GetPoints())
 			for j, line in enumerate(lines):
@@ -3196,6 +3201,11 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 				else:
 					label = "_nolegend_"
 				map.plot(x, y, ls=sm_line_style, lw=sm_line_width, color=sm_color, label=label)
+
+				if centroid and sm_label_style:
+					x, y = map(centroid.GetX(), centroid.GetY())
+					zone_name = zone_data['ShortName']
+					pylab.text(x, y, zone_name, color=sm_color, fontsize=sm_label_style, fontweight='bold', ha='center', va='center')
 
 	## Catalogs
 	for i, catalog in enumerate(catalogs):
@@ -3257,7 +3267,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 	if title:
 		pylab.title(title)
 	plt.legend(loc=legend_location)
-	
+
 	plt.tight_layout()
 	if fig_filespec:
 		default_figsize = pylab.rcParams['figure.figsize']
@@ -3536,7 +3546,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		else:
 			x = catalog.get_fractional_years()
 		plt.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color)
-	
+
 	## crop x axis to data when using fractional years
 	if not plot_date:
 		xmin, xmax, ymin, ymax = plt.axis()
@@ -3597,7 +3607,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		ymin, ymax = plt.ylim()
 		plt.vlines(vlines, ymin=ymin, ymax=ymax, colors='b')
 		plt.ylim(ymin, ymax)
-	
+
 	## plot completeness
 	if completeness:
 		x, y = completeness.min_years, completeness.min_mags
