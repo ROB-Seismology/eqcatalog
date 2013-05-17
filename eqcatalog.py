@@ -3268,7 +3268,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		pylab.title(title)
 	plt.legend(loc=legend_location)
 
-	plt.tight_layout()
+	#plt.tight_layout()
 	if fig_filespec:
 		default_figsize = pylab.rcParams['figure.figsize']
 		default_dpi = pylab.rcParams['figure.dpi']
