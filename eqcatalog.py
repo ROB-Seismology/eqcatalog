@@ -2538,41 +2538,7 @@ class EQCatalog:
 
 		return synthetic_catalogs
 
-	def analyse_completeness_Stepp(self, Mmin=1.8, dM=1.0, Mtype="MW", Mrelation=None, dt=5, ttol=0.2):
-		"""
-		Analyze catalog completeness with the Stepp method algorithm from GEM (old
-		implementation). This method is a wrapper for :meth:`stepp_analysis` in
-		the OQ hazard modeller's toolkit.
-
-		:param Mmin:
-			Float, minimum magnitude (default: 1.8)
-		:param dM:
-			Float, magnitude bin width (default: 0.1)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param dt:
-			Int, time interval (in years) (default: 5)
-		:param ttol:
-			Positive float, tolerance threshold (default: 0.2)
-
-		:return:
-			instance of :class:`Completeness`
-		"""
-		# TODO: determine sensible default values for dt and ttol
-
-		from mtoolkit.scientific.completeness import stepp_analysis
-		subcatalog = self.subselect(Mmin=Mmin, Mtype=Mtype, Mrelation=Mrelation)
-		years = self.get_years()
-		Mags = self.get_magnitudes(Mtype, Mrelation)
-		result = stepp_analysis(years, Mags, dM, dt, ttol, iloc=True)
-		Min_Years, Min_Mags = result[:,0].astype('i'), result[:,1]
-		return Completeness(Min_Years[::-1], Min_Mags[::-1])
-
-	def analyse_completeness_Stepp_new(self, dM=0.1, Mtype="MW", Mrelation=None, dt=5.0, increment_lock=True):
+	def analyse_completeness_Stepp(self, dM=0.1, Mtype="MW", Mrelation=None, dt=5.0, increment_lock=True):
 		"""
 		Analyze catalog completeness with the Stepp method algorithm from GEM (new
 		implementation). This method is a wrapper for :meth:`Step1971.completeness`
@@ -2590,111 +2556,23 @@ class EQCatalog:
 			Float, time interval (in years) (default: 5)
 		:param increment_lock:
 			Boolean, ensure completeness magnitudes always decrease with more
-			recent bins (default: True).
+			recent bins (default: True)
+		
 		:return:
 			instance of :class:`Completeness`
 		"""
-		from hmtk.seismicity.catalogue import Catalogue
 		from hmtk.seismicity.completeness.comp_stepp_1971 import Stepp1971
-
-		ec = Catalogue()
-		keys_int = ['year', 'month', 'day', 'hour', 'minute']
-		keys_flt = ['second', 'magnitude']
-		data_int, data_flt = [], []
-		for eq in self:
-			data_int.append([
-				int(eq.datetime.year),
-				int(eq.datetime.month),
-				int(eq.datetime.day),
-				int(eq.datetime.hour),
-				int(eq.datetime.minute),
-			])
-			data_flt.append([
-				float(eq.datetime.second),
-				float(eq.get_M(Mtype, Mrelation)),
-			])
-		ec.load_from_array(keys_int, np.array(data_int, dtype=np.int16))
-		ec.load_from_array(keys_flt, np.array(data_flt, dtype=np.float64))
-		stepp = Stepp1971()
-		result = stepp.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
+		ec = self.get_hmtk_catalogue(Mtype=Mtype, Mrelation=Mrelation)
+		stepp_1971_algorithm = Stepp1971()
+		result = stepp_1971_algorithm.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
 		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
-		return Completeness(Min_Years, Min_Mags)
-
-	def completeness_Stepp(self, start_year=None, mags=[2.], dt=5, Mtype="MW", Mrelation=None):
+		return Completeness(Min_Years, Min_Mags, Mtype=Mtype)
+	
+	def analyse_completeness_CUVI(self):
 		"""
 		"""
-		for mag in mags:
-			eqc_m = self.subselect(start_date=start_year, Mmin=mag, Mtype=Mtype, Mrelation=Mrelation)
-			bin_year = self.end_date.year - dt
-			while bin_year > eqc_m.start_date.year:
-				eqc_t = eqc_m.subselect(start_date=bin_year)
-				N = len(eqc_t)/(eqc_t.timespan())
-				print '%s-%s: %s' % (bin_year, self.end_date.year, N)
-				bin_year -= dt
-
-	def decluster(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MW", Mrelation=None):
-		"""
-		Decluster catalog.
-		This method is a wrapper for the declustering methods in the OQ
-		hazard modeller's toolkit (old implementation).
-
-		:param method:
-			String, method name: "afteran" or "gardner-knopoff" (default: "afteran")
-		:param window_opt:
-			String, declustering window type: "GardnerKnopoff", "Gruenthal" or "Uhrhammer"
-			(default: "GardnerKnopoff")
-		:param fs_time_prop:
-			Positive float, foreshock time window as a proportion of
-			aftershock time window. Only applies to gardner_knopoff method
-			(default: 0.)
-		:param time_window:
-			Positive float, length (in days) of moving time window.
-			Only applies to afteran method (default: 60.)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-
-		:return:
-			Tuple mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
-			mainshock_catalog: instance of class:`EQCatalog` containing main shocks
-			foreshock_catalog: instance of class:`EQCatalog` containing foreshocks
-			aftershock_catalog: instance of class:`EQCatalog` containing aftershocks
-			cluster_catalog: list with instances of class:`EQCatalog` containing
-				earthquakes belonging to the different clusters. The first element
-				in this list represents earthquakes that do not belong to any cluster
-		"""
-		from mtoolkit.scientific.declustering import afteran_decluster, gardner_knopoff_decluster
-
-		if method == "afteran":
-			decluster_func = afteran_decluster
-			decluster_param = time_window
-		elif method == "gardner-knopoff":
-			decluster_func = gardner_knopoff_decluster
-			decluster_param = fs_time_prop
-
-		eq_matrix = np.zeros((len(self), 6) ,'f')
-		for i, eq in enumerate(self):
-			M = eq.get_M(Mtype, Mrelation)
-			eq_matrix[i,:] = (eq.datetime.year, eq.datetime.month, eq.datetime.day, eq.lon, eq.lat, M)
-		cluster_vector, mainshock_matrix, flag_vector = decluster_func(eq_matrix, window_opt, decluster_param)
-
-		## cluster_vector: cluster number of each earthquake
-		## main_shock_matrix: 2-D matrix containing only mainshocks
-		## flag_vector: -1 = foreshock, 0 = mainshock, 1 = aftershock
-
-		mainshock_catalog = self.__getitem__(np.where(flag_vector == 0)[0])
-		foreshock_catalog = self.__getitem__(np.where(flag_vector == -1)[0])
-		aftershock_catalog = self.__getitem__(np.where(flag_vector == 1)[0])
-		cluster_catalogs = []
-		cluster_IDs = set(cluster_vector)
-		for cluster_ID in cluster_IDs:
-			cluster_catalog = self.__getitem__(np.where(cluster_vector == cluster_ID)[0])
-			cluster_catalogs.append(cluster_catalog)
-
-		return mainshock_catalog, foreshock_catalog, aftershock_catalog, cluster_catalogs
+		pass
+		# TODO: complete
 
 	def decluster_new(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MW", Mrelation=None):
 		"""
@@ -2729,6 +2607,7 @@ class EQCatalog:
 				earthquakes belonging to the different clusters. The first element
 				in this list represents earthquakes that do not belong to any cluster
 		"""
+		## TODO: revisit
 		from hmtk.seismicity.declusterer.dec_gardner_knopoff import GardnerKnopoffType1
 		from hmtk.seismicity.declusterer.dec_afteran import Afteran
 		from hmtk.seismicity.declusterer.distance_time_windows import GardnerKnopoffWindow, GruenthalWindow, UhrhammerWindow
@@ -2899,6 +2778,57 @@ class EQCatalog:
 		fig.colorbar(p)
 		## plot
 		plt.show()
+
+	def get_hmtk_catalogue(self, Mtype='MW', Mrelation=None):
+		"""
+		Convert ROB catalog to hmtk catalogue
+		
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		
+		:return:
+			instance of :class:`hmtk.seismicity.catalogue.Catalogue`
+		"""
+		from hmtk.seismicity.catalogue import Catalogue
+		catalogue = Catalogue()
+		keys_flt = ['second', 'longitude', 'latitude', 'depth', 'magnitude']
+		keys_int = ['year', 'month', 'day', 'hour', 'minute']
+		data_int, data_flt = [], []
+		for eq in self:
+			data_flt.append([
+				float(eq.datetime.second),
+				float(eq.lon),
+				float(eq.lat),
+				float(eq.depth),
+				float(eq.get_M(Mtype=Mtype, Mrelation=Mrelation)),
+			])
+			data_int.append([
+				int(eq.datetime.year),
+				int(eq.datetime.month),
+				int(eq.datetime.day),
+				int(eq.datetime.hour),
+				int(eq.datetime.minute),
+			])
+		catalogue.load_from_array(keys_flt, np.array(data_flt, dtype=np.float))
+		catalogue.load_from_array(keys_int, np.array(data_int, dtype=np.int))
+		return catalogue
+
+
+	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a):
+		"""
+		"""
+		from hmtk.seismicity.smoothing.smoothed_seismicity import SmoothedSeismicity
+		xmin, xmax, ymin, ymax = self.get_region()
+		zmin, zmax, spcz = 0., 0., 0.
+		smoothed_seismicity = SmoothedSeismicity(grid_limits=[xmin, xmax, spcx, ymin, ymax, spcy, zmin, zmax, spcz])
+		catalogue = self.get_hmtk_catalogue(Mtype=Mtype, Mrelation=Mrelation)
+		config = {'Length_limit': 50., 'BandWidth': 25., 'increment': True}
+		completeness_table = completeness.to_table()
+		data = smoothed_seismicity.run_analysis(catalogue=catalogue, config=config, completeness_table=completeness_table, smoothing_kernel=None, end_year=None)
 
 
 EQCollection = EQCatalog
