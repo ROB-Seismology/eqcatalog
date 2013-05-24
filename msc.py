@@ -206,8 +206,8 @@ class Camelbeeck1985(MSCE_ML_MW):
 	Camelbeek, T. (1985). Recent seismicity in Hainaut - Scaling laws from the
 	seismological stations in Belgium and Luxemburg. P. Melchior (ed.), Seismic
 	Activity in Western Europe, 109-126. D. Reidel Publishing Company.
-	
-	Validity tange: ML 2.6 - 4.4 (judging from their Table 1)
+
+	Validity range: ML 2.6 - 4.4 (judging from their Table 1)
 	Region: Hainaut, Belgium
 	Standard deviation not given
 	"""

@@ -2557,7 +2557,7 @@ class EQCatalog:
 		:param increment_lock:
 			Boolean, ensure completeness magnitudes always decrease with more
 			recent bins (default: True)
-		
+
 		:return:
 			instance of :class:`Completeness`
 		"""
@@ -2567,7 +2567,7 @@ class EQCatalog:
 		result = stepp_1971_algorithm.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
 		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
 		return Completeness(Min_Years, Min_Mags, Mtype=Mtype)
-	
+
 	def analyse_completeness_CUVI(self):
 		"""
 		"""
@@ -2782,14 +2782,14 @@ class EQCatalog:
 	def get_hmtk_catalogue(self, Mtype='MW', Mrelation=None):
 		"""
 		Convert ROB catalog to hmtk catalogue
-		
+
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		
+
 		:return:
 			instance of :class:`hmtk.seismicity.catalogue.Catalogue`
 		"""
@@ -2829,6 +2829,35 @@ class EQCatalog:
 		config = {'Length_limit': 50., 'BandWidth': 25., 'increment': True}
 		completeness_table = completeness.to_table()
 		data = smoothed_seismicity.run_analysis(catalogue=catalogue, config=config, completeness_table=completeness_table, smoothing_kernel=None, end_year=None)
+
+	def plot_Poisson_test(self, Mmin, interval=100, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a):
+		"""
+		Plot catalog distribution versus Poisson distribution
+		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
+
+		:param Mmin:
+			Float, minimum magnitude to consider in analysis (should correspond
+			to one of the completeness magnitudes)
+		:param interval:
+			Int, length of interval (number of days) (default: 100)
+		"""
+		from scipy.misc import factorial
+
+		def poisson(n, t, tau):
+			return (t / tau)**n * np.exp(-t/tau) / factorial(n)
+
+		min_year = completeness.get_completeness_year(Mmin)
+		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		catalog = cc_catalog.subselect(start_date=min_year, Mmin=Mmin)
+		num_events = len(catalog)
+		td = catalog.get_time_delta()
+		catalog_num_days = td.days + td.seconds / 86400.
+		tau = catalog_num_days / num_events
+		print catalog_num_days, num_events, tau
+		n = np.arange(0, 15)
+		p = poisson(n, interval, tau)
+		pylab.plot(n, p)
+		pylab.show()
 
 
 EQCollection = EQCatalog
