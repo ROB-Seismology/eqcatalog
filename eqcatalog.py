@@ -2854,7 +2854,7 @@ class EQCatalog:
 		completeness_table = completeness.to_table()
 		data = smoothed_seismicity.run_analysis(catalogue=catalogue, config=config, completeness_table=completeness_table, smoothing_kernel=None, end_year=None)
 
-	def plot_Poisson_test(self, Mmin, interval=100, nmax=15, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
+	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
 		"""
 		Plot catalog distribution versus Poisson distribution
 		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
@@ -2875,7 +2875,7 @@ class EQCatalog:
 			Int, length of interval (number of days) (default: 100)
 		:param nmax:
 			Int, maximum number of earthquakes in an interval to test
-			(default: 15)
+			(default: 0, will determine automatically)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -2898,22 +2898,38 @@ class EQCatalog:
 		from scipy.misc import factorial
 
 		def poisson(n, t, tau):
+			## Probability of n events in period t
+			## given average recurrence interval tau
 			return (t / tau)**n * np.exp(-t/tau) / factorial(n)
 
 		def time_delta_to_days(td):
 			return td.days + td.seconds / 86400.
 
+		## Apply completeness constraint, and truncate result to completeness
+		## year for specified minimum magnitude
 		min_year = completeness.get_completeness_year(Mmin)
 		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		catalog = cc_catalog.subselect(start_date=min_year, Mmin=Mmin)
 
-		n = np.arange(nmax)
 		num_events = len(catalog)
 		td = catalog.get_time_delta()
 		catalog_num_days = time_delta_to_days(td)
 		num_intervals = np.ceil(catalog_num_days / interval)
 
+		## Real catalog distribution
+		## Compute interval index for each event
+		time_deltas = catalog.get_time_deltas()
+		time_delta_days = np.array([time_delta_to_days(td) for td in time_deltas])
+		interval_indexes = np.floor(time_delta_days / interval)
+		## Compute number of events in each interval
+		num_events_per_interval, _ = np.histogram(interval_indexes, np.arange(num_intervals))
+		if not nmax:
+			nmax = num_events_per_interval.max()
+		## Compute number of intervals having n events
+		bins_num_events, _ = np.histogram(num_events_per_interval, bins=np.arange(nmax+1))
+
 		## Theoretical Poisson distribution
+		n = np.arange(nmax)
 		tau = catalog_num_days / num_events
 		if verbose:
 			print("Number of events in catalog: %d" % num_events)
@@ -2923,16 +2939,6 @@ class EQCatalog:
 		poisson_probs = poisson(n, interval, tau)
 		poisson_n = poisson_probs * num_intervals
 
-		## Real catalog distribution
-		## Compute interval index for each event
-		time_deltas = catalog.get_time_deltas()
-		time_delta_days = np.array([time_delta_to_days(td) for td in time_deltas])
-		interval_indexes = np.floor(time_delta_days / interval)
-		## Compute number of events in each interval
-		num_events_per_interval, _ = np.histogram(interval_indexes, np.arange(num_intervals))
-		## Compute number of intervals having n events
-		bins_num_events, _ = np.histogram(num_events_per_interval, bins=np.arange(nmax+1))
-
 		## Plot
 		pylab.bar(n-0.5, bins_num_events, label="Catalog distribution")
 		pylab.plot(n, poisson_n, 'r', lw=2, label="Poisson distribution")
@@ -2940,13 +2946,13 @@ class EQCatalog:
 		pylab.ylabel("Number of intervals", fontsize="x-large")
 		pylab.legend()
 		xmin, xmax, ymin, ymax = pylab.axis()
-		pylab.axis((-0.5, xmax, ymin, ymax))
+		pylab.axis((-0.5, nmax, ymin, ymax))
 
 		ax = pylab.gca()
 		for label in ax.get_xticklabels() + ax.get_yticklabels():
 			label.set_size('large')
 		if title is None:
-			title = r"Poisson test (t=%d, $\tau$=%.1f days)" % (interval, tau)
+			title = r"Poisson test for $M\geq%.1f$ (t=%d, $\tau$=%.1f days, nt=%d)" % (Mmin, interval, tau, num_intervals)
 		pylab.title(title, fontsize="x-large")
 
 		if fig_filespec:
