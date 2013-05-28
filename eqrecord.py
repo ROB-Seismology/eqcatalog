@@ -141,6 +141,64 @@ class LocalEarthquake:
 		dct = {key: self.__dict__}
 		return json.dumps(dct, default=json_handler, encoding="latin1")
 
+	@classmethod
+	def from_HY4(self, hypdat, Mtype='ML', ID=0):
+		"""
+		Construct from HYPDAT structure used in HY4 catalog format
+		used by SeismicEruption
+
+		:param hypdat:
+			instance of :class:`HYPDAT`
+		:param Mtype:
+			Str, magnitude type, either 'ML', 'MS' or 'MW' (default: 'ML')
+		:param ID:
+			Int, identifier
+		"""
+		lat = hypdat.latitude * 0.001 / 3600.0
+		lon = hypdat.longitude * 0.001 / 3600.0
+		year = int(hypdat.year)
+		month = int(hypdat.month)
+		day = int(hypdat.day)
+		date = datetime.date(year, month, day)
+		hour, minutes = divmod(hypdat.minutes, 60)
+		seconds = hypdat.tseconds * 0.1
+		time = datetime.time(hour, minutes, seconds)
+		depth = hypdat.depth / 100000.0
+		magnitude = hypdat.magnitude / 10.0
+		ML = {True: magnitude, False: 0.}[Mtype == 'ML']
+		MS = {True: magnitude, False: 0.}[Mtype == 'MS']
+		MW = {True: magnitude, False: 0.}[Mtype == 'MW']
+
+		return LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW)
+
+
+	def to_HY4(self, Mtype='ML', Mrelation=None):
+		"""
+		Convert to HYPDAT structure used by SeismicEruption HY4 catalog format
+
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "ML")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			instance of :class:`HYPDAT`
+		"""
+		from HY4 import HYPDAT
+
+		latitude = int(round(self.lat * 3600 / 0.001))
+		longitude = int(round(self.lon * 3600 / 0.001))
+		year, month, day, tm_hour, tm_min, tm_sec = self.datetime.timetuple()[:6]
+		minutes = int(round(tm_hour * 60 + tm_min))
+		tseconds = int(round(tm_sec / 0.1))
+		depth = int(round(self.depth * 100000))
+		M = self.get_M(Mtype, Mrelation)
+		magnitude = int(round(M * 10))
+
+		return HYPDAT(latitude, longitude, year, month, day, minutes, tseconds, depth, magnitude, 0, 0, 0)
+
 	@property
 	def date(self):
 		return self.datetime.date()
@@ -385,6 +443,7 @@ class LocalEarthquake:
 			return seismodb.query_ROB_FocalMechanisms(id_earth=self.ID, verbose=verbose)[0]
 		except IndexError:
 			return None
+
 
 
 class MacroseismicDataPoint:

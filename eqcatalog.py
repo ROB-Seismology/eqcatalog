@@ -271,6 +271,29 @@ class EQCatalog:
 		dct = {key: self.__dict__}
 		return json.dumps(dct, default=json_handler)
 
+	@classmethod
+	def from_HY4(self, filespec, Mtype='ML'):
+		"""
+		Read from HY4 earthquake catalog format used by SeismicEruption
+
+		:param filespec:
+			Str, full path to input file
+		:param Mtype:
+			Str, magnitude type, either 'ML', 'MS' or 'MW' (default: 'ML')
+		"""
+		eq_list = []
+		fd = open(filespec, "rb")
+		ID = 1
+		while 1:
+			bytes = fd.read(24)
+			if bytes:
+				h = HYPDAT(*struct.unpack("2ih2B2hl4B", bytes))
+				eq_list.append(LocalEarthquake.from_HY4(h, Mtype=Mtype, ID=ID))
+				ID += 1
+			else:
+				break
+		return EQCatalog(eq_list)
+
 	def get_time_delta(self):
 		"""
 		Return duration of catalog as datetime.timedelta object
@@ -2483,6 +2506,21 @@ class EQCatalog:
 		for eq in self:
 			f.write("%.2f\n" % eq.get_M(Mtype, Mrelation))
 		f.close()
+
+	def export_HY4(self, filespec):
+		"""
+		Export to SeismicEruption HY4 earthquake catalog format
+
+		:param filespec:
+			String, full path to output file
+		"""
+		from HY4 import HYPDAT
+
+		ofd = open(filespec, "wb")
+		for eq in self:
+			hyp = eq.to_HY4()
+			ofd.write("%s" % hyp.pack())
+		ofd.close()
 
 	def pickle(self, filespec):
 		"""
