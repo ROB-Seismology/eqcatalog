@@ -1178,7 +1178,7 @@ class EQCatalog:
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
 		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
+	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
 		"""
 		Compute cumulative magnitude-frequency distribution.
 
@@ -1187,7 +1187,7 @@ class EQCatalog:
 		:param Mmax:
 			Float, maximum magnitude to bin
 		:param dM:
-			Float, magnitude interval
+			Float, magnitude bin width (default: 0.1)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -1211,6 +1211,60 @@ class EQCatalog:
 		bins_N_incremental = bins_N_incremental[::-1]
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
+
+	def get_Mmax_EPRI_distribution(self, Mmin, b_val, extended=False, dM=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+		"""
+		Compute Mmax distribution following EPRI (1994) method.
+
+		:param Mmin:
+			Float, lower magnitude (corresponding to lower magnitude in PSHA
+		:param b_val:
+			Float, b value of MFD
+		:param extended:
+			Bool, whether or not crust is extended (default: False)
+		:param dM:
+			Float, bin width of distribution (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+		:param verbose:
+			Bool, whether or not to print additional information (default: True)
+
+		:return:
+			(ndarray, ndarray) tuple
+		"""
+		from matplotlib import mlab
+
+		## Global prior distributions
+		if extended:
+			mean, sigma = 6.4, 0.8
+		else:
+			mean, sigma = 6.3, 0.5
+		magnitudes = np.arange(Mmin, mean + 3 * sigma + dM, dM)
+		prior = mlab.normpdf(magnitudes, mean, sigma)
+		prior /= np.sum(prior)
+
+		## Regional likelihood functions
+		beta = b_val * np.log(10)
+		mmax_obs = self.get_Mmax()
+		cc_catalog = self.subselect_completeness(completeness)
+		n = len(cc_catalog.subselect(Mmin=Mmin))
+		if verbose:
+				print("Maximum observed magnitude: %.1f" % mmax_obs)
+				print("n(M > observed Mmax): %d" % n)
+		likelihood = np.zeros_like(magnitudes, dtype='d')
+		likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
+
+		## Posterior
+		posterior = prior * likelihood
+		posterior /= np.sum(posterior)
+		return magnitudes, prior, likelihood, posterior
 
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW", Mrelation=None, title=None, fig_filespec=None, verbose=False):
 		"""
@@ -2273,11 +2327,15 @@ class EQCatalog:
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation=None):
 		"""
 		Export earthquake list to ZMAP format (ETH Zürich).
-		Parameters:
-			Required:
-				filespec: full path specification of output file
-			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MW"
+
+		:param filespec:
+			String, full path specification of output file
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		"""
 		f = open(filespec, "w")
 		for eq in self.eq_list:
