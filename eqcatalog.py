@@ -1212,14 +1212,15 @@ class EQCatalog:
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def get_Mmax_EPRI_distribution(self, Mmin, b_val, extended=False, dM=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+	def get_EPRI_Mmax_pdf(self, Mmin, b_val=None, extended=False, dM=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
 		"""
 		Compute Mmax distribution following EPRI (1994) method.
 
 		:param Mmin:
 			Float, lower magnitude (corresponding to lower magnitude in PSHA
 		:param b_val:
-			Float, b value of MFD
+			Float, b value of MFD (default: None, will compute b value using
+			Weichert method)
 		:param extended:
 			Bool, whether or not crust is extended (default: False)
 		:param dM:
@@ -1251,6 +1252,8 @@ class EQCatalog:
 		prior /= np.sum(prior)
 
 		## Regional likelihood functions
+		if not b_val:
+			a_val, b_val, stdb = self.calcGR_Weichert(Mmin=Mmin, Mmax=mean, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 		beta = b_val * np.log(10)
 		mmax_obs = self.get_Mmax()
 		cc_catalog = self.subselect_completeness(completeness)
