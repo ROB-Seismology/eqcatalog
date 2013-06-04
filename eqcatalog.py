@@ -41,108 +41,16 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
+
 from openquake.hazardlib.geo.geodetic import point_at
-from scipy import stats
 
 
 ## Import ROB modules
 import seismodb
 import hazard.rshalib.mfd as mfd
 from source_models import read_source_model
+from completeness import *
 
-
-class Completeness:
-	"""
-	Class defining completeness of earthquake catalog.
-
-	:param min_years:
-		list or array containing initial years of completeness, in
-		chronological order (= from small to large)
-	:param min_mags:
-		list or array with corresponding lower magnitude for which
-		catalog is assumed to be complete
-	:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW"
-	"""
-	def __init__(self, min_years, min_mags, Mtype):
-		self.min_years = np.array(min_years)
-		self.min_mags = np.array(min_mags)
-		self.Mtype = Mtype
-		## Make sure ordering is chronologcal
-		if self.min_years[0] > self.min_years[1]:
-			self.min_years = self.min_years[::-1]
-			self.min_mags = self.min_mags[::-1]
-
-	def __len__(self):
-		return len(self.min_years)
-
-	def __str__(self):
-		s = "\n".join(["%d, %.2f" % (year, mag) for (year, mag) in zip(self.min_years, self.min_mags)])
-		return s
-
-	@property
-	def start_year(self):
-		return self.min_years.min()
-
-	def get_completeness_magnitude(self, year):
-		"""
-		Return completeness magnitude for given year, this is the lowest
-		magnitude for which the catalog is complete.
-
-		:param year:
-			Int, year
-
-		:return:
-			Float, completeness magnitude
-		"""
-		try:
-			index = np.where(year >= self.min_years)[0][-1]
-		except IndexError:
-			return None
-		else:
-			return self.min_mags[index]
-
-	def get_completeness_year(self, M):
-		"""
-		Return initial year of completeness for given magnitude
-
-		:param M:
-			Float, magnitude
-
-		:return:
-			Int, initial year of completeness for given magnitude
-		"""
-		try:
-			index = np.where(M >= self.min_mags)[0][0]
-		except:
-			return None
-		else:
-			return self.min_years[index]
-
-	def to_table(self, Mmax=None):
-		"""
-		Convert to a 2-D completeness table
-		"""
-		n = len(self)
-		if Mmax and Mmax > self.min_mags.max():
-			n += 1
-		table = np.zeros((n, 2), 'f')
-		table[:len(self),0] = self.min_years[::-1]
-		table[:len(self),1] = self.min_mags[::-1]
-		if Mmax and Mmax > self.min_mags.max():
-			table[-1,0] = self.min_years.min()
-			table[-1,1] = Mmax
-		return table
-
-
-## NOTE: I think threshold magnitudes should be a multiple of dM (or dM/2)!
-Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.7, 3.3, 1.8], "MS")
-#Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.75, 3.25, 1.75], "MS")
-Completeness_Rosset = Completeness([1350, 1926, 1960, 1985], [5.0, 4.0, 3.0, 1.8], "MS")
-## Following relation is for MW based on conversion from ML using Ahorner (1983)
-Completeness_MW_201303a = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.9, 4.5, 4.0, 3.0, 2.2], "MW")
-## Following relation is for MW based on conversion from ML using Reamer and Hinzen (2004)
-Completeness_MW_201303b = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.9, 4.5, 3.9, 2.9, 2.0], "MW")
 
 
 class EQCatalog:
@@ -732,7 +640,7 @@ class EQCatalog:
 			instance of :class:`EQCatalog`
 		"""
 		if completeness:
-			start_date = datetime.date(min(completeness.min_years), 1, 1)
+			start_date = min(completeness.min_dates)
 			if completeness.Mtype != Mtype:
 				raise Exception("Magnitude type of completeness not compatible with specified Mtype!")
 		else:
@@ -744,7 +652,7 @@ class EQCatalog:
 			eq_list = []
 			for eq in self.eq_list:
 				M = eq.get_M(Mtype, Mrelation)
-				if M >= completeness.get_completeness_magnitude(eq.datetime.year):
+				if M >= completeness.get_completeness_magnitude(eq.datetime.date()):
 					eq_list.append(eq)
 		else:
 			eq_list = self.eq_list
@@ -1041,7 +949,7 @@ class EQCatalog:
 		"""
 		## Set lower magnitude to lowermost threshold magnitude possible
 		if completeness:
-			Mmin = max(Mmin, completeness.get_completeness_magnitude(self.end_date.year))
+			Mmin = max(Mmin, completeness.get_completeness_magnitude(self.end_date))
 
 		## Construct bins_Mag, including Mmax as right edge
 		Mmin = np.floor(Mmin / dM) * dM
@@ -1063,9 +971,9 @@ class EQCatalog:
 
 		return bins_N, bins_Mag
 
-	def get_completeness_years(self, magnitudes, completeness=Completeness_MW_201303a):
+	def get_completeness_dates(self, magnitudes, completeness=Completeness_MW_201303a):
 		"""
-		Compute year of completeness for list of magnitudes
+		Compute date of completeness for list of magnitudes
 
 		:param magnitudes:
 			list or numpy array, magnitudes
@@ -1075,20 +983,20 @@ class EQCatalog:
 			catalog (default: Completeness_MW_201303a)
 
 		:return:
-			numpy float array, completeness years
+			numpy array, completeness dates
 		"""
 		## Calculate year of completeness for each magnitude interval
 		if completeness:
-			completeness_years = []
+			completeness_dates = []
 			for M in magnitudes:
-				start_year = max(self.start_date.year, completeness.get_completeness_year(M))
-				#start_year = completeness.get_completeness_year(M)
-				completeness_years.append(start_year)
+				start_date = max(self.start_date, completeness.get_completeness_date(M))
+				#start_date = completeness.get_completeness_date(M)
+				completeness_dates.append(start_date)
 		else:
 			print("Warning: no completeness object provided. Using catalog length!")
-			completeness_years = [self.start_date.year] * len(magnitudes)
-		completeness_years = np.array(completeness_years, 'f')
-		return completeness_years
+			completeness_dates = [self.start_date] * len(magnitudes)
+		completeness_dates = np.array(completeness_dates)
+		return completeness_dates
 
 	def get_completeness_timespans(self, magnitudes, completeness=Completeness_MW_201303a):
 		"""
@@ -1104,9 +1012,7 @@ class EQCatalog:
 		:return:
 			numpy float array, completeness timespans (fractional years)
 		"""
-		completeness_years = self.get_completeness_years(magnitudes, completeness)
-		completeness_timespans = [((self.end_date - datetime.date(int(start_year),1,1)).days + 1) / 365.25 for start_year in completeness_years]
-		return np.array(completeness_timespans)
+		return completeness.get_completeness_timespans(magnitudes, self.end_date)
 
 	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
 		"""
@@ -1203,7 +1109,7 @@ class EQCatalog:
 
 		:return:
 			Tuple (bins_N_cumulative, bins_Mag)
-			bins_N_incremental: cumulative annual occurrence rates
+			bins_N_cumulative: cumulative annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim)
@@ -2006,33 +1912,40 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.2, Mtype="MW", completeness=Completeness_MW_201303a, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
-		Parameters:
-			Required:
-				Mmin: minimum magnitude to use for binning
-				Mmax: maximum magnitude to use for binning
-				dM: magnitude interval to use for binning
-			Optional:
-				Mtype: magnitude type ("ML", "MS" or "MW"), defaults to "MW"
-				completeness: Completeness object with initial years of completeness and corresponding
-					minimum magnitudes, defaults to Completeness_MW_201303a
-				verbose: boolean indicating whether some messages should be printed or not, defaults to False
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+		:param b_val:
+			Float, fixed b value to constrain MLE estimation (default: None)
+			This parameter is currently ignored.
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
 		Return value:
-			(a, b, r) tuple
-			a: a value (intercept)
-			b: b value (slope, taken positive)
-			r: correlation coefficient
+			Tuple (a, b, stdb)
+			- a: a value (intercept)
+			- b: b value (slope, taken positive)
+			- stdb: standard deviation on b value (0.)
 		"""
-		# TODO: constrained regression with fixed b
-		# TODO: see also np.linalg.lstsq
-		bins_N_cumul_log, bins_N_disc_log, bins_Mag, bins_Years, num_events, Mmax_obs = self.LogMagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=False)
-		b, a, r, ttprob, stderr = stats.linregress(bins_Mag, bins_N_cumul_log)
-		## stderr = standard error on b?
-		if verbose:
-			print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
-		return (a, -b, r)
+		from calcGR import calcGR_LSQ
+		cumul_rates, magnitudes = self.get_cumulative_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False)
+		a, b, r = calcGR_LSQ(magnitudes, cumul_rates, b_val=b_val, verbose=verbose)
+		return a, b, 0.
 
 	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
 		"""
@@ -2103,7 +2016,13 @@ class EQCatalog:
 		are taken into account. It is therefore important to specify Mmax as
 		the evaluated Mmax for the specific region or source.
 		"""
+		from calcGR import calcGR_Weichert
+		## Note: don't use get_incremental_MagFreq here, as completeness
+		## is taken into account in the Weichert algorithm !
 		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date, b_val=b_val, verbose=verbose)
+
+		"""
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 		bins_Mag += dM/2.0
 
@@ -2192,6 +2111,7 @@ class EQCatalog:
 		#	return (A, B, BETA, STDA, STDB, STDBETA)
 
 		return A, B, STDB
+		"""
 
 	#TODO: averaged Weichert method
 
@@ -2857,9 +2777,10 @@ class EQCatalog:
 		from mtoolkit.scientific.recurrence import recurrence_analysis
 
 		subcatalog = self.subselect_completeness(completeness, Mtype=Mtype, Mrelation=Mrelation)
-		years = subcatalog.get_years()
+		#years = subcatalog.get_years()
+		years = subcatalog.get_fractional_years()
 		Mags = subcatalog.get_magnitudes(Mtype, Mrelation)
-		completeness_table = completeness.to_table(Mmax=None)
+		completeness_table = completeness.to_hmtk_table(Mmax=None)
 		if method == "Weichert" and aM == 0.:
 			aM = dM / 2.
 		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table, dM, method, aM, dt)
@@ -2950,7 +2871,7 @@ class EQCatalog:
 		smoothed_seismicity = SmoothedSeismicity(grid_limits=[xmin, xmax, spcx, ymin, ymax, spcy, zmin, zmax, spcz])
 		catalogue = self.get_hmtk_catalogue(Mtype=Mtype, Mrelation=Mrelation)
 		config = {'Length_limit': 50., 'BandWidth': 25., 'increment': True}
-		completeness_table = completeness.to_table()
+		completeness_table = completeness.to_hmtk_table()
 		data = smoothed_seismicity.run_analysis(catalogue=catalogue, config=config, completeness_table=completeness_table, smoothing_kernel=None, end_year=None)
 
 	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
@@ -3006,9 +2927,9 @@ class EQCatalog:
 
 		## Apply completeness constraint, and truncate result to completeness
 		## year for specified minimum magnitude
-		min_year = completeness.get_completeness_year(Mmin)
+		min_date = completeness.get_completeness_date(Mmin)
 		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
-		catalog = cc_catalog.subselect(start_date=min_year, Mmin=Mmin)
+		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
 
 		num_events = len(catalog)
 		td = catalog.get_time_delta()
@@ -3769,6 +3690,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		plt.ylim(ymin, ymax)
 
 	## plot completeness
+	# TODO: implement completeness dates rather than years
 	if completeness:
 		x, y = completeness.min_years, completeness.min_mags
 		x = np.append(x, max([catalog.end_date for catalog in catalogs]).year+1)
@@ -4266,7 +4188,7 @@ if __name__ == "__main__":
 				zones.append(zone)
 			print
 
-	#M=completeness.get_completeness_magnitude(datetime.datetime.now().year)
+	#M=completeness.get_completeness_magnitude(datetime.date.today())
 	distribute_avalues(zones, cat, Mc)
 
 	for zone in zones:
