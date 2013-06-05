@@ -20,19 +20,18 @@ class SourceModelDefinition:
 		return getattr(self, key)
 
 
-class AreaSourceColumnMap:
+class AreaSourceColumnMap(object):
 	__slots__ = ["id", "name", "tectonic_region_type", "a_val", "b_val",
 				"min_mag", "max_mag", "upper_seismogenic_depth", "lower_seismogenic_depth",
 				"min_hypo_depth", "max_hypo_depth", "min_strike", "max_strike",
 				"min_dip", "max_dip", "Ss", "Nf", "Tf"]
 
-	def __init__(self, k1, k2):
-		self.key1, self.key2 = k1, k2
+	def __setattr__(self, name, val):
+		if name in Foo.__slots__:
+			object.__setattr__(self, name, val)
 
-	def __getitem__(self, key):
-		if key not in self.__slots__:
-			raise KeyError("%r not found" % key)
-		return getattr(self, key)
+	def __getattr__(self, name):
+		return "Value of %s" % name
 
 
 ## Dictionary with data for ROB source models
