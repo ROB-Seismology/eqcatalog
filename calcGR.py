@@ -38,7 +38,8 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 	obs_periods = completeness.get_completeness_timespans(magnitudes, end_date)
 
 	dM = magnitudes[1] - magnitudes[0]
-	magnitudes += dM
+	## Avoid side effects in calling function
+	magnitudes = magnitudes.copy() + dM
 
 	if not b_val:
 		## Initial trial value
