@@ -1144,7 +1144,7 @@ class EQCatalog:
 			Bool, whether or not to print additional information (default: True)
 
 		:return:
-			(ndarray, ndarray) tuple
+			(magnitudes, prior, likelihood, posterior) tuple of arrays
 		"""
 		from matplotlib import mlab
 
@@ -1166,7 +1166,7 @@ class EQCatalog:
 		n = len(cc_catalog.subselect(Mmin=Mmin))
 		if verbose:
 				print("Maximum observed magnitude: %.1f" % mmax_obs)
-				print("n(M > observed Mmax): %d" % n)
+				print("n(M >= Mmin): %d" % n)
 		likelihood = np.zeros_like(magnitudes, dtype='d')
 		likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
 
