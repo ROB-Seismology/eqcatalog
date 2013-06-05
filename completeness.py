@@ -24,7 +24,7 @@ class Completeness:
 		self.min_mags = np.array(min_mags)
 		self.Mtype = Mtype
 		## Make sure ordering is chronologcal
-		if self.min_dates[0] > self.min_dates[1]:
+		if len(self.min_dates) > 1 and self.min_dates[0] > self.min_dates[1]:
 			self.min_dates = self.min_dates[::-1]
 			self.min_mags = self.min_mags[::-1]
 
