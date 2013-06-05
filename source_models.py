@@ -5,38 +5,43 @@ from collections import OrderedDict
 ## Directories with MapInfo tables for source models
 GIS_root = r"D:\GIS-data"
 
-GIS_areasource_directory = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models")
+ROB_directory = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models")
 SHARE_directory = os.path.join(GIS_root, "SHARE")
-GIS_faultsource_directory = os.path.join(SHARE_directory, "Task 3.2", "DATA")
+SHARE_CSS_directory = os.path.join(SHARE_directory, "Task 3.2", "DATA")
 
 
 class SourceModelDefinition:
-	def __init__(self, name, gis_filename, gis_folder):
+	def __init__(self, name, gis_filespec, column_map):
 		self.name = name
-		self.gis_filename = gis_filename
-		self.gis_folder = gis_folder
+		self.gis_filespec = gis_filespec
+		self.column_map = column_map
+
+	def __getitem__(self, key):
+		return getattr(self, key)
 
 
-class AreaSourceModelDefinition(SourceModelDefinition):
-	pass
+class AreaSourceColumnMap:
+	__slots__ = ["id", "name", "tectonic_region_type", "a_val", "b_val",
+				"min_mag", "max_mag", "upper_seismogenic_depth", "lower_seismogenic_depth",
+				"min_hypo_depth", "max_hypo_depth", "min_strike", "max_strike",
+				"min_dip", "max_dip", "Ss", "Nf", "Tf"]
 
+	def __init__(self, k1, k2):
+		self.key1, self.key2 = k1, k2
 
-class FaultSourceModelDefinition(SourceModelDefinition):
-	pass
-
-
-class HybridSourceModelDefinition:
-	pass
+	def __getitem__(self, key):
+		if key not in self.__slots__:
+			raise KeyError("%r not found" % key)
+		return getattr(self, key)
 
 
 ## Dictionary with data for ROB source models
 rob_source_models_dict = {}
 
 ## Seismotectonic
-rob_source_model = {}
-rob_source_model['name'] = 'Seismotectonic'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'seismotectonic zones 1.2.TAB')
-rob_source_model['column_map'] = {
+name = 'Seismotectonic'
+gis_filespec = os.path.join(ROB_directory, 'seismotectonic zones 1.2.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
@@ -56,13 +61,14 @@ rob_source_model['column_map'] = {
 	'Ss': 'Ss',
 	'Nf': 'Nf',
 	'Tf': 'Tf'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+Seismotectonic = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = Seismotectonic
+
 
 ## TwoZone
-rob_source_model = {}
-rob_source_model['name'] = 'TwoZone'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'SLZ+RVG.TAB')
-rob_source_model['column_map'] = {
+name = 'TwoZone'
+gis_filespec = os.path.join(ROB_directory, 'SLZ+RVG.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
@@ -72,19 +78,22 @@ rob_source_model['column_map'] = {
 	'max_mag': 'MS_max_evaluated',
 	'upper_seismogenic_depth': 0.0,
 	'lower_seismogenic_depth': 25.0,
+	'min_hypo_depth': 'min_hypo_depth',
+	'max_hypo_depth': 'max_hypo_depth',
 	'min_strike': 'min_strike',
 	'max_strike': 'max_strike',
-	'dip': 45.0,
-	'rake': 0.0,
-	'min_hypo_depth': 'min_hypo_depth',
-	'max_hypo_depth': 'max_hypo_depth'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+	'min_dip': 45.0,
+	'max_dip': 45.0,
+	'Ss': 34,
+	'Nf': 33,
+	'Tf': 33}
+TwoZone = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = TwoZone
 
 ## TwoZone_split
-rob_source_model = {}
-rob_source_model['name'] = 'TwoZone_split'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'SLZ+RVG_split.TAB')
-rob_source_model['column_map'] = {
+name = 'TwoZone_split'
+gis_filespec = os.path.join(ROB_directory, 'SLZ+RVG_split.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
@@ -94,19 +103,22 @@ rob_source_model['column_map'] = {
 	'max_mag': 'MS_max_evaluated',
 	'upper_seismogenic_depth': 0.0,
 	'lower_seismogenic_depth': 25.0,
+	'min_hypo_depth': 'min_hypo_depth',
+	'max_hypo_depth': 'max_hypo_depth',
 	'min_strike': 'min_strike',
 	'max_strike': 'max_strike',
-	'dip': 45.0,
-	'rake': 0.0,
-	'min_hypo_depth': 'min_hypo_depth',
-	'max_hypo_depth': 'max_hypo_depth'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+	'min_dip': 45.0,
+	'max_dip': 45.0,
+	'Ss': 34,
+	'Nf': 33,
+	'Tf': 33}
+TwoZone_split = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = TwoZone_split
 
 ## TwoZonev2
-rob_source_model = {}
-rob_source_model['name'] = 'TwoZonev2'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'TwoZone_v2.TAB')
-rob_source_model['column_map'] = {
+name = 'TwoZonev2'
+gis_filespec = os.path.join(ROB_directory, 'TwoZone_v2.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'area': 'Area',
@@ -127,13 +139,13 @@ rob_source_model['column_map'] = {
 	'Ss': 'Ss',
 	'Nf': 'Nf',
 	'Tf': 'Tf'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+TwoZonev2 = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = TwoZonev2
 
 ## Leynaud
-rob_source_model = {}
-rob_source_model['name'] = 'Leynaud'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'ROB Seismic Source Model (Leynaud, 2000).TAB')
-rob_source_model['column_map'] = {
+name = 'Leynaud'
+gis_filespec = os.path.join(ROB_directory, 'ROB Seismic Source Model (Leynaud, 2000).TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
@@ -143,19 +155,22 @@ rob_source_model['column_map'] = {
 	'max_mag': 'MS_max_evaluated',
 	'upper_seismogenic_depth': 0.0,
 	'lower_seismogenic_depth': 25.0,
+	'min_hypo_depth': 'min_hypo_depth',
+	'max_hypo_depth': 'max_hypo_depth',
 	'min_strike': 'min_strike',
 	'max_strike': 'max_strike',
-	'dip': 45.0,
-	'rake': 0.0,
-	'min_hypo_depth': 'min_hypo_depth',
-	'max_hypo_depth': 'max_hypo_depth'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+	'min_dip': 45.0,
+	'max_dip': 45.0,
+	'Ss': 34,
+	'Nf': 33,
+	'Tf': 33}
+Leynaud = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = Leynaud
 
 ## Leynaud_extended
-rob_source_model = {}
-rob_source_model['name'] = 'Leynaud_extended'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'Leynaud extended.TAB')
-rob_source_model['column_map'] = {
+name = 'Leynaud_extended'
+gis_filespec = os.path.join(ROB_directory, 'Leynaud extended.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
@@ -175,13 +190,13 @@ rob_source_model['column_map'] = {
 	'Ss': 'Ss',
 	'Nf': 'Nf',
 	'Tf': 'Tf'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+Leynaud_extended = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = Leynaud_extended
 
 ## Leynaud_updated
-rob_source_model = {}
-rob_source_model['name'] = 'Leynaud_updated'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'Leynaud updated.TAB')
-rob_source_model['column_map'] = {
+name = 'Leynaud_updated'
+gis_filespec = os.path.join(ROB_directory, 'Leynaud updated.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type':'SHARE_TRT',
@@ -191,19 +206,22 @@ rob_source_model['column_map'] = {
 	'max_mag': 'MS_max_evaluated',
 	'upper_seismogenic_depth': 0.0,
 	'lower_seismogenic_depth': 25.0,
+	'min_hypo_depth': 'min_hypo_depth',
+	'max_hypo_depth': 'max_hypo_depth',
 	'min_strike': 'min_strike',
 	'max_strike': 'max_strike',
-	'dip': 45.0,
-	'rake': 0.0,
-	'min_hypo_depth': 'min_hypo_depth',
-	'max_hypo_depth': 'max_hypo_depth'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+	'min_dip': 45.0,
+	'max_dip': 45.0,
+	'Ss': 34,
+	'Nf': 33,
+	'Tf': 33}
+Leynaud_updated = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = Leynaud_updated
 
 ## RVRS_area
-rob_source_model = {}
-rob_source_model['name'] = 'RVRS_area'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'RVRS_area_v2.TAB')
-rob_source_model['column_map'] = {
+name = 'RVRS_area'
+gis_filespec = os.path.join(ROB_directory, 'RVRS_area_v2.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type': 'SHARE_TRT',
@@ -223,37 +241,41 @@ rob_source_model['column_map'] = {
 	'Ss': 'Ss',
 	'Nf': 'Nf',
 	'Tf': 'Tf'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+RVRS_area = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = RVRS_area
 
 ## RVRS_CSS
-rob_source_model = {}
-rob_source_model['name'] = 'RVRS_CSS'
-rob_source_model['tab_filespec'] = os.path.join(GIS_faultsource_directory, 'CSS_SurfaceTrace.TAB')
-rob_source_model['column_map'] = {
+name = 'RVRS_CSS'
+gis_filespec = os.path.join(SHARE_CSS_directory, 'CSS_SurfaceTrace.TAB')
+column_map = {
 	'id': 'IDSource',
 	'name': 'SourceName',
 	'tectonic_region_type': 'Active Shallow Crust',
 	'a_val': 2.4,
 	'b_val': 0.9,
-	'min_mag': 3.5,
+	'min_mag': 4.0,
 	'max_mag': 'MaxMag',
 	'upper_seismogenic_depth': 'MinDepth',
 	'lower_seismogenic_depth': 'MaxDepth',
-	'dip': 'Dip',
-	'rake': 'Rake',
-	'slip_rate': 'SlipRate'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+	'min_dip': 'DipMin',
+	'max_dip': 'DipMax',
+	'min_rake': 'RakeMin',
+	'max_rake': 'RakeMax',
+	'min_slip_rate': 'SlipRateMin',
+	'max_slip_rate': 'SlipRateMax',
+	'bg_zone': None}
+RVRS_CSS = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = RVRS_CSS
 
 ## Seismotectonic Hybrid
-rob_source_model = {}
-rob_source_model['name'] = 'Seismotectonic_Hybrid'
-rob_source_model['tab_filespec'] = os.path.join(GIS_faultsource_directory, 'Seismotectonic Hybrid.TAB')
-rob_source_model['column_map'] = {
+name = 'Seismotectonic_Hybrid'
+gis_filespec = os.path.join(ROB_directory, 'Seismotectonic Hybrid.TAB')
+column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
 	'tectonic_region_type': 'SHARE_TRT',
-	'a_val': 'aMLE',
-	'b_val': 'bMLE',
+	'a_val': 'aMLEfix',
+	'b_val': 'bMLEfix',
 	'min_mag': 4.0,
 	'max_mag': 'Mmax_evaluated',
 	'upper_seismogenic_depth': 'upper_rupture_depth',
@@ -272,14 +294,15 @@ rob_source_model['column_map'] = {
 	'min_rake': 'min_rake',
 	'max_rake': 'max_rake',
 	'min_slip_rate': 'min_slip_rate',
-	'max_slip_rate': 'max_slip_rate'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+	'max_slip_rate': 'max_slip_rate',
+	'bg_zone': 'BG_zone'}
+Seismotectonic_Hybrid = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = Seismotectonic_Hybrid
 
 ## RVRS SHARE AS model
-rob_source_model = {}
-rob_source_model['name'] = 'RVRS_SHARE_AS'
-rob_source_model['tab_filespec'] = os.path.join(GIS_areasource_directory, 'RVRS_SHARE_v4alpha.TAB')
-rob_source_model['column_map'] = {
+name = 'RVRS_SHARE_AS'
+gis_filespec = os.path.join(ROB_directory, 'RVRS_SHARE_v4alpha.TAB')
+column_map = {
 	'id': 'Idas',
 	'name': 'Idas',
 	'tectonic_region_type': 'Active Shallow Crust',
@@ -298,13 +321,13 @@ rob_source_model['column_map'] = {
 	'Tf': 0,
 	'min_hypo_depth': 'Mindepth',
 	'max_hypo_depth': 'Maxdepth'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+RVRS_SHARE_AS = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = RVRS_SHARE_AS
 
 ## SHARE AS model
-rob_source_model = {}
-rob_source_model['name'] = 'SHARE_AS'
-rob_source_model['tab_filespec'] = os.path.join(SHARE_directory, 'ASModel', 'Ver6.1', 'ASModelVer61.shp')
-rob_source_model['column_map'] = {
+name = 'SHARE_AS'
+gis_filespec = os.path.join(SHARE_directory, 'ASModel', 'Ver6.1', 'ASModelVer61.shp')
+column_map = {
 	'id': 'IDAS',
 	'name': 'IDAS',
 	'tectonic_region_type': 'TECTONICS',
@@ -323,7 +346,33 @@ rob_source_model['column_map'] = {
 	'Ss': 'SS',
 	'Nf': 'NF',
 	'Tf': 'TF'}
-rob_source_models_dict[rob_source_model['name']] = rob_source_model
+SHARE_AS = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = SHARE_AS
+
+## SHARE AS model around Belgium
+name = 'SHARE_AS_Belgium'
+gis_filespec = os.path.join(ROB_directory, 'SHARE_ASv61_Belgium.TAB')
+column_map = {
+	'id': 'Idas',
+	'name': 'Idas',
+	'tectonic_region_type': 'SHARE_TRT',
+	'a_val': 'A',
+	'b_val': 'B',
+	'min_mag': 4.0,
+	'max_mag': 'Maxmag',
+	'upper_seismogenic_depth': 'upper_rupture_depth',
+	'lower_seismogenic_depth': 'lower_rupture_depth',
+	'min_strike': 'min_strike',
+	'max_strike': 'max_strike',
+	'min_hypo_depth': 'min_hypo_depth',
+	'max_hypo_depth': 'max_hypo_depth',
+	'min_dip': 'min_dip',
+	'max_dip': 'max_dip',
+	'Ss': 'Ss',
+	'Nf': 'Nf',
+	'Tf': 'Tf'}
+SHARE_AS_Belgium = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = SHARE_AS_Belgium
 
 
 def read_source_model(source_model_name, verbose=True):
@@ -343,11 +392,11 @@ def read_source_model(source_model_name, verbose=True):
 
 	## Read zone model from MapInfo file
 	#source_model_table = ZoneModelTables[source_model_name.lower()]
-	#tab_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
-	tab_filespec = rob_source_models_dict[source_model_name]["tab_filespec"]
+	#gis_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
+	gis_filespec = rob_source_models_dict[source_model_name]["gis_filespec"]
 	ID_colname = rob_source_models_dict[source_model_name]["column_map"]["id"]
 
-	zone_records = read_GIS_file(tab_filespec, verbose=verbose)
+	zone_records = read_GIS_file(gis_filespec, verbose=verbose)
 	zone_ids = [rec[ID_colname] for rec in zone_records]
 
 	zone_data = OrderedDict()
