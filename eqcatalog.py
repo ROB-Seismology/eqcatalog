@@ -442,7 +442,11 @@ class EQCatalog:
 		:return:
 			Float, maximum observed magnitude
 		"""
-		return self.get_magnitudes(Mtype, Mrelation).max()
+		if len(self) > 0:
+			Mmax = self.get_magnitudes(Mtype, Mrelation).max()
+		else:
+			Mmax = np.nan
+		return Mmax
 
 	def get_M0(self, Mrelation=None):
 		"""
@@ -1144,7 +1148,7 @@ class EQCatalog:
 			Bool, whether or not to print additional information (default: True)
 
 		:return:
-			(magnitudes, prior, likelihood, posterior) tuple of arrays
+			(ndarray, ndarray) tuple
 		"""
 		from matplotlib import mlab
 
@@ -1158,21 +1162,25 @@ class EQCatalog:
 		prior /= np.sum(prior)
 
 		## Regional likelihood functions
-		if not b_val:
-			a_val, b_val, stdb = self.calcGR_Weichert(Mmin=Mmin, Mmax=mean, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
-		beta = b_val * np.log(10)
-		mmax_obs = self.get_Mmax()
-		cc_catalog = self.subselect_completeness(completeness)
-		n = len(cc_catalog.subselect(Mmin=Mmin))
-		if verbose:
-				print("Maximum observed magnitude: %.1f" % mmax_obs)
-				print("n(M >= Mmin): %d" % n)
-		likelihood = np.zeros_like(magnitudes, dtype='d')
-		likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
+		if len(self) > 0:
+			if not b_val:
+				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=Mmin, Mmax=mean, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+			beta = b_val * np.log(10)
+			mmax_obs = self.get_Mmax()
+			cc_catalog = self.subselect_completeness(completeness)
+			n = len(cc_catalog.subselect(Mmin=Mmin))
+			if verbose:
+					print("Maximum observed magnitude: %.1f" % mmax_obs)
+					print("n(M > Mmin): %d" % n)
+			likelihood = np.zeros_like(magnitudes, dtype='d')
+			likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
+		else:
+			likelihood = np.ones_like(magnitudes)
 
 		## Posterior
 		posterior = prior * likelihood
 		posterior /= np.sum(posterior)
+
 		return magnitudes, prior, likelihood, posterior
 
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW", Mrelation=None, title=None, fig_filespec=None, verbose=False):
@@ -2543,16 +2551,18 @@ class EQCatalog:
 		zone_catalogs = OrderedDict()
 		for zoneID, zone_data in model_data.items():
 			zone_poly = zone_data['obj']
-			zone_eq_list = []
-			for i, eq in enumerate(self.eq_list):
-				point.SetPoint(0, eq.lon, eq.lat)
-				if point.Within(zone_poly):
-					zone_eq_list.append(eq)
-			linear_ring = zone_poly.GetGeometryRef(0)
-			points = linear_ring.GetPoints()
-			lons, lats = zip(*points)
-			region = (min(lons), max(lons), min(lats), max(lats))
-			zone_catalogs[zoneID] = EQCatalog(zone_eq_list, self.start_date, self.end_date, region, zoneID)
+			if zone_poly.GetGeometryName() == "POLYGON":
+				## Fault sources will be skipped
+				zone_eq_list = []
+				for i, eq in enumerate(self.eq_list):
+					point.SetPoint(0, eq.lon, eq.lat)
+					if point.Within(zone_poly):
+						zone_eq_list.append(eq)
+				linear_ring = zone_poly.GetGeometryRef(0)
+				points = linear_ring.GetPoints()
+				lons, lats = zip(*points)
+				region = (min(lons), max(lons), min(lats), max(lats))
+				zone_catalogs[zoneID] = EQCatalog(zone_eq_list, self.start_date, self.end_date, region, zoneID)
 
 		return zone_catalogs
 

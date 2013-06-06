@@ -247,7 +247,7 @@ class LocalEarthquake:
 		else:
 			return self.MS
 
-	def get_MW(self, Mrelation={"MS": "Geller1976", "ML": "ReamerHinzen2004Q"}):
+	def get_MW(self, Mrelation={"MS": "Geller1976", "ML": "Ahorner1983"}):
 		"""
 		Return MW.
 		If MW is None or zero, calculate it using the specified
@@ -274,7 +274,7 @@ class LocalEarthquake:
 				- "ReamerHinzen2004L"
 				- "ReamerHinzen2004Q"
 
-			(default: {"MS": "Geller1976", "ML": "ReamerHinzen2004Q"})
+			(default: {"MS": "Geller1976", "ML": "Ahorner1983"})
 			Note that MS -> MW relations take precedence over ML -> MW relations
 
 		:return:
@@ -282,7 +282,7 @@ class LocalEarthquake:
 		"""
 		## Set default conversion relation
 		if Mrelation is None:
-			Mrelation={"MS": "Geller1976", "ML": "ReamerHinzen2004Q"}
+			Mrelation={"MS": "Geller1976", "ML": "Ahorner1983"}
 
 		if not self.MW:
 			if self.MS and Mrelation.has_key("MS"):
