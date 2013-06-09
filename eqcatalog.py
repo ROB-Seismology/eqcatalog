@@ -922,7 +922,7 @@ class EQCatalog:
 					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_depth
 
-	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=None):
+	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=None, verbose=True):
 		"""
 		Bin all earthquake magnitudes in catalog according to specified magnitude interval.
 
@@ -941,6 +941,8 @@ class EQCatalog:
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes (default: None)
+		:param verbose:
+			Bool, whether or not to print additional information
 
 		#:param large_eq_correction: (M, corr_factor) tuple, with M the lower magnitude for which to apply corr_factor
 		#	This is to correct the frequency of large earthquakes having a return period which is longer
@@ -963,7 +965,7 @@ class EQCatalog:
 
 		## Select magnitudes according to completeness criteria
 		if completeness:
-			cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation)
+			cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
 			Mags = cc_catalog.get_magnitudes(Mtype, Mrelation)
 		else:
 			Mags = self.get_magnitudes(Mtype, Mrelation)
@@ -1162,26 +1164,63 @@ class EQCatalog:
 		prior /= np.sum(prior)
 
 		## Regional likelihood functions
+		likelihood = np.ones_like(magnitudes)
 		if len(self) > 0:
 			if not b_val:
-				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=Mmin, Mmax=mean, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
-			beta = b_val * np.log(10)
-			mmax_obs = self.get_Mmax()
-			cc_catalog = self.subselect_completeness(completeness)
-			n = len(cc_catalog.subselect(Mmin=Mmin))
-			if verbose:
-					print("Maximum observed magnitude: %.1f" % mmax_obs)
-					print("n(M > Mmin): %d" % n)
-			likelihood = np.zeros_like(magnitudes, dtype='d')
-			likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
-		else:
-			likelihood = np.ones_like(magnitudes)
+				## Note: using lowest magnitude of completeness to compute Weichert
+				## is more robust than using min_mag
+				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+			if not np.isnan(b_val):
+				beta = b_val * np.log(10)
+				mmax_obs = self.get_Mmax()
+				cc_catalog = self.subselect_completeness(completeness, verbose=verbose)
+				n = len(cc_catalog.subselect(Mmin=Mmin))
+				if verbose:
+						print("Maximum observed magnitude: %.1f" % mmax_obs)
+						print("n(M > Mmin): %d" % n)
+				likelihood = np.zeros_like(magnitudes, dtype='d')
+				likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
 
 		## Posterior
 		posterior = prior * likelihood
 		posterior /= np.sum(posterior)
 
 		return magnitudes, prior, likelihood, posterior
+
+	def get_EPRI_Mmax_percentile(self, Mmin, perc=50, b_val=None, extended=False, dM=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+		"""
+		Compute percentile from Mmax distribution following EPRI (1994) method.
+
+		:param Mmin:
+			Float, lower magnitude (corresponding to lower magnitude in PSHA
+		:param perc:
+			Int, percentile of distribution to compute (default: 50)
+		:param b_val:
+			Float, b value of MFD (default: None, will compute b value using
+			Weichert method)
+		:param extended:
+			Bool, whether or not crust is extended (default: False)
+		:param dM:
+			Float, bin width of distribution (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+		:param verbose:
+			Bool, whether or not to print additional information (default: True)
+
+		:return:
+			Float, magnitude
+		"""
+		from stats.percentiles import weighted_percentiles
+		mags, prior, likelihood, posterior = self.get_EPRI_Mmax_pdf(Mmin, b_val=b_val, extended=extended, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		Mmax = weighted_percentiles(mags, [perc], weights=posterior)[0]
+		return Mmax
 
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW", Mrelation=None, title=None, fig_filespec=None, verbose=False):
 		"""
@@ -1987,7 +2026,7 @@ class EQCatalog:
 		"""
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 
-	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
+	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=True):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
 		for variable observation periods for different magnitude increments.
@@ -2027,7 +2066,7 @@ class EQCatalog:
 		from calcGR import calcGR_Weichert
 		## Note: don't use get_incremental_MagFreq here, as completeness
 		## is taken into account in the Weichert algorithm !
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date, b_val=b_val, verbose=verbose)
 
 		"""
@@ -2123,7 +2162,7 @@ class EQCatalog:
 
 	#TODO: averaged Weichert method
 
-	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
+	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=True):
 		"""
 		Compute a and b values of Gutenberg Richter relation, and return
 		as TruncatedGRMFD object.
@@ -3000,20 +3039,172 @@ class CompositeEQCatalog:
 	Class representing a catalog that has been split into a number
 	of non-overlapping subcatalogs (e.g., split according to different
 	source zones).
+
+	:param master_catalog:
+		instance of :class:`EQCatalog`, master catalog
+	:param zone_catalogs:
+		list of instances of :class:`EQCatalog`, non-overlapping subcatalogs
+		corresponding to different source zones
+	:param Mtype:
+		String, magnitude type: "MW", "MS" or "ML" (default: "MW")
+	:param Mrelation":
+		{str: str} dict, mapping name of magnitude conversion relation
+		to magnitude type ("MW", "MS" or "ML") (default: None, will
+		select the default relation for the given Mtype)
+	:param completeness:
+		instance of :class:`Completeness` (default: Completeness_MW_201303a)
+	:param min_mag:
+		Float, minimum magnitude of sampled MFD's. Note that lower completenes
+		magnitude will be used to compute MFD's. (default: 4.0)
+	:param mfd_bin_width:
+		Float, bin width of sampled MFD's (default: 0.1)
+	:param master_MFD:
+		instance of :class:`TruncatedGRMFD`, MFD of master catalog (default: None)
+	:param zone_MFDs:
+		list of instances of :class:´TruncatedGRMFD`, MFDs of subcatalogs
+		(default: [])
 	"""
-	def __init__(self, master_catalog, zone_catalogs):
+	def __init__(self, master_catalog, zone_catalogs, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
 		self.master_catalog = master_catalog
 		self.zone_catalogs = zone_catalogs
+		self.Mtype = Mtype
+		self.Mrelation = Mrelation
+		self.completeness = completeness
+		self.min_mag = min_mag
+		self.mfd_bin_width = mfd_bin_width
+		self.master_MFD = master_MFD
+		self.zone_MFDs = zone_MFDs
 
-	def balance_MFD_by_moment_rate(self, Nsamples):
-		"""
-		For each zone catalog: MC sampling of b value, compute corresponding
-		a value. Sum total moment rate of all zonee catalogs, and check that
-		it falls within +/- 2 sigma of total moment rate in master catalog.
-		"""
-		pass
+	def _get_catalog_Mmaxes(self):
+		zone_catalogs = self.zone_catalogs
+		max_mags = np.zeros(len(zone_catalogs), 'f')
+		max_mags = dict.fromkeys(zone_catalogs.keys())
+		for zone_id, catalog in zone_catalogs.items():
+			if self.zone_MFDs:
+				b_val = self.zone_MFDs[zone_id].b_val
+			else:
+				b_val = None
+			max_mag = catalog.get_EPRI_Mmax_percentile(self.min_mag, 50, b_val=b_val, extended=False, dM=self.mfd_bin_width, Mtype=self.Mtype, Mrelation=self.Mrelation, completeness=self.completeness, verbose=False)
+			max_mag = np.ceil(max_mag / self.mfd_bin_width) * self.mfd_bin_width
+			max_mags[zone_id] = max_mag
+		return max_mags
 
-	def balance_MFD_by_num_eq(self, Nsamples):
+	def _compute_MFD(self, catalog, Mmax, b_val=None):
+		mfd_bin_width = self.mfd_bin_width
+		Mtype, Mrelation, completeness = self.Mtype, self.Mrelation, self.completeness
+		min_mag = completeness.min_mag
+		mfd = catalog.get_estimated_MFD(min_mag, Mmax, mfd_bin_width, method="Weichert", b_val=b_val, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+		mfd.min_mag = self.min_mag
+		return mfd
+
+	def _compute_zone_MFDs(self):
+		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
+		for zone_id, zone_catalog in self.zone_catalogs.items():
+			zone_Mmax = zone_Mmaxes[zone_id]
+			try:
+				zone_MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=None)
+			except ValueError:
+				## Note: it is critical that this doesn't fail for any one zone
+				## Therefore, we should construct minimal MFD following Fenton et al.,
+				## but this requires area...
+				zone_MFD = None
+			zone_MFDs[zone_id] = zone_MFD
+		return zone_MFDs
+
+	def balance_MFD_by_moment_rate(self, num_samples, mr_num_sigma=1, b_num_sigma=2):
+		"""
+		Balance MFD's of zone catalogs by moment rate.
+		First, calculate moment rate range corresponding to b_val +/-
+		mr_num_sigma of master catalog. Then, for each subcatalog, do
+		Monte Carlo sampling of b_val within +/- b_num_sigma bounds,
+		compute corresponding a_val. Finally, sum total moment rate of
+		all subcatalogs, and check if it falls within the moment rate
+		range of the master catalog.
+
+		:param num_samples:
+			Int, number of MFD samples to generate
+		:param mr_num_sigma:
+			Float, number of standard deviations on b value of master catalog
+			to determine moment rate range (default: 1)
+		:param b_num_sigma:
+			Float, number of standard deviations on b value of zone catalogs
+			for Monte Carlo sampling (default: 2)
+
+		:return:
+			Dict, with zone IDs as keys and a list of num_samples MFD's as
+			values
+		"""
+		import scipy.stats
+
+		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
+
+		## Determine Mmax of each zone catalog, and overall Mmax
+		zone_Mmaxes = self._get_catalog_Mmaxes()
+		overall_Mmax = max(zone_Mmaxes.values())
+
+		## Determine moment rate range of master catalog
+		if not self.master_MFD:
+			master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
+		else:
+			master_MFD = self.master_MFD
+		b_val1 = master_MFD.b_val + mr_num_sigma * master_MFD.b_sigma
+		master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
+		b_val2 = master_MFD.b_val - mr_num_sigma * master_MFD.b_sigma
+		master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
+		master_moment_rate_range = np.zeros(2, 'd')
+		master_moment_rate_range[0] = master_MFD1._get_total_moment_rate()
+		master_moment_rate_range[1] = master_MFD2._get_total_moment_rate()
+		print master_moment_rate_range
+
+		## Determine unconstrained MFD for each zone catalog
+		if not self.zone_MFDs:
+			zone_MFDs = self._compute_zone_MFDs()
+		else:
+			zone_MFDs = self.zone_MFDs
+
+		## Monte Carlo sampling
+		MFD_container = dict.fromkeys(zone_catalogs.keys())
+		num_passed, num_rejected, num_failed = 0, 0, 0
+		num_iterations = 0
+		while num_passed < num_samples:
+			if num_iterations % 10 == 0:
+				print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
+			failed = False
+			temp_MFD_container = dict.fromkeys(zone_catalogs.keys())
+			for zone_id, zone_catalog in zone_catalogs.items():
+				zone_Mmax = zone_Mmaxes[zone_id]
+				zone_MFD = zone_MFDs[zone_id]
+				## Monte Carlo sampling from truncated normal distribution
+				mu, sigma = zone_MFD.b_val, zone_MFD.b_sigma
+				b_val = scipy.stats.truncnorm.rvs(-b_num_sigma, b_num_sigma, mu, sigma)
+				try:
+					MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
+				except ValueError:
+					failed = True
+					num_failed += 1
+					break
+				else:
+					temp_MFD_container[zone_id] = MFD
+
+			if not failed:
+				zone_mfds = temp_MFD_container.values()
+				summed_moment_rate = np.sum(mfd._get_total_moment_rate() for mfd in zone_mfds)
+				if master_moment_rate_range[0] <= summed_moment_rate <= master_moment_rate_range[1]:
+					for zone_id in zone_catalogs.keys():
+						if num_passed == 0:
+							MFD_container[zone_id] = [temp_MFD_container[zone_id]]
+						else:
+							MFD_container[zone_id].append(temp_MFD_container[zone_id])
+					num_passed += 1
+				else:
+					num_rejected += 1
+
+			num_iterations += 1
+		print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
+
+		return MFD_container
+
+	def balance_MFD_by_num_eq(self, num_samples):
 		"""
 		For each zone catalog: MC sampling of b value, compute corresponding
 		a value. Then, for each magnitude bin, compute total number of

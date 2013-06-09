@@ -44,6 +44,10 @@ class Completeness:
 		return self.start_date.year
 
 	@property
+	def min_mag(self):
+		return self.min_mags.min()
+
+	@property
 	def min_years(self):
 		#return np.array([date.year for date in self.min_dates])
 		years = np.array([date.year for date in self.min_dates], 'f')
