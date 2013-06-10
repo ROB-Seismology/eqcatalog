@@ -3133,7 +3133,7 @@ class CompositeEQCatalog:
 				b_val = beta / np.log(10)
 				lamda = 0.004 * zone_areas[zone_id]
 				a_val = mfd.a_from_lambda(lamda, 6.0, b_val)
-				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, mfd_bin_width, a_val, b_val, stdb)
+				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val, stdb)
 			zone_MFDs[zone_id] = zone_MFD
 		return zone_MFDs
 
@@ -3230,8 +3230,31 @@ class CompositeEQCatalog:
 
 		return MFD_container
 
-	def balance_MFD_by_frequency(self, num_samples):
+	def balance_MFD_by_frequency(self, num_samples, num_sigma=2, max_test_mag=None):
 		"""
+		Balance MFD's of zone catalogs by frequency.
+		First, calculate frequency range corresponding to b_val +/-
+		num_sigma of master catalog. Then, for each subcatalog, do
+		Monte Carlo sampling of b_val within +/- num_sigma bounds,
+		compute corresponding a_val. Finally, sum frequency of
+		all subcatalogs (up to max_test_mag), and check if it falls
+		within the frequency range of the master catalog.
+
+		:param num_samples:
+			Int, number of MFD samples to generate
+		:param num_sigma:
+			Float, number of standard deviations on b value of master
+			catalog (to determine bounds) and of zone catalogs (for
+			Monte Carlo sampling) (default: 2)
+		:param max_test_mag:
+			Float, maximum magnitude to test if summed frequency is
+			within range of master catalog (default: None, will take
+			lowest zone Mmax)
+
+		:return:
+			Dict, with zone IDs as keys and a list of num_samples MFD's as
+			values
+
 		For each zone catalog: MC sampling of b value, compute corresponding
 		a value. Then, for each magnitude bin, compute total number of
 		earthquakes (or annual rate) up to Mmax - 1 or 2 bins of each zone,
@@ -3245,19 +3268,22 @@ class CompositeEQCatalog:
 		## Determine Mmax of each zone catalog, and overall Mmax
 		zone_Mmaxes = self._get_catalog_Mmaxes()
 		overall_Mmax = max(zone_Mmaxes.values())
+		if max_test_mag is None:
+			max_test_mag = min(zone_Mmaxes.values())
+		max_test_mag_index = int(round(max_test_mag - self.min_mag) / self.mfd_bin_width) + 1
 
 		## Determine frequency range of master catalog
 		if not self.master_MFD:
 			master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
 		else:
 			master_MFD = self.master_MFD
-		b_val1 = master_MFD.b_val + mr_num_sigma * master_MFD.b_sigma
+		b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
 		master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
-		b_val2 = master_MFD.b_val - mr_num_sigma * master_MFD.b_sigma
+		b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
 		master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
 		master_frequency_range = np.zeros((2, len(master_MFD)), 'd')
-		master_frequency_range[0] = master_MFD1._get_cumulative_rate()
-		master_frequency_range[1] = master_MFD2._get_cumulative_rate()
+		master_frequency_range[0] = master_MFD1.get_cumulative_rates()
+		master_frequency_range[1] = master_MFD2.get_cumulative_rates()
 		print master_frequency_range
 
 		## Determine unconstrained MFD for each zone catalog
@@ -3280,7 +3306,7 @@ class CompositeEQCatalog:
 				zone_MFD = zone_MFDs[zone_id]
 				## Monte Carlo sampling from truncated normal distribution
 				mu, sigma = zone_MFD.b_val, zone_MFD.b_sigma
-				b_val = scipy.stats.truncnorm.rvs(-b_num_sigma, b_num_sigma, mu, sigma)
+				b_val = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, mu, sigma)
 				try:
 					MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
 				except ValueError:
@@ -3295,7 +3321,7 @@ class CompositeEQCatalog:
 				summed_frequency_range = np.zeros(len(master_MFD), 'd')
 				for MFD in zone_mfds:
 					summed_frequency_range[:len(MFD)] += MFD.get_cumulative_rates()
-				if ((master_frequency_range[0] <= summed_frequency_range).all() <= master_frequency_range[1]).all():
+				if ((master_frequency_range[0, :max_test_mag_index] <= summed_frequency_range[:max_test_mag_index]).all() <= master_frequency_range[1, :max_test_mag_index]).all():
 					for zone_id in zone_catalogs.keys():
 						if num_passed == 0:
 							MFD_container[zone_id] = [temp_MFD_container[zone_id]]
