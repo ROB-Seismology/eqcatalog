@@ -3040,11 +3040,10 @@ class CompositeEQCatalog:
 	of non-overlapping subcatalogs (e.g., split according to different
 	source zones).
 
-	:param master_catalog:
-		instance of :class:`EQCatalog`, master catalog
 	:param zone_catalogs:
-		list of instances of :class:`EQCatalog`, non-overlapping subcatalogs
-		corresponding to different source zones
+		Dict, with zource zone ID's as keys and lists of instances of
+		:class:`EQCatalog`, non-overlapping subcatalogs corresponding to
+		different source zones, as values
 	:param source_model_name:
 		Str, name of source model (will be used to read additional info from
 		GIS table, if necessary)
@@ -3067,8 +3066,7 @@ class CompositeEQCatalog:
 		list of instances of :class:´TruncatedGRMFD`, MFDs of subcatalogs
 		(default: [])
 	"""
-	def __init__(self, master_catalog, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
-		self.master_catalog = master_catalog
+	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
 		self.zone_catalogs = zone_catalogs
 		self.source_model_name = source_model_name
 		self.Mtype = Mtype
@@ -3078,6 +3076,16 @@ class CompositeEQCatalog:
 		self.mfd_bin_width = mfd_bin_width
 		self.master_MFD = master_MFD
 		self.zone_MFDs = zone_MFDs
+		self.master_catalog = self.construct_master_catalog()
+
+	def construct_master_catalog(self):
+		eq_list = []
+		for zone_catalog in self.zone_catalogs.values():
+			eq_list.extend(zone_catalog.eq_list)
+		start_date = zone_catalog.start_date
+		end_date = zone_catalog.end_date
+		master_catalog = EQCatalog(eq_list, start_date=start_date, end_date=end_date)
+		return master_catalog
 
 	def _get_catalog_Mmaxes(self):
 		zone_catalogs = self.zone_catalogs
@@ -3117,7 +3125,7 @@ class CompositeEQCatalog:
 			zone_areas[zone_id] = zone_poly.GetArea() / 1E6
 		return zone_areas
 
-	def _compute_zone_MFDs(self):
+	def _compute_zone_MFDs(self, num_sigma=0):
 		zone_Mmaxes = self._get_catalog_Mmaxes()
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
@@ -3131,11 +3139,50 @@ class CompositeEQCatalog:
 				beta, std_beta = 1.84, 0.24
 				stdb = std_beta / np.log(10)
 				b_val = beta / np.log(10)
-				lamda = 0.004 * zone_areas[zone_id]
+				lamda = 0.004 * zone_areas[zone_id] / 1E6
 				a_val = mfd.a_from_lambda(lamda, 6.0, b_val)
 				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val, stdb)
 			zone_MFDs[zone_id] = zone_MFD
+			if num_sigma > 0:
+				zone_MFDs[zone_id] = [zone_MFD]
+				b_val1 = zone_MFD.b_val + zone_MFD.b_sigma * num_sigma
+				MFD_sigma1 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val1)
+				zone_MFDs[zone_id].append(MFD_sigma1)
+				b_val2 = zone_MFD.b_val - zone_MFD.b_sigma * num_sigma
+				MFD_sigma2 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val2)
+				zone_MFDs[zone_id].append(MFD_sigma2)
 		return zone_MFDs
+
+	def _compute_master_MFD(self, num_sigma=0):
+		zone_Mmaxes = self._get_catalog_Mmaxes()
+		overall_Mmax = max(zone_Mmaxes.values())
+		master_catalog = self.master_catalog
+		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
+		if num_sigma > 0:
+			b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
+			master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
+			b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
+			master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
+			return [master_MFD, master_MFD1, master_MFD2]
+		else:
+			return master_MFD
+
+	def _get_master_moment_rate_range(self, num_sigma=1):
+		zone_Mmaxes = self._get_catalog_Mmaxes()
+		overall_Mmax = max(zone_Mmaxes.values())
+		master_catalog = self.master_catalog
+		if not self.master_MFD:
+			master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
+		else:
+			master_MFD = self.master_MFD
+		b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
+		master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
+		b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
+		master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
+		master_moment_rate_range = np.zeros(2, 'd')
+		master_moment_rate_range[0] = master_MFD1._get_total_moment_rate()
+		master_moment_rate_range[1] = master_MFD2._get_total_moment_rate()
+		return master_moment_rate_range
 
 	def balance_MFD_by_moment_rate(self, num_samples, mr_num_sigma=1, b_num_sigma=2):
 		"""
@@ -3169,18 +3216,8 @@ class CompositeEQCatalog:
 		overall_Mmax = max(zone_Mmaxes.values())
 
 		## Determine moment rate range of master catalog
-		if not self.master_MFD:
-			master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
-		else:
-			master_MFD = self.master_MFD
-		b_val1 = master_MFD.b_val + mr_num_sigma * master_MFD.b_sigma
-		master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
-		b_val2 = master_MFD.b_val - mr_num_sigma * master_MFD.b_sigma
-		master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
-		master_moment_rate_range = np.zeros(2, 'd')
-		master_moment_rate_range[0] = master_MFD1._get_total_moment_rate()
-		master_moment_rate_range[1] = master_MFD2._get_total_moment_rate()
-		print master_moment_rate_range
+		master_moment_rate_range = self._get_master_moment_rate_range(mr_num_sigma)
+		print("Moment rate range: %E - %E N.m" % (master_moment_rate_range[0], master_moment_rate_range[1]))
 
 		## Determine unconstrained MFD for each zone catalog
 		if not self.zone_MFDs:
@@ -3210,7 +3247,10 @@ class CompositeEQCatalog:
 					num_failed += 1
 					break
 				else:
-					temp_MFD_container[zone_id] = MFD
+					if not np.isinf(MFD.a_val):
+						temp_MFD_container[zone_id] = MFD
+					else:
+						temp_MFD_container[zone_id] = zone_MFD
 
 			if not failed:
 				zone_mfds = temp_MFD_container.values()
@@ -3270,7 +3310,8 @@ class CompositeEQCatalog:
 		overall_Mmax = max(zone_Mmaxes.values())
 		if max_test_mag is None:
 			max_test_mag = min(zone_Mmaxes.values())
-		max_test_mag_index = int(round(max_test_mag - self.min_mag) / self.mfd_bin_width) + 1
+		max_test_mag_index = int(round((max_test_mag - self.min_mag) / self.mfd_bin_width)) + 1
+		print("Maximum magnitude to test: %.1f (i=%d)" % (max_test_mag, max_test_mag_index))
 
 		## Determine frequency range of master catalog
 		if not self.master_MFD:
@@ -3284,7 +3325,7 @@ class CompositeEQCatalog:
 		master_frequency_range = np.zeros((2, len(master_MFD)), 'd')
 		master_frequency_range[0] = master_MFD1.get_cumulative_rates()
 		master_frequency_range[1] = master_MFD2.get_cumulative_rates()
-		print master_frequency_range
+		#print master_frequency_range
 
 		## Determine unconstrained MFD for each zone catalog
 		if not self.zone_MFDs:
@@ -3314,14 +3355,19 @@ class CompositeEQCatalog:
 					num_failed += 1
 					break
 				else:
-					temp_MFD_container[zone_id] = MFD
+					if not np.isinf(MFD.a_val):
+						temp_MFD_container[zone_id] = MFD
+					else:
+						temp_MFD_container[zone_id] = zone_MFD
 
 			if not failed:
 				zone_mfds = temp_MFD_container.values()
 				summed_frequency_range = np.zeros(len(master_MFD), 'd')
 				for MFD in zone_mfds:
 					summed_frequency_range[:len(MFD)] += MFD.get_cumulative_rates()
-				if ((master_frequency_range[0, :max_test_mag_index] <= summed_frequency_range[:max_test_mag_index]).all() <= master_frequency_range[1, :max_test_mag_index]).all():
+				if ((master_frequency_range[0, :max_test_mag_index] <= summed_frequency_range[:max_test_mag_index]).all()
+					and (summed_frequency_range[:max_test_mag_index] <= master_frequency_range[1, :max_test_mag_index]).all()):
+					#print master_frequency_range[0, max_test_mag_index], summed_frequency_range[max_test_mag_index], master_frequency_range[1, max_test_mag_index]
 					for zone_id in zone_catalogs.keys():
 						if num_passed == 0:
 							MFD_container[zone_id] = [temp_MFD_container[zone_id]]
