@@ -3316,7 +3316,7 @@ class CompositeEQCatalog:
 			for Monte Carlo sampling (default: 2)
 		:param max_test_mag:
 			Float, maximum magnitude to test if summed moment rate is
-			within range of master catalog (default: None, will take
+			below upper range of master catalog (default: None, will take
 			a default value depending on use_master)
 		:param use_master:
 			Bool, whether master catalog (True) or summed catalog (False)
@@ -3344,12 +3344,12 @@ class CompositeEQCatalog:
 		## Determine moment rate range of master catalog
 		if use_master:
 			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=mr_num_sigma)
-			master_MFD1.max_mag = max_test_mag
+			#master_MFD1.max_mag = max_test_mag
 			master_MFD2.max_mag = max_test_mag
 		else:
 			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(num_sigma=mr_num_sigma)
 			min_mag = master_MFD1.min_mag
-			master_MFD1 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width, master_MFD1.occurrence_rates[:max_test_mag_index])
+			#master_MFD1 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width, master_MFD1.occurrence_rates[:max_test_mag_index])
 			master_MFD2 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width, master_MFD2.occurrence_rates[:max_test_mag_index])
 		master_moment_rate_range = np.zeros(2, 'd')
 		master_moment_rate_range[0] = master_MFD1._get_total_moment_rate()
@@ -3435,7 +3435,7 @@ class CompositeEQCatalog:
 			Monte Carlo sampling) (default: 2)
 		:param max_test_mag:
 			Float, maximum magnitude to test if summed frequency is
-			within range of master catalog (default: None, will take
+			below upper range of master catalog (default: None, will take
 			a default value depending on use_master)
 		:param use_master:
 			Bool, whether master catalog (True) or summed catalog (False)
@@ -3465,17 +3465,6 @@ class CompositeEQCatalog:
 			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=num_sigma)
 		else:
 			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(num_sigma=num_sigma)
-		"""
-		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
-		b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
-		#master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
-		zone_MFDs1 = self._compute_zone_MFDs(b_val=b_val1)
-		master_MFD1 = mfd.sum_MFDs(zone_MFDs1.values())
-		b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
-		#master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
-		zone_MFDs2 = self._compute_zone_MFDs(b_val=b_val2)
-		master_MFD2 = mfd.sum_MFDs(zone_MFDs2.values())
-		"""
 		master_frequency_range = np.zeros((2, len(master_MFD)), 'd')
 		master_frequency_range[0] = master_MFD1.get_cumulative_rates()
 		master_frequency_range[1] = master_MFD2.get_cumulative_rates()
@@ -3529,7 +3518,7 @@ class CompositeEQCatalog:
 				summed_frequency_range = np.zeros(len(master_MFD), 'd')
 				for MFD in zone_mfds:
 					summed_frequency_range[:len(MFD)] += MFD.get_cumulative_rates()
-				if ((master_frequency_range[0, :max_test_mag_index] <= summed_frequency_range[:max_test_mag_index]).all()
+				if ((master_frequency_range[0] <= summed_frequency_range).all()
 					and (summed_frequency_range[:max_test_mag_index] <= master_frequency_range[1, :max_test_mag_index]).all()):
 					#print master_frequency_range[0, max_test_mag_index], summed_frequency_range[max_test_mag_index], master_frequency_range[1, max_test_mag_index]
 					for zone_id in zone_catalogs.keys():
@@ -3585,6 +3574,73 @@ class CompositeEQCatalog:
 
 		return MFD_container
 
+	def sample_MFD_unconstrained(self, num_samples, num_sigma=2):
+		"""
+		Perform unconstrained sampling on b value of zone catalogs
+
+		:param num_samples:
+			Int, number of MFD samples to generate
+		:param num_sigma:
+			Float, number of standard deviations on b value of zone catalogs
+			for Monte Carlo sampling (default: 2)
+
+		:return:
+			Dict, with zone IDs as keys and a list of num_samples MFD's as
+			values
+		"""
+		import scipy.stats
+
+		zone_catalogs = self.zone_catalogs
+		zone_Mmaxes = self._get_zone_Mmaxes()
+
+		## Determine unconstrained MFD for each zone catalog
+		if not self.zone_MFDs:
+			zone_MFDs = self._compute_zone_MFDs()
+		else:
+			zone_MFDs = self.zone_MFDs
+
+		## Monte Carlo sampling
+		MFD_container = dict.fromkeys(zone_catalogs.keys())
+		num_passed, num_failed = 0, 0
+		while num_passed < num_samples:
+			failed = False
+			temp_MFD_container = dict.fromkeys(zone_catalogs.keys())
+
+			## Draw random b value for each zone
+			for zone_id, zone_catalog in zone_catalogs.items():
+				zone_Mmax = zone_Mmaxes[zone_id]
+				zone_MFD = zone_MFDs[zone_id]
+				## Monte Carlo sampling from truncated normal distribution
+				mu, sigma = zone_MFD.b_val, zone_MFD.b_sigma
+				b_val = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, mu, sigma)
+				if zone_MFD.Weichert:
+					try:
+						MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
+					except ValueError:
+						failed = True
+						num_failed += 1
+						break
+					else:
+						if not np.isinf(MFD.a_val):
+							temp_MFD_container[zone_id] = MFD
+						else:
+							temp_MFD_container[zone_id] = zone_MFD
+				else:
+					## Do not recompute if mean MFD is Fenton MFD
+					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
+					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
+					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
+					temp_MFD_container[zone_id] = MFD
+
+			if not failed:
+				for zone_id in zone_catalogs.keys():
+					if num_passed == 0:
+						MFD_container[zone_id] = [temp_MFD_container[zone_id]]
+					else:
+						MFD_container[zone_id].append(temp_MFD_container[zone_id])
+				num_passed += 1
+
+		return MFD_container
 
 
 def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", convert_NULL=True, verbose=False, errf=None):
