@@ -32,7 +32,7 @@ class Completeness:
 		return len(self.min_dates)
 
 	def __str__(self):
-		s = "\n".join(["%d, %.2f" % (date, mag) for (date, mag) in zip(self.min_dates, self.min_mags)])
+		s = "\n".join(["%s, %.2f" % (date, mag) for (date, mag) in zip(self.min_dates, self.min_mags)])
 		return s
 
 	@property

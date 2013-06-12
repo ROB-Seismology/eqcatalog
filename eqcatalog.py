@@ -1219,7 +1219,7 @@ class EQCatalog:
 		"""
 		from stats.percentiles import weighted_percentiles
 		mags, prior, likelihood, posterior = self.get_EPRI_Mmax_pdf(Mmin, b_val=b_val, extended=extended, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
-		Mmax = weighted_percentiles(mags, [perc], weights=posterior)[0]
+		Mmax = weighted_percentiles(mags, [perc], weights=posterior)[0][0]
 		return Mmax
 
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW", Mrelation=None, title=None, fig_filespec=None, verbose=False):
@@ -3066,6 +3066,7 @@ class CompositeEQCatalog:
 		list of instances of :class:´TruncatedGRMFD`, MFDs of subcatalogs
 		(default: [])
 	"""
+	# TODO: modify to make it work with master and zone MFD's without catalogs
 	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
 		self.zone_catalogs = zone_catalogs
 		self.source_model_name = source_model_name
@@ -3079,6 +3080,12 @@ class CompositeEQCatalog:
 		self.master_catalog = self.construct_master_catalog()
 
 	def construct_master_catalog(self):
+		"""
+		Construct master catalog from zone catalogs
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
 		eq_list = []
 		for zone_catalog in self.zone_catalogs.values():
 			eq_list.extend(zone_catalog.eq_list)
@@ -3087,9 +3094,14 @@ class CompositeEQCatalog:
 		master_catalog = EQCatalog(eq_list, start_date=start_date, end_date=end_date)
 		return master_catalog
 
-	def _get_catalog_Mmaxes(self):
+	def _get_zone_Mmaxes(self):
+		"""
+		Determine Mmax for each zone catalog as median value of EPRI pdf
+
+		:return:
+			Dict, mapping zone ids (str) to Mmax values (float)
+		"""
 		zone_catalogs = self.zone_catalogs
-		max_mags = np.zeros(len(zone_catalogs), 'f')
 		max_mags = dict.fromkeys(zone_catalogs.keys())
 		for zone_id, catalog in zone_catalogs.items():
 			if self.zone_MFDs:
@@ -3101,15 +3113,13 @@ class CompositeEQCatalog:
 			max_mags[zone_id] = max_mag
 		return max_mags
 
-	def _compute_MFD(self, catalog, Mmax, b_val=None):
-		mfd_bin_width = self.mfd_bin_width
-		Mtype, Mrelation, completeness = self.Mtype, self.Mrelation, self.completeness
-		min_mag = completeness.min_mag
-		MFD = catalog.get_estimated_MFD(min_mag, Mmax, mfd_bin_width, method="Weichert", b_val=b_val, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
-		MFD.min_mag = self.min_mag
-		return MFD
-
 	def _get_zone_areas(self):
+		"""
+		Determine surface area for each zone in the source model
+
+		:return:
+			Dict, mapping zone id's (str) to surface areas (float)
+		"""
 		import osr
 		from mapping.geo.coordtrans import wgs84, get_utm_spec, get_utm_srs
 
@@ -3125,36 +3135,125 @@ class CompositeEQCatalog:
 			zone_areas[zone_id] = zone_poly.GetArea() / 1E6
 		return zone_areas
 
-	def _compute_zone_MFDs(self, num_sigma=0):
-		zone_Mmaxes = self._get_catalog_Mmaxes()
+	def _compute_MFD(self, catalog, Mmax, b_val=None):
+		"""
+		Generic method to compute MFD of a catalog using Weichert method
+		with parameters (Mtype, Mrelation, completeness) stored as class
+		properties
+
+		:param catalog:
+			instance of :class:`EQCatalog`
+		:param Mmax:
+			float, maximum magnitude
+		:param b_val:
+			float, imposed b value (default: None = unconstrained)
+
+		:return:
+			instance of :class:`TruncatedGRMFD`
+		"""
+		mfd_bin_width = self.mfd_bin_width
+		Mtype, Mrelation, completeness = self.Mtype, self.Mrelation, self.completeness
+		min_mag = completeness.min_mag
+		MFD = catalog.get_estimated_MFD(min_mag, Mmax, mfd_bin_width, method="Weichert", b_val=b_val, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+		MFD.min_mag = self.min_mag
+		return MFD
+
+	def _get_Fenton_zone_MFDs(self, b_val=None):
+		"""
+		Determine minimum MFD for each zone according to Fenton et al. (2006)
+
+		:param b_val:
+			float, imposed b value (default: None = use Fenton's b value)
+
+		:return:
+			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
+		"""
+		zone_Mmaxes = self._get_zone_Mmaxes()
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
+			zone_area = zone_areas[zone_id]
+			beta, std_beta = 1.84, 0.24
+			lamda = 0.004 * zone_area / 1E6
+			b = beta / np.log(10)
+			stdb = std_beta / np.log(10)
+			a_val = mfd.a_from_lambda(lamda, 6.0, b)
+			zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stdb)
+			if b_val != None:
+				b = b_val
+				stdb = 0
+				lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
+				a_val = mfd.a_from_lambda(lamda, M, b) + mfd.get_a_separation(b, self.mfd_bin_width)
+				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stdb)
+			zone_MFDs[zone_id] = zone_MFD
+		return zone_MFDs
+
+	def _compute_zone_MFDs(self, b_val=None, num_sigma=0):
+		"""
+		Compute MFD for each zone using same imposed b value
+		If MFD cannot be computed, the "minimum" MFD according to
+		Fenton et al. (2006) will be determined
+
+		:param b_val:
+			float, imposed b value (default: None = unconstrained)
+		:param num_sigma:
+			float, number of standard deviations. If not zero,
+			mean + num_sigma stdevs and mean - num_sigma stddevs MFD's
+			will be computed as well
+
+		:return:
+			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
+			or (if num_sigma > 0) to lists of instances of :class:`TruncatedGRMFD`
+		"""
+		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Fenton_MFDs = self._get_Fenton_zone_MFDs()
+		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
+		for zone_id, zone_catalog in self.zone_catalogs.items():
+			zone_Mmax = zone_Mmaxes[zone_id]
 			try:
-				zone_MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=None)
+				zone_MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
+				zone_MFD.Weichert = True
 			except ValueError:
 				## Note: it is critical that this doesn't fail for any one zone,
 				## so, fall back to minimum MFD following Fenton et al., based on area
-				beta, std_beta = 1.84, 0.24
-				stdb = std_beta / np.log(10)
-				b_val = beta / np.log(10)
-				lamda = 0.004 * zone_areas[zone_id] / 1E6
-				a_val = mfd.a_from_lambda(lamda, 6.0, b_val)
-				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val, stdb)
+				zone_MFD = zone_Fenton_MFDs[zone_id]
+				zone_MFD.Weichert = False
 			zone_MFDs[zone_id] = zone_MFD
+
 			if num_sigma > 0:
 				zone_MFDs[zone_id] = [zone_MFD]
 				b_val1 = zone_MFD.b_val + zone_MFD.b_sigma * num_sigma
-				MFD_sigma1 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val1)
-				zone_MFDs[zone_id].append(MFD_sigma1)
 				b_val2 = zone_MFD.b_val - zone_MFD.b_sigma * num_sigma
-				MFD_sigma2 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val2)
+				if zone_MFD.Weichert:
+					MFD_sigma1 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val1)
+					MFD_sigma2 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val2)
+				else:
+					## If median MFD could not be computed
+					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
+					a_val1 = mfd.a_from_lambda(lamda, M, b_val1) + mfd.get_a_separation(b_val1, self.mfd_bin_width)
+					MFD_sigma1 = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val1, b_val1)
+					a_val2 = mfd.a_from_lambda(lamda, M, b_val2) + mfd.get_a_separation(b_val2, self.mfd_bin_width)
+					MFD_sigma2 = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val2, b_val2)
+				zone_MFDs[zone_id].append(MFD_sigma1)
 				zone_MFDs[zone_id].append(MFD_sigma2)
+
 		return zone_MFDs
 
 	def _compute_master_MFD(self, num_sigma=0):
-		zone_Mmaxes = self._get_catalog_Mmaxes()
+		"""
+		Compute MFD of master catalog
+
+		:param num_sigma:
+			float, number of standard deviations. If not zero,
+			mean + num_sigma stdevs and mean - num_sigma stddevs MFD's
+			will be computed as well
+
+		:return:
+			instances of :class:`TruncatedGRMFD` (if num_sigma == 0)
+			or list of instances of :class:`TruncatedGRMFD` (if num_sigma > 0)
+		"""
+		zone_Mmaxes = self._get_zone_Mmaxes()
 		overall_Mmax = max(zone_Mmaxes.values())
 		master_catalog = self.master_catalog
 		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
@@ -3167,24 +3266,37 @@ class CompositeEQCatalog:
 		else:
 			return master_MFD
 
-	def _get_master_moment_rate_range(self, num_sigma=1):
-		zone_Mmaxes = self._get_catalog_Mmaxes()
-		overall_Mmax = max(zone_Mmaxes.values())
-		master_catalog = self.master_catalog
-		if not self.master_MFD:
-			master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
-		else:
-			master_MFD = self.master_MFD
-		b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
-		master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
-		b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
-		master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
-		master_moment_rate_range = np.zeros(2, 'd')
-		master_moment_rate_range[0] = master_MFD1._get_total_moment_rate()
-		master_moment_rate_range[1] = master_MFD2._get_total_moment_rate()
-		return master_moment_rate_range
+	def _compute_summed_MFD(self, b_val=None, num_sigma=0):
+		"""
+		Compute summed MFD of zone catalogs, where MFD of each zone catalog
+		is computed using the same b value
 
-	def balance_MFD_by_moment_rate(self, num_samples, mr_num_sigma=1, b_num_sigma=2):
+		:param b_val:
+			float, imposed b value. If None, the b value of the master catalog
+			MFD will be used (default: None)
+		:param num_sigma:
+			float, number of standard deviations. If not zero,
+			mean + num_sigma stdevs and mean - num_sigma stddevs MFD's
+			will be computed as well (again, using b_val +/- b_sigma
+			of master catalog MFD)
+
+		:return:
+			instances of :class:`TruncatedGRMFD` (if num_sigma == 0)
+			or list of instances of :class:`TruncatedGRMFD` (if num_sigma > 0)
+		"""
+		master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=num_sigma)
+		zone_MFDs = self._compute_zone_MFDs(b_val=master_MFD.b_val)
+		summed_MFD = mfd.sum_MFDs(zone_MFDs.values())
+		if num_sigma > 0:
+			zone_MFDs1 = self._compute_zone_MFDs(b_val=master_MFD1.b_val)
+			summed_MFD1 = mfd.sum_MFDs(zone_MFDs1.values())
+			zone_MFDs2 = self._compute_zone_MFDs(b_val=master_MFD2.b_val)
+			summed_MFD2 = mfd.sum_MFDs(zone_MFDs2.values())
+			return [summed_MFD, summed_MFD1, summed_MFD2]
+		else:
+			return summed_MFD
+
+	def balance_MFD_by_moment_rate(self, num_samples, mr_num_sigma=1, max_test_mag=None, b_num_sigma=2, use_master=False):
 		"""
 		Balance MFD's of zone catalogs by moment rate.
 		First, calculate moment rate range corresponding to b_val +/-
@@ -3202,6 +3314,13 @@ class CompositeEQCatalog:
 		:param b_num_sigma:
 			Float, number of standard deviations on b value of zone catalogs
 			for Monte Carlo sampling (default: 2)
+		:param max_test_mag:
+			Float, maximum magnitude to test if summed moment rate is
+			within range of master catalog (default: None, will take
+			a default value depending on use_master)
+		:param use_master:
+			Bool, whether master catalog (True) or summed catalog (False)
+			should be used to constrain frequencies
 
 		:return:
 			Dict, with zone IDs as keys and a list of num_samples MFD's as
@@ -3212,11 +3331,29 @@ class CompositeEQCatalog:
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
 
 		## Determine Mmax of each zone catalog, and overall Mmax
-		zone_Mmaxes = self._get_catalog_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes()
 		overall_Mmax = max(zone_Mmaxes.values())
+		if max_test_mag is None:
+			if use_master:
+				max_test_mag = min(zone_Mmaxes.values()) - self.mfd_bin_width
+			else:
+				max_test_mag = max(zone_Mmaxes.values()) - self.mfd_bin_width
+		max_test_mag_index = int(round((max_test_mag - self.min_mag) / self.mfd_bin_width)) + 1
+		print("Maximum magnitude to test: %.1f (i=%d)" % (max_test_mag, max_test_mag_index))
 
 		## Determine moment rate range of master catalog
-		master_moment_rate_range = self._get_master_moment_rate_range(mr_num_sigma)
+		if use_master:
+			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=mr_num_sigma)
+			master_MFD1.max_mag = max_test_mag
+			master_MFD2.max_mag = max_test_mag
+		else:
+			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(num_sigma=mr_num_sigma)
+			min_mag = master_MFD1.min_mag
+			master_MFD1 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width, master_MFD1.occurrence_rates[:max_test_mag_index])
+			master_MFD2 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width, master_MFD2.occurrence_rates[:max_test_mag_index])
+		master_moment_rate_range = np.zeros(2, 'd')
+		master_moment_rate_range[0] = master_MFD1._get_total_moment_rate()
+		master_moment_rate_range[1] = master_MFD2._get_total_moment_rate()
 		print("Moment rate range: %E - %E N.m" % (master_moment_rate_range[0], master_moment_rate_range[1]))
 
 		## Determine unconstrained MFD for each zone catalog
@@ -3234,24 +3371,34 @@ class CompositeEQCatalog:
 				print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
 			failed = False
 			temp_MFD_container = dict.fromkeys(zone_catalogs.keys())
+
+			## Draw random b value for each zone
 			for zone_id, zone_catalog in zone_catalogs.items():
 				zone_Mmax = zone_Mmaxes[zone_id]
 				zone_MFD = zone_MFDs[zone_id]
 				## Monte Carlo sampling from truncated normal distribution
 				mu, sigma = zone_MFD.b_val, zone_MFD.b_sigma
 				b_val = scipy.stats.truncnorm.rvs(-b_num_sigma, b_num_sigma, mu, sigma)
-				try:
-					MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
-				except ValueError:
-					failed = True
-					num_failed += 1
-					break
-				else:
-					if not np.isinf(MFD.a_val):
-						temp_MFD_container[zone_id] = MFD
+				if zone_MFD.Weichert:
+					try:
+						MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
+					except ValueError:
+						failed = True
+						num_failed += 1
+						break
 					else:
-						temp_MFD_container[zone_id] = zone_MFD
+						if not np.isinf(MFD.a_val):
+							temp_MFD_container[zone_id] = MFD
+						else:
+							temp_MFD_container[zone_id] = zone_MFD
+				else:
+					## Do not recompute if mean MFD is Fenton MFD
+					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
+					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
+					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
+					temp_MFD_container[zone_id] = MFD
 
+			## Check if summed moment rate lies within master moment rate range
 			if not failed:
 				zone_mfds = temp_MFD_container.values()
 				summed_moment_rate = np.sum(mfd._get_total_moment_rate() for mfd in zone_mfds)
@@ -3270,7 +3417,7 @@ class CompositeEQCatalog:
 
 		return MFD_container
 
-	def balance_MFD_by_frequency(self, num_samples, num_sigma=2, max_test_mag=None):
+	def balance_MFD_by_frequency(self, num_samples, num_sigma=2, max_test_mag=None, use_master=False):
 		"""
 		Balance MFD's of zone catalogs by frequency.
 		First, calculate frequency range corresponding to b_val +/-
@@ -3289,39 +3436,46 @@ class CompositeEQCatalog:
 		:param max_test_mag:
 			Float, maximum magnitude to test if summed frequency is
 			within range of master catalog (default: None, will take
-			lowest zone Mmax)
+			a default value depending on use_master)
+		:param use_master:
+			Bool, whether master catalog (True) or summed catalog (False)
+			should be used to constrain frequencies
 
 		:return:
 			Dict, with zone IDs as keys and a list of num_samples MFD's as
 			values
-
-		For each zone catalog: MC sampling of b value, compute corresponding
-		a value. Then, for each magnitude bin, compute total number of
-		earthquakes (or annual rate) up to Mmax - 1 or 2 bins of each zone,
-		and check that sum of all zone catalogs falls within +/- 2 sigma of
-		annual rate of master catalog.
 		"""
 		import scipy.stats
 
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
 
 		## Determine Mmax of each zone catalog, and overall Mmax
-		zone_Mmaxes = self._get_catalog_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes()
 		overall_Mmax = max(zone_Mmaxes.values())
 		if max_test_mag is None:
-			max_test_mag = min(zone_Mmaxes.values())
+			if use_master:
+				max_test_mag = min(zone_Mmaxes.values()) - self.mfd_bin_width
+			else:
+				max_test_mag = max(zone_Mmaxes.values()) - self.mfd_bin_width
 		max_test_mag_index = int(round((max_test_mag - self.min_mag) / self.mfd_bin_width)) + 1
 		print("Maximum magnitude to test: %.1f (i=%d)" % (max_test_mag, max_test_mag_index))
 
 		## Determine frequency range of master catalog
-		if not self.master_MFD:
-			master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
+		if use_master:
+			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=num_sigma)
 		else:
-			master_MFD = self.master_MFD
+			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(num_sigma=num_sigma)
+		"""
+		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
 		b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
-		master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
+		#master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
+		zone_MFDs1 = self._compute_zone_MFDs(b_val=b_val1)
+		master_MFD1 = mfd.sum_MFDs(zone_MFDs1.values())
 		b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
-		master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
+		#master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
+		zone_MFDs2 = self._compute_zone_MFDs(b_val=b_val2)
+		master_MFD2 = mfd.sum_MFDs(zone_MFDs2.values())
+		"""
 		master_frequency_range = np.zeros((2, len(master_MFD)), 'd')
 		master_frequency_range[0] = master_MFD1.get_cumulative_rates()
 		master_frequency_range[1] = master_MFD2.get_cumulative_rates()
@@ -3342,24 +3496,34 @@ class CompositeEQCatalog:
 				print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
 			failed = False
 			temp_MFD_container = dict.fromkeys(zone_catalogs.keys())
+
+			## Draw random b value for each zone
 			for zone_id, zone_catalog in zone_catalogs.items():
 				zone_Mmax = zone_Mmaxes[zone_id]
 				zone_MFD = zone_MFDs[zone_id]
 				## Monte Carlo sampling from truncated normal distribution
 				mu, sigma = zone_MFD.b_val, zone_MFD.b_sigma
 				b_val = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, mu, sigma)
-				try:
-					MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
-				except ValueError:
-					failed = True
-					num_failed += 1
-					break
-				else:
-					if not np.isinf(MFD.a_val):
-						temp_MFD_container[zone_id] = MFD
+				if zone_MFD.Weichert:
+					try:
+						MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
+					except ValueError:
+						failed = True
+						num_failed += 1
+						break
 					else:
-						temp_MFD_container[zone_id] = zone_MFD
+						if not np.isinf(MFD.a_val):
+							temp_MFD_container[zone_id] = MFD
+						else:
+							temp_MFD_container[zone_id] = zone_MFD
+				else:
+					## Do not recompute if mean MFD is Fenton MFD
+					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
+					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
+					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
+					temp_MFD_container[zone_id] = MFD
 
+			## Check if summed frequencies lie within master frequency range
 			if not failed:
 				zone_mfds = temp_MFD_container.values()
 				summed_frequency_range = np.zeros(len(master_MFD), 'd')
@@ -3382,8 +3546,45 @@ class CompositeEQCatalog:
 
 		return MFD_container
 
-	def balance_MFD_by_fixed_b_value(self):
-		pass
+	def balance_MFD_by_fixed_b_value(self, num_samples, num_sigma=2):
+		"""
+		Balance MFD's of zone catalogs by Monte Carlo sampling of b value
+		of master catalog MFD, and computing zone MFD's with this fixed
+		b value
+
+		:param num_samples:
+			Int, number of MFD samples to generate
+		:param num_sigma:
+			Float, number of standard deviations on b value of master
+			catalog (to determine bounds) and of zone catalogs (for
+			Monte Carlo sampling) (default: 2)
+
+		:return:
+			Dict, with zone IDs as keys and a list of num_samples MFD's as
+			values
+		"""
+		import scipy.stats
+
+		master_MFD = self._compute_master_MFD()
+		MFD_container = dict.fromkeys(self.zone_catalogs.keys())
+
+		## Monte Carlo sampling from truncated normal distribution
+		mu, sigma = master_MFD.b_val, master_MFD.b_sigma
+		for i in range(num_samples):
+			b_val = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, mu, sigma)
+			zone_MFDs = self._compute_zone_MFDs(b_val=b_val, num_sigma=0)
+			zone_Fenton_MFDs = self._get_Fenton_zone_MFDs(b_val=b_val)
+			for zone_id in self.zone_catalogs.keys():
+				zone_MFD = zone_MFDs[zone_id]
+				if np.isinf(zone_MFD.a_val):
+					zone_MFD = zone_Fenton_MFDs[zone_id]
+				if i == 0:
+					MFD_container[zone_id] = [zone_MFD]
+				else:
+					MFD_container[zone_id].append(zone_MFD)
+
+		return MFD_container
+
 
 
 def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", convert_NULL=True, verbose=False, errf=None):
