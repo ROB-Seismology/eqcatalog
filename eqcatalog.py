@@ -1124,7 +1124,7 @@ class EQCatalog:
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def get_EPRI_Mmax_pdf(self, Mmin, b_val=None, extended=False, dM=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+	def get_EPRI_Mmax_pdf(self, Mmin, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
 		"""
 		Compute Mmax distribution following EPRI (1994) method.
 
@@ -1137,6 +1137,9 @@ class EQCatalog:
 			Bool, whether or not crust is extended (default: False)
 		:param dM:
 			Float, bin width of distribution (default: 0.1)
+		:param num_sigma:
+			Int, number of standard deviations to consider on prior distribution
+			(default: 3)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -1150,7 +1153,11 @@ class EQCatalog:
 			Bool, whether or not to print additional information (default: True)
 
 		:return:
-			(ndarray, ndarray) tuple
+			(prior, likelihood, posterior, params) tuple
+			- prior: ndarray, prior distribution
+			- likelihood: ndarray, likelihood distribution
+			- posterior: ndarray, posterior distribution
+			- params: (observed Mmax, n, b) tuple
 		"""
 		from matplotlib import mlab
 
@@ -1159,35 +1166,41 @@ class EQCatalog:
 			mean, sigma = 6.4, 0.8
 		else:
 			mean, sigma = 6.3, 0.5
-		magnitudes = np.arange(Mmin, mean + 3 * sigma + dM, dM)
+		magnitudes = np.arange(Mmin, mean + num_sigma * sigma + dM, dM)
 		prior = mlab.normpdf(magnitudes, mean, sigma)
 		prior /= np.sum(prior)
 
 		## Regional likelihood functions
 		likelihood = np.ones_like(magnitudes)
 		if len(self) > 0:
+			mmax_obs = self.get_Mmax()
+			cc_catalog = self.subselect_completeness(completeness, verbose=verbose)
+			n = len(cc_catalog.subselect(Mmin=Mmin))
 			if not b_val:
 				## Note: using lowest magnitude of completeness to compute Weichert
 				## is more robust than using min_mag
 				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 			if not np.isnan(b_val):
 				beta = b_val * np.log(10)
-				mmax_obs = self.get_Mmax()
-				cc_catalog = self.subselect_completeness(completeness, verbose=verbose)
-				n = len(cc_catalog.subselect(Mmin=Mmin))
 				if verbose:
 						print("Maximum observed magnitude: %.1f" % mmax_obs)
 						print("n(M > Mmin): %d" % n)
 				likelihood = np.zeros_like(magnitudes, dtype='d')
 				likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
+		else:
+			mmax_obs = 0.
+			n = 0.
+			b_val = np.nan
 
 		## Posterior
 		posterior = prior * likelihood
 		posterior /= np.sum(posterior)
 
-		return magnitudes, prior, likelihood, posterior
+		params = (mmax_obs, n, b_val)
 
-	def get_EPRI_Mmax_percentile(self, Mmin, perc=50, b_val=None, extended=False, dM=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+		return magnitudes, prior, likelihood, posterior, params
+
+	def get_EPRI_Mmax_percentile(self, Mmin, perc=50, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
 		"""
 		Compute percentile from Mmax distribution following EPRI (1994) method.
 
@@ -1202,6 +1215,9 @@ class EQCatalog:
 			Bool, whether or not crust is extended (default: False)
 		:param dM:
 			Float, bin width of distribution (default: 0.1)
+		:param num_sigma:
+			Int, number of standard deviations to consider on prior distribution
+			(default: 3)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -1218,9 +1234,142 @@ class EQCatalog:
 			Float, magnitude
 		"""
 		from stats.percentiles import weighted_percentiles
-		mags, prior, likelihood, posterior = self.get_EPRI_Mmax_pdf(Mmin, b_val=b_val, extended=extended, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		mags, prior, likelihood, posterior, params = self.get_EPRI_Mmax_pdf(Mmin, b_val=b_val, extended=extended, dM=dM, num_sigma=num_sigma, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		Mmax = weighted_percentiles(mags, [perc], weights=posterior)[0][0]
 		return Mmax
+
+	def get_EPRI_Mmax_histogram(self, Mmin, num_bins=5, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+		"""
+		Compute histogram from Mmax distribution following EPRI (1994) method.
+
+		:param Mmin:
+			Float, lower magnitude (corresponding to lower magnitude in PSHA
+		:param num_bins:
+			Int, number of bins in histogram (default: 5)
+		:param b_val:
+			Float, b value of MFD (default: None, will compute b value using
+			Weichert method)
+		:param extended:
+			Bool, whether or not crust is extended (default: False)
+		:param dM:
+			Float, bin width of distribution (default: 0.1)
+		:param num_sigma:
+			Int, number of standard deviations to consider on prior distribution
+			(default: 3)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+		:param verbose:
+			Bool, whether or not to print additional information (default: True)
+
+		:return:
+			(mag_bin_centers, probs) tuple:
+			- mag_bin_centers: ndarray, center magnitudes of each bin
+			- probs: ndarray, probabilities for each bin
+		"""
+		mags, prior, likelihood, posterior, params = self.get_EPRI_Mmax_pdf(Mmin, b_val=b_val, extended=extended, dM=dM, num_sigma=num_sigma, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+
+		## Divide posterior pdf in num_bins chunks
+		cumul_probs = np.add.accumulate(posterior)
+
+		cumul_prob_bin_edges = np.linspace(0, 1, num_bins + 1)
+		mag_bin_edges = np.zeros(num_bins+1, 'd')
+		mag_bin_edge_indexes = np.zeros(num_bins+1, 'i')
+		index = 0
+		for Mindex, cumul_prob in zip(np.arange(len(mags)), cumul_probs):
+			if cumul_prob > cumul_prob_bin_edges[index]:
+				M = mags[Mindex]
+				mag_bin_edges[index] = M
+				mag_bin_edge_indexes[index] = Mindex
+				index += 1
+				if index == num_bins + 1:
+					break
+		if mag_bin_edges[-1] == 0:
+			mag_bin_edges[-1] = mags[-1]
+			mag_bin_edge_indexes[-1] = len(mags) - 1
+
+		## Determine number of decimals for rounding center magnitudes
+		## based on bin width
+		for num_decimals in range(5):
+			if np.allclose(dM, np.round(dM, decimals=num_decimals)):
+				break
+
+		## Determine magnitude bin centers and corresponding probabilities
+		mag_bin_centers = mag_bin_edges[:-1] + (mag_bin_edges[1:] - mag_bin_edges[:-1]) / 2.
+		mag_bin_centers = np.round(mag_bin_centers, decimals=num_decimals)
+		mag_bin_center_probs = np.zeros_like(mag_bin_centers)
+		for k in range(num_bins):
+			upper_index, lower_index = mag_bin_edge_indexes[k+1], mag_bin_edge_indexes[k]
+			mag_bin_center_probs[k] = cumul_probs[upper_index] - cumul_probs[lower_index]
+
+		return (mag_bin_centers, mag_bin_center_probs)
+
+	def plot_EPRI_Mmax_pdf(self, Mmin, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
+		"""
+		Compute Mmax distribution following EPRI (1994) method.
+
+		:param Mmin:
+			Float, lower magnitude (corresponding to lower magnitude in PSHA
+		:param b_val:
+			Float, b value of MFD (default: None, will compute b value using
+			Weichert method)
+		:param extended:
+			Bool, whether or not crust is extended (default: False)
+		:param dM:
+			Float, bin width of distribution (default: 0.1)
+		:param num_sigma:
+			Int, number of standard deviations to consider on prior distribution
+			(default: 3)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+		:param title:
+			String, plot title (None = default title, "" = no title)
+			(default: None)
+		:param fig_filespec:
+			String, full path of image to be saved.
+			If None (default), histogram is displayed on screen.
+		:param verbose:
+			Bool, whether or not to print additional information (default: True)
+		"""
+		mags, prior, likelihood, posterior, params = self.get_EPRI_Mmax_pdf(Mmin, extended=extended, dM=dM, num_sigma=num_sigma, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		mmax_obs, n, b_val = params
+		#mag_bin_centers, bin_probs = self.get_EPRI_Mmax_histogram(Mmin, 3, extended=extended, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		#bin_probs *= (posterior.max() / likelihood.max())
+		likelihood *= (prior.max() / likelihood.max())
+
+		pylab.plot(mags, prior, 'b', lw=2, label="Global prior")
+		pylab.plot(mags, likelihood, 'g', lw=2, label="Regional likelihood")
+		pylab.plot(mags, posterior, 'r', lw=2, label="Posterior")
+		#pylab.plot(mag_bin_centers, bin_probs, 'ro', label="_nolegend_")
+		font = FontProperties(size='large')
+		pylab.legend(loc=0, prop=font)
+		pylab.xlabel("Magnitude", fontsize="x-large")
+		pylab.ylabel("Probability", fontsize="x-large")
+		ax = pylab.gca()
+		for label in ax.get_xticklabels() + ax.get_yticklabels():
+			label.set_size('large')
+		if title != None:
+			title += " (Mmax_obs = %.1f, n=%d, b=%.3f)" % (mmax_obs, n, b_val)
+		pylab.title(title, fontsize="large")
+
+		if fig_filespec:
+			pylab.savefig(fig_filespec)
+			pylab.clf()
+		else:
+			pylab.show()
 
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW", Mrelation=None, title=None, fig_filespec=None, verbose=False):
 		"""
@@ -3094,13 +3243,19 @@ class CompositeEQCatalog:
 		master_catalog = EQCatalog(eq_list, start_date=start_date, end_date=end_date)
 		return master_catalog
 
-	def _get_zone_Mmaxes(self):
+	def _get_zone_Mmaxes(self, num_sigma=3):
 		"""
 		Determine Mmax for each zone catalog as median value of EPRI pdf
+
+		:param num_sigma:
+			Int, number of standard deviations to consider on prior distribution
+			(default: 3)
 
 		:return:
 			Dict, mapping zone ids (str) to Mmax values (float)
 		"""
+		# TODO: find mechanism to discern between extended and non-extended
+		# (maybe using GIS table)
 		zone_catalogs = self.zone_catalogs
 		max_mags = dict.fromkeys(zone_catalogs.keys())
 		for zone_id, catalog in zone_catalogs.items():
@@ -3108,7 +3263,7 @@ class CompositeEQCatalog:
 				b_val = self.zone_MFDs[zone_id].b_val
 			else:
 				b_val = None
-			max_mag = catalog.get_EPRI_Mmax_percentile(self.min_mag, 50, b_val=b_val, extended=False, dM=self.mfd_bin_width, Mtype=self.Mtype, Mrelation=self.Mrelation, completeness=self.completeness, verbose=False)
+			max_mag = catalog.get_EPRI_Mmax_percentile(self.min_mag, 50, b_val=b_val, extended=False, dM=self.mfd_bin_width, num_sigma=num_sigma, Mtype=self.Mtype, Mrelation=self.Mrelation, completeness=self.completeness, verbose=False)
 			max_mag = np.ceil(max_mag / self.mfd_bin_width) * self.mfd_bin_width
 			max_mags[zone_id] = max_mag
 		return max_mags
@@ -3745,7 +3900,7 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	return eqc
 
 
-def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_style=11, sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_size=11, sm_label_colname="ShortName", sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot multiple catalogs on a map
 
@@ -3805,6 +3960,8 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 	:param sm_label_size:
 		Int, font size of source labels. If 0 or None, no labels will
 		be plotted (default: 11)
+	:param sm_label_colname:
+		Str, column name of GIS table to use as label (default: "ShortName")
 	:param sites:
 		List of (lon, lat) tuples or instance of :class:`PSHASite`
 	:param site_symbol:
@@ -3909,10 +4066,13 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 					label = "_nolegend_"
 				map.plot(x, y, ls=sm_line_style, lw=sm_line_width, color=sm_color, label=label)
 
-				if centroid and sm_label_style:
+				if centroid and sm_label_size:
 					x, y = map(centroid.GetX(), centroid.GetY())
-					zone_name = zone_data['ShortName']
-					pylab.text(x, y, zone_name, color=sm_color, fontsize=sm_label_style, fontweight='bold', ha='center', va='center')
+					if isinstance(sm_label_colname, (str, unicode)):
+						zone_label = zone_data[sm_label_colname]
+					else:
+						zone_label = " / ".join([str(zone_data[colname]) for colname in sm_label_colname])
+					pylab.text(x, y, zone_label, color=sm_color, fontsize=sm_label_size, fontweight='bold', ha='center', va='center')
 
 	## Catalogs
 	for i, catalog in enumerate(catalogs):
