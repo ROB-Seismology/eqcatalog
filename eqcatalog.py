@@ -843,7 +843,7 @@ class EQCatalog:
 		bins_N, junk = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
-	def bin_depth(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None):
+	def bin_depth(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None):
 		"""
 		Bin earthquakes into depth bins
 
@@ -853,6 +853,8 @@ class EQCatalog:
 			Int, maximum depth in km (default: 30)
 		:param bin_width:
 			Int, bin width in km (default: 2)
+		:param depth_error:
+			Float, maximum depth uncertainty (default: None)
 		:param Mmin:
 			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
@@ -874,12 +876,15 @@ class EQCatalog:
 			bins_depth: array containing lower depth value of each interval
 		"""
 		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
+		if depth_error:
+			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0) and 0 < eq.errh < depth_error]
+		else:
+			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, junk = np.histogram(depths, bins_depth)
 		return bins_N, bins_depth[:-1]
 
-	def bin_depth_by_M0(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mrelation=None, start_year=None, end_year=None):
+	def bin_depth_by_M0(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mrelation=None, start_year=None, end_year=None):
 		"""
 		Bin earthquake moments into depth bins
 
@@ -889,6 +894,8 @@ class EQCatalog:
 			Int, maximum depth in km (default: 30)
 		:param bin_width:
 			Int, bin width in km (default: 2)
+		:param depth_error:
+			Float, maximum depth uncertainty (default: None)
 		:param Mmin:
 			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
@@ -910,8 +917,13 @@ class EQCatalog:
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_M0 = np.zeros(len(bins_depth))
 		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation, min_depth=min_depth, max_depth=max_depth)
+		if depth_error:
+			min_depth_error = 0
+		else:
+			min_depth_error = -1
+			depth_error = 100
 		for eq in subcatalog:
-			if eq.depth not in (None, 0):
+			if eq.depth not in (None, 0) and min_depth_error < eq.errh < depth_error:
 				try:
 					#bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
 					bin_id = np.where(bins_depth <= eq.depth)[0][-1]
@@ -1882,7 +1894,7 @@ class EQCatalog:
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
-	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
+	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Plot histogram with number of earthquakes versus depth.
 
@@ -1892,6 +1904,8 @@ class EQCatalog:
 			Float, maximum depth in km (default: 30)
 		:param bin_width:
 			Float, bin width in km (default: 2)
+		:param depth_error:
+			Float, maximum depth uncertainty (default: None)
 		:param Mmin:
 			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
@@ -1921,7 +1935,7 @@ class EQCatalog:
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		bins_N, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, Mmin, Mmax, Mtype, Mrelation, start_year, end_year)
+		bins_N, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mtype, Mrelation, start_year, end_year)
 		pylab.barh(bins_depth, bins_N, height=bin_width, color=color)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((xmin, xmax, min_depth, max_depth))
@@ -1955,7 +1969,7 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_Depth_M0_Histogram(self, min_depth=0, max_depth=30, bin_width=2, Mmin=None, Mmax=None, Mrelation=None, start_year=None, end_year=None, color='b', title=None, log=True, fig_filespec="", fig_width=0, dpi=300):
+	def plot_Depth_M0_Histogram(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mrelation=None, start_year=None, end_year=None, color='b', title=None, log=True, fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Plot histogram with seismic moment versus depth.
 
@@ -1965,6 +1979,8 @@ class EQCatalog:
 			Float, maximum depth in km (default: 30)
 		:param bin_width:
 			Float, bin width in km (default: 2)
+		:param depth_error:
+			Float, maximum depth uncertainty (default: None)
 		:param Mmin:
 			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
@@ -1994,8 +2010,12 @@ class EQCatalog:
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		bins_M0, bins_depth = self.bin_depth_by_M0(min_depth, max_depth, bin_width, Mmin, Mmax, Mrelation, start_year, end_year)
-		pylab.barh(bins_depth, bins_M0, height=bin_width, log=log, color=color)
+		bins_M0, bins_depth = self.bin_depth_by_M0(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mrelation, start_year, end_year)
+		try:
+			pylab.barh(bins_depth, bins_M0, height=bin_width, log=log, color=color)
+		except:
+			## This happens when all bins_M0 values are zero
+			pass
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((xmin, xmax, min_depth, max_depth))
 		pylab.ylabel("Depth (km)", fontsize='x-large')
@@ -3439,7 +3459,10 @@ class CompositeEQCatalog:
 			instances of :class:`TruncatedGRMFD` (if num_sigma == 0)
 			or list of instances of :class:`TruncatedGRMFD` (if num_sigma > 0)
 		"""
-		master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=num_sigma)
+		if num_sigma > 0:
+			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=num_sigma)
+		else:
+			master_MFD = self._compute_master_MFD()
 		zone_MFDs = self._compute_zone_MFDs(b_val=master_MFD.b_val)
 		summed_MFD = mfd.sum_MFDs(zone_MFDs.values())
 		if num_sigma > 0:
