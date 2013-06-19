@@ -877,7 +877,7 @@ class EQCatalog:
 		"""
 		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		if depth_error:
-			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0) and 0 < eq.errh < depth_error]
+			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0) and 0 < eq.errz < depth_error]
 		else:
 			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
@@ -923,7 +923,7 @@ class EQCatalog:
 			min_depth_error = -1
 			depth_error = 100
 		for eq in subcatalog:
-			if eq.depth not in (None, 0) and min_depth_error < eq.errh < depth_error:
+			if eq.depth not in (None, 0) and min_depth_error < eq.errz < depth_error:
 				try:
 					#bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
 					bin_id = np.where(bins_depth <= eq.depth)[0][-1]
@@ -2019,11 +2019,11 @@ class EQCatalog:
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((xmin, xmax, min_depth, max_depth))
 		pylab.ylabel("Depth (km)", fontsize='x-large')
-		pylab.xlabel("Cumulated seismic moment (N.m)", fontsize='x-large')
+		pylab.xlabel("Summed seismic moment (N.m)", fontsize='x-large')
 		ax = pylab.gca()
 		ax.invert_yaxis()
 		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('x-large')
+			label.set_size('large')
 		if title is None:
 			if not start_year:
 				start_year = self.start_date.year
