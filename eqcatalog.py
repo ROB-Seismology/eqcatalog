@@ -1100,6 +1100,8 @@ class EQCatalog:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
+		## Mmin may have changed depending on completeness
+		Mmin = bins_Mag[0]
 		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
 	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
