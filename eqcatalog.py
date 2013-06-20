@@ -973,7 +973,7 @@ class EQCatalog:
 		Mmin = np.floor(Mmin / dM) * dM
 		Mmax = np.ceil(Mmax / dM) * dM
 		num_bins = int((Mmax - Mmin) / dM) + 1
-		bins_Mag = np.linspace(Mmin, Mmax, num_bins)
+		bins_Mag = np.arange(num_bins + 1) * dM + Mmin
 
 		## Select magnitudes according to completeness criteria
 		if completeness:
