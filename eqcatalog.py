@@ -3351,12 +3351,33 @@ class CompositeEQCatalog:
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
 			zone_area = zone_areas[zone_id]
-			beta, std_beta = 1.84, 0.24
-			lamda = 0.004 * zone_area / 1E6
-			b = beta / np.log(10)
-			stdb = std_beta / np.log(10)
-			a_val = mfd.a_from_lambda(lamda, 6.0, b)
-			zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stdb)
+			zone_MFD = mfd.TruncatedGRMFD.construct_FentonEtAl2006MFD(self.min_mag, zone_Mmax, self.mfd_bin_width, zone_area)
+			if b_val != None:
+				b = b_val
+				stdb = 0
+				lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
+				a_val = mfd.a_from_lambda(lamda, M, b) + mfd.get_a_separation(b, self.mfd_bin_width)
+				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stdb)
+			zone_MFDs[zone_id] = zone_MFD
+		return zone_MFDs
+
+	def _get_Johnston_zone_MFDs(self, b_val=None):
+		"""
+		Determine minimum MFD for each zone according to Johnston (1994)
+
+		:param b_val:
+			float, imposed b value (default: None = use Johnston's b value)
+
+		:return:
+			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
+		"""
+		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_areas = self._get_zone_areas()
+		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
+		for zone_id, zone_catalog in self.zone_catalogs.items():
+			zone_Mmax = zone_Mmaxes[zone_id]
+			zone_area = zone_areas[zone_id]
+			zone_MFD = mfd.TruncatedGRMFD.construct_Johnston1994MFD(self.min_mag, zone_Mmax, self.mfd_bin_width, zone_area)
 			if b_val != None:
 				b = b_val
 				stdb = 0
@@ -3370,7 +3391,7 @@ class CompositeEQCatalog:
 		"""
 		Compute MFD for each zone using same imposed b value
 		If MFD cannot be computed, the "minimum" MFD according to
-		Fenton et al. (2006) will be determined
+		Johnston (1994) will be determined
 
 		:param b_val:
 			float, imposed b value (default: None = unconstrained)
@@ -3384,7 +3405,7 @@ class CompositeEQCatalog:
 			or (if num_sigma > 0) to lists of instances of :class:`TruncatedGRMFD`
 		"""
 		zone_Mmaxes = self._get_zone_Mmaxes()
-		zone_Fenton_MFDs = self._get_Fenton_zone_MFDs()
+		zone_Johnston_MFDs = self._get_Johnston_zone_MFDs()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
@@ -3393,8 +3414,8 @@ class CompositeEQCatalog:
 				zone_MFD.Weichert = True
 			except ValueError:
 				## Note: it is critical that this doesn't fail for any one zone,
-				## so, fall back to minimum MFD following Fenton et al., based on area
-				zone_MFD = zone_Fenton_MFDs[zone_id]
+				## so, fall back to minimum MFD following Johnston (1994), based on area
+				zone_MFD = zone_Johnston_MFDs[zone_id]
 				zone_MFD.Weichert = False
 			zone_MFDs[zone_id] = zone_MFD
 
@@ -3572,7 +3593,7 @@ class CompositeEQCatalog:
 						else:
 							temp_MFD_container[zone_id] = zone_MFD
 				else:
-					## Do not recompute if mean MFD is Fenton MFD
+					## Do not recompute if mean MFD is Johnston MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
 					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
@@ -3686,7 +3707,7 @@ class CompositeEQCatalog:
 						else:
 							temp_MFD_container[zone_id] = zone_MFD
 				else:
-					## Do not recompute if mean MFD is Fenton MFD
+					## Do not recompute if mean MFD is Johnston MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
 					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
@@ -3742,11 +3763,11 @@ class CompositeEQCatalog:
 		for i in range(num_samples):
 			b_val = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, mu, sigma)
 			zone_MFDs = self._compute_zone_MFDs(b_val=b_val, num_sigma=0)
-			zone_Fenton_MFDs = self._get_Fenton_zone_MFDs(b_val=b_val)
+			zone_Johnston_MFDs = self._get_Johnston_zone_MFDs(b_val=b_val)
 			for zone_id in self.zone_catalogs.keys():
 				zone_MFD = zone_MFDs[zone_id]
 				if np.isinf(zone_MFD.a_val):
-					zone_MFD = zone_Fenton_MFDs[zone_id]
+					zone_MFD = zone_Johnston_MFDs[zone_id]
 				if i == 0:
 					MFD_container[zone_id] = [zone_MFD]
 				else:
@@ -3806,7 +3827,7 @@ class CompositeEQCatalog:
 						else:
 							temp_MFD_container[zone_id] = zone_MFD
 				else:
-					## Do not recompute if mean MFD is Fenton MFD
+					## Do not recompute if mean MFD is Johnston MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
 					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
