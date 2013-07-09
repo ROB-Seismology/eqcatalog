@@ -2803,9 +2803,8 @@ class EQCatalog:
 
 	def analyse_completeness_Stepp(self, dM=0.1, Mtype="MW", Mrelation=None, dt=5.0, increment_lock=True):
 		"""
-		Analyze catalog completeness with the Stepp method algorithm from GEM (new
-		implementation). This method is a wrapper for :meth:`Step1971.completeness`
-		in the OQ hazard modeller's toolkit.
+		Analyze catalog completeness with the Stepp method (1971). The GEM algorithm
+		from the OQ hazard modeller's toolkit is used.
 
 		:param dM:
 			Float, magnitude bin width (default: 0.1)
@@ -2831,11 +2830,82 @@ class EQCatalog:
 		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
 		return Completeness(Min_Years, Min_Mags, Mtype=Mtype)
 
-	def analyse_completeness_CUVI(self):
+	def analyse_completeness_CUVI(self, magnitudes, start_year, dYear, year1=None, year2=None, reg_line=None, Mtype="MW", Mrelation=None, fig_filespec="", fig_width=0, dpi=300):
 		"""
+		Analyze catalog completeness with the CUVI method (Mulargia, 1987).
+
+		:param magnitudes:
+			List of floats, magnitudes to analyze completeness for.
+		:param start_year:
+			Int, start year of analysis.
+		:param dYear:
+			Int, bin interval in years
+		:param year1:
+			Int, year to plot as completeness year (default=None)
+		:param year2:
+			Int, year to plot as next completeness year (default=None)
+		:param reg_line:
+			Float, magnitude to plot regression line for (default=None)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
 		"""
-		pass
-		# TODO: complete
+		colors = ['b', 'g', 'r', 'y', 'm', 'c']
+		max_mag = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
+		start_year_index = None
+		for i, magnitude in enumerate(magnitudes):
+			bins_N, bins_Years = self.bin_year(self.start_date.year,
+				self.end_date.year+1, dYear, magnitude, max_mag, Mtype=Mtype, Mrelation=Mrelation)
+			bins_N_cumul = np.add.accumulate(bins_N)
+			if not start_year_index:
+				start_year_index = np.abs(bins_Years - start_year).argmin()
+			bins_Years = bins_Years[start_year_index:]
+			bins_N_cumul = bins_N_cumul[start_year_index:]
+			plt.plot(bins_Years, bins_N_cumul, colors[i], label= '%.1f' % magnitude)
+			plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i], label='_nolegend_')
+			if magnitude == reg_line and year1 != None:
+				index = np.abs(bins_Years - year1).argmin()
+				bins_Years = bins_Years[index:]
+				bins_N_cumul = bins_N_cumul[index:]
+				x = np.array([bins_Years, np.ones_like(bins_Years)])
+				m, c = np.linalg.lstsq(x.T, bins_N_cumul)[0]
+				plt.plot(bins_Years, m*bins_Years+c, color='k', linestyle='--', linewidth=5)
+		minorLocator = MultipleLocator(dYear)
+		plt.gca().xaxis.set_minor_locator(minorLocator)
+		xmin, xmax, ymin, ymax = plt.axis()
+		if year1:
+			plt.vlines(year1, ymin, ymax, colors='r', linestyles='-', linewidth=5)
+		if year2:
+			plt.vlines(year2, ymin, ymax, colors='r', linestyles='--', linewidth=5)
+		plt.axis((start_year, self.end_date.year, ymin, ymax))
+		plt.xlabel('Time (years)', fontsize='large')
+		plt.ylabel('Cumulative number of events since' + ' %d' % self.start_date.year,
+			fontsize='large')
+		plt.title('Completeness Analysis with CUVI method for magnitudes %.1f - %.1f'
+			% (magnitudes[0], magnitudes[-1]), fontsize='x-large')
+		plt.legend(loc=0)
+		plt.grid()
+		if fig_filespec:
+			default_figsize = pylab.rcParams['figure.figsize']
+			default_dpi = pylab.rcParams['figure.dpi']
+			if fig_width:
+				fig_width /= 2.54
+				dpi = dpi * (fig_width / default_figsize[0])
+			pylab.savefig(fig_filespec, dpi=dpi)
+			pylab.clf()
+		else:
+			pylab.show()
 
 	def decluster_new(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MW", Mrelation=None):
 		"""
