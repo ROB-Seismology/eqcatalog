@@ -398,7 +398,8 @@ def read_source_model(source_model_name, verbose=True):
 		GIS table (default: True)
 
 	:return:
-		ordered dict {String sourceID: instande of :class:`osgeo.ogr.Geometry`}
+		ordered dict {String sourceID: dict {String column_name: value}}
+		Note: special key 'obj' contains instance of :class:`osgeo.ogr.Geometry`}
 	"""
 	from mapping.geo.readGIS import read_GIS_file
 

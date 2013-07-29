@@ -41,6 +41,7 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
+import scitools.numpytools as scitools
 
 from openquake.hazardlib.geo.geodetic import point_at
 
@@ -229,10 +230,21 @@ class EQCatalog:
 
 	def timespan(self):
 		"""
-		Return total time span of catalog as number of years (not fractional).
+		Return total time span of catalog as number of fractional years.
 		"""
 		start_date, end_date = self.start_date, self.end_date
-		catalog_length = (end_date.year - start_date.year) * 1.0 + 1
+		num_intervening_years = end_date.year - start_date.year
+		if num_intervening_years == 0:
+			year = end_date.year
+			catalog_length = (end_date - start_date).days * 1. / (datetime.date(year+1,1,1) - datetime.date(year,1,1)).days
+		else:
+			end_of_last_year = datetime.date(end_date.year-1,12,31)
+			end_of_this_year = datetime.date(end_date.year,12,31)
+			catalog_length = (end_date - end_of_last_year).days * 1./ (end_of_this_year - end_of_last_year).days
+			start_of_this_year = datetime.date(start_date.year,1,1)
+			start_of_next_year = datetime.date(start_date.year+1,1,1)
+			catalog_length += (start_of_next_year - start_date).days * 1. / (start_of_next_year - start_of_this_year).days
+			catalog_length += (num_intervening_years - 1)
 		return catalog_length
 
 	def get_datetimes(self):
@@ -476,10 +488,12 @@ class EQCatalog:
 		"""
 		return np.add.reduce(self.get_M0(Mrelation=Mrelation))
 
-	def get_M0rate(self, Mrelation=None):
+	def get_M0rate(self, completeness=None, Mrelation=None):
 		"""
 		Compute seismic moment rate.
 
+		:param completeness:
+			instance of :class:`Completeness` (default: None)
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MS" or "ML")
@@ -488,7 +502,15 @@ class EQCatalog:
 		:return:
 			Float, seismic moment rate in N.m/yr
 		"""
-		return self.get_M0_total(Mrelation=Mrelation) / self.timespan()
+		if completeness is None:
+			M0rate = self.get_M0_total(Mrelation=Mrelation) / self.timespan()
+		else:
+			if completeness.Mtype != "MW":
+				raise Exception("Completeness magnitude must be moment magnitude!")
+			M0rate = 0.
+			for subcatalog in self.split_completeness(completeness=completeness, Mtype="MW", Mrelation=Mrelation):
+				M0rate += subcatalog.get_M0_total(Mrelation=Mrelation) / subcatalog.timespan()
+		return M0rate
 
 	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MW", Mrelation=None):
 		"""
@@ -665,6 +687,31 @@ class EQCatalog:
 			print "Number of events constrained by completeness criteria: %d out of %d" % (len(eq_list), len(self.eq_list))
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=self.region, name=self.name + " (completeness-constrained)")
+
+	def split_completeness(self, completeness=Completeness_MW_201303a, Mtype="MW", Mrelation=None):
+		"""
+		Split catlog in subcatalogs according to completeness periods and magnitudes
+
+		:param completeness:
+			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			list of instances of :class:`EQCatalog`
+		"""
+		completeness_catalogs = []
+		min_mags = completeness.min_mags[::-1]
+		max_mags = list(min_mags[1:]) + [None]
+		start_dates = completeness.min_dates[::-1]
+		for Mmin, Mmax, start_date in zip(min_mags, max_mags, start_dates):
+			catalog = self.subselect(Mmin=Mmin, Mmax=Mmax, start_date=start_date, end_date=self.end_date)
+			completeness_catalogs.append(catalog)
+		return completeness_catalogs
 
 	def bin_year(self, start_year, end_year, dYear, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None):
 		"""
@@ -970,10 +1017,11 @@ class EQCatalog:
 			Mmin = max(Mmin, completeness.get_completeness_magnitude(self.end_date))
 
 		## Construct bins_Mag, including Mmax as right edge
-		Mmin = np.floor(Mmin / dM) * dM
-		Mmax = np.ceil(Mmax / dM) * dM
-		num_bins = int((Mmax - Mmin) / dM) + 1
-		bins_Mag = np.arange(num_bins + 1) * dM + Mmin
+		#Mmin = np.floor(Mmin / dM) * dM
+		#Mmax = np.ceil(Mmax / dM) * dM
+		#num_bins = int((Mmax - Mmin) / dM) + 1
+		#bins_Mag = np.arange(num_bins + 1) * dM + Mmin
+		bins_Mag = scitools.seq(Mmin, Mmax, dM)
 
 		## Select magnitudes according to completeness criteria
 		if completeness:
