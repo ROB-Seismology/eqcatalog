@@ -46,7 +46,19 @@ class LocalEarthquake:
 	:param MW:
 		Float, moment magnitude
 	:param name:
-		String, name of location
+		String, name of location (default: "")
+	:param intensity_max:
+		Int, maximum intensity (default: None)
+	:param macro_radius:
+		Float, macroseismic radius (default: None)
+	:param errh:
+		Float, uncertainty on epicentral location, in km (default: 0)
+	:param errz:
+		Float, uncertainty on hypocentral depth, in km (default: 0)
+	:param errt:
+		Float, uncertainty on origin time, in s (default: 0)
+	:param errM:
+		Float, uncertainty on magnitude (default: 0)
 	"""
 	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0.):
 		self.ID = ID

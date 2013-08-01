@@ -47,6 +47,7 @@ from openquake.hazardlib.geo.geodetic import point_at
 
 
 ## Import ROB modules
+from eqrecord import LocalEarthquake
 import seismodb
 import hazard.rshalib.mfd as mfd
 from source_models import read_source_model
@@ -159,7 +160,7 @@ class EQCatalog:
 			dct['time'] = dt.time()
 			del dct['datetime']
 		if 'eq_list' in dct:
-			dct['eq_list'] = [seismodb.LocalEarthquake.from_dict(d["__LocalEarthquake__"]) for d in dct['eq_list']]
+			dct['eq_list'] = [LocalEarthquake.from_dict(d["__LocalEarthquake__"]) for d in dct['eq_list']]
 		return EQCatalog(**dct)
 
 	def dump_json(self):
@@ -167,7 +168,7 @@ class EQCatalog:
 		Generate json string
 		"""
 		def json_handler(obj):
-			if isinstance(obj, seismodb.LocalEarthquake):
+			if isinstance(obj, LocalEarthquake):
 				key = '__%s__' % obj.__class__.__name__
 				dct = {key: obj.__dict__}
 				return dct
@@ -1215,7 +1216,8 @@ class EQCatalog:
 			Bool, whether or not to print additional information (default: True)
 
 		:return:
-			(prior, likelihood, posterior, params) tuple
+			(magnitudes, prior, likelihood, posterior, params) tuple
+			- magnitudes, ndarray
 			- prior: ndarray, prior distribution
 			- likelihood: ndarray, likelihood distribution
 			- posterior: ndarray, posterior distribution
@@ -1944,7 +1946,7 @@ class EQCatalog:
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
-	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
+	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, normalized=False, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Plot histogram with number of earthquakes versus depth.
 
@@ -1956,6 +1958,8 @@ class EQCatalog:
 			Float, bin width in km (default: 2)
 		:param depth_error:
 			Float, maximum depth uncertainty (default: None)
+		:param normalized:
+			Bool, whether or not bin numbers should be normalized (default: False)
 		:param Mmin:
 			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
@@ -1986,11 +1990,17 @@ class EQCatalog:
 			Int, image resolution in dots per inch (default: 300)
 		"""
 		bins_N, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mtype, Mrelation, start_year, end_year)
+		if normalized:
+			total_num = np.add.reduce(bins_N) * 1.0
+			bins_N = bins_N.astype('f') / total_num
 		pylab.barh(bins_depth, bins_N, height=bin_width, color=color)
 		xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((xmin, xmax, min_depth, max_depth))
 		pylab.ylabel("Depth (km)", fontsize='x-large')
-		pylab.xlabel("Number of events", fontsize='x-large')
+		xlabel = "Number of events"
+		if normalized:
+			xlabel += " (%)"
+		pylab.xlabel(xlabel, fontsize='x-large')
 		ax = pylab.gca()
 		ax.invert_yaxis()
 		for label in ax.get_xticklabels() + ax.get_yticklabels():
@@ -2779,6 +2789,43 @@ class EQCatalog:
 		cPickle.dump(self, f)
 		f.close()
 
+	def subselect_polygon(self, poly_obj, catalog_name=""):
+		"""
+		Subselect earthquakes from catalog situated inside a polygon
+
+		:param poly_obj:
+			polygon object (osr geometry object)
+		:param catalog_name:
+			Str, name of resulting catalog
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		import osr, ogr
+
+		## Construct WGS84 projection system corresponding to earthquake coordinates
+		wgs84 = osr.SpatialReference()
+		wgs84.SetWellKnownGeogCS("WGS84")
+
+		## Point object that will be used to test if earthquake is inside zone
+		point = ogr.Geometry(ogr.wkbPoint)
+		point.AssignSpatialReference(wgs84)
+
+		if poly_obj.GetGeometryName() == "POLYGON":
+			## Objects other than polygons will be skipped
+			eq_list = []
+			for i, eq in enumerate(self.eq_list):
+				point.SetPoint(0, eq.lon, eq.lat)
+				if point.Within(poly_obj):
+					eq_list.append(eq)
+
+			## Determine bounding box (region)
+			linear_ring = poly_obj.GetGeometryRef(0)
+			points = linear_ring.GetPoints()
+			lons, lats = zip(*points)
+			region = (min(lons), max(lons), min(lats), max(lats))
+			return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
+
 	def split_into_zones(self, source_model_name, verbose=True):
 		"""
 		Split catalog into subcatalogs according to a
@@ -2793,34 +2840,15 @@ class EQCatalog:
 		:return:
 			ordered dict {String sourceID: EQCatalog}
 		"""
-		import osr, ogr
-
-		## Construct WGS84 projection system corresponding to earthquake coordinates
-		wgs84 = osr.SpatialReference()
-		wgs84.SetWellKnownGeogCS("WGS84")
-
 		## Read zone model from MapInfo file
 		model_data = read_source_model(source_model_name, verbose=verbose)
-
-		## Point object that will be used to test if earthquake is inside zone
-		point = ogr.Geometry(ogr.wkbPoint)
-		point.AssignSpatialReference(wgs84)
 
 		zone_catalogs = OrderedDict()
 		for zoneID, zone_data in model_data.items():
 			zone_poly = zone_data['obj']
 			if zone_poly.GetGeometryName() == "POLYGON":
 				## Fault sources will be skipped
-				zone_eq_list = []
-				for i, eq in enumerate(self.eq_list):
-					point.SetPoint(0, eq.lon, eq.lat)
-					if point.Within(zone_poly):
-						zone_eq_list.append(eq)
-				linear_ring = zone_poly.GetGeometryRef(0)
-				points = linear_ring.GetPoints()
-				lons, lats = zip(*points)
-				region = (min(lons), max(lons), min(lats), max(lats))
-				zone_catalogs[zoneID] = EQCatalog(zone_eq_list, self.start_date, self.end_date, region, zoneID)
+				zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
 
 		return zone_catalogs
 
@@ -4011,6 +4039,188 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
+def read_catalogGIS(gis_filespec, column_map, verbose=True):
+	"""
+	Read catalog from GIS file
+
+	:param gis_filespec:
+		Str, full path to GIS file containing catalog
+	:param column_map:
+		dict, mapping properties ('date', 'year', 'month', 'day', 'time',
+			'hour', 'minute', 'second', 'lon', 'lat', 'depth', 'MW', 'MS', 'ML',
+			'name', 'intensity_max', 'macro_radius', 'errh', 'errz', 'errt', 'errM')
+			to column names in the GIS file.
+			If 'lon' or 'lat' are not specified, they will be derived from
+			the geographic object.
+	:param verbose:
+		Boolean, whether or not to print information while reading
+		GIS table (default: True)
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	from mapping.geo.readGIS import read_GIS_file
+
+	data = read_GIS_file(gis_filespec, verbose=verbose)
+	eq_list = []
+	skipped = 0
+	for i, rec in enumerate(data):
+		if column_map.has_key('ID'):
+			ID = rec[column_map['ID']]
+		else:
+			ID = i
+
+		if column_map.has_key('date'):
+			date = rec[column_map['date']]
+			year, month, day = [int(s) for s in date.split('/')]
+		else:
+			if column_map.has_key('year'):
+				year = rec[column_map['year']]
+			if column_map.has_key('month'):
+				month = rec[column_map['month']]
+			if column_map.has_key('day'):
+				day = rec[column_map['day']]
+		try:
+			date = datetime.date(year, month, day)
+		except:
+			print year, month, day
+			date = None
+
+		if column_map.has_key('time'):
+			time = rec[column_map['time']]
+			hour, minute, second = [int(s) for s in time.split(':')]
+		else:
+			if column_map.has_key('hour'):
+				hour = rec[column_map['hour']]
+			else:
+				hour = 0
+			if column_map.has_key('minute'):
+				minute = rec[column_map['minute']]
+			else:
+				minute = 0
+			if column_map.has_key('second'):
+				second = rec[column_map['second']]
+			else:
+				second = 0
+			second = int(round(second))
+			second = min(second, 59)
+		try:
+			time = datetime.time(hour, minute, second)
+		except:
+			print hour, minute, second
+			time = None
+
+		if column_map.has_key('lon'):
+			lon = rec[column_map['lon']]
+		else:
+			lon = rec["obj"].GetX()
+
+		if column_map.has_key('lat'):
+			lat = rec[column_map['lat']]
+		else:
+			lat = rec["obj"].GetY()
+
+		if column_map.has_key('depth'):
+			depth = rec[column_map['depth']]
+		else:
+			depth = 0
+
+		if column_map.has_key('ML'):
+			ML = rec[column_map['ML']]
+		else:
+			ML = 0
+
+		if column_map.has_key('MS'):
+			MS = rec[column_map['MS']]
+		else:
+			MS = 0
+
+		if column_map.has_key('MW'):
+			MW = rec[column_map['MW']]
+		else:
+			MW = 0
+
+		if column_map.has_key('name'):
+			name = rec[column_map['name']]
+		else:
+			name = ""
+
+		if column_map.has_key('intensity_max'):
+			intensity_max = rec[column_map['intensity_max']]
+		else:
+			intensity_max = None
+
+		if column_map.has_key('macro_radius'):
+			macro_radius = rec[column_map['macro_radius']]
+		else:
+			macro_radius = None
+
+		if column_map.has_key('errh'):
+			errh = rec[column_map['errh']]
+		else:
+			errh = 0.
+
+		if column_map.has_key('errz'):
+			errz = rec[column_map['errz']]
+		else:
+			errz = 0.
+
+		if column_map.has_key('errt'):
+			errt = rec[column_map['errt']]
+		else:
+			errt = 0.
+
+		if column_map.has_key('errM'):
+			errM = rec[column_map['errM']]
+		else:
+			errM = 0.
+
+		#print ID, date, time, lon, lat, depth, ML, MS, MW
+		try:
+			eq = LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW, name, intensity_max=intensity_max, macro_radius=macro_radius, errh=errh, errz=errz, errt=errt, errM=errM)
+		except:
+			skipped += 1
+		else:
+			eq_list.append(eq)
+
+	name = os.path.split(gis_filespec)[-1]
+	eqc = EQCatalog(eq_list, name=name)
+	print("Skipped %d records" % skipped)
+	return eqc
+
+
+def read_named_catalog(catalog_name, verbose=True):
+	"""
+	Read a known catalog (corresponding files should be in standard location)
+
+	:param catalog_name:
+		Str, name of catalog ("SHEEC", "CENEC", "ISC-GEM"):
+	:param verbose:
+		Boolean, whether or not to print information while reading
+		GIS table (default: True)
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	if catalog_name.upper() == "SHEEC":
+		gis_filespec = r"D:\GIS-data\SHARE\SHEEC\Ver3.3\SHAREver3.3.shp"
+		column_map = {'lon': 'Lon', 'lat': 'Lat', 'year': 'Year', 'month': 'Mo', 'day': 'Da', 'hour': 'Ho', 'minute': 'Mi', 'second': 'Se', 'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
+	elif catalog_name.upper() == "CENEC":
+		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\CENEC\CENEC 2008.TAB"
+		column_map = {'lon': 'lon', 'lat': 'lat', 'year': 'year', 'month': 'month', 'day': 'day', 'hour': 'hour', 'minute': 'minute', 'MW': 'Mw', 'depth': 'depth'}
+	elif catalog_name.upper() == "ISC-GEM":
+		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\ISC-GEM\isc-gem-cat.TAB"
+		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
+	else:
+		raise Exception("Catalog not recognized: %s" % catalog_name)
+
+	if not os.path.exists(gis_filespec):
+		raise Exception("Catalog file not found: %s" % gis_filespec)
+	eqc = read_catalogGIS(gis_filespec, column_map, verbose=verbose)
+	eqc.name = catalog_name
+	return eqc
+
+
 def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MW", Mrelation=None):
 	"""
 	Read ROB local earthquake catalog from txt file.
@@ -4031,7 +4241,7 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 	eq_list_txt = np.loadtxt(filespec, skiprows=skiprows)
 	eq_list = []
 	for eq_txt in eq_list_txt:
-		id = eq_txt[column_map['id']]
+		ID = eq_txt[column_map['id']]
 		year = int(eq_txt[column_map['year']])
 		month = int(eq_txt[column_map['month']])
 		day = int(eq_txt[column_map['day']])
@@ -4056,7 +4266,7 @@ def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=No
 			MW = eq_txt[column_map['MW']]
 		else:
 			MW = 0
-		eq_list.append(seismodb.LocalEarthquake(id, date, time, lon, lat, depth,
+		eq_list.append(LocalEarthquake(ID, date, time, lon, lat, depth,
 			ML, MS, MW))
 	eqc = EQCatalog(eq_list)
 	eqc = eqc.subselect(region, start_date, end_date, Mmin, Mmax, min_depth,
@@ -4766,7 +4976,7 @@ def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_
 			values = rec.GetValues(col_info)
 			h, m, s = [int(s) for s in values["time"].split(':')]
 			time = datetime.time(h, m, s)
-			eq = seismodb.LocalEarthquake(values["id_earth"], values["date"], time, values["longitude"], values["latitude"], values["depth"], values["ML"], values["MS"], values["MW"], values["name"])
+			eq = LocalEarthquake(values["id_earth"], values["date"], time, values["longitude"], values["latitude"], values["depth"], values["ML"], values["MS"], values["MW"], values["name"])
 			catalog.append(eq)
 		catalog = EQCatalog(catalog, start_date, end_date, name=name)
 		try:
