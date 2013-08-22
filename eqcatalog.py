@@ -4194,7 +4194,7 @@ def read_named_catalog(catalog_name, verbose=True):
 	Read a known catalog (corresponding files should be in standard location)
 
 	:param catalog_name:
-		Str, name of catalog ("SHEEC", "CENEC", "ISC-GEM"):
+		Str, name of catalog ("SHEEC", "CENEC", "ISC-GEM", "CEUS-SCR"):
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -4211,6 +4211,9 @@ def read_named_catalog(catalog_name, verbose=True):
 	elif catalog_name.upper() == "ISC-GEM":
 		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\ISC-GEM\isc-gem-cat.TAB"
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
+	elif catalog_name.upper() == "CEUS-SCR":
+		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\CEUS-SCR\CEUS_SCR_Catalog_2012.TAB"
+		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E[M]', 'errM': 'sigma_M'}
 	else:
 		raise Exception("Catalog not recognized: %s" % catalog_name)
 
