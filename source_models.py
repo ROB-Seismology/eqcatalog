@@ -148,6 +148,7 @@ rob_source_models_dict[name] = TwoZonev2
 ## Leynaud
 name = 'Leynaud'
 gis_filespec = os.path.join(ROB_directory, 'ROB Seismic Source Model (Leynaud, 2000).TAB')
+# Note: leave min_mag at 3.5 (Eurocode 8)
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -155,12 +156,12 @@ column_map = {
 	'a_val': 'a',
 	'b_val': 'b',
 	'b_sigma': 0.,
-	'min_mag': 4.0,
+	'min_mag': 3.5,
 	'max_mag': 'MS_max_evaluated',
 	'upper_seismogenic_depth': 0.0,
 	'lower_seismogenic_depth': 25.0,
-	'min_hypo_depth': 'min_hypo_depth',
-	'max_hypo_depth': 'max_hypo_depth',
+	'min_hypo_depth': 'Source_Depth',
+	'max_hypo_depth': 'Source_Depth',
 	'min_strike': 'min_strike',
 	'max_strike': 'max_strike',
 	'min_dip': 45.0,

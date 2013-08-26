@@ -41,7 +41,6 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
-import scitools.numpytools as scitools
 
 from openquake.hazardlib.geo.geodetic import point_at
 
@@ -1013,6 +1012,10 @@ class EQCatalog:
 			bins_N: array containing number of earthquakes for each magnitude interval
 			bins_Mag: array containing lower magnitude of each interval
 		"""
+		## Import of scitools makes matplotlib plots disappear immediately
+		## from any script that imports this module...
+		import scitools.numpytools as scitools
+
 		## Set lower magnitude to lowermost threshold magnitude possible
 		if completeness:
 			Mmin = max(Mmin, completeness.get_completeness_magnitude(self.end_date))
