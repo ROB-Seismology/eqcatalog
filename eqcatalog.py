@@ -3354,6 +3354,43 @@ class EQCatalog:
 EQCollection = EQCatalog
 
 
+def concatenate_catalogs(catalog_list, name=""):
+	"""
+	Concatenate different catalogs into one new catalog
+
+	:param catalog_list:
+		list containing instances of :class:`EQCatalog`
+	:param name:
+		str, name of concatenated catalog
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	if not name:
+		name = "Concatenated catalog"
+	catalog0 = catalog_list[0]
+	eq_list = catalog0.eq_list[:]
+	start_date = catalog0.start_date
+	end_date = catalog0.end_date
+	region = list(catalog0.region)
+	for catalog in catalog_list[1:]:
+		eq_list.extend(catalog.eq_list)
+		if catalog.start_date < start_date:
+			start_date = catalog.start_date
+		if catalog.end_date > end_date:
+			end_date = catalog.end_date
+		w, e, s, n = catalog.region
+		if w < region[0]:
+			region[0] = w
+		if e > region[1]:
+			region[1] = e
+		if s < region[2]:
+			region[2] = s
+		if n > region[3]:
+			region[3] = n
+	return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region, name=name)
+
+
 class CompositeEQCatalog:
 	"""
 	Class representing a catalog that has been split into a number
