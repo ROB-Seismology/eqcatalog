@@ -1190,22 +1190,34 @@ class EQCatalog:
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def get_EPRI_Mmax_pdf(self, Mmin, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
 		"""
-		Compute Mmax distribution following EPRI (1994) method.
+		Compute Mmax distribution following Bayesian approach.
 
-		:param Mmin:
-			Float, lower magnitude (corresponding to lower magnitude in PSHA
+		:param prior_model:
+			String, indicating which prior model should be considered, one of:
+			- "EPRI_extended": extended crust in EPRI (1994)
+			- "EPRI_non_extended": non-extended crust in EPRI (1994)
+			- "CEUS_COMP": composite prior in CEUS (2012)
+			- "CEUS_MESE": Mesozoic and younger extension in CEUS (2012)
+			- "CEUS_NMESE": Non-Mesozoic and younger extension in CEUS (2012)
+			(default: "CEUS_COMP")
+		:param Mmin_n:
+			Float, lower magnitude, used to count n, the number of earthquakes
+			between Mmin and Mmax_obs (corresponds to lower magnitude in PSHA).
+			(default: 4.5)
 		:param b_val:
-			Float, b value of MFD (default: None, will compute b value using
-			Weichert method)
-		:param extended:
-			Bool, whether or not crust is extended (default: False)
+			Float, b value of MFD (default: None, will compute b value
+			using Weichert method)
 		:param dM:
-			Float, bin width of distribution (default: 0.1)
-		:param num_sigma:
-			Int, number of standard deviations to consider on prior distribution
-			(default: 3)
+			Float, magnitude bin width.
+			(default: 0.1)
+		:param truncation:
+			Int or tuple, representing truncation of prior distribution.
+			If int, truncation is interpreted as the number of standard deviations.
+			If tuple, elements are interpreted as minimum and maximum magnitude of
+			the distribution
+			(default: (5.5, 8.25), corresponding to the truncation applied in CEUS)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -1219,180 +1231,68 @@ class EQCatalog:
 			Bool, whether or not to print additional information (default: True)
 
 		:return:
-			(magnitudes, prior, likelihood, posterior, params) tuple
-			- magnitudes, ndarray
-			- prior: ndarray, prior distribution
-			- likelihood: ndarray, likelihood distribution
-			- posterior: ndarray, posterior distribution
+			(prior, likelihood, posterior, params) tuple
+			- prior: instance of :class:`NumericPMF`, prior distribution
+			- likelihood: instance of :class:`NumericPMF`, likelihood distribution
+			- posterior: instance of :class:`NumericPMF`, posterior distribution
 			- params: (observed Mmax, n, b) tuple
 		"""
-		from matplotlib import mlab
+		## Mean Mmax of Global prior distributions
+		if prior_model == "EPRI_extended":
+			mean_Mmax = 6.4
+		elif prior_model == "EPRI_non_extended":
+			mean_Mmax = 6.3
+		elif prior_model == "CEUS_COMP":
+			mean_Mmax = 7.2
+		elif prior_model == "CEUS_MESE":
+			mean_Mmax = 7.35
+		elif prior_model == "CEUS_NMESE":
+			mean_Mmax = 6.7
 
-		## Global prior distributions
-		if extended:
-			mean, sigma = 6.4, 0.8
-		else:
-			mean, sigma = 6.3, 0.5
-		magnitudes = np.arange(Mmin, mean + num_sigma * sigma + dM, dM)
-		prior = mlab.normpdf(magnitudes, mean, sigma)
-		prior /= np.sum(prior)
-
-		## Regional likelihood functions
-		likelihood = np.ones_like(magnitudes)
 		if len(self) > 0:
-			mmax_obs = self.get_Mmax()
+			Mmax_obs = self.get_Mmax()
 			cc_catalog = self.subselect_completeness(completeness, verbose=verbose)
-			n = len(cc_catalog.subselect(Mmin=Mmin))
+			n = len(cc_catalog.subselect(Mmin=Mmin_n))
 			if not b_val:
 				## Note: using lowest magnitude of completeness to compute Weichert
 				## is more robust than using min_mag
-				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
-			if not np.isnan(b_val):
-				beta = b_val * np.log(10)
-				if verbose:
-						print("Maximum observed magnitude: %.1f" % mmax_obs)
-						print("n(M > Mmin): %d" % n)
-				likelihood = np.zeros_like(magnitudes, dtype='d')
-				likelihood[magnitudes >= mmax_obs] = (1 - np.exp(-beta * (magnitudes[magnitudes >= mmax_obs] - Mmin))) ** -n
+				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 		else:
-			mmax_obs = 0.
+			Mmax_obs = 0.
 			n = 0.
 			b_val = np.nan
 
-		## Posterior
-		posterior = prior * likelihood
-		posterior /= np.sum(posterior)
+		mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		return mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM, truncation=truncation, completeness=completeness, end_date=self.end_date, verbose=verbose)
 
-		params = (mmax_obs, n, b_val)
-
-		return magnitudes, prior, likelihood, posterior, params
-
-	def get_EPRI_Mmax_percentile(self, Mmin, perc=50, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
 		"""
-		Compute percentile from Mmax distribution following EPRI (1994) method.
+		Compute Mmax distribution following Bayesian approach.
 
-		:param Mmin:
-			Float, lower magnitude (corresponding to lower magnitude in PSHA
-		:param perc:
-			Int, percentile of distribution to compute (default: 50)
+		:param prior_model:
+			String, indicating which prior model should be considered, one of:
+			- "EPRI_extended": extended crust in EPRI (1994)
+			- "EPRI_non_extended": non-extended crust in EPRI (1994)
+			- "CEUS_COMP": composite prior in CEUS (2012)
+			- "CEUS_MESE": Mesozoic and younger extension in CEUS (2012)
+			- "CEUS_NMESE": Non-Mesozoic and younger extension in CEUS (2012)
+			(default: "CEUS_COMP")
+		:param Mmin_n:
+			Float, lower magnitude, used to count n, the number of earthquakes
+			between Mmin and Mmax_obs (corresponds to lower magnitude in PSHA).
+			(default: 4.5)
 		:param b_val:
-			Float, b value of MFD (default: None, will compute b value using
-			Weichert method)
-		:param extended:
-			Bool, whether or not crust is extended (default: False)
+			Float, b value of MFD (default: None, will compute b value
+			using Weichert method)
 		:param dM:
-			Float, bin width of distribution (default: 0.1)
-		:param num_sigma:
-			Int, number of standard deviations to consider on prior distribution
-			(default: 3)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
-		:param verbose:
-			Bool, whether or not to print additional information (default: True)
-
-		:return:
-			Float, magnitude
-		"""
-		from stats.percentiles import weighted_percentiles
-		mags, prior, likelihood, posterior, params = self.get_EPRI_Mmax_pdf(Mmin, b_val=b_val, extended=extended, dM=dM, num_sigma=num_sigma, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
-		Mmax = weighted_percentiles(mags, [perc], weights=posterior)[0][0]
-		return Mmax
-
-	def get_EPRI_Mmax_histogram(self, Mmin, num_bins=5, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
-		"""
-		Compute histogram from Mmax distribution following EPRI (1994) method.
-
-		:param Mmin:
-			Float, lower magnitude (corresponding to lower magnitude in PSHA
-		:param num_bins:
-			Int, number of bins in histogram (default: 5)
-		:param b_val:
-			Float, b value of MFD (default: None, will compute b value using
-			Weichert method)
-		:param extended:
-			Bool, whether or not crust is extended (default: False)
-		:param dM:
-			Float, bin width of distribution (default: 0.1)
-		:param num_sigma:
-			Int, number of standard deviations to consider on prior distribution
-			(default: 3)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
-		:param verbose:
-			Bool, whether or not to print additional information (default: True)
-
-		:return:
-			(mag_bin_centers, probs) tuple:
-			- mag_bin_centers: ndarray, center magnitudes of each bin
-			- probs: ndarray, probabilities for each bin
-		"""
-		mags, prior, likelihood, posterior, params = self.get_EPRI_Mmax_pdf(Mmin, b_val=b_val, extended=extended, dM=dM, num_sigma=num_sigma, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
-
-		## Divide posterior pdf in num_bins chunks
-		cumul_probs = np.add.accumulate(posterior)
-
-		cumul_prob_bin_edges = np.linspace(0, 1, num_bins + 1)
-		mag_bin_edges = np.zeros(num_bins+1, 'd')
-		mag_bin_edge_indexes = np.zeros(num_bins+1, 'i')
-		index = 0
-		for Mindex, cumul_prob in zip(np.arange(len(mags)), cumul_probs):
-			if cumul_prob > cumul_prob_bin_edges[index]:
-				M = mags[Mindex]
-				mag_bin_edges[index] = M
-				mag_bin_edge_indexes[index] = Mindex
-				index += 1
-				if index == num_bins + 1:
-					break
-		if mag_bin_edges[-1] == 0:
-			mag_bin_edges[-1] = mags[-1]
-			mag_bin_edge_indexes[-1] = len(mags) - 1
-
-		## Determine number of decimals for rounding center magnitudes
-		## based on bin width
-		for num_decimals in range(5):
-			if np.allclose(dM, np.round(dM, decimals=num_decimals)):
-				break
-
-		## Determine magnitude bin centers and corresponding probabilities
-		mag_bin_centers = mag_bin_edges[:-1] + (mag_bin_edges[1:] - mag_bin_edges[:-1]) / 2.
-		mag_bin_centers = np.round(mag_bin_centers, decimals=num_decimals)
-		mag_bin_center_probs = np.zeros_like(mag_bin_centers)
-		for k in range(num_bins):
-			upper_index, lower_index = mag_bin_edge_indexes[k+1], mag_bin_edge_indexes[k]
-			mag_bin_center_probs[k] = cumul_probs[upper_index] - cumul_probs[lower_index]
-
-		return (mag_bin_centers, mag_bin_center_probs)
-
-	def plot_EPRI_Mmax_pdf(self, Mmin, b_val=None, extended=False, dM=0.1, num_sigma=3, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
-		"""
-		Compute Mmax distribution following EPRI (1994) method.
-
-		:param Mmin:
-			Float, lower magnitude (corresponding to lower magnitude in PSHA
-		:param b_val:
-			Float, b value of MFD (default: None, will compute b value using
-			Weichert method)
-		:param extended:
-			Bool, whether or not crust is extended (default: False)
-		:param dM:
-			Float, bin width of distribution (default: 0.1)
-		:param num_sigma:
-			Int, number of standard deviations to consider on prior distribution
-			(default: 3)
+			Float, magnitude bin width.
+			(default: 0.1)
+		:param truncation:
+			Int or tuple, representing truncation of prior distribution.
+			If int, truncation is interpreted as the number of standard deviations.
+			If tuple, elements are interpreted as minimum and maximum magnitude of
+			the distribution
+			(default: (5.5, 8.25), corresponding to the truncation applied in CEUS)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -1411,16 +1311,16 @@ class EQCatalog:
 		:param verbose:
 			Bool, whether or not to print additional information (default: True)
 		"""
-		mags, prior, likelihood, posterior, params = self.get_EPRI_Mmax_pdf(Mmin, extended=extended, dM=dM, num_sigma=num_sigma, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		prior, likelihood, posterior, params = self.get_Bayesian_Mmax_pdf(prior_model, Mmin_n, b_val=b_val, dM=dM, truncation=truncation, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		mmax_obs, n, b_val = params
-		#mag_bin_centers, bin_probs = self.get_EPRI_Mmax_histogram(Mmin, 3, extended=extended, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		mags = prior.values
+		#binned_posterior = posterior.rebin_equal_weight(dM, 5)
 		#bin_probs *= (posterior.max() / likelihood.max())
-		likelihood *= (prior.max() / likelihood.max())
 
-		pylab.plot(mags, prior, 'b', lw=2, label="Global prior")
-		pylab.plot(mags, likelihood, 'g', lw=2, label="Regional likelihood")
-		pylab.plot(mags, posterior, 'r', lw=2, label="Posterior")
-		#pylab.plot(mag_bin_centers, bin_probs, 'ro', label="_nolegend_")
+		pylab.plot(mags, prior.weights, 'b', lw=2, label="Global prior")
+		pylab.plot(mags, likelihood.weights, 'g', lw=2, label="Regional likelihood")
+		pylab.plot(mags, posterior.weights, 'r', lw=2, label="Posterior")
+		#pylab.plot(binned_posterior.values, binned_posterior.weights, 'ro', label="_nolegend_")
 		font = FontProperties(size='large')
 		pylab.legend(loc=0, prop=font)
 		pylab.xlabel("Magnitude", fontsize="x-large")
