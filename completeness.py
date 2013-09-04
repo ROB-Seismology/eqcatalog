@@ -149,4 +149,4 @@ Completeness_MW_201303a = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.
 ## Following relation is for MW based on conversion from ML using Reamer and Hinzen (2004)
 Completeness_MW_201303b = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.9, 4.5, 3.9, 2.9, 2.0], "MW")
 
-
+default_completeness = Completeness_MW_201303a

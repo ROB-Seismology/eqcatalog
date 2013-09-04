@@ -646,7 +646,7 @@ class EQCatalog:
 		else:
 			return dc
 
-	def subselect_completeness(self, completeness=Completeness_MW_201303a, Mtype="MW", Mrelation=None, verbose=True):
+	def subselect_completeness(self, completeness=default_completeness, Mtype="MW", Mrelation=None, verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		completeness criterion.
@@ -688,7 +688,7 @@ class EQCatalog:
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=self.region, name=self.name + " (completeness-constrained)")
 
-	def split_completeness(self, completeness=Completeness_MW_201303a, Mtype="MW", Mrelation=None):
+	def split_completeness(self, completeness=default_completeness, Mtype="MW", Mrelation=None):
 		"""
 		Split catlog in subcatalogs according to completeness periods and magnitudes
 
@@ -1041,7 +1041,7 @@ class EQCatalog:
 
 		return bins_N, bins_Mag
 
-	def get_completeness_dates(self, magnitudes, completeness=Completeness_MW_201303a):
+	def get_completeness_dates(self, magnitudes, completeness=default_completeness):
 		"""
 		Compute date of completeness for list of magnitudes
 
@@ -1068,7 +1068,7 @@ class EQCatalog:
 		completeness_dates = np.array(completeness_dates)
 		return completeness_dates
 
-	def get_completeness_timespans(self, magnitudes, completeness=Completeness_MW_201303a):
+	def get_completeness_timespans(self, magnitudes, completeness=default_completeness):
 		"""
 		Compute completeness timespans for list of magnitudes
 
@@ -1084,7 +1084,7 @@ class EQCatalog:
 		"""
 		return completeness.get_completeness_timespans(magnitudes, self.end_date)
 
-	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
+	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1125,7 +1125,7 @@ class EQCatalog:
 
 		return bins_N_incremental, bins_Mag
 
-	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
+	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1156,7 +1156,7 @@ class EQCatalog:
 		Mmin = bins_Mag[0]
 		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, trim=False):
+	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False):
 		"""
 		Compute cumulative magnitude-frequency distribution.
 
@@ -1190,7 +1190,7 @@ class EQCatalog:
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, verbose=True):
+	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=default_completeness, verbose=True):
 		"""
 		Compute Mmax distribution following Bayesian approach.
 
@@ -1265,7 +1265,7 @@ class EQCatalog:
 		mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		return mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM, truncation=truncation, completeness=completeness, end_date=self.end_date, verbose=verbose)
 
-	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
+	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=default_completeness, title=None, fig_filespec=None, verbose=True):
 		"""
 		Compute Mmax distribution following Bayesian approach.
 
@@ -2091,7 +2091,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
@@ -2126,7 +2126,7 @@ class EQCatalog:
 		a, b, r = calcGR_LSQ(magnitudes, cumul_rates, b_val=b_val, verbose=verbose)
 		return a, b, 0.
 
-	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=False):
+	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using original
 		maximum likelihood estimation by Aki (1965)
@@ -2158,7 +2158,7 @@ class EQCatalog:
 		"""
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 
-	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=True):
+	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=True):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
 		for variable observation periods for different magnitude increments.
@@ -2294,7 +2294,7 @@ class EQCatalog:
 
 	#TODO: averaged Weichert method (Felzer, 2007)
 
-	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, verbose=True):
+	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=True):
 		"""
 		Compute a and b values of Gutenberg Richter relation, and return
 		as TruncatedGRMFD object.
@@ -2329,7 +2329,7 @@ class EQCatalog:
 		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
 
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
 		Compute GR MFD from observed MFD, and plot result
 
@@ -3005,7 +3005,7 @@ class EQCatalog:
 		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
 		return Mmax, Mmax_sigma
 
-	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a):
+	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation=None, completeness=default_completeness):
 		"""
 		Analyse magnitude-frequency.
 		This method is a wrapper for meth:`recurrence_analysis` in the
@@ -3131,7 +3131,7 @@ class EQCatalog:
 		return catalogue
 
 
-	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a):
+	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation=None, completeness=default_completeness):
 		"""
 		"""
 		from hmtk.seismicity.smoothing.smoothed_seismicity import SmoothedSeismicity
@@ -3143,7 +3143,7 @@ class EQCatalog:
 		completeness_table = completeness.to_hmtk_table()
 		data = smoothed_seismicity.run_analysis(catalogue=catalogue, config=config, completeness_table=completeness_table, smoothing_kernel=None, end_year=None)
 
-	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation=None, completeness=Completeness_MW_201303a, title=None, fig_filespec=None, verbose=True):
+	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation=None, completeness=default_completeness, title=None, fig_filespec=None, verbose=True):
 		"""
 		Plot catalog distribution versus Poisson distribution
 		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
@@ -3324,7 +3324,7 @@ class CompositeEQCatalog:
 		(default: [])
 	"""
 	# TODO: modify to make it work with master and zone MFD's without catalogs
-	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None, completeness=Completeness_MW_201303a, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
+	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None, completeness=default_completeness, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
 		self.zone_catalogs = zone_catalogs
 		self.source_model_name = source_model_name
 		self.Mtype = Mtype
