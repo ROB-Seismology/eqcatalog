@@ -128,7 +128,7 @@ class EQCatalog:
 			return None
 
 	@classmethod
-	def from_json(self, s):
+	def from_json(cls, s):
 		"""
 		Generate instance of :class:`EQCatalog` from a json string
 
@@ -139,10 +139,10 @@ class EQCatalog:
 		if len(dct) == 1:
 			class_name = dct.keys()[0]
 			if class_name == "__EQCatalog__":
-				return self.from_dict(dct[class_name])
+				return cls.from_dict(dct[class_name])
 
 	@classmethod
-	def from_dict(self, dct):
+	def from_dict(cls, dct):
 		"""
 		Generate instance of :class:`EQCatalog` from a dictionary
 
@@ -181,7 +181,7 @@ class EQCatalog:
 		return json.dumps(dct, default=json_handler)
 
 	@classmethod
-	def from_HY4(self, filespec, Mtype='ML'):
+	def from_HY4(cls, filespec, Mtype='ML'):
 		"""
 		Read from HY4 earthquake catalog format used by SeismicEruption
 
@@ -1232,9 +1232,9 @@ class EQCatalog:
 
 		:return:
 			(prior, likelihood, posterior, params) tuple
-			- prior: instance of :class:`NumericPMF`, prior distribution
-			- likelihood: instance of :class:`NumericPMF`, likelihood distribution
-			- posterior: instance of :class:`NumericPMF`, posterior distribution
+			- prior: instance of :class:`MmaxPMF`, prior distribution
+			- likelihood: instance of :class:`MmaxPMF`, likelihood distribution
+			- posterior: instance of :class:`MmaxPMF`, posterior distribution
 			- params: (observed Mmax, n, b) tuple
 		"""
 		## Mean Mmax of Global prior distributions
