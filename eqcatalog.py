@@ -1235,7 +1235,7 @@ class EQCatalog:
 			- prior: instance of :class:`MmaxPMF`, prior distribution
 			- likelihood: instance of :class:`MmaxPMF`, likelihood distribution
 			- posterior: instance of :class:`MmaxPMF`, posterior distribution
-			- params: (observed Mmax, n, b) tuple
+			- params: (observed Mmax, n, a, b) tuple
 		"""
 		## Mean Mmax of Global prior distributions
 		if prior_model == "EPRI_extended":
@@ -1312,7 +1312,7 @@ class EQCatalog:
 			Bool, whether or not to print additional information (default: True)
 		"""
 		prior, likelihood, posterior, params = self.get_Bayesian_Mmax_pdf(prior_model, Mmin_n, b_val=b_val, dM=dM, truncation=truncation, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
-		mmax_obs, n, b_val = params
+		mmax_obs, n, a_val, b_val = params
 		mags = prior.values
 		#binned_posterior = posterior.rebin_equal_weight(dM, 5)
 		#bin_probs *= (posterior.max() / likelihood.max())

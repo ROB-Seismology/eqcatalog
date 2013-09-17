@@ -60,7 +60,8 @@ column_map = {
 	'max_dip': 'max_dip',
 	'Ss': 'Ss',
 	'Nf': 'Nf',
-	'Tf': 'Tf'}
+	'Tf': 'Tf',
+	'area': 'Area'}
 Seismotectonic = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = Seismotectonic
 
@@ -87,7 +88,8 @@ column_map = {
 	'max_dip': 45.0,
 	'Ss': 34,
 	'Nf': 33,
-	'Tf': 33}
+	'Tf': 33,
+	'area': 'Area'}
 TwoZone = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = TwoZone
 
@@ -141,7 +143,8 @@ column_map = {
 	'max_dip': 'max_dip',
 	'Ss': 'Ss',
 	'Nf': 'Nf',
-	'Tf': 'Tf'}
+	'Tf': 'Tf',
+	'area': 'Area'}
 TwoZonev2 = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = TwoZonev2
 
@@ -195,7 +198,8 @@ column_map = {
 	'max_dip': 'max_dip',
 	'Ss': 'Ss',
 	'Nf': 'Nf',
-	'Tf': 'Tf'}
+	'Tf': 'Tf',
+	'area': 'Area'}
 Leynaud_extended = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = Leynaud_extended
 
@@ -305,7 +309,8 @@ column_map = {
 	'max_rake': 'max_rake',
 	'min_slip_rate': 'min_slip_rate',
 	'max_slip_rate': 'max_slip_rate',
-	'bg_zone': 'BG_zone'}
+	'bg_zone': 'BG_zone',
+	'area': 'Area'}
 Seismotectonic_Hybrid = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = Seismotectonic_Hybrid
 
