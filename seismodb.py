@@ -260,7 +260,7 @@ def query_ROB_LocalEQCatalogByID(id_earth, verbose=False, errf=None):
 	return eq
 
 
-def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, id_earth=None , sort_key="Mag", sort_order="asc", verbose=False, errf=None):
+def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, id_earth=None, sort_key="Mag", sort_order="asc", verbose=False, errf=None):
 	global MT
 	import eqgeology.FocMec.MomentTensor as MT
 
