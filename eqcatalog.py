@@ -1257,13 +1257,17 @@ class EQCatalog:
 				## Note: using lowest magnitude of completeness to compute Weichert
 				## is more robust than using min_mag
 				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+			mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		else:
+			from hazard.rshalib.mfd import EvenlyDiscretizedMFD
 			Mmax_obs = 0.
 			n = 0.
 			b_val = np.nan
+			## Fake MFD
+			mfd = EvenlyDiscretizedMFD(Mmin_n, dM, [1.0])
 
-		mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
-		return mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM, truncation=truncation, completeness=completeness, end_date=self.end_date, verbose=verbose)
+		prior, likelihood, posterior, params = mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM, truncation=truncation, completeness=completeness, end_date=self.end_date, verbose=verbose)
+		return (prior, likelihood, posterior, params)
 
 	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=default_completeness, title=None, fig_filespec=None, verbose=True):
 		"""
@@ -3732,6 +3736,7 @@ class CompositeEQCatalog:
 			Dict, with zone IDs as keys and a list of num_samples MFD's as
 			values
 		"""
+		# TODO: use random seed!
 		import scipy.stats
 
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
