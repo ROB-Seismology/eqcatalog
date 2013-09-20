@@ -3328,6 +3328,7 @@ class CompositeEQCatalog:
 		(default: [])
 	"""
 	# TODO: modify to make it work with master and zone MFD's without catalogs
+	# TODO: modify to make sure parameters for _get_zone_Mmaxes are consistent
 	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None, completeness=default_completeness, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
 		self.zone_catalogs = zone_catalogs
 		self.source_model_name = source_model_name
@@ -3355,27 +3356,46 @@ class CompositeEQCatalog:
 		master_catalog = EQCatalog(eq_list, start_date=start_date, end_date=end_date)
 		return master_catalog
 
-	def _get_zone_Mmaxes(self, num_sigma=3):
+	def _get_zone_Mmaxes(self, prior_model_category="CEUS", use_posterior=True):
 		"""
 		Determine Mmax for each zone catalog as median value of EPRI pdf
 
-		:param num_sigma:
-			Int, number of standard deviations to consider on prior distribution
-			(default: 3)
+		:param prior_model_category:
+			str, category of prior model to consider, either "EPRI" or "CEUS"
+			(default: "CEUS")
+		:param use_posterior:
+			bool, whether to consider the posterior (True) or the prior (False)
+			Mmax pdf (default: True)
 
 		:return:
 			Dict, mapping zone ids (str) to Mmax values (float)
 		"""
-		# TODO: find mechanism to discern between extended and non-extended
-		# (maybe using GIS table)
 		zone_catalogs = self.zone_catalogs
 		max_mags = dict.fromkeys(zone_catalogs.keys())
 		for zone_id, catalog in zone_catalogs.items():
+			# TODO: find better mechanism to discern between extended and non-extended
+			# (maybe using GIS table)
+			if zone_id in ("RVG", "RVRS", "BGRVRS"):
+				if prior_model_category == "CEUS":
+					prior_model = "CEUS_MESE"
+					max_mag = 7.35
+				else:
+					prior_model = "EPRI_extended"
+					max_mag = 6.4
+			else:
+				if prior_model_category == "CEUS":
+					prior_model = "CEUS_NMESE"
+					max_mag = 6.7
+				else:
+					prior_model = "CEUS_NMESE"
+					max_mag = 6.3
 			if self.zone_MFDs:
 				b_val = self.zone_MFDs[zone_id].b_val
 			else:
 				b_val = None
-			max_mag = catalog.get_EPRI_Mmax_percentile(self.min_mag, 50, b_val=b_val, extended=False, dM=self.mfd_bin_width, num_sigma=num_sigma, Mtype=self.Mtype, Mrelation=self.Mrelation, completeness=self.completeness, verbose=False)
+			if use_posterior:
+				prior, likelihood, posterior, params = catalog.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmin_n=4.5, b_val=b_val, dM=self.mfd_bin_width, Mtype=self.Mtype, Mrelation=self.Mrelation, completeness=self.completeness, verbose=False)
+				max_mag = posterior.get_percentiles([50])[0]
 			max_mag = np.ceil(max_mag / self.mfd_bin_width) * self.mfd_bin_width
 			max_mags[zone_id] = max_mag
 		return max_mags
@@ -3435,7 +3455,7 @@ class CompositeEQCatalog:
 		:return:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 		"""
-		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
 		for zone_id, zone_catalog in self.zone_catalogs.items():
@@ -3461,7 +3481,7 @@ class CompositeEQCatalog:
 		:return:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 		"""
-		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
 		for zone_id, zone_catalog in self.zone_catalogs.items():
@@ -3494,7 +3514,7 @@ class CompositeEQCatalog:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 			or (if num_sigma > 0) to lists of instances of :class:`TruncatedGRMFD`
 		"""
-		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_Johnston_MFDs = self._get_Johnston_zone_MFDs()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
 		for zone_id, zone_catalog in self.zone_catalogs.items():
@@ -3541,7 +3561,7 @@ class CompositeEQCatalog:
 			instances of :class:`TruncatedGRMFD` (if num_sigma == 0)
 			or list of instances of :class:`TruncatedGRMFD` (if num_sigma > 0)
 		"""
-		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		overall_Mmax = max(zone_Mmaxes.values())
 		master_catalog = self.master_catalog
 		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
@@ -3622,7 +3642,7 @@ class CompositeEQCatalog:
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
 
 		## Determine Mmax of each zone catalog, and overall Mmax
-		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		overall_Mmax = max(zone_Mmaxes.values())
 		if max_test_mag is None:
 			if use_master:
@@ -3742,7 +3762,7 @@ class CompositeEQCatalog:
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
 
 		## Determine Mmax of each zone catalog, and overall Mmax
-		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		overall_Mmax = max(zone_Mmaxes.values())
 		if max_test_mag is None:
 			if use_master:
@@ -3883,7 +3903,7 @@ class CompositeEQCatalog:
 		import scipy.stats
 
 		zone_catalogs = self.zone_catalogs
-		zone_Mmaxes = self._get_zone_Mmaxes()
+		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 
 		## Determine unconstrained MFD for each zone catalog
 		if not self.zone_MFDs:
