@@ -3269,6 +3269,22 @@ class EQCatalog:
 			pylab.clf()
 		else:
 			pylab.show()
+	
+	def get_epicentral_distances(self, lon, lat):
+		"""
+		"""
+		distances = np.zeros(len(self))
+		for i, eq in enumerate(self):
+			distances[i] = eq.epicentral_distance((lon, lat))
+		return distances
+
+	def get_hypocentral_distances(self, lon, lat):
+		"""
+		"""
+		distances = np.zeros(len(self))
+		for i, eq in enumerate(self):
+			distances[i] = eq.hypocentral_distance((lon, lat))
+		return distances
 
 
 EQCollection = EQCatalog
