@@ -3898,7 +3898,10 @@ class CompositeEQCatalog:
 		"""
 		import scipy.stats
 
-		master_MFD = self._compute_master_MFD()
+		if not self.master_MFD:
+			master_MFD = self._compute_master_MFD()
+		else:
+			master_MFD = self.master_MFD
 		MFD_container = dict.fromkeys(self.zone_catalogs.keys())
 
 		## Monte Carlo sampling from truncated normal distribution
