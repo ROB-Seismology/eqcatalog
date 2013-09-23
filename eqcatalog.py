@@ -111,6 +111,18 @@ class EQCatalog:
 				eq_list.append(self.eq_list[index])
 			return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name + " %s" % item)
 
+	@property
+	def lons(self):
+		return self.get_longitudes()
+
+	@property
+	def lats(self):
+		return self.get_latitudes()
+
+	@property
+	def mags(self):
+		return self.get_magnitudes()
+
 	def get_record(self, ID):
 		"""
 		Fetch record with given ID
@@ -1084,7 +1096,7 @@ class EQCatalog:
 		"""
 		return completeness.get_completeness_timespans(magnitudes, self.end_date)
 
-	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False):
+	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False, verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1106,13 +1118,15 @@ class EQCatalog:
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
+		:param verbose:
+			Bool, whether or not to print additional information
 
 		:return:
 			Tuple (bins_N_incremental, bins_Mag)
 			bins_N_incremental: incremental annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 
 		bins_N_incremental = bins_N / bins_timespans
@@ -1125,7 +1139,7 @@ class EQCatalog:
 
 		return bins_N_incremental, bins_Mag
 
-	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False):
+	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False, verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1147,11 +1161,13 @@ class EQCatalog:
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
+		:param verbose:
+			Bool, whether or not to print additional information
 
 		:return:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
-		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim)
+		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim, verbose=verbose)
 		## Mmin may have changed depending on completeness
 		Mmin = bins_Mag[0]
 		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
@@ -1257,7 +1273,7 @@ class EQCatalog:
 				## Note: using lowest magnitude of completeness to compute Weichert
 				## is more robust than using min_mag
 				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
-			mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+			mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		else:
 			from hazard.rshalib.mfd import EvenlyDiscretizedMFD
 			Mmax_obs = 0.
