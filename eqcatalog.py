@@ -1285,7 +1285,7 @@ class EQCatalog:
 		prior, likelihood, posterior, params = mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM, truncation=truncation, completeness=completeness, end_date=self.end_date, verbose=verbose)
 		return (prior, likelihood, posterior, params)
 
-	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=default_completeness, title=None, fig_filespec=None, verbose=True):
+	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation=None, completeness=default_completeness, num_discretizations=0, title=None, fig_filespec=None, verbose=True):
 		"""
 		Compute Mmax distribution following Bayesian approach.
 
@@ -1322,6 +1322,9 @@ class EQCatalog:
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+		:param num_discretizations:
+			int, number of portions to discretize the posterior in
+			(default: 0)
 		:param title:
 			String, plot title (None = default title, "" = no title)
 			(default: None)
@@ -1334,13 +1337,17 @@ class EQCatalog:
 		prior, likelihood, posterior, params = self.get_Bayesian_Mmax_pdf(prior_model, Mmin_n, b_val=b_val, dM=dM, truncation=truncation, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		mmax_obs, n, a_val, b_val = params
 		mags = prior.values
-		#binned_posterior = posterior.rebin_equal_weight(dM, 5)
-		#bin_probs *= (posterior.max() / likelihood.max())
 
 		pylab.plot(mags, prior.weights, 'b', lw=2, label="Global prior")
 		pylab.plot(mags, likelihood.weights, 'g', lw=2, label="Regional likelihood")
 		pylab.plot(mags, posterior.weights, 'r', lw=2, label="Posterior")
-		#pylab.plot(binned_posterior.values, binned_posterior.weights, 'ro', label="_nolegend_")
+		if num_discretizations:
+			binned_posterior = posterior.rebin_equal_weight(dM, num_discretizations)
+			weights = binned_posterior.weights.astype('d')
+			## Apply some rescaling
+			weights /=  posterior.max()
+			# TODO: reconstruct left edges and widths of discretized portions, and plot as histogram
+			pylab.plot(binned_posterior.values, weights, 'ro', label="Discretized posterior")
 		font = FontProperties(size='large')
 		pylab.legend(loc=0, prop=font)
 		pylab.xlabel("Magnitude", fontsize="x-large")
@@ -3269,7 +3276,7 @@ class EQCatalog:
 			pylab.clf()
 		else:
 			pylab.show()
-	
+
 	def get_epicentral_distances(self, lon, lat):
 		"""
 		"""
@@ -3760,7 +3767,7 @@ class CompositeEQCatalog:
 
 		return MFD_container
 
-	def balance_MFD_by_frequency(self, num_samples, num_sigma=2, max_test_mag=None, use_master=False):
+	def balance_MFD_by_frequency(self, num_samples, num_sigma=2, max_test_mag=None, use_master=False, random_seed=None):
 		"""
 		Balance MFD's of zone catalogs by frequency.
 		First, calculate frequency range corresponding to b_val +/-
@@ -3782,13 +3789,15 @@ class CompositeEQCatalog:
 			a default value depending on use_master)
 		:param use_master:
 			Bool, whether master catalog (True) or summed catalog (False)
-			should be used to constrain frequencies
+			should be used to constrain frequencies (default: False)
+		:param random_seed:
+			None or int, seed to initialize internal state of random number
+			generator (default: None, will seed from current time)
 
 		:return:
 			Dict, with zone IDs as keys and a list of num_samples MFD's as
 			values
 		"""
-		# TODO: use random seed!
 		import scipy.stats
 
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
@@ -3821,6 +3830,7 @@ class CompositeEQCatalog:
 			zone_MFDs = self.zone_MFDs
 
 		## Monte Carlo sampling
+		np.random.seed(seed=random_seed)
 		MFD_container = dict.fromkeys(zone_catalogs.keys())
 		num_passed, num_rejected, num_failed = 0, 0, 0
 		num_iterations = 0
@@ -3879,7 +3889,7 @@ class CompositeEQCatalog:
 
 		return MFD_container
 
-	def balance_MFD_by_fixed_b_value(self, num_samples, num_sigma=2):
+	def balance_MFD_by_fixed_b_value(self, num_samples, num_sigma=2, random_seed=None):
 		"""
 		Balance MFD's of zone catalogs by Monte Carlo sampling of b value
 		of master catalog MFD, and computing zone MFD's with this fixed
@@ -3891,6 +3901,9 @@ class CompositeEQCatalog:
 			Float, number of standard deviations on b value of master
 			catalog (to determine bounds) and of zone catalogs (for
 			Monte Carlo sampling) (default: 2)
+		:param random_seed:
+			None or int, seed to initialize internal state of random number
+			generator (default: None, will seed from current time)
 
 		:return:
 			Dict, with zone IDs as keys and a list of num_samples MFD's as
@@ -3905,6 +3918,7 @@ class CompositeEQCatalog:
 		MFD_container = dict.fromkeys(self.zone_catalogs.keys())
 
 		## Monte Carlo sampling from truncated normal distribution
+		np.random.seed(seed=random_seed)
 		mu, sigma = master_MFD.b_val, master_MFD.b_sigma
 		for i in range(num_samples):
 			b_val = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, mu, sigma)
@@ -3921,7 +3935,7 @@ class CompositeEQCatalog:
 
 		return MFD_container
 
-	def sample_MFD_unconstrained(self, num_samples, num_sigma=2):
+	def sample_MFD_unconstrained(self, num_samples, num_sigma=2, random_seed=None):
 		"""
 		Perform unconstrained sampling on b value of zone catalogs
 
@@ -3930,6 +3944,9 @@ class CompositeEQCatalog:
 		:param num_sigma:
 			Float, number of standard deviations on b value of zone catalogs
 			for Monte Carlo sampling (default: 2)
+		:param random_seed:
+			None or int, seed to initialize internal state of random number
+			generator (default: None, will seed from current time)
 
 		:return:
 			Dict, with zone IDs as keys and a list of num_samples MFD's as
@@ -3947,6 +3964,7 @@ class CompositeEQCatalog:
 			zone_MFDs = self.zone_MFDs
 
 		## Monte Carlo sampling
+		np.random.seed(seed=random_seed)
 		MFD_container = dict.fromkeys(zone_catalogs.keys())
 		num_passed, num_failed = 0, 0
 		while num_passed < num_samples:
