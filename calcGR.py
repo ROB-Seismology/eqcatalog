@@ -159,6 +159,7 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 	b, a, r, ttprob, stderr = stats.linregress(magnitudes, np.log10(occurrence_rates))
 
 	## Standard deviation on slope and intercept
+	## (from: http://mail.scipy.org/pipermail/scipy-user/2008-May/016777.html)
 	mx = magnitudes.mean()
 	sx2 = ((magnitudes - mx)**2).sum()
 	a_sigma = stderr * np.sqrt(1./len(magnitudes) + mx*mx/sx2)
