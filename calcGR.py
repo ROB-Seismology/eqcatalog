@@ -28,7 +28,8 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 		Tuple (a, b, stdb)
 		- a: a value
 		- b: b value
-		- stdb: standard deviation on b value
+		- stda: standard deviation of a value
+		- stdb: standard deviation of b value
 
 	Note:
 	This regression depends on the Mmax specified, as empty magnitude bins
@@ -125,17 +126,18 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 	#else:
 	#	return (A, B, BETA, STDA, STDB, STDBETA)
 
-	return A, B, STDB
+	return A, B, STDA, STDB
 
 
-def calcGR_LSQ(magnitudes, cumulative_rates, b_val=None, verbose=False):
+def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 	"""
 	Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
 	:param magnitudes:
 		numpy float array, left edges of magnitude bins up to Mmax
-	:param cumulative_rates:
-		numpy float array, cumulative occurrence rates corresponding to magnitude bins
+	:param occurrence_rates:
+		numpy float array, occurrence rates (cumulative or incremental)
+		corresponding to magnitude bins
 	:param b_val:
 		Float, fixed b value to constrain MLE estimation (default: None)
 		This parameter is currently ignored
@@ -146,16 +148,24 @@ def calcGR_LSQ(magnitudes, cumulative_rates, b_val=None, verbose=False):
 		Tuple (a, b, r)
 		- a: a value (intercept)
 		- b: b value (slope, taken positive)
-		- r: correlation coefficient
+		- a_sigma: standard deviation of a value
+		- b_sigma: standard deviation of b value
 	"""
 	# TODO: constrained regression with fixed b
 	# TODO: see also np.linalg.lstsq
-	indexes = np.where(cumulative_rates > 0)
-	cumulative_rates = cumulative_rates[indexes]
+	indexes = np.where(occurrence_rates > 0)
+	occurrence_rates = occurrence_rates[indexes]
 	magnitudes = magnitudes[indexes]
-	b, a, r, ttprob, stderr = stats.linregress(magnitudes, np.log10(cumulative_rates))
-	## stderr = standard error on b?
+	b, a, r, ttprob, stderr = stats.linregress(magnitudes, np.log10(occurrence_rates))
+
+	## Standard deviation on slope and intercept
+	mx = magnitudes.mean()
+	sx2 = ((magnitudes - mx)**2).sum()
+	a_sigma = stderr * np.sqrt(1./len(magnitudes) + mx*mx/sx2)
+	b_sigma = stderr * np.sqrt(1./sx2)
+
 	if verbose:
 		print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
-	return (a, -b, r)
+
+	return (a, -b, a_sigma, b_sigma)
 

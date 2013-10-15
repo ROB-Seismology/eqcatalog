@@ -1272,7 +1272,7 @@ class EQCatalog:
 			if not b_val:
 				## Note: using lowest magnitude of completeness to compute Weichert
 				## is more robust than using min_mag
-				a_val, b_val, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+				a_val, b_val, stda, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
 			mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		else:
 			from hazard.rshalib.mfd import EvenlyDiscretizedMFD
@@ -2215,7 +2215,8 @@ class EQCatalog:
 			Tuple (a, b, stdb)
 			- a: a value
 			- b: b value
-			- stdb: standard deviation on b value
+			- stda: standard deviation of a value
+			- stdb: standard deviation of b value
 
 		Note:
 		This regression depends on the Mmax specified, as empty magnitude bins
@@ -2353,8 +2354,8 @@ class EQCatalog:
 			instance of :class:`mfd.TruncatedGRMFD`
 		"""
 		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
-		a, b, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
-		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stdb, Mtype)
+		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
 
 	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
@@ -3080,7 +3081,7 @@ class EQCatalog:
 		if method == "Weichert" and aM == 0.:
 			aM = dM / 2.
 		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table, dM, method, aM, dt)
-		return np.log10(a), b, stdb
+		return np.log10(a), b, stda, stdb
 
 	def plot_3d(self, limits=None, Mtype=None, Mrelation=None):
 		"""
@@ -3503,10 +3504,10 @@ class CompositeEQCatalog:
 			zone_MFD = mfd.TruncatedGRMFD.construct_FentonEtAl2006MFD(self.min_mag, zone_Mmax, self.mfd_bin_width, zone_area)
 			if b_val != None:
 				b = b_val
-				stdb = 0
+				stda, stdb = 0, 0
 				lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 				a_val = mfd.a_from_lambda(lamda, M, b) + mfd.get_a_separation(b, self.mfd_bin_width)
-				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stdb)
+				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stda, stdb)
 			zone_MFDs[zone_id] = zone_MFD
 		return zone_MFDs
 
@@ -3529,10 +3530,10 @@ class CompositeEQCatalog:
 			zone_MFD = mfd.TruncatedGRMFD.construct_Johnston1994MFD(self.min_mag, zone_Mmax, self.mfd_bin_width, zone_area)
 			if b_val != None:
 				b = b_val
-				stdb = 0
+				stda, stdb = 0, 0
 				lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 				a_val = mfd.a_from_lambda(lamda, M, b) + mfd.get_a_separation(b, self.mfd_bin_width)
-				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stdb)
+				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stda, stdb)
 			zone_MFDs[zone_id] = zone_MFD
 		return zone_MFDs
 
