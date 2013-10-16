@@ -1249,7 +1249,7 @@ class EQCatalog:
 		:return:
 			(prior, likelihood, posterior, params) tuple
 			- prior: instance of :class:`MmaxPMF`, prior distribution
-			- likelihood: instance of :class:`MmaxPMF`, likelihood distribution
+			- likelihood: numpy array
 			- posterior: instance of :class:`MmaxPMF`, posterior distribution
 			- params: (observed Mmax, n, a, b) tuple
 		"""
@@ -1339,7 +1339,7 @@ class EQCatalog:
 		mags = prior.values
 
 		pylab.plot(mags, prior.weights, 'b', lw=2, label="Global prior")
-		pylab.plot(mags, likelihood.weights, 'g', lw=2, label="Regional likelihood")
+		pylab.plot(mags, likelihood, 'g', lw=2, label="Regional likelihood")
 		pylab.plot(mags, posterior.weights, 'r', lw=2, label="Posterior")
 		if num_discretizations:
 			binned_posterior = posterior.rebin_equal_weight(dM, num_discretizations)
