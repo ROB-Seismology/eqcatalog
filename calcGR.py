@@ -69,8 +69,6 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 			SUMTEX += TJEXP
 			STM2X += magnitudes[k] * TMEXP
 
-		#print SNM, NKOUNT, STMEX, SUMTEX, STM2X, SUMEXP
-
 		try:
 			DLDB = STMEX / SUMTEX
 		except:
@@ -96,7 +94,6 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 	STDFN0 = FN0 / np.sqrt(NKOUNT)
 	## Applying error propogation for base-10 logarithm
 	STDA = STDFN0 / (2.303 * FN0)
-	#print STDA
 	## Note: the following formula in Philippe Rosset's program is equivalent
 	#A = np.log10(FNGTMO) + B * (magnitudes[0] - dM/2.0)
 	## This is also equivalent to:
@@ -139,8 +136,7 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 		numpy float array, occurrence rates (cumulative or incremental)
 		corresponding to magnitude bins
 	:param b_val:
-		Float, fixed b value to constrain MLE estimation (default: None)
-		This parameter is currently ignored
+		Float, fixed b value to constrain LSQ estimation (default: None)
 	:param verbose:
 		Bool, whether some messages should be printed or not (default: False)
 
@@ -151,22 +147,31 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 		- a_sigma: standard deviation of a value
 		- b_sigma: standard deviation of b value
 	"""
-	# TODO: constrained regression with fixed b
-	# TODO: see also np.linalg.lstsq
+	## Do not consider magnitudes with zero occurrence rates
 	indexes = np.where(occurrence_rates > 0)
 	occurrence_rates = occurrence_rates[indexes]
+	log_occurrence_rates = np.log10(occurrence_rates)
 	magnitudes = magnitudes[indexes]
-	b, a, r, ttprob, stderr = stats.linregress(magnitudes, np.log10(occurrence_rates))
 
-	## Standard deviation on slope and intercept
-	## (from: http://mail.scipy.org/pipermail/scipy-user/2008-May/016777.html)
-	mx = magnitudes.mean()
-	sx2 = ((magnitudes - mx)**2).sum()
-	a_sigma = stderr * np.sqrt(1./len(magnitudes) + mx*mx/sx2)
-	b_sigma = stderr * np.sqrt(1./sx2)
+	if not b_val:
+		b_val, a_val, r, ttprob, stderr = stats.linregress(magnitudes, log_occurrence_rates)
+		b_val = -b_val
+
+		## Standard deviation on slope and intercept
+		## (from: http://mail.scipy.org/pipermail/scipy-user/2008-May/016777.html)
+		mx = np.mean(magnitudes)
+		sx2 = np.sum((magnitudes - mx)**2)
+		a_sigma = stderr * np.sqrt(1./len(magnitudes) + mx*mx/sx2)
+		b_sigma = stderr * np.sqrt(1./sx2)
+	else:
+		## Regression line always goes through mean x and y
+		mean_mag = np.mean(magnitudes)
+		mean_log_rate = np.mean(log_occurrence_rates)
+		a_val = mean_log_rate + b_val * mean_mag
+		a_sigma, b_sigma = 0, 0
 
 	if verbose:
-		print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a, -b, r)
+		print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a_val, b_val, r)
 
-	return (a, -b, a_sigma, b_sigma)
+	return (a_val, b_val, a_sigma, b_sigma)
 
