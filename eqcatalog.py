@@ -3554,6 +3554,8 @@ class CompositeEQCatalog:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 			or (if num_sigma > 0) to lists of instances of :class:`TruncatedGRMFD`
 		"""
+		# TODO: use Johnston or Fenton depending on Mtype
+		# TODO: check if Weichert MFD < Johnston MFD for M >= 4.5
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_Johnston_MFDs = self._get_Johnston_zone_MFDs()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
