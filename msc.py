@@ -452,16 +452,24 @@ def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=No
 	for msce in msces:
 		plt.plot(mags, msce().get_mean(mags), label=msce.__name__)
 
+	catalog_data_x, catalog_data_y = [], []
+
 	## plot data from catalog
 	ec = seismodb.query_ROB_LocalEQCatalog()
 	for e in ec:
 		if getattr(e, msce._FROM) and getattr(e, msce._TO):
-			plt.scatter(getattr(e, msce._FROM), getattr(e, msce._TO))
+			catalog_data_x.append(getattr(e, msce._FROM))
+			catalog_data_y.append(getattr(e, msce._TO))
+#			plt.scatter(getattr(e, msce._FROM), getattr(e, msce._TO), label=data_label)
 
 	## plot additional data
 	for dataset in datasets:
 		if msce._FROM in dataset and msce._TO in dataset:
-			plt.scatter(dataset[msce._FROM], dataset[msce._TO])
+			catalog_data_x.extend(dataset[msce._FROM])
+			catalog_data_y.extend(dataset[msce._TO])
+#			plt.scatter(dataset[msce._FROM], dataset[msce._TO], label=data_label)
+	
+	plt.scatter(catalog_data_x, catalog_data_y, label='Catalog data')
 
 	## plot 1:1 relation
 	plt.plot(mags, mags, color='0.75', label='1:1 relation')
@@ -469,7 +477,7 @@ def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=No
 	plt.axis((mags[0]-1, mags[-1]+1, mags[0]-1, mags[-1]+1))
 
 	plt.grid()
-	plt.legend(loc=2)
+	plt.legend(loc=0, ncol=1)
 
 	majorLocator = MultipleLocator(1.)
 	minorLocator = MultipleLocator(dM)
@@ -502,12 +510,12 @@ if __name__ == '__main__':
 	"""
 	datasets = [
 		{'name': 'roermond_aftershocks', 'ML': [2.4, 2.5, 2.5, 3.4, 2.6, 3.0, 3.2, 2.7, 2.7, 2.2, 2.0, 2.3, 2.8, 2.9, 1.9, 2.0, 2.3, 2.5], 'MW': [2.5, 2.6, 2.5, 3.2, 2.5, 2.9, 3.0, 2.6, 2.8, 2.3, 2.2, 2.5, 2.8, 2.8, 2.2, 2.2, 2.4, 2.5]},
-		{'name': 'liege', 'ML': 5.0, 'MS': 4.4, 'MW': seismic_moment_to_moment_magnitude_dyncm(1.6*10**23)},
-		{'name': 'Camelbeeck (1985)', 'ML': [4.4, 3.4, 3.8, 4.4, 3.8, 3.3, 2.6, 3.7, 3.6, 2.8, 4.1, 3.0, 2.9, 2.8, 3.7, 3.0, 3.5], 'MW': seismic_moment_to_moment_magnitude_dyncm([3.6*10**22, 3.2*10**21, 6.9*10**21, 4.8*10**22, 7.2*10**21, 3.8*10**21, 7.2*10**20, 8.3*10**21, 7.7*10**21, 1.1*10**21, 2.2*10**22, 2.2*10**21, 1.1*10**21, 1.5*10**21, 8.5*10**21, 1.4*10**21, 2.9*10**21])},
+		{'name': 'liege', 'ML': [5.0], 'MS': [4.4], 'MW': [seismic_moment_to_moment_magnitude_dyncm(1.6*10**23)]},
+#		{'name': 'Camelbeeck (1985)', 'ML': [4.4, 3.4, 3.8, 4.4, 3.8, 3.3, 2.6, 3.7, 3.6, 2.8, 4.1, 3.0, 2.9, 2.8, 3.7, 3.0, 3.5], 'MW': seismic_moment_to_moment_magnitude_dyncm([3.6*10**22, 3.2*10**21, 6.9*10**21, 4.8*10**22, 7.2*10**21, 3.8*10**21, 7.2*10**20, 8.3*10**21, 7.7*10**21, 1.1*10**21, 2.2*10**22, 2.2*10**21, 1.1*10**21, 1.5*10**21, 8.5*10**21, 1.4*10**21, 2.9*10**21])},
 	]
 
-#	fig_filespec = r'D:\Temp\fig.png'
-	fig_filespec = None
+	fig_filespec = r'D:\Temp\fig.png'
+#	fig_filespec = None
 
 	plot(MSCE_ML_MW, datasets=datasets, fig_filespec=fig_filespec)
 #	plot(MSCE_MS_MW, datasets=datasets, fig_filespec=fig_filespec)
