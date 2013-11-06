@@ -42,7 +42,6 @@ import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
 
-from openquake.hazardlib.geo.geodetic import point_at
 
 
 ## Import ROB modules
@@ -2118,7 +2117,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
@@ -2128,6 +2127,9 @@ class EQCatalog:
 			Float, maximum magnitude to use for binning
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
+		:param cumul:
+			Bool, whether to use cumulative (True) or incremental (False)
+			occurrence rates for linear regression (default: True)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -2143,15 +2145,21 @@ class EQCatalog:
 			Bool, whether some messages should be printed or not (default: False)
 
 		Return value:
-			Tuple (a, b, stdb)
+			Tuple (a, b, stda, stdb)
 			- a: a value (intercept)
 			- b: b value (slope, taken positive)
-			- stdb: standard deviation on b value (0.)
+			- stda: standard deviation on a value
+			- stdb: standard deviation on b value
 		"""
 		from calcGR import calcGR_LSQ
-		cumul_rates, magnitudes = self.get_cumulative_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False)
-		a, b, r = calcGR_LSQ(magnitudes, cumul_rates, b_val=b_val, verbose=verbose)
-		return a, b, 0.
+		if cumul:
+			rates, magnitudes = self.get_cumulative_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False)
+		else:
+			rates, magnitudes = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False)
+		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, verbose=verbose)
+		if not cumul:
+			a += mfd.get_a_separation(b, dM)
+		return a, b, stda, stdb
 
 	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""
@@ -4516,6 +4524,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 
 	## Circle
 	if circle:
+		from openquake.hazardlib.geo.geodetic import point_at
 		center, radius, color = circle
 		x, y = [], []
 		for azimuth in range(0, 360):
