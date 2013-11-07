@@ -3493,6 +3493,23 @@ class CompositeEQCatalog:
 		MFD.min_mag = self.min_mag
 		return MFD
 
+	def _get_min_SCR_zone_MFDs(self, b_val=None):
+		"""
+		Determine minimum MFD (SCR) for each zone.
+		This is a wrapper; depending on Mtype, either :meth:`_get_Fenton_zone_MFDs`
+		(MS) or :meth:`_get_Johnston_zone_MFDs` (MW) will be called.
+
+		:param b_val:
+			float, imposed b value (default: None = use Fenton's b value)
+
+		:return:
+			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
+		"""
+		if self.Mtype == "MS":
+			return self._get_Fenton_zone_MFDs(b_val=b_val)
+		elif self.Mtype == "MW":
+			return self._get_Johnston_zone_MFDs(b_val=b_val)
+
 	def _get_Fenton_zone_MFDs(self, b_val=None):
 		"""
 		Determine minimum MFD for each zone according to Fenton et al. (2006)
@@ -3548,8 +3565,8 @@ class CompositeEQCatalog:
 	def _compute_zone_MFDs(self, b_val=None, num_sigma=0):
 		"""
 		Compute MFD for each zone using same imposed b value
-		If MFD cannot be computed, the "minimum" MFD according to
-		Johnston (1994) will be determined
+		If MFD cannot be computed, a "minimum" MFD, corresponding
+		to the average for SCR will be determined.
 
 		:param b_val:
 			float, imposed b value (default: None = unconstrained)
@@ -3562,10 +3579,8 @@ class CompositeEQCatalog:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 			or (if num_sigma > 0) to lists of instances of :class:`TruncatedGRMFD`
 		"""
-		# TODO: use Johnston or Fenton depending on Mtype
-		# TODO: check if Weichert MFD < Johnston MFD for M >= 4.5
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
-		zone_Johnston_MFDs = self._get_Johnston_zone_MFDs()
+		zone_min_SCR_MFDs = self._get_min_SCR_zone_MFDs()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
@@ -3574,9 +3589,17 @@ class CompositeEQCatalog:
 				zone_MFD.Weichert = True
 			except ValueError:
 				## Note: it is critical that this doesn't fail for any one zone,
-				## so, fall back to minimum MFD following Johnston (1994), based on area
-				zone_MFD = zone_Johnston_MFDs[zone_id]
+				## so, fall back to minimum MFD for SCR, based on area
+				zone_MFD = zone_min_SCR_MFDs[zone_id]
 				zone_MFD.Weichert = False
+			else:
+				## If computed MFD is below min SCR MFD, select the latter
+				mags, rates = zone_MFD.get_center_magnitudes(), zone_MFD.occurrence_rates
+				mags_scr, rates_scr = zone_min_SCR_MFDs[zone_id].get_center_magnitudes(), zone_min_SCR_MFDs[zone_id].occurrence_rates
+				M = 5.5
+				if rates_scr[mags_scr > M][0] > rates[mags > M][0]:
+					zone_MFD = zone_min_SCR_MFDs[zone_id]
+					zone_MFD.Weichert = False
 			zone_MFDs[zone_id] = zone_MFD
 
 			if num_sigma > 0:
@@ -3753,7 +3776,7 @@ class CompositeEQCatalog:
 						else:
 							temp_MFD_container[zone_id] = zone_MFD
 				else:
-					## Do not recompute if mean MFD is Johnston MFD
+					## Do not recompute if mean MFD is min SCR MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
 					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
@@ -3871,7 +3894,7 @@ class CompositeEQCatalog:
 						else:
 							temp_MFD_container[zone_id] = zone_MFD
 				else:
-					## Do not recompute if mean MFD is Johnston MFD
+					## Do not recompute if mean MFD is min SCR MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
 					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
@@ -3934,11 +3957,11 @@ class CompositeEQCatalog:
 		for i in range(num_samples):
 			b_val = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, mu, sigma)
 			zone_MFDs = self._compute_zone_MFDs(b_val=b_val, num_sigma=0)
-			zone_Johnston_MFDs = self._get_Johnston_zone_MFDs(b_val=b_val)
+			zone_min_SCR_MFDs = self._get_min_SCR_zone_MFDs(b_val=b_val)
 			for zone_id in self.zone_catalogs.keys():
 				zone_MFD = zone_MFDs[zone_id]
 				if np.isinf(zone_MFD.a_val):
-					zone_MFD = zone_Johnston_MFDs[zone_id]
+					zone_MFD = zone_min_SCR_MFDs[zone_id]
 				if i == 0:
 					MFD_container[zone_id] = [zone_MFD]
 				else:
@@ -4002,7 +4025,7 @@ class CompositeEQCatalog:
 						else:
 							temp_MFD_container[zone_id] = zone_MFD
 				else:
-					## Do not recompute if mean MFD is Johnston MFD
+					## Do not recompute if mean MFD is min SCR MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
 					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
 					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
