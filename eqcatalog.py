@@ -2117,7 +2117,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=False, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
@@ -2129,7 +2129,7 @@ class EQCatalog:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param cumul:
 			Bool, whether to use cumulative (True) or incremental (False)
-			occurrence rates for linear regression (default: True)
+			occurrence rates for linear regression (default: False)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -2791,26 +2791,75 @@ class EQCatalog:
 
 		return zone_catalogs
 
-	def generate_synthetic_catalogs(self, N, sigma=0.2):
+	def generate_synthetic_catalogs(self, num_samples, num_sigma=2, random_seed=None):
 		"""
-		Generate synthetic catalogs by random sampling of the magnitude of each earthquake.
-		Parameters:
-			N: number of random synthetic catalogs to generate
-			sigma: magnitude uncertainty (considered uniform for the entire catalog).
-		Return value:
-			list of EQCatalog objects
+		Generate synthetic catalogs by random sampling of the magnitude
+		and epicenter of each earthquake.
+
+		:param num_samples:
+			Int, number of random synthetic catalogs to generate
+		:param num_sigma:
+			Float, number of standard deviations to consider
+		:param random_seed:
+			None or int, seed to initialize internal state of random number
+			generator (default: None, will seed from current time)
+
+		:return:
+			list of instances of :class:`EQCatalog`
 		"""
 		import copy
-		M_list = []
-		for eq in self:
-			M_list.append(np.random.normal(eq.get_MS(), sigma, N))
+		import scipy.stats
+
+		num_eq = len(self)
+		ML = np.zeros((num_eq, num_samples))
+		MS = np.zeros((num_eq, num_samples))
+		MW = np.zeros((num_eq, num_samples))
+		lons = np.zeros((num_eq, num_samples))
+		lats = np.zeros((num_eq, num_samples))
+		# depths relevant in declustering?
+		depths = np.zeros((num_eq, num_samples))
+
+		for i, eq in enumerate(self):
+			# TODO: write function to generate errM, errh based on date (use completeness dates?)
+			# A lot of earthquakes have errM = 9.9 ???
+			if not eq.errM or eq.errM >= 1.:
+				errM = 0.3
+			else:
+				errM = eq.errM
+			if not eq.errh:
+				errh = 5.
+			else:
+				errh = eq.errh
+			## Convert uncertainty in km to uncertainty in lon, lat
+			errlon = errh / ((40075./360.) * np.cos(np.radians(eq.lat)))
+			errlat = errh / (40075./360.)
+			if not eq.errz:
+				errz = 5.
+			else:
+				errz = eq.errz
+
+			if eq.ML:
+				ML[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.ML, errM, size=num_samples)
+			if eq.MS:
+				MS[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MS, errM, size=num_samples)
+			if eq.MW:
+				MW[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MW, errM, size=num_samples)
+			lons[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lon, errlon, size=num_samples)
+			lats[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lat, errlat, size=num_samples)
+			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.depth, errz, size=num_samples)
+		depths.clip(min=0.)
 
 		synthetic_catalogs = []
-		for i in range(N):
+		for n in range(num_samples):
 			eq_list = []
-			for eq, Mrange in zip(self, M_list):
+			for i, eq in enumerate(self):
 				new_eq = copy.deepcopy(eq)
-				new_eq.MS = Mrange[i]
+				new_eq.ML = ML[i,n]
+				new_eq.MS = MS[i,n]
+				new_eq.MW = MW[i,n]
+				new_eq.lon = lons[i,n]
+				new_eq.lat = lats[i,n]
+				new_eq.depth = depths[i,n]
 				eq_list.append(new_eq)
 			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date, self.end_date, region=self.region))
 
