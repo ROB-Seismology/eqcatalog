@@ -2810,6 +2810,8 @@ class EQCatalog:
 		import copy
 		import scipy.stats
 
+		np.random.seed(seed=random_seed)
+
 		num_eq = len(self)
 		ML = np.zeros((num_eq, num_samples))
 		MS = np.zeros((num_eq, num_samples))
