@@ -66,6 +66,8 @@ class EQCatalog:
 		datetime, end of catalog (default: None = datetime of youngest
 		earthquake in catalog)
 	:param region:
+		(lon0, lon1, lat0, lat1) tuple with geographic coordinates of
+		bounding box (default: None)
 
 	:param name:
 		String, catalog name (default: "")
@@ -1118,7 +1120,7 @@ class EQCatalog:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
 		:param verbose:
-			Bool, whether or not to print additional information
+			Bool, whether or not to print additional information (default: True)
 
 		:return:
 			Tuple (bins_N_incremental, bins_Mag)
