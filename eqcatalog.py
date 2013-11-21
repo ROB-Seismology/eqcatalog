@@ -3242,9 +3242,11 @@ class EQCatalog:
 		specified minimum magnitude and corresponding year of completeness.
 		The resulting catalog is divided into intervals of the specified
 		length, the number of events in each interval is counted, and a
-		histogram is computed of the number of the number of intervals
-		having the same number of events up to nmax.
+		histogram is computed of the number of intervals having the same
+		number of events up to nmax.
 		This histogram is compared to the theoretical Poisson distribution.
+		It seems to work best if :param:`interval` is larger (2 to 4 times)
+		than tau, the average return period.
 
 		:param Mmin:
 			Float, minimum magnitude to consider in analysis (ideally
