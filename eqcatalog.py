@@ -1163,7 +1163,7 @@ class EQCatalog:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
 		:param verbose:
-			Bool, whether or not to print additional information
+			Bool, whether or not to print additional information (default: True)
 
 		:return:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
@@ -1173,7 +1173,7 @@ class EQCatalog:
 		Mmin = bins_Mag[0]
 		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False):
+	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation=None, completeness=default_completeness, trim=False, verbose=True):
 		"""
 		Compute cumulative magnitude-frequency distribution.
 
@@ -1195,13 +1195,15 @@ class EQCatalog:
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
+		:param verbose:
+			Bool, whether or not to print additional information (default: True)
 
 		:return:
 			Tuple (bins_N_cumulative, bins_Mag)
 			bins_N_cumulative: cumulative annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim)
+		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
 		## Reverse arrays for calculating cumulative number of events
 		bins_N_incremental = bins_N_incremental[::-1]
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
@@ -1391,7 +1393,7 @@ class EQCatalog:
 			String, full path of image to be saved.
 			If None (default), histogram is displayed on screen.
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
 		pylab.bar(bins_Mag, bins_N, width=dM)
 		pylab.xlabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
 		pylab.ylabel("Number of events", fontsize="x-large")
@@ -2119,7 +2121,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=False, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
@@ -2131,7 +2133,7 @@ class EQCatalog:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param cumul:
 			Bool, whether to use cumulative (True) or incremental (False)
-			occurrence rates for linear regression (default: False)
+			occurrence rates for linear regression (default: True)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
@@ -2155,9 +2157,9 @@ class EQCatalog:
 		"""
 		from calcGR import calcGR_LSQ
 		if cumul:
-			rates, magnitudes = self.get_cumulative_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False)
+			rates, magnitudes = self.get_cumulative_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
 		else:
-			rates, magnitudes = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False)
+			rates, magnitudes = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
 		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, verbose=verbose)
 		if not cumul:
 			a += mfd.get_a_separation(b, dM)
@@ -2344,7 +2346,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "Aki" or "LSQ"
+			String, computation method, either "Weichert", "Aki", "LSQc" or "LSQi"
 			(default: "Weichert")
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
@@ -2363,8 +2365,14 @@ class EQCatalog:
 		:return:
 			instance of :class:`mfd.TruncatedGRMFD`
 		"""
-		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
-		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+		if method == "LSQc":
+			kwargs = {'cumul': True}
+		elif method == "LSQi":
+			kwargs = {'cumul': False}
+		else:
+			kwargs = {}
+		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQc": self.calcGR_LSQ, "LSQi": self.calcGR_LSQ}[method]
+		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose, **kwargs)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
 
 	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
@@ -3525,7 +3533,7 @@ class CompositeEQCatalog:
 			zone_areas[zone_id] = zone_poly.GetArea() / 1E6
 		return zone_areas
 
-	def _compute_MFD(self, catalog, Mmax, b_val=None):
+	def _compute_MFD(self, catalog, Mmax, method="Weichert", b_val=None):
 		"""
 		Generic method to compute MFD of a catalog using Weichert method
 		with parameters (Mtype, Mrelation, completeness) stored as class
@@ -3535,6 +3543,9 @@ class CompositeEQCatalog:
 			instance of :class:`EQCatalog`
 		:param Mmax:
 			float, maximum magnitude
+		:param method:
+			str, calculation method, either "Weichert", "Aki", "LSQc" or "LSQi"
+			(default: "Weichert")
 		:param b_val:
 			float, imposed b value (default: None = unconstrained)
 
@@ -3544,7 +3555,7 @@ class CompositeEQCatalog:
 		mfd_bin_width = self.mfd_bin_width
 		Mtype, Mrelation, completeness = self.Mtype, self.Mrelation, self.completeness
 		min_mag = completeness.min_mag
-		MFD = catalog.get_estimated_MFD(min_mag, Mmax, mfd_bin_width, method="Weichert", b_val=b_val, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+		MFD = catalog.get_estimated_MFD(min_mag, Mmax, mfd_bin_width, method=method, b_val=b_val, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
 		MFD.min_mag = self.min_mag
 		return MFD
 
@@ -3617,12 +3628,15 @@ class CompositeEQCatalog:
 			zone_MFDs[zone_id] = zone_MFD
 		return zone_MFDs
 
-	def _compute_zone_MFDs(self, b_val=None, num_sigma=0):
+	def _compute_zone_MFDs(self, method="Weichert", b_val=None, num_sigma=0):
 		"""
 		Compute MFD for each zone using same imposed b value
 		If MFD cannot be computed, a "minimum" MFD, corresponding
 		to the average for SCR will be determined.
 
+		:param method:
+			str, calculation method, either "Weichert", "Aki", "LSQc" or "LSQi"
+			(default: "Weichert")
 		:param b_val:
 			float, imposed b value (default: None = unconstrained)
 		:param num_sigma:
@@ -3640,7 +3654,7 @@ class CompositeEQCatalog:
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
 			try:
-				zone_MFD = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val)
+				zone_MFD = self._compute_MFD(zone_catalog, zone_Mmax, method=method, b_val=b_val)
 				zone_MFD.Weichert = True
 			except ValueError:
 				## Note: it is critical that this doesn't fail for any one zone,
@@ -3662,8 +3676,8 @@ class CompositeEQCatalog:
 				b_val1 = zone_MFD.b_val + zone_MFD.b_sigma * num_sigma
 				b_val2 = zone_MFD.b_val - zone_MFD.b_sigma * num_sigma
 				if zone_MFD.Weichert:
-					MFD_sigma1 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val1)
-					MFD_sigma2 = self._compute_MFD(zone_catalog, zone_Mmax, b_val=b_val2)
+					MFD_sigma1 = self._compute_MFD(zone_catalog, zone_Mmax, method=method, b_val=b_val1)
+					MFD_sigma2 = self._compute_MFD(zone_catalog, zone_Mmax, method=method, b_val=b_val2)
 				else:
 					## If median MFD could not be computed
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
@@ -3676,10 +3690,13 @@ class CompositeEQCatalog:
 
 		return zone_MFDs
 
-	def _compute_master_MFD(self, num_sigma=0):
+	def _compute_master_MFD(self, method="Weichert", num_sigma=0):
 		"""
 		Compute MFD of master catalog
 
+		:param method:
+			str, calculation method, either "Weichert", "Aki", "LSQc" or "LSQi"
+			(default: "Weichert")
 		:param num_sigma:
 			float, number of standard deviations. If not zero,
 			mean + num_sigma stdevs and mean - num_sigma stddevs MFD's
@@ -3692,21 +3709,24 @@ class CompositeEQCatalog:
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		overall_Mmax = max(zone_Mmaxes.values())
 		master_catalog = self.master_catalog
-		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, b_val=None)
+		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, method=method, b_val=None)
 		if num_sigma > 0:
 			b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
-			master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val1)
+			master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, method=method, b_val=b_val1)
 			b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
-			master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, b_val=b_val2)
+			master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, method=method, b_val=b_val2)
 			return [master_MFD, master_MFD1, master_MFD2]
 		else:
 			return master_MFD
 
-	def _compute_summed_MFD(self, b_val=None, num_sigma=0):
+	def _compute_summed_MFD(self, method="Weichert", b_val=None, num_sigma=0):
 		"""
 		Compute summed MFD of zone catalogs, where MFD of each zone catalog
 		is computed using the same b value
 
+		:param method:
+			str, calculation method, either "Weichert", "Aki", "LSQc" or "LSQi"
+			(default: "Weichert")
 		:param b_val:
 			float, imposed b value. If None, the b value of the master catalog
 			MFD will be used (default: None)
@@ -3721,15 +3741,15 @@ class CompositeEQCatalog:
 			or list of instances of :class:`TruncatedGRMFD` (if num_sigma > 0)
 		"""
 		if num_sigma > 0:
-			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=num_sigma)
+			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(method=method, num_sigma=num_sigma)
 		else:
-			master_MFD = self._compute_master_MFD()
-		zone_MFDs = self._compute_zone_MFDs(b_val=master_MFD.b_val)
+			master_MFD = self._compute_master_MFD(method=method)
+		zone_MFDs = self._compute_zone_MFDs(method=method, b_val=master_MFD.b_val)
 		summed_MFD = mfd.sum_MFDs(zone_MFDs.values())
 		if num_sigma > 0:
-			zone_MFDs1 = self._compute_zone_MFDs(b_val=master_MFD1.b_val)
+			zone_MFDs1 = self._compute_zone_MFDs(method=method, b_val=master_MFD1.b_val)
 			summed_MFD1 = mfd.sum_MFDs(zone_MFDs1.values())
-			zone_MFDs2 = self._compute_zone_MFDs(b_val=master_MFD2.b_val)
+			zone_MFDs2 = self._compute_zone_MFDs(method=method, b_val=master_MFD2.b_val)
 			summed_MFD2 = mfd.sum_MFDs(zone_MFDs2.values())
 			return [summed_MFD, summed_MFD1, summed_MFD2]
 		else:
