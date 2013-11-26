@@ -25,7 +25,7 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 		Bool, whether some messages should be printed or not (default: False)
 
 	:return:
-		Tuple (a, b, stdb)
+		Tuple (a, b, stda, stdb)
 		- a: a value
 		- b: b value
 		- stda: standard deviation of a value
@@ -93,7 +93,8 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 	A = FLGN0
 	STDFN0 = FN0 / np.sqrt(NKOUNT)
 	## Applying error propogation for base-10 logarithm
-	STDA = STDFN0 / (2.303 * FN0)
+	## See: http://chemwiki.ucdavis.edu/Analytical_Chemistry/Quantifying_Nature/Significant_Digits/Propagation_of_Error
+	STDA = 0.434 * (STDFN0 / FN0)
 	## Note: the following formula in Philippe Rosset's program is equivalent
 	#A = np.log10(FNGTMO) + B * (magnitudes[0] - dM/2.0)
 	## This is also equivalent to:
@@ -107,21 +108,13 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 		print("Total number of events: %d" % NKOUNT)
 		print("LOG(annual rate above M0): %.3f" % FLGN0)
 		print("Annual rate above M5: %.3f +/- %.3f" % (FN5, STDFN5))
+		print("Annual rate above M0: %.3f +/- %.3f" % (FN0, STDFN0))
 
 	## Other parameters computed in Philippe Rosset's version
 	#STDA = np.sqrt((magnitudes[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(magnitudes[0]-dM/2.0))*np.log(10))))))
 	#STDA = np.sqrt(abs(A)/NKOUNT)
 	#ALPHA = FNGTMO * np.exp(-BETA * (magnitudes[0] - dM/2.0))
 	#STDALPHA = ALPHA / np.sqrt(NKOUNT)
-	#if Mc !=None:
-	#	LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (magnitudes[0] - dM/2.0)))
-	#	STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
-	#if verbose:
-	#	print "Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)" % (A, STDA, B, STDB, BETA, STDBETA)
-	#if Mc != None:
-	#	return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
-	#else:
-	#	return (A, B, BETA, STDA, STDB, STDBETA)
 
 	return A, B, STDA, STDB
 
@@ -141,37 +134,52 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 		Bool, whether some messages should be printed or not (default: False)
 
 	:return:
-		Tuple (a, b, r)
+		Tuple (a, b, a_sigma, b_sigma)
 		- a: a value (intercept)
 		- b: b value (slope, taken positive)
 		- a_sigma: standard deviation of a value
 		- b_sigma: standard deviation of b value
 	"""
 	## Do not consider magnitudes with zero occurrence rates
-	indexes = np.where(occurrence_rates > 0)
-	occurrence_rates = occurrence_rates[indexes]
+	idxs = np.where(occurrence_rates > 0)
+	occurrence_rates = occurrence_rates[idxs]
 	log_occurrence_rates = np.log10(occurrence_rates)
-	magnitudes = magnitudes[indexes]
+	magnitudes = magnitudes[idxs]
+
+	if len(magnitudes) == 0:
+		return (np.nan, np.nan, 0, 0)
 
 	if not b_val:
 		b_val, a_val, r, ttprob, stderr = stats.linregress(magnitudes, log_occurrence_rates)
+		## In earlier versions of linregress, stderr was the standard error
+		## of the estimate (see), in newer versions, it is the standard error
+		## of the slope (b_sigma). To be on the safe side, we ignore it, and
+		## compute a_sigma and b_sigma manually.
 		b_val = -b_val
+		n = len(magnitudes)
+		y = log_occurrence_rates
+		y_estimate = a_val - b_val * magnitudes
+		residual = y - y_estimate
+		see = residual.std(ddof=2)
 
 		## Standard deviation on slope and intercept
 		## (from: http://mail.scipy.org/pipermail/scipy-user/2008-May/016777.html)
 		mx = np.mean(magnitudes)
 		sx2 = np.sum((magnitudes - mx)**2)
-		a_sigma = stderr * np.sqrt(1./len(magnitudes) + mx*mx/sx2)
-		b_sigma = stderr * np.sqrt(1./sx2)
+		a_sigma = see * np.sqrt(1./n + mx*mx/sx2)
+		b_sigma = see * np.sqrt(1./sx2)
+		## Formula for a_sigma from http://www.chem.mtu.edu/~fmorriso/cm3215/UncertaintySlopeInterceptOfLeastSquaresFit.pdf
+		#a_sigma = np.sqrt((see**2 * np.sum(magnitudes**2)) / (n * sx2))
 	else:
 		## Regression line always goes through mean x and y
 		mean_mag = np.mean(magnitudes)
 		mean_log_rate = np.mean(log_occurrence_rates)
 		a_val = mean_log_rate + b_val * mean_mag
 		a_sigma, b_sigma = 0, 0
+		r = np.nan
 
 	if verbose:
-		print "Linear regression: a=%.3f, b=%.3f (r=%.2f)" % (a_val, b_val, r)
+		print "Linear regression: a=%.3f, b=%.3f (r**2=%.2f)" % (a_val, b_val, r**2)
 
 	return (a_val, b_val, a_sigma, b_sigma)
 

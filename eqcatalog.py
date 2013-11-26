@@ -23,6 +23,7 @@ Required modules:
 
 ## Import standard python modules
 import os
+import sys
 import platform
 import datetime
 import cPickle
@@ -2450,14 +2451,14 @@ class EQCatalog:
 			labels.append(label)
 			colors.append(color_estimated)
 			styles.append('-')
-			if num_sigma and method == "Weichert":
+			if num_sigma:
 				sigma_mfd1 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b+num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd1)
 				label = {"en": "Computed", "nl": "Berekend"}[lang]
 				label += " $\pm$ %d sigma" % num_sigma
 				labels.append(label)
 				colors.append(color_estimated)
-				styles.append(':')
+				styles.append('--')
 				sigma_mfd2 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b-num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd2)
 				labels.append("_nolegend_")
@@ -2491,20 +2492,43 @@ class EQCatalog:
 			f.write("%f  %f  %d  %d  %d  %.1f %.2f %d %d\n" % (eq.lon, eq.lat, eq.datetime.year, eq.datetime.month, eq.datetime.day, M, eq.depth, eq.datetime.hour, eq.datetime.minute))
 		f.close()
 
-	def export_csv(self, csv_filespec):
+	def export_csv(self, csv_filespec=None, Mtype=None, Mrelation=None):
 		"""
 		Export earthquake list to a csv file.
 
 		:param csv_filespec:
-			String, full path specification of output csv file.
+			String, full path specification of output csv file
+			(default: None, will write to standard output)
+		:param Mtype:
+			Str, magnitude type, either 'ML', 'MS' or 'MW'.
+			If None, magnitudes will not be converted (default: None)
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
 		"""
-		f = open(csv_filespec, "w")
-		f.write('ID,Date,Time,Name,Longitude,Latitude,Depth,ML,MS,MW,MS (converted),Intensity_max,Macro_radius\n')
+		if csv_filespec == None:
+			f = sys.stdout
+		else:
+			f = open(csv_filespec, "w")
+
+		if Mtype:
+			f.write('EQ_ID,Date,Time,Name,Longitude,Latitude,Depth,%s,Intensity_max,Macro_radius\n' % Mtype)
+		else:
+			f.write('EQ_ID,Date,Time,Name,Longitude,Latitude,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
 		for eq in self.eq_list:
 			date = eq.datetime.date().isoformat()
 			time = eq.datetime.time().isoformat()
-			f.write('%d,"%s","%s","%s",%.3f,%.3f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d\n' % (eq.ID, date, time, eq.name, eq.lon, eq.lat, eq.depth, eq.ML, eq.MS, eq.MW, eq.get_MS(), eq.intensity_max, eq.macro_radius))
-		f.close()
+			if eq.name != None:
+				eq_name = eq.name.encode('ascii', 'ignore')
+			else:
+				eq_name = ""
+			if Mtype:
+				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.1f,%d,%d\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.get_M(Mtype, Mrelation), eq.intensity_max, eq.macro_radius))
+			else:
+				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.1f,%.1f,%.1f,%.1f,%d,%d\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
+		if csv_filespec != None:
+			f.close()
 
 	def export_KML(self, kml_filespec=None, time_folders=True, instrumental_start_year=1910, color_by_depth=False):
 		"""
