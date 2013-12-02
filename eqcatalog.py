@@ -2857,18 +2857,42 @@ class EQCatalog:
 
 		for i, eq in enumerate(self):
 			# TODO: write function to generate errM, errh based on date (use completeness dates?)
-			# A lot of earthquakes have errM = 9.9 ???
-			if not eq.errM or eq.errM >= 1.:
+			if not eq.errM:
+				if eq.datetime.year < 1910:
+					errM = 0.5
+				elif 1910 <= eq.datetime.year < 1985:
+					if eq.MS > 0:
+						errM = 0.2
+					else:
+						errM = 0.3
+				elif eq.datetime.year >= 1985:
+					eq.errM = 0.2
+			elif eq.errM >= 1.:
+				# A lot of earthquakes have errM = 9.9 ???
 				errM = 0.3
 			else:
 				errM = eq.errM
+
 			if not eq.errh:
-				errh = 5.
+				if eq.datetime.year < 1650:
+					errh = 25
+				elif 1650 <= eq.datetime.year < 1910:
+					errh = 15
+				elif 1910 <= eq.datetime.year < 1930:
+					errh = 10
+				elif 1930 <= eq.datetime.year < 1960:
+					errh = 5.
+				elif 1960 <= eq.datetime.year < 1985:
+					errh = 2.5
+				elif eq.datetime.year >= 1985:
+					errh = 1.5
 			else:
 				errh = eq.errh
+
 			## Convert uncertainty in km to uncertainty in lon, lat
 			errlon = errh / ((40075./360.) * np.cos(np.radians(eq.lat)))
 			errlat = errh / (40075./360.)
+
 			if not eq.errz:
 				errz = 5.
 			else:
