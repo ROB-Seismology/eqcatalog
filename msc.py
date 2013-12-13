@@ -8,7 +8,6 @@ import numpy as np
 
 from matplotlib.ticker import MultipleLocator
 
-import seismodb
 
 
 class MSCE(object):
@@ -443,6 +442,7 @@ def seismic_moment_to_moment_magnitude_dyncm(M0):
 def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=None, fig_width=None):
 	"""
 	"""
+	import seismodb
 	mags = np.arange(Mmin, Mmax, dM)
 
 	if issubclass(msces, MSCE):
@@ -468,7 +468,7 @@ def plot(msces, datasets=[], Mmin=1, Mmax=7.1, dM=0.1, fig_filespec=None, dpi=No
 			catalog_data_x.extend(dataset[msce._FROM])
 			catalog_data_y.extend(dataset[msce._TO])
 #			plt.scatter(dataset[msce._FROM], dataset[msce._TO], label=data_label)
-	
+
 	plt.scatter(catalog_data_x, catalog_data_y, label='Catalog data')
 
 	## plot 1:1 relation

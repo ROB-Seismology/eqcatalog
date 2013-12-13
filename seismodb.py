@@ -23,12 +23,12 @@ import MySQLdb
 import MySQLdb.cursors
 
 ## Import ROB modules
-import eqrecord
-reload(eqrecord)
+#import eqrecord
+#reload(eqrecord)
 from eqrecord import LocalEarthquake, MacroseismicRecord, FocMecRecord
 
-import eqcatalog
-reload(eqcatalog)
+#import eqcatalog
+#reload(eqcatalog)
 from eqcatalog import EQCatalog
 
 ## Database information

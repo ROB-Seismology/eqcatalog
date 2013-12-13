@@ -42,12 +42,12 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
+import mx.DateTime as mxDateTime
 
 
 
 ## Import ROB modules
 from eqrecord import LocalEarthquake
-import seismodb
 import hazard.rshalib.mfd as mfd
 from source_models import read_source_model
 from completeness import *
@@ -82,9 +82,9 @@ class EQCatalog:
 		self.end_date = end_date
 		if not end_date:
 			self.end_date = Tmax
-		if isinstance(self.start_date, datetime.datetime):
+		if isinstance(self.start_date, (datetime.datetime, mxDateTime.DateTimeType)):
 			self.start_date = self.start_date.date()
-		if isinstance(self.end_date, datetime.datetime):
+		if isinstance(self.end_date, (datetime.datetime, mxDateTime.DateTimeType)):
 			self.end_date = self.end_date.date()
 		self.region = region
 		self.name = name
@@ -239,7 +239,8 @@ class EQCatalog:
 			list of timedelta objects
 		"""
 		if not start_datetime:
-			start_datetime = datetime.datetime.combine(self.start_date, datetime.time(0,0,0))
+			year, month, day = self.start_date.year, self.start_date.month, self.start_date.day
+			start_datetime = mxDateTime.Date(year, month, day)
 		return [eq.datetime - start_datetime for eq in self]
 
 	def timespan(self):
@@ -252,11 +253,11 @@ class EQCatalog:
 			year = end_date.year
 			catalog_length = (end_date - start_date).days * 1. / (datetime.date(year+1,1,1) - datetime.date(year,1,1)).days
 		else:
-			end_of_last_year = datetime.date(end_date.year-1,12,31)
-			end_of_this_year = datetime.date(end_date.year,12,31)
+			end_of_last_year = mxDateTime.Date(end_date.year-1,12,31)
+			end_of_this_year = mxDateTime.Date(end_date.year,12,31)
 			catalog_length = (end_date - end_of_last_year).days * 1./ (end_of_this_year - end_of_last_year).days
-			start_of_this_year = datetime.date(start_date.year,1,1)
-			start_of_next_year = datetime.date(start_date.year+1,1,1)
+			start_of_this_year = mxDateTime.Date(start_date.year,1,1)
+			start_of_next_year = mxDateTime.Date(start_date.year+1,1,1)
 			catalog_length += (start_of_next_year - start_date).days * 1. / (start_of_next_year - start_of_this_year).days
 			catalog_length += (num_intervening_years - 1)
 		return catalog_length
@@ -4211,6 +4212,7 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	:return:
 		instance of :class:`EQCatalog`
 	"""
+	import seismodb
 	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 

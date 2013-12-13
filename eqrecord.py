@@ -8,10 +8,11 @@ import time
 import json
 import numpy as np
 
+## Third-part modules
+import mx.DateTime as mxDateTime
 
 ## Import ROB modules
 import mapping.geo.geodetic as geodetic
-import seismodb
 import msc
 
 
@@ -62,7 +63,13 @@ class LocalEarthquake:
 	"""
 	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0.):
 		self.ID = ID
-		self.datetime = datetime.datetime.combine(date, time)
+		if isinstance(date, datetime.date) and isinstance(time, datetime.time):
+			self.datetime = datetime.datetime.combine(date, time)
+		elif isinstance(date, datetime.datetime) or isinstance(date, mxDateTime.DateTimeType):
+			self.datetime = date
+		elif isinstance(time, datetime.datetime) or isinstance(time, mxDateTime.DateTimeType):
+			self.datetime = time
+
 		self.lon = lon
 		self.lat = lat
 		self.depth = depth
@@ -213,11 +220,32 @@ class LocalEarthquake:
 
 	@property
 	def date(self):
-		return self.datetime.date()
+		if isinstance(self.datetime, mxDateTime.DateTimeType):
+			year, month, day = self.datetime.year, self.datetime.month, self.datetime.day
+			return mxDateTime.Date(year, month, day)
+		else:
+			return self.datetime.date()
 
 	@property
 	def time(self):
-		return self.datetime.time()
+		if isinstance(self.datetime, mxDateTime.DateTimeType):
+			return self.datetime.pytime()
+		else:
+			return self.datetime.time()
+
+	def set_mx_datetime(self):
+		"""
+		Convert datetime property to mxDateTime object
+		"""
+		if isinstance(self.datetime, datetime.datetime):
+			self.datetime = mxDateTime.DateTimeFrom(self.datetime)
+
+	def set_py_datetime(self):
+		"""
+		Convert datetime property to Python datetime object
+		"""
+		if isinstance(self.datetime, mxDateTime.DateTimeType):
+			self.datetime = self.datetime.pydatetime()
 
 	def get_ML(self, Mrelation=None):
 		"""
@@ -350,15 +378,15 @@ class LocalEarthquake:
 		"""
 		def sinceEpoch(date):
 			# returns seconds since epoch
-			epoch = datetime.datetime(1970, 1, 1)
+			epoch = mxDateTime.Date(1970, 1, 1)
 			diff = epoch - date
 			return diff.days * 24. * 3600. + diff.seconds
 			## The line below only works for dates after the epoch
 			#return time.mktime(date.timetuple())
 
 		year = self.datetime.year
-		startOfThisYear = datetime.datetime(year=year, month=1, day=1)
-		startOfNextYear = datetime.datetime(year=year+1, month=1, day=1)
+		startOfThisYear = mxDateTime.Date(year=year, month=1, day=1)
+		startOfNextYear = mxDateTime.Date(year=year+1, month=1, day=1)
 
 		yearElapsed = sinceEpoch(self.datetime) - sinceEpoch(startOfThisYear)
 		yearDuration = sinceEpoch(startOfNextYear) - sinceEpoch(startOfThisYear)
@@ -445,14 +473,17 @@ class LocalEarthquake:
 		return geodetic.get_point_at((self.lon, self.lat), distance, azimuth)
 
 	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", sort_key="intensity", sort_order="asc", verbose=False):
-		return seismodb.query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, sort_key=sort_key, sort_order=sort_order, verbose=verbose)
+		from seismodb import query_ROB_Web_MacroCatalog
+		return query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, sort_key=sort_key, sort_order=sort_order, verbose=verbose)
 
 	def get_macroseismic_data_aggregated_official(self, Imax=True, min_val=1, group_by_main_village=False, agg_function="maximum", verbose=False):
-		return seismodb.query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, verbose=verbose)
+		from seismodb import query_ROB_Official_MacroCatalog
+		return query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val, group_by_main_village=group_by_main_village, agg_function=agg_function, lonlat=True, verbose=verbose)
 
 	def get_focal_mechanism(self, verbose=False):
+		from seismodb import query_ROB_FocalMechanisms
 		try:
-			return seismodb.query_ROB_FocalMechanisms(id_earth=self.ID, verbose=verbose)[0]
+			return query_ROB_FocalMechanisms(id_earth=self.ID, verbose=verbose)[0]
 		except IndexError:
 			return None
 

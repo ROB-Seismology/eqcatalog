@@ -1,6 +1,8 @@
 import datetime
 import numpy as np
 
+import mx.DateTime as mxDateTime
+
 
 
 class Completeness:
@@ -19,7 +21,7 @@ class Completeness:
 	def __init__(self, min_dates, min_mags, Mtype):
 		## Convert years to dates if necessary
 		if isinstance(min_dates[0], int):
-			min_dates = [datetime.date(yr, 1, 1) for yr in min_dates]
+			min_dates = [mxDateTime.Date(yr, 1, 1) for yr in min_dates]
 		self.min_dates = np.array(min_dates)
 		self.min_mags = np.array(min_mags)
 		self.Mtype = Mtype
@@ -51,8 +53,8 @@ class Completeness:
 	def min_years(self):
 		#return np.array([date.year for date in self.min_dates])
 		years = np.array([date.year for date in self.min_dates], 'f')
-		year_num_days = np.array([(datetime.date(year, 12, 31) - datetime.date(year, 1, 1)).days + 1 for year in years], 'f')
-		time_deltas = self.min_dates - np.array([datetime.date(year, 1, 1) for year in years])
+		year_num_days = np.array([(mxDateTime.Date(year, 12, 31) - mxDateTime.Date(year, 1, 1)).days + 1 for year in years], 'f')
+		time_deltas = self.min_dates - np.array([mxDateTime.Date(year, 1, 1) for year in years])
 		num_days = np.array([td.days for td in time_deltas], 'f')
 		return years + num_days / year_num_days
 
@@ -68,7 +70,7 @@ class Completeness:
 			Float, completeness magnitude
 		"""
 		if isinstance(date, int):
-			date = datetime.date(date, 1, 1)
+			date = mxDateTime.Date(date, 1, 1)
 		try:
 			index = np.where(self.min_dates <= date)[0][-1]
 		except IndexError:
@@ -119,7 +121,7 @@ class Completeness:
 			numpy float array, completeness timespans (fractional years)
 		"""
 		if isinstance(end_date, int):
-			end_date = datetime.date(end_date, 1, 1)
+			end_date = mxDateTime.Date(end_date, 1, 1)
 		completeness_dates = [self.get_completeness_date(M) for M in magnitudes]
 		completeness_timespans = [((end_date - start_date).days + 1) / 365.25 for start_date in completeness_dates]
 		return np.array(completeness_timespans)
