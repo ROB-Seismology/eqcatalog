@@ -36,9 +36,15 @@ from eqrecord import (LocalEarthquake, FocMecRecord, MacroseismicDataPoint, Macr
 import eqcatalog
 reload(eqcatalog)
 
-from eqcatalog import (EQCatalog, CompositeEQCatalog, read_catalogSQL, read_catalogGIS,
-	read_named_catalog, read_catalogTXT, plot_catalogs_map, plot_catalogs_magnitude_time)
-	
+from eqcatalog import (EQCatalog, read_catalogSQL, read_catalogGIS,
+	concatenate_catalogs, read_named_catalog, read_catalogTXT, plot_catalogs_map,
+	plot_catalogs_magnitude_time)
+
+import composite_catalog
+reload(composite_catalog)
+
+from composite_catalog import CompositeEQCatalog
+
 ## Depends on eqrecord, eqcatalog
 import seismodb
 reload(seismodb)

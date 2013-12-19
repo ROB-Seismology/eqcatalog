@@ -221,7 +221,7 @@ class LocalEarthquake:
 	@property
 	def date(self):
 		if isinstance(self.datetime, mxDateTime.DateTimeType):
-			year, month, day = self.datetime.year, self.datetime.month, self.datetime.day
+			year, month, day = self.datetime.timetuple()[:3]
 			return mxDateTime.Date(year, month, day)
 		else:
 			return self.datetime.date()
@@ -385,8 +385,8 @@ class LocalEarthquake:
 			#return time.mktime(date.timetuple())
 
 		year = self.datetime.year
-		startOfThisYear = mxDateTime.Date(year=year, month=1, day=1)
-		startOfNextYear = mxDateTime.Date(year=year+1, month=1, day=1)
+		startOfThisYear = mxDateTime.DateFrom(year=year, month=1, day=1)
+		startOfNextYear = mxDateTime.DateFrom(year=year+1, month=1, day=1)
 
 		yearElapsed = sinceEpoch(self.datetime) - sinceEpoch(startOfThisYear)
 		yearDuration = sinceEpoch(startOfNextYear) - sinceEpoch(startOfThisYear)

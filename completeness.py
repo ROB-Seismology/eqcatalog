@@ -1,4 +1,3 @@
-import datetime
 import numpy as np
 
 import mx.DateTime as mxDateTime
