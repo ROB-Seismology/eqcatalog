@@ -22,6 +22,7 @@ Required modules:
 
 
 ## Import standard python modules
+import csv
 import os
 import sys
 import platform
@@ -3761,57 +3762,97 @@ def read_named_catalog(catalog_name, verbose=True):
 	return eqc
 
 
-def read_catalogTXT(filespec, column_map, skiprows=0, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MW", Mrelation=None):
+def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9}, header=True, **fmtparams):
 	"""
-	Read ROB local earthquake catalog from txt file.
+	Read ROB local earthquake catalog from csv file.
 
 	:param filespec:
-		String, defining filespec of a txt file with columns defining at least
-		the attributes id, year, month, day, hours, minutes, seconds, longitude,
-		latitude and depth. ML, MS and MW are optional.
+		String, defining filespec of a text file with columns defining attributes
+		id, date (or year, month and day), time (or hours, minutes and seconds),
+		lon, lat, depth, ML, MS and MW. All are optional.
 	:param column_map:
 		Dictionary, mapping attributes to number of column (starting from 0).
-		ML, MS and MW must be set to None if not given.
-	:param skiprows:
-		Integer, defining number of lines to skip at top of file (default: 0).
-		To be used when header is present.
-
-	See method EQCatalog.read_catalogSQL for other params.
+		(default: {"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9})
+	:param header:
+		bool, if one-line header is present (default: True).
+	:param **fmtparams:
+		kwargs for csv reader (e.g. "delimiter" and "quotechar")
+	
+	:returns:
+		instance of :class:`EQCatalog`
 	"""
-	eq_list_txt = np.loadtxt(filespec, skiprows=skiprows)
-	eq_list = []
-	for eq_txt in eq_list_txt:
-		ID = eq_txt[column_map['id']]
-		year = int(eq_txt[column_map['year']])
-		month = int(eq_txt[column_map['month']])
-		day = int(eq_txt[column_map['day']])
-		date = datetime.date(year, month, day)
-		hour = int(eq_txt[column_map['hour']])
-		minute = int(eq_txt[column_map['minute']])
-		second = int(eq_txt[column_map['second']])
-		time = datetime.time(hour, minute, second)
-		lon = eq_txt[column_map['lon']]
-		lat = eq_txt[column_map['lat']]
-		depth = eq_txt[column_map['depth']]
-		ML = eq_txt[column_map['ML']]
-		if column_map['ML']:
-			ML = eq_txt[column_map['ML']]
-		else:
-			ML = 0
-		if column_map['MS']:
-			MS = eq_txt[column_map['MS']]
-		else:
-			MS = 0
-		if column_map['MW']:
-			MW = eq_txt[column_map['MW']]
-		else:
-			MW = 0
-		eq_list.append(LocalEarthquake(ID, date, time, lon, lat, depth,
-			ML, MS, MW))
-	eqc = EQCatalog(eq_list)
-	eqc = eqc.subselect(region, start_date, end_date, Mmin, Mmax, min_depth,
-		max_depth, Mtype, Mrelation)
-	return eqc
+	earthquakes = []
+	with open(filespec, "r") as f:
+		lines = csv.reader(f, **fmtparams)
+		if header:
+			for line in lines:
+				break
+		for i, line in enumerate(lines):
+			if hasattr(column_map, "id"):
+				ID = int(line[column_map["id"]])
+			else:
+				ID = i+1
+			if "date" in column_map:
+				date = line[column_map["date"]]
+				year, month, day = map(int, date.split("-"))
+			else:
+				if "year" in column_map:
+					year = int(line[column_map["year"]])
+				else:
+					year = 1.
+				if "month" in column_map:
+					month = int(line[column_map["month"]])
+				else:
+					month = 1.
+				if "day" in column_map:
+					day = int(line[column_map["day"]])
+				else:
+					day = 1.
+			date = mxDateTime.Date(year, month, day)
+			if "time" in column_map:
+				time = line[column_map["time"]]
+				hour, minute, second = map(int, time.split(":"))
+			else:
+				if "hour" in column_map:
+					hour = int(line[column_map["hour"]])
+				else:
+					hour = 0
+				if "minute" in column_map:
+					minute = int(line[column_map["minute"]])
+				else:
+					minute = 0
+				if "second" in column_map:
+					second = int(line[column_map["second"]])
+				else:
+					second = 0
+			time = mxDateTime.Time(hour, minute, second)
+			if "lon" in column_map:
+				lon = float(line[column_map["lon"]])
+			else:
+				lon = 0.
+			if "lat" in column_map:
+				lat = float(line[column_map["lat"]])
+			else:
+				lat = 0.
+			if "depth" in column_map:
+				depth = float(line[column_map["depth"]])
+			else:
+				depth = 0.
+			if "ML" in column_map:
+				ML = float(line[column_map["ML"]])
+			else:
+				ML = 0.
+			if "MS" in column_map:
+				MS = float(line[column_map["MS"]])
+			else:
+				MS = 0.
+			if "MW" in column_map:
+				MW = float(line[column_map["MW"]])
+			else:
+				MW = 0.
+			earthquakes.append(LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW))
+	catalog = EQCatalog(earthquakes)
+	return catalog
 
 
 def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_size=11, sm_label_colname="ShortName", sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
