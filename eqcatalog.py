@@ -221,10 +221,10 @@ class EQCatalog:
 
 	def get_time_delta(self):
 		"""
-		Return duration of catalog as datetime.timedelta object
+		Return duration of catalog as timedelta object
 
 		:return:
-			instance of datetime.timedelta
+			instance of datetime.timedelta or mxDateTime.DateTimeDelta
 		"""
 		Tmin, Tmax = self.Tminmax()
 		return Tmax - Tmin
@@ -2544,9 +2544,9 @@ class EQCatalog:
 			f = open(csv_filespec, "w")
 
 		if Mtype:
-			f.write('EQ_ID,Date,Time,Name,Longitude,Latitude,Depth,%s,Intensity_max,Macro_radius\n' % Mtype)
+			f.write('ID,Date,Time,Name,Lon,Lat,Depth,%s,Intensity_max,Macro_radius\n' % Mtype)
 		else:
-			f.write('EQ_ID,Date,Time,Name,Longitude,Latitude,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
+			f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
 		for eq in self.eq_list:
 			try:
 				date = eq.date.isoformat()
