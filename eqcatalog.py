@@ -2073,7 +2073,7 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_map(self, symbol='o', edge_color='r', fill_color=None, label="Epicenters", symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+	def plot_map(self, symbol='o', edge_color='r', fill_color=None, label="Epicenters", symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_colname="ShortName", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 		"""
 		Plot map of catalog
 
@@ -2124,6 +2124,8 @@ class EQCatalog:
 			String, line style to plot source model (default: '-')
 		:param sm_line_width:
 			Int, line width to plot source model (default: 2)
+		:param sm_label_colname:
+			Str, column name of GIS table to use as label (default: "ShortName")
 		:param title:
 			String, plot title (default: None)
 		:param legend_location:
@@ -2152,7 +2154,7 @@ class EQCatalog:
 		if title is None:
 			title = self.name
 
-		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, sm_label_colname=sm_label_colname, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""

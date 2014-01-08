@@ -354,6 +354,7 @@ rob_source_models_dict[name] = RVRS_SHARE_AS
 ## SHARE AS model
 name = 'SHARE_AS'
 gis_filespec = os.path.join(SHARE_directory, 'ASModel', 'Ver6.1', 'ASModelVer61.shp')
+#gis_filespec = os.path.join(SHARE_directory, 'ASModel', 'Ver4alpha', 'AsModel_ver4_alpha.shp')
 column_map = {
 	'id': 'IDAS',
 	'name': 'IDAS',
