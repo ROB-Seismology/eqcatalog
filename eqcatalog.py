@@ -52,6 +52,7 @@ from eqrecord import LocalEarthquake
 import hazard.rshalib.mfd as mfd
 from source_models import read_source_model
 from completeness import *
+from time_functions import timespan
 
 
 
@@ -251,19 +252,7 @@ class EQCatalog:
 		Return total time span of catalog as number of fractional years.
 		"""
 		start_date, end_date = self.start_date, self.end_date
-		num_intervening_years = end_date.year - start_date.year
-		if num_intervening_years == 0:
-			year = end_date.year
-			catalog_length = (end_date - start_date).days * 1. / (datetime.date(year+1,1,1) - datetime.date(year,1,1)).days
-		else:
-			end_of_last_year = mxDateTime.Date(end_date.year-1,12,31)
-			end_of_this_year = mxDateTime.Date(end_date.year,12,31)
-			catalog_length = (end_date - end_of_last_year).days * 1./ (end_of_this_year - end_of_last_year).days
-			start_of_this_year = mxDateTime.Date(start_date.year,1,1)
-			start_of_next_year = mxDateTime.Date(start_date.year+1,1,1)
-			catalog_length += (start_of_next_year - start_date).days * 1. / (start_of_next_year - start_of_this_year).days
-			catalog_length += (num_intervening_years - 1)
-		return catalog_length
+		return timespan(start_date, end_date)
 
 	def get_datetimes(self):
 		"""
@@ -3779,7 +3768,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		bool, if one-line header is present (default: True).
 	:param **fmtparams:
 		kwargs for csv reader (e.g. "delimiter" and "quotechar")
-	
+
 	:returns:
 		instance of :class:`EQCatalog`
 	"""

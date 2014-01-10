@@ -1,6 +1,7 @@
 import numpy as np
 
 import mx.DateTime as mxDateTime
+from time_functions import timespan
 
 
 
@@ -120,9 +121,10 @@ class Completeness:
 			numpy float array, completeness timespans (fractional years)
 		"""
 		if isinstance(end_date, int):
-			end_date = mxDateTime.Date(end_date, 1, 1)
+			end_date = mxDateTime.Date(end_date, 12, 31)
 		completeness_dates = [self.get_completeness_date(M) for M in magnitudes]
-		completeness_timespans = [((end_date - start_date).days + 1) / 365.25 for start_date in completeness_dates]
+		completeness_timespans = [timespan(start_date, end_date) for start_date in completeness_dates]
+		#completeness_timespans = [((end_date - start_date).days + 1) / 365.25 for start_date in completeness_dates]
 		return np.array(completeness_timespans)
 
 	def to_hmtk_table(self, Mmax=None):

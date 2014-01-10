@@ -3,12 +3,16 @@
 #
 
 ## No internal dependencies
+import time_functions
+reload(time_functions)
+
+## No internal dependencies
 import completeness
 reload(completeness)
 
 from completeness import *
 
-## No internal dependencies
+## Depends on time_functions
 import calcGR
 reload(calcGR)
 
@@ -26,13 +30,13 @@ reload(source_models)
 
 from source_models import (read_source_model, rob_source_models_dict)
 
-## Depends on msc
+## Depends on time_functions, msc
 import eqrecord
 reload(eqrecord)
 
 from eqrecord import (LocalEarthquake, FocMecRecord, MacroseismicDataPoint, MacroseismicRecord)
 
-## Depends on eqrecord, declustering, source_models
+## Depends on time_functions, eqrecord, declustering, source_models
 import eqcatalog
 reload(eqcatalog)
 

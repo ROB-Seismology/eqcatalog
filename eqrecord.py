@@ -14,6 +14,7 @@ import mx.DateTime as mxDateTime
 ## Import ROB modules
 import mapping.geo.geodetic as geodetic
 import msc
+from time_functions import fractional_year
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
@@ -376,23 +377,7 @@ class LocalEarthquake:
 		:return:
 			Float, fractional year
 		"""
-		def sinceEpoch(date):
-			# returns seconds since epoch
-			epoch = mxDateTime.Date(1970, 1, 1)
-			diff = epoch - date
-			return diff.days * 24. * 3600. + diff.seconds
-			## The line below only works for dates after the epoch
-			#return time.mktime(date.timetuple())
-
-		year = self.datetime.year
-		startOfThisYear = mxDateTime.DateFrom(year=year, month=1, day=1)
-		startOfNextYear = mxDateTime.DateFrom(year=year+1, month=1, day=1)
-
-		yearElapsed = sinceEpoch(self.datetime) - sinceEpoch(startOfThisYear)
-		yearDuration = sinceEpoch(startOfNextYear) - sinceEpoch(startOfThisYear)
-		fraction = yearElapsed/yearDuration
-
-		return self.datetime.year + fraction
+		return fractional_year(self.datetime)
 
 	def get_fractional_hour(self):
 		"""
