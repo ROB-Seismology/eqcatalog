@@ -2,7 +2,7 @@
 
 import numpy as np
 from completeness import default_completeness
-
+from eqcatalog import EQCatalog, read_source_model
 
 
 class CompositeEQCatalog:
@@ -127,7 +127,7 @@ class CompositeEQCatalog:
 			centroid = zone_poly.Centroid()
 			utm_spec = get_utm_spec(centroid.GetX(), centroid.GetY())
 			utm_srs = get_utm_srs(utm_spec)
-			coordTrans = osr.CoordinateTransforion(wgs84, utm_srs)
+			coordTrans = osr.CoordinateTransformation(wgs84, utm_srs)
 			zone_poly.Transform(coordTrans)
 			zone_areas[zone_id] = zone_poly.GetArea() / 1E6
 		return zone_areas
