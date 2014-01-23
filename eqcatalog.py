@@ -49,7 +49,7 @@ import mx.DateTime as mxDateTime
 
 ## Import ROB modules
 from eqrecord import LocalEarthquake
-import hazard.rshalib.mfd as mfd
+import hazard.rshalib.mfd.mfd as mfd
 from source_models import read_source_model
 from completeness import *
 from time_functions import timespan

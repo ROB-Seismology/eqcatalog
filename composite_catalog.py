@@ -3,7 +3,9 @@
 import numpy as np
 from completeness import default_completeness
 from eqcatalog import EQCatalog, read_source_model
-from hazard.rshalib import mfd
+import hazard.rshalib.mfd.mfd as mfd
+
+
 
 class CompositeEQCatalog:
 	"""
