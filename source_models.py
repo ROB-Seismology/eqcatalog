@@ -324,6 +324,41 @@ column_map = {
 Seismotectonic_Hybrid = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = Seismotectonic_Hybrid
 
+## Seismotectonic Hybrid (including Hockai fault)
+name = 'Seismotectonic_Hybrid_Hockai'
+gis_filespec = os.path.join(ROB_directory, 'Seismotectonic Hybrid + Hockai.TAB')
+column_map = {
+	'id': 'ShortName',
+	'name': 'Name',
+	'tectonic_region_type': 'SHARE_TRT',
+	'a_val': 'aMLE',
+	'b_val': 'bMLE',
+	'a_sigma': 0.,
+	'b_sigma': 'stdbMLE',
+	'min_mag': 4.0,
+	'max_mag': 'Mmax_evaluated',
+	'upper_seismogenic_depth': 'upper_rupture_depth',
+	'lower_seismogenic_depth': 'lower_rupture_depth',
+	'min_hypo_depth': 'min_hypo_depth',
+	'max_hypo_depth': 'max_hypo_depth',
+	'mean_hypo_depth': 'mean_hypo_depth',
+	'min_strike': 'min_strike',
+	'max_strike': 'max_strike',
+	'min_dip': 'min_dip',
+	'max_dip': 'max_dip',
+	'Ss': 'Ss',
+	'Nf': 'Nf',
+	'Tf': 'Tf',
+	'length': 'Length',
+	'min_rake': 'min_rake',
+	'max_rake': 'max_rake',
+	'min_slip_rate': 'min_slip_rate',
+	'max_slip_rate': 'max_slip_rate',
+	'bg_zone': 'BG_zone',
+	'area': 'Area'}
+Seismotectonic_Hybrid_Hockai = SourceModelDefinition(name, gis_filespec, column_map)
+rob_source_models_dict[name] = Seismotectonic_Hybrid_Hockai
+
 ## RVRS SHARE AS model
 name = 'RVRS_SHARE_AS'
 gis_filespec = os.path.join(ROB_directory, 'RVRS_SHARE_v4alpha.TAB')
