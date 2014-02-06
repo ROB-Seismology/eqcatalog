@@ -3601,14 +3601,21 @@ def read_catalogGIS(gis_filespec, column_map, verbose=True):
 
 		if column_map.has_key('date'):
 			date = rec[column_map['date']]
-			year, month, day = [int(s) for s in date.split('/')]
+			if date:
+				year, month, day = [int(s) for s in date.split('/')]
+			else:
+				year, month, day = 0, 0, 0
 		else:
 			if column_map.has_key('year'):
 				year = rec[column_map['year']]
 			if column_map.has_key('month'):
 				month = rec[column_map['month']]
+			else:
+				month = 1
 			if column_map.has_key('day'):
 				day = rec[column_map['day']]
+			else:
+				day = 1
 		try:
 			date = datetime.date(year, month, day)
 		except:
@@ -3710,7 +3717,10 @@ def read_catalogGIS(gis_filespec, column_map, verbose=True):
 		except:
 			skipped += 1
 		else:
-			eq_list.append(eq)
+			if date:
+				eq_list.append(eq)
+			else:
+				skipped += 1
 
 	name = os.path.split(gis_filespec)[-1]
 	eqc = EQCatalog(eq_list, name=name)
@@ -3723,7 +3733,7 @@ def read_named_catalog(catalog_name, verbose=True):
 	Read a known catalog (corresponding files should be in standard location)
 
 	:param catalog_name:
-		Str, name of catalog ("SHEEC", "CENEC", "ISC-GEM", "CEUS-SCR"):
+		Str, name of catalog ("SHEEC", "CENEC", "ISC-GEM", "CEUS-SCR", "BGS"):
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -3736,13 +3746,16 @@ def read_named_catalog(catalog_name, verbose=True):
 		column_map = {'lon': 'Lon', 'lat': 'Lat', 'year': 'Year', 'month': 'Mo', 'day': 'Da', 'hour': 'Ho', 'minute': 'Mi', 'second': 'Se', 'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
 	elif catalog_name.upper() == "CENEC":
 		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\CENEC\CENEC 2008.TAB"
-		column_map = {'lon': 'lon', 'lat': 'lat', 'year': 'year', 'month': 'month', 'day': 'day', 'hour': 'hour', 'minute': 'minute', 'MW': 'Mw', 'depth': 'depth'}
+		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'Date', 'hour': 'hour', 'minute': 'minute', 'MW': 'Mw', 'depth': 'depth'}
 	elif catalog_name.upper() == "ISC-GEM":
 		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\ISC-GEM\isc-gem-cat.TAB"
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
 	elif catalog_name.upper() == "CEUS-SCR":
 		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\CEUS-SCR\CEUS_SCR_Catalog_2012.TAB"
 		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E[M]', 'errM': 'sigma_M'}
+	elif catalog_name.upper() == "BGS":
+		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\BGS\Selection of SE-UK-BGS-earthquakes.TAB"
+		column_map = {'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR', 'hour': 'HR', 'minute': 'MN', 'second': 'SECS', 'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'ID': 'ID', 'name': 'LOCALITY', 'intensity_max': 'INT'}
 	else:
 		raise Exception("Catalog not recognized: %s" % catalog_name)
 
