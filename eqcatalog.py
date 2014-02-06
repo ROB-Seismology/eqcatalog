@@ -4040,6 +4040,8 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			magnitudes = catalog.get_magnitudes(Mtype, Mrelation)
 			symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
 			symbol_sizes = symbol_sizes ** 2
+			if symbol_sizes.min() <= 0:
+				print "Warning: negative or zero symbol size encountered"
 			#print symbol_sizes.min(), symbol_sizes.max()
 
 		## Earthquake epicenters
