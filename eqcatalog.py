@@ -46,6 +46,13 @@ from matplotlib.ticker import MultipleLocator, MaxNLocator
 import mx.DateTime as mxDateTime
 
 
+## Directories with MapInfo tables for named catalogs
+if platform.uname()[0] == "Windows":
+	GIS_root = r"D:\GIS-data"
+else:
+	GIS_root = os.path.join(os.environ["HOME"], "gis-data")
+
+
 
 ## Import ROB modules
 from eqrecord import LocalEarthquake
@@ -3742,19 +3749,19 @@ def read_named_catalog(catalog_name, verbose=True):
 		instance of :class:`EQCatalog`
 	"""
 	if catalog_name.upper() == "SHEEC":
-		gis_filespec = r"D:\GIS-data\SHARE\SHEEC\Ver3.3\SHAREver3.3.shp"
+		gis_filespec = os.path.join(GIS_root, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
 		column_map = {'lon': 'Lon', 'lat': 'Lat', 'year': 'Year', 'month': 'Mo', 'day': 'Da', 'hour': 'Ho', 'minute': 'Mi', 'second': 'Se', 'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
 	elif catalog_name.upper() == "CENEC":
-		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\CENEC\CENEC 2008.TAB"
+		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "CENEC", "CENEC 2008.TAB")
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'Date', 'hour': 'hour', 'minute': 'minute', 'MW': 'Mw', 'depth': 'depth'}
 	elif catalog_name.upper() == "ISC-GEM":
-		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\ISC-GEM\isc-gem-cat.TAB"
+		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "ISC-GEM", "isc-gem-cat.TAB")
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
 	elif catalog_name.upper() == "CEUS-SCR":
-		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\CEUS-SCR\CEUS_SCR_Catalog_2012.TAB"
+		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
 		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E[M]', 'errM': 'sigma_M'}
 	elif catalog_name.upper() == "BGS":
-		gis_filespec = r"D:\GIS-data\Seismology\Earthquake Catalogs\BGS\Selection of SE-UK-BGS-earthquakes.TAB"
+		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
 		column_map = {'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR', 'hour': 'HR', 'minute': 'MN', 'second': 'SECS', 'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'ID': 'ID', 'name': 'LOCALITY', 'intensity_max': 'INT'}
 	else:
 		raise Exception("Catalog not recognized: %s" % catalog_name)
@@ -4472,7 +4479,6 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 
 # TODO: revise the following two functions
 
-GIS_root = r"D:\GIS-data"
 
 ZoneModelTables =	{"leynaud": "ROB Seismic Source Model (Leynaud, 2000)",
 						"leynaud_updated": "Leynaud updated",
