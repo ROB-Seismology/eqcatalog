@@ -2833,7 +2833,7 @@ class EQCatalog:
 			## In some versions of ogr, GetPoints method does not exist
 			#points = linear_ring.GetPoints()
 			points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
-			lons, lats = zip(*points)
+			lons, lats = zip(*points)[:2]
 			region = (min(lons), max(lons), min(lats), max(lats))
 			return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
 
