@@ -2830,7 +2830,9 @@ class EQCatalog:
 
 			## Determine bounding box (region)
 			linear_ring = poly_obj.GetGeometryRef(0)
-			points = linear_ring.GetPoints()
+			## In some versions of ogr, GetPoints method does not exist
+			#points = linear_ring.GetPoints()
+			points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
 			lons, lats = zip(*points)
 			region = (min(lons), max(lons), min(lats), max(lats))
 			return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
@@ -4017,12 +4019,16 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 			geom = zone_data['obj']
 			lines = []
 			if geom.GetGeometryName() == "LINESTRING":
-				lines.append(geom.GetPoints())
+				## In some versions of ogr, GetPoints method does not exist
+				#points = linear_ring.GetPoints()
+				points = [geom.GetPoint(i) for i in range(geom.GetPointCount())]
+				lines.append(points)
 				centroid = None
 			elif geom.GetGeometryName() == "POLYGON":
 				centroid = geom.Centroid()
 				for linear_ring in geom:
-					lines.append(linear_ring.GetPoints())
+					points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
+					lines.append(points)
 			for j, line in enumerate(lines):
 				lons, lats = zip(*line)
 				x, y = map(lons, lats)
