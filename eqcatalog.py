@@ -2557,9 +2557,9 @@ class EQCatalog:
 			else:
 				eq_name = ""
 			if Mtype:
-				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.1f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.get_M(Mtype, Mrelation), eq.intensity_max, eq.macro_radius))
+				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.get_M(Mtype, Mrelation), eq.intensity_max, eq.macro_radius))
 			else:
-				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.1f,%.1f,%.1f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
+				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%.2f,%.2f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
 		if csv_filespec != None:
 			f.close()
 
@@ -4030,7 +4030,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 					points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
 					lines.append(points)
 			for j, line in enumerate(lines):
-				lons, lats = zip(*line)
+				lons, lats, _ = zip(*line)
 				x, y = map(lons, lats)
 				if i == 0 and j == 0:
 					label = source_model
