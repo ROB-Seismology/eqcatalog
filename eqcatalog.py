@@ -3868,6 +3868,45 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	return catalog
 
 
+def get_catalogs_map(catalogs, catalog_styles=[], catalog_labels=[],
+					mag_size_inc=4,  Mtype="MW", Mrelation=None,
+					region=None, projection="merc", resolution="i", grid_interval=(1., 1.),
+					coastline_style={}, country_style={},
+					source_model=None, sm_style={"line_color": 'k', "line_style": '-', "line_width": 2},
+					sm_label_size=11, sm_label_colname="ShortName",
+					sites=[], site_style={"shape": 'o', "fill_color": 'b', "size": 10}, site_legend="",
+					circles=[], circle_styles=[],
+					title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+	"""
+	"""
+	from source_models import rob_source_models_dict
+	import mapping.Basemap as lbm
+
+	layers = []
+
+	## Coastlines
+	data = lbm.BuiltinData("coastlines")
+	style = lbm.LineStyle.from_dict(coastline_style)
+	layers.append(data, style)
+
+	## Country borders
+	data = lbm.BuiltinDate("countries")
+	style = lbm.LineStyle.from_dict(country_style)
+	layers.append(data, style)
+
+	## Source model
+	if source_model:
+		gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
+		data = GisData(gis_filespec, label_colname=sm_label_colname)
+		line_style = lbm.LineStyle.from_dict(sm_style)
+		polygon_style = lbm.PolygonStyle.from_dict(sm_style)
+		style = lbm.CompositeStyle(line_style=line_style, polygon_style=polygon_style)
+		layers.append(data, style)
+
+	map = lbm.LayeredBasemap(layers, title, projection, region=region, grid_interval=grid_interval, resolution=resolution, annot_axes="SE")
+	return map
+
+
 def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_size=11, sm_label_colname="ShortName", sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot multiple catalogs on a map
