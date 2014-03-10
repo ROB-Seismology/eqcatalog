@@ -452,7 +452,7 @@ class EQCatalog:
 		:return:
 			Float, maximum observed magnitude
 		"""
-		return self.get_magnitudes(Mtype, Mrelation).min()
+		return np.nanmin(self.get_magnitudes(Mtype, Mrelation))
 
 	def get_Mmax(self, Mtype="MW", Mrelation=None):
 		"""
@@ -469,7 +469,7 @@ class EQCatalog:
 			Float, maximum observed magnitude
 		"""
 		if len(self) > 0:
-			Mmax = self.get_magnitudes(Mtype, Mrelation).max()
+			Mmax = np.nanmax(self.get_magnitudes(Mtype, Mrelation))
 		else:
 			Mmax = np.nan
 		return Mmax
@@ -3868,14 +3868,14 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	return catalog
 
 
-def get_catalogs_map(catalogs, catalog_styles=[], catalog_labels=[],
-					mag_size_inc=4,  Mtype="MW", Mrelation=None,
-					region=None, projection="merc", resolution="i", grid_interval=(1., 1.),
-					coastline_style={}, country_style={},
+def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fill_colors=[],
+					labels=[], mag_size_inc=4,  Mtype="MW", Mrelation=None,
+					projection="merc", region=None, origin=(None, None), grid_interval=(1., 1.), resolution="i", annot_axes="SE",
+					coastline_style={}, country_style={}, river_style=None,
 					source_model=None, sm_style={"line_color": 'k', "line_style": '-', "line_width": 2},
 					sm_label_size=11, sm_label_colname="ShortName",
-					sites=[], site_style={"shape": 'o', "fill_color": 'b', "size": 10}, site_legend="",
-					circles=[], circle_styles=[],
+					sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
+					circles=[], circle_styles={},
 					title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	"""
@@ -3885,25 +3885,153 @@ def get_catalogs_map(catalogs, catalog_styles=[], catalog_labels=[],
 	layers = []
 
 	## Coastlines
-	data = lbm.BuiltinData("coastlines")
-	style = lbm.LineStyle.from_dict(coastline_style)
-	layers.append(data, style)
+	if coastline_style != None:
+		data = lbm.BuiltinData("coastlines")
+		if isinstance(coastline_style, dict):
+			style = lbm.LineStyle.from_dict(coastline_style)
+		else:
+			style = coastline_style
+		layers.append(lbm.MapLayer(data, style))
 
 	## Country borders
-	data = lbm.BuiltinDate("countries")
-	style = lbm.LineStyle.from_dict(country_style)
-	layers.append(data, style)
+	if country_style != None:
+		data = lbm.BuiltinData("countries")
+		if isinstance(country_style, dict):
+			style = lbm.LineStyle.from_dict(country_style)
+		else:
+			style = country_style
+		layers.append(lbm.MapLayer(data, style))
+
+	## Rivers
+	if river_style != None:
+		data = lbm.BuiltinData("rivers")
+		if isinstance(river_style, dict):
+			style = lbm.LineStyle.from_dict(river_style)
+		else:
+			style = country_style
+		layers.append(lbm.MapLayer(data, style))
 
 	## Source model
 	if source_model:
 		gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
-		data = GisData(gis_filespec, label_colname=sm_label_colname)
-		line_style = lbm.LineStyle.from_dict(sm_style)
-		polygon_style = lbm.PolygonStyle.from_dict(sm_style)
+		data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
+		if isinstance(sm_style, dict):
+			line_style = lbm.LineStyle.from_dict(sm_style)
+			polygon_style = lbm.PolygonStyle.from_dict(sm_style)
+			polygon_style.label_style = lbm.TextStyle(color=polygon_style.line_color)
+		else:
+			line_style = polygon_style = sm_style
+			line_style.label_style = lbm.TextStyle(color=line_style.line_color)
 		style = lbm.CompositeStyle(line_style=line_style, polygon_style=polygon_style)
-		layers.append(data, style)
+		layers.append(lbm.MapLayer(data, style, legend_label={'lines': source_model, 'polygons': source_model}))
 
-	map = lbm.LayeredBasemap(layers, title, projection, region=region, grid_interval=grid_interval, resolution=resolution, annot_axes="SE")
+	## Earthquakes
+	if not labels:
+		labels = [None] * len(catalogs)
+	if catalog_styles in ([], None):
+		catalog_styles = lbm.PointStyle(shape='o', size=9)
+	if isinstance(catalog_styles, (lbm.PointStyle, dict)):
+		catalog_styles = [catalog_styles]
+	if len(catalog_styles) == 1:
+		base_style = catalog_styles[0]
+		if isinstance(base_style, dict):
+			base_style = lbm.PointStyle.from_dict(base_style)
+		if not symbols:
+			symbols = ["o"]
+		if not edge_colors:
+			edge_colors = ("r", "g", "b", "c", "m", "k")
+		if not fill_colors:
+			fill_colors = ["None"]
+		catalog_styles = []
+		for i in range(len(catalogs)):
+			style = lbm.PointStyle.from_dict(base_style.to_kwargs())
+			style.shape = symbols[i%len(symbols)]
+			style.line_color = edge_colors[i%len(edge_colors)]
+			style.fill_color = fill_colors[i%len(fill_colors)]
+			catalog_styles.append(style)
+
+	for i in range(len(catalogs)):
+		catalog = catalogs[i]
+		style = catalog_styles[i]
+		if isinstance(style, dict):
+			style = lbm.PointStyle.from_dict(style)
+		values = {}
+		if mag_size_inc:
+			if i == 0:
+				min_mag = np.ceil(catalog.get_Mmin(Mtype, Mrelation))
+				max_mag = np.floor(catalog.get_Mmax(Mtype, Mrelation))
+				mags = np.arange(min_mag, max_mag, 1)
+				sizes = style.size + (mags - 3) * mag_size_inc
+				sizes = sizes.clip(min=0.1)
+			values['magnitude'] = catalog.get_magnitudes(Mtype, Mrelation)
+			style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
+			style.thematic_legend_style = lbm.LegendStyle(title="Magnitude", location=3, shadow=True, fancy_box=True, label_spacing=0.7)
+
+		# TODO: color by depth
+		#values['depth'] = catalog.get_depths()
+		#colorbar_style = ColorbarStyle(title="Depth (km)", location="bottom", format="%d")
+		#style.fill_color = ThematicStyleRanges([0,1,10,25,50], ['red', 'orange', 'yellow', 'green'], value_key="depth", colorbar_style=colorbar_style)
+
+		# TODO: color by age
+		#values['year'] = [eq.datetime.year for eq in catalog]
+		#style.fill_color = ThematicStyleRanges([1350,1910,2050], ['green', (1,1,1,0)], value_key="year")
+
+		point_data = lbm.MultiPointData(catalog.get_longitudes(), catalog.get_latitudes(), values=values)
+
+		layer = lbm.MapLayer(point_data, style, legend_label=labels[i])
+		layers.append(layer)
+
+	## Sites
+	if sites:
+		if isinstance(site_style, dict):
+			site_style = lbm.PointStyle.from_dict(site_style)
+			site_style.label_style = lbm.TextStyle()
+		site_lons, site_lats, site_labels = [], [], []
+		for i, site in enumerate(sites):
+			try:
+				lon, lat = site.longitude, site.latitude
+				name = site.name
+			except:
+				lon, lat, name = site[:3]
+			site_lons.append(lon)
+			site_lats.append(lat)
+			site_labels.append(name)
+
+		point_data = lbm.MultiPointData(site_lons, site_lats, labels=site_labels)
+		layer = lbm.MapLayer(point_data, site_style, site_legend)
+		layers.append(layer)
+
+	## Circles
+	if circles:
+		if isinstance(circle_styles, dict):
+			circle_styles = lbm.LineStyle.from_dict(circle_styles)
+		if isinstance(circle_styles, lbm.LineStyle):
+			circle_styles = [circle_styles]
+		for circle in circles:
+			lon, lat, radius = circle
+			circle_data = lbm.CircleData([lon], [lat], [radius])
+			layer = lbm.MapLayer(circle_data, circle_styles[i%len(circle_styles)])
+			layers.append(layer)
+
+	## Determine map extent if necessary
+	if not region:
+		west, east, south, north = 180, -180, 90, -90
+		for catalog in catalogs:
+			if catalog.region:
+				w, e, s, n = list(catalog.region)
+			else:
+				w, e, s, n = list(catalog.get_region())
+			if w < west:
+				west = w
+			if e > east:
+				east = e
+			if s < south:
+				south = s
+			if n > north:
+				north = n
+		region = (west, east, south, north)
+
+	map = lbm.LayeredBasemap(layers, title, projection, region=region, origin=origin, grid_interval=grid_interval, resolution=resolution, annot_axes=annot_axes)
 	return map
 
 
