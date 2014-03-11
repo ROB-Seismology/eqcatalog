@@ -3872,7 +3872,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 					labels=[], mag_size_inc=4,  Mtype="MW", Mrelation=None,
 					projection="merc", region=None, origin=(None, None), grid_interval=(1., 1.), resolution="i", annot_axes="SE",
 					coastline_style={}, country_style={}, river_style=None,
-					source_model=None, sm_style={"line_color": 'k', "line_style": '-', "line_width": 2},
+					source_model=None, sm_style={"line_color": 'k', "line_style": '-', "line_width": 2, "fill_color": "None"},
 					sm_label_size=11, sm_label_colname="ShortName",
 					sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
 					circles=[], circle_styles={},
