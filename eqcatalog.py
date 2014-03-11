@@ -3916,12 +3916,22 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
 		data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
 		if isinstance(sm_style, dict):
-			line_style = lbm.LineStyle.from_dict(sm_style)
-			polygon_style = lbm.PolygonStyle.from_dict(sm_style)
-			polygon_style.label_style = lbm.TextStyle(color=polygon_style.line_color)
-		else:
-			line_style = polygon_style = sm_style
-			line_style.label_style = lbm.TextStyle(color=line_style.line_color)
+			if sm_style.has_key("fill_color"):
+				polygon_style = lbm.PolygonStyle.from_dict(sm_style)
+				line_style = None
+			else:
+				line_style = lbm.LineStyle.from_dict(sm_style)
+				polygon_style = None
+		elif isinstance(sm_style, lbm.LineStyle):
+			line_style = sm_style
+			polygon_style = None
+		elif isinstance(sm_style, lbm.PolygonStyle):
+			polygon_style = sm_style
+			line_style = None
+		if line_style and not line_style.label_style:
+			line_style.label_style = lbm.TextStyle(color=line_style.line_color, font_size=8)
+		elif polygon_style and not polygon_style.label_style:
+			polygon_style.label_style = lbm.TextStyle(color=polygon_style.line_color, font_size=8)
 		style = lbm.CompositeStyle(line_style=line_style, polygon_style=polygon_style)
 		layers.append(lbm.MapLayer(data, style, legend_label={'lines': source_model, 'polygons': source_model}))
 
@@ -3963,9 +3973,9 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 				mags = np.arange(min_mag, max_mag, 1)
 				sizes = style.size + (mags - 3) * mag_size_inc
 				sizes = sizes.clip(min=0.1)
+				style.thematic_legend_style = lbm.LegendStyle(title="Magnitude", location=3, shadow=True, fancy_box=True, label_spacing=0.7)
 			values['magnitude'] = catalog.get_magnitudes(Mtype, Mrelation)
 			style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
-			style.thematic_legend_style = lbm.LegendStyle(title="Magnitude", location=3, shadow=True, fancy_box=True, label_spacing=0.7)
 
 		# TODO: color by depth
 		#values['depth'] = catalog.get_depths()
