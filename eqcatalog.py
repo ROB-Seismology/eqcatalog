@@ -3922,6 +3922,9 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			else:
 				line_style = lbm.LineStyle.from_dict(sm_style)
 				polygon_style = None
+		elif isinstance(sm_style, lbm.CompositeStyle):
+			line_style = sm_style.line_style
+			polygon_style = sm_style.polygon_style
 		elif isinstance(sm_style, lbm.LineStyle):
 			line_style = sm_style
 			polygon_style = None
@@ -3969,7 +3972,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		if mag_size_inc:
 			if i == 0:
 				min_mag = np.ceil(catalog.get_Mmin(Mtype, Mrelation))
-				max_mag = np.floor(catalog.get_Mmax(Mtype, Mrelation))
+				max_mag = np.round(catalog.get_Mmax(Mtype, Mrelation))
 				mags = np.arange(min_mag, max_mag, 1)
 				sizes = style.size + (mags - 3) * mag_size_inc
 				sizes = sizes.clip(min=0.1)
