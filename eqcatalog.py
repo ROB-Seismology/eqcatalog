@@ -3870,14 +3870,111 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 
 def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fill_colors=[],
 					labels=[], mag_size_inc=4,  Mtype="MW", Mrelation=None,
-					projection="merc", region=None, origin=(None, None), grid_interval=(1., 1.), resolution="i", annot_axes="SE",
 					coastline_style={}, country_style={}, river_style=None,
 					source_model=None, sm_style={"line_color": 'k', "line_style": '-', "line_width": 2, "fill_color": "None"},
-					sm_label_size=11, sm_label_colname="ShortName",
+					sm_label_colname="ShortName",
 					sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
 					circles=[], circle_styles={},
-					title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+					projection="merc", region=None, origin=(None, None), grid_interval=(1., 1.), resolution="i", annot_axes="SE",
+					title=None, legend_style={}, fig_filespec=None, fig_width=0, dpi=300):
 	"""
+	Construct map of multiple catalogs.
+
+	:param catalogs:
+		List containing instances of :class:`EQCatalog`
+	:param catalog_styles:
+		List with styles (instances of :class:`PointStyle` or dictionaries
+		with subset of PointStyle attributes as keys) for each catalog.
+		If list is empty or contains only 1 element, the same style will
+		be used for all catalogs. Point size refers to a magnitude-3
+		earthquake if :param:`mag_size_inc` is set
+		(default: [])
+	:param symbols:
+		List containing point symbols (matplotlib marker specifications)
+		for each catalog, overriding style given by :param:`catalog_styles`
+		(default: [])
+	:param edge_colors:
+		List containing symbol edge colors (matplotlib color specifications)
+		for each catalog, overriding style given by :param:`catalog_styles`
+		(default: [])
+	:param fill_colors:
+		List containing symbol fill colors (matplotlib color specifications)
+		for each catalog, overriding style given by :param:`catalog_styles`
+		(default: [])
+	:param labels:
+		List containing plot labels, one for each catalog (default: [])
+	:param mag_size_inc:
+		Int or Float, symbol size increment per magnitude relative to M=3
+		(default: 4)
+	:param Mtype:
+		String, magnitude type for magnitude scaling (default: "MW")
+	:param Mrelation:
+		{str: str} dict, mapping name of magnitude conversion relation
+		to magnitude type ("MW", "MS" or "ML") (default: None, will
+		select the default relation for the given Mtype)
+	:param coastline_style:
+		instance of :class:`LineStyle` or dictionary with subset of
+		LineStyle attributes as keys, used to plot coastlines. If None,
+		coastlines will not be drawn
+		(default: {}, equivalent to default line style)
+	:param country_style:
+		instance of :class:`LineStyle` or dictionary with subset of
+		LineStyle attributes as keys, used to plot country borders. If None,
+		country borders will not be drawn
+		(default: {}, equivalent to default line style)
+	:param river_style:
+		instance of :class:`LineStyle` or dictionary with subset of
+		LineStyle attributes as keys, used to plot rivers. If None, rivers
+		will not be drawn
+		(default: None)
+	:param source_model:
+		String, name of source model to overlay on the plot
+		(default: None)
+	:param sm_style:
+		instance of :class:`LineStyle`, :class:`PolygonStyle`,
+		:class:`CompositeStyle` or dictionary with subset of attributes
+		of LineStyle or PolygonStyle as keys, used to plot source model.
+		(default: {"line_color": 'k', "line_style": '-', "line_width": 2, "fill_color": "None"}
+	:param sm_label_colname:
+		Str, column name of GIS table to use as label (default: "ShortName")
+	:param sites:
+		List of (lon, lat) tuples or instance of :class:`PSHASite`
+	:param site_style:
+		instance of :class:`PointStyle` or dictionary containing subset of
+		PointStyle attributes as keys, used to plot sites
+		(default: {"shape": 's', "fill_color": 'b', "size": 10})
+	:param site_legend:
+		String, common text referring to all sites to be placed in legend
+		(default: "")
+
+
+	:param circle:
+		((lon, lat), float, string), respectively defining center, radius (in
+		km) and color of circle to plot
+
+
+	:param region:
+		(w, e, s, n) tuple specifying rectangular region to plot in
+		geographic coordinates (default: None)
+	:param projection:
+		String, map projection. See Basemap documentation
+		(default: "merc")
+	:param resolution:
+		String, map resolution (coastlines and country borders):
+		'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
+		(default: 'i')
+	:param dlon:
+		Float, meridian interval in degrees (default: 1.)
+	:param dlat:
+		Float, parallel interval in degrees (default: 1.)
+	:param title:
+		String, plot title (default: None)
+	:param legend_style:
+		(default: {})
+
+
+	:return:
+		instance of :class:`LayeredBasemap`
 	"""
 	from source_models import rob_source_models_dict
 	import mapping.Basemap as lbm
@@ -3957,7 +4054,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			fill_colors = ["None"]
 		catalog_styles = []
 		for i in range(len(catalogs)):
-			style = lbm.PointStyle.from_dict(base_style.to_kwargs())
+			style = lbm.PointStyle.from_dict(base_style.__dict__)
 			style.shape = symbols[i%len(symbols)]
 			style.line_color = edge_colors[i%len(edge_colors)]
 			style.fill_color = fill_colors[i%len(fill_colors)]
@@ -4044,7 +4141,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 				north = n
 		region = (west, east, south, north)
 
-	map = lbm.LayeredBasemap(layers, title, projection, region=region, origin=origin, grid_interval=grid_interval, resolution=resolution, annot_axes=annot_axes)
+	map = lbm.LayeredBasemap(layers, title, projection, region=region, origin=origin, grid_interval=grid_interval, resolution=resolution, annot_axes=annot_axes, legend_style=legend_style)
 	return map
 
 
