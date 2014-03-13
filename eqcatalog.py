@@ -4033,7 +4033,8 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		elif polygon_style and not polygon_style.label_style:
 			polygon_style.label_style = lbm.TextStyle(color=polygon_style.line_color, font_size=8)
 		style = lbm.CompositeStyle(line_style=line_style, polygon_style=polygon_style)
-		layers.append(lbm.MapLayer(data, style, legend_label={'lines': source_model, 'polygons': source_model}))
+		layer = lbm.MapLayer(data, style, legend_label={'lines': source_model + " faults", 'polygons': source_model + " zones"})
+		layers.append(layer)
 
 	## Earthquakes
 	if not labels:
