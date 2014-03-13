@@ -3870,13 +3870,13 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 
 def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fill_colors=[],
 					labels=[], mag_size_inc=4,  Mtype="MW", Mrelation=None,
-					coastline_style={}, country_style={}, river_style=None,
+					coastline_style={}, country_style={}, river_style=None, continent_style=None,
 					source_model=None, sm_style={"line_color": 'k', "line_style": '-', "line_width": 2, "fill_color": "None"},
 					sm_label_colname="ShortName",
 					sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
-					circles=[], circle_styles={},
+					circles=[], circle_styles=[],
 					projection="merc", region=None, origin=(None, None), grid_interval=(1., 1.), resolution="i", annot_axes="SE",
-					title=None, legend_style={}, fig_filespec=None, fig_width=0, dpi=300):
+					title=None, legend_style={}, border_style={}):
 	"""
 	Construct map of multiple catalogs.
 
@@ -3885,10 +3885,10 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	:param catalog_styles:
 		List with styles (instances of :class:`PointStyle` or dictionaries
 		with subset of PointStyle attributes as keys) for each catalog.
-		If list is empty or contains only 1 element, the same style will
-		be used for all catalogs. Point size refers to a magnitude-3
-		earthquake if :param:`mag_size_inc` is set
-		(default: [])
+		If list contains only 1 element, the same style will be used for
+		all catalogs. If list is empty, a default style will be used.
+		Point size refers to a magnitude-3 earthquake if :param:`mag_size_inc`
+		is set (default: [])
 	:param symbols:
 		List containing point symbols (matplotlib marker specifications)
 		for each catalog, overriding style given by :param:`catalog_styles`
@@ -3927,6 +3927,10 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		LineStyle attributes as keys, used to plot rivers. If None, rivers
 		will not be drawn
 		(default: None)
+	:param continent_style:
+		instance of :class:`PolygonStyle` or dictionary with subset of
+		PolygonStyle attributes as keys, used to plot continents/oceans.
+		If None, continents/oceans will not be drawn (default: None)
 	:param source_model:
 		String, name of source model to overlay on the plot
 		(default: None)
@@ -3946,32 +3950,44 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	:param site_legend:
 		String, common text referring to all sites to be placed in legend
 		(default: "")
-
-
-	:param circle:
-		((lon, lat), float, string), respectively defining center, radius (in
-		km) and color of circle to plot
-
-
-	:param region:
-		(w, e, s, n) tuple specifying rectangular region to plot in
-		geographic coordinates (default: None)
+	:param circles:
+		list with (lon, lat, radius) tuples defining center and radius
+		(in km) of circles to plot (default: [])
+	:param circle_styles:
+		List with styles (instances of :class:`LineStyle` or dictionaries
+		with subset of LineStyle attributes as keys) for each circle.
+		If list contains only 1 element, the same style will be used for
+		all circles. If list is empty, a default style will be used
+		(default: [])
 	:param projection:
 		String, map projection. See Basemap documentation
 		(default: "merc")
+	:param region:
+		(w, e, s, n) tuple specifying rectangular region to plot in
+		geographic coordinates (default: None)
+	:param origin:
+		(lon, lat) tuple defining map origin. Needed for some
+		projections (default: None)
+	:param grid_interval:
+		(dlon, dlat) tuple defining meridian and parallel interval in
+		degrees (default: (1., 1.)
 	:param resolution:
 		String, map resolution (coastlines and country borders):
 		'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
 		(default: 'i')
-	:param dlon:
-		Float, meridian interval in degrees (default: 1.)
-	:param dlat:
-		Float, parallel interval in degrees (default: 1.)
+	:param annot_axes:
+		String, containing up to 4 characters ('W', 'E', 'S' and/or 'N'),
+		defining which axes should be annotated (default: "SE")
 	:param title:
 		String, plot title (default: None)
 	:param legend_style:
+		instance of :class:`LegendStyle` or dictionary containing
+		LegendStyle attributes as keys, defining style of map legend
 		(default: {})
-
+	:param border_style:
+		instance ov :class:`MapBorderStyle` or dictionary containing
+		MapBorderStyle attributes as keys, defining style of map border
+		(default: {})
 
 	:return:
 		instance of :class:`LayeredBasemap`
@@ -3980,6 +3996,15 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	import mapping.Basemap as lbm
 
 	layers = []
+
+	## Continents/oceans
+	if continent_style != None:
+		data = lbm.BuiltinData("continents")
+		if isinstance(continent_style, dict):
+			style = lbm.PolygonStyle.from_dict(continent_style)
+		else:
+			style = continent_style
+		layers.append(lbm.MapLayer(data, style))
 
 	## Coastlines
 	if coastline_style != None:
@@ -4068,12 +4093,13 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			style = lbm.PointStyle.from_dict(style)
 		values = {}
 		if mag_size_inc:
+			## Magnitude-dependent size
 			if i == 0:
-				min_mag = np.ceil(catalog.get_Mmin(Mtype, Mrelation))
-				max_mag = np.round(catalog.get_Mmax(Mtype, Mrelation))
-				mags = np.arange(min_mag, max_mag, 1)
+				min_mag = np.floor(catalog.get_Mmin(Mtype, Mrelation))
+				max_mag = np.ceil(catalog.get_Mmax(Mtype, Mrelation))
+				mags = np.linspace(min_mag, max_mag, min(5, max_mag-min_mag+1))
 				sizes = style.size + (mags - 3) * mag_size_inc
-				sizes = sizes.clip(min=0.1)
+				sizes = sizes.clip(min=1)
 				style.thematic_legend_style = lbm.LegendStyle(title="Magnitude", location=3, shadow=True, fancy_box=True, label_spacing=0.7)
 			values['magnitude'] = catalog.get_magnitudes(Mtype, Mrelation)
 			style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
@@ -4114,6 +4140,8 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 
 	## Circles
 	if circles:
+		if circle_styles == []:
+			circle_styles = {}
 		if isinstance(circle_styles, dict):
 			circle_styles = lbm.LineStyle.from_dict(circle_styles)
 		if isinstance(circle_styles, lbm.LineStyle):
@@ -4123,6 +4151,11 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			circle_data = lbm.CircleData([lon], [lat], [radius])
 			layer = lbm.MapLayer(circle_data, circle_styles[i%len(circle_styles)])
 			layers.append(layer)
+
+	if isinstance(legend_style, dict):
+		legend_style = lbm.LegendStyle.from_dict(legend_style)
+	if isinstance(border_style, dict):
+		border_style = lbm.BorderStyle.from_dict(border_style)
 
 	## Determine map extent if necessary
 	if not region:
