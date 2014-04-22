@@ -2871,11 +2871,12 @@ class EQCatalog:
 		:return:
 			list with instances of :class:`EQCatalog`
 		"""
+		## Todo: check if this subfunction works with something else than integer as time_delta
 		def add_time_delta(date_time, time_delta):
 			if isinstance(time_delta, int):
 				time_tuple = list(date_time.timetuple())
 				time_tuple[0] += time_delta
-				out_date_time = mxDateTime.DateTimeFrom(*time_tuple[:6])
+				out_date_time = mxDateTime.DateTimeFrom(*time_tuple[:6]) - mxDateTime.DateTimeDeltaFromDays(1)
 			else:
 				out_date_time = mxDateTime.DateTimeFrom(date_time)
 				out_date_time += time_delta
@@ -2885,10 +2886,11 @@ class EQCatalog:
 		start_date = self.start_date
 		end_date = add_time_delta(self.start_date, time_interval)
 		while end_date <= self.end_date:
-			catalog = self.subselect(start_date=start_date, end_date=end_date, include_right_edges=False)
+			catalog = self.subselect(start_date=start_date, end_date=end_date, include_right_edges=True)
 			subcatalogs.append(catalog)
-			start_date = end_date
-			end_date = add_time_delta(end_date, time_interval)
+			start_date = end_date + mxDateTime.DateTimeDeltaFromDays(1)
+			end_date = add_time_delta(start_date, time_interval)
+		print end_date, self.end_date
 
 		return subcatalogs
 
