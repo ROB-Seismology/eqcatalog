@@ -2864,7 +2864,7 @@ class EQCatalog:
 	def split_into_time_intervals(self, time_interval):
 		"""
 		:param time_interval:
-			int or timedelta object
+			int (years) or timedelta object (precision of days)
 
 		:return:
 			list with instances of :class:`EQCatalog`
@@ -2882,8 +2882,9 @@ class EQCatalog:
 		subcatalogs = []
 		start_date = self.start_date
 		end_date = add_time_delta(self.start_date, time_interval)
+		max_end_date = self.end_date + mxDateTime.DateTimeDelta(1)
 		while start_date <= self.end_date:
-			catalog = self.subselect(start_date=start_date, end_date=min(end_date, self.end_date), include_right_edges=False)
+			catalog = self.subselect(start_date=start_date, end_date=min(end_date, max_end_date), include_right_edges=False)
 			subcatalogs.append(catalog)
 			start_date = end_date
 			end_date = add_time_delta(start_date, time_interval)
