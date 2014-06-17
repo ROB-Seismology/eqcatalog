@@ -1054,9 +1054,7 @@ class EQCatalog:
 			bins_N: array containing number of earthquakes for each magnitude interval
 			bins_Mag: array containing lower magnitude of each interval
 		"""
-		## Import of scitools makes matplotlib plots disappear immediately
-		## from any script that imports this module...
-		import scitools.numpytools as scitools
+		from hazard.rshalib.utils import seq
 
 		## Set lower magnitude to lowermost threshold magnitude possible
 		if completeness:
@@ -1067,7 +1065,7 @@ class EQCatalog:
 		#Mmax = np.ceil(Mmax / dM) * dM
 		#num_bins = int((Mmax - Mmin) / dM) + 1
 		#bins_Mag = np.arange(num_bins + 1) * dM + Mmin
-		bins_Mag = scitools.seq(Mmin, Mmax, dM)
+		bins_Mag = seq(Mmin, Mmax, dM)
 
 		## Select magnitudes according to completeness criteria
 		if completeness:
@@ -2871,12 +2869,11 @@ class EQCatalog:
 		:return:
 			list with instances of :class:`EQCatalog`
 		"""
-		## Todo: check if this subfunction works with something else than integer as time_delta
 		def add_time_delta(date_time, time_delta):
 			if isinstance(time_delta, int):
 				time_tuple = list(date_time.timetuple())
 				time_tuple[0] += time_delta
-				out_date_time = mxDateTime.DateTimeFrom(*time_tuple[:6]) - mxDateTime.DateTimeDeltaFromDays(1)
+				out_date_time = mxDateTime.DateTimeFrom(*time_tuple[:6])
 			else:
 				out_date_time = mxDateTime.DateTimeFrom(date_time)
 				out_date_time += time_delta
@@ -2885,12 +2882,11 @@ class EQCatalog:
 		subcatalogs = []
 		start_date = self.start_date
 		end_date = add_time_delta(self.start_date, time_interval)
-		while end_date <= self.end_date:
-			catalog = self.subselect(start_date=start_date, end_date=end_date, include_right_edges=True)
+		while start_date <= self.end_date:
+			catalog = self.subselect(start_date=start_date, end_date=min(end_date, self.end_date), include_right_edges=False)
 			subcatalogs.append(catalog)
-			start_date = end_date + mxDateTime.DateTimeDeltaFromDays(1)
+			start_date = end_date
 			end_date = add_time_delta(start_date, time_interval)
-		print end_date, self.end_date
 
 		return subcatalogs
 
@@ -4157,7 +4153,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	if isinstance(legend_style, dict):
 		legend_style = lbm.LegendStyle.from_dict(legend_style)
 	if isinstance(border_style, dict):
-		border_style = lbm.BorderStyle.from_dict(border_style)
+		border_style = lbm.MapBorderStyle.from_dict(border_style)
 
 	## Determine map extent if necessary
 	if not region:
