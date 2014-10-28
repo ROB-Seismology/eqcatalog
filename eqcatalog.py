@@ -3732,7 +3732,8 @@ def read_catalogGIS(gis_filespec, column_map, verbose=True):
 
 	name = os.path.split(gis_filespec)[-1]
 	eqc = EQCatalog(eq_list, name=name)
-	print("Skipped %d records" % skipped)
+	if verbose:
+		print("Skipped %d records" % skipped)
 	return eqc
 
 
