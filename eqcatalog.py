@@ -2067,7 +2067,7 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_map(self, symbol='o', edge_color='r', fill_color=None, label="Epicenters", symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_colname="ShortName", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+	def plot_map(self, symbol='o', edge_color='r', fill_color=None, edge_width=1, label="Epicenters", symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_colname="ShortName", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 		"""
 		Plot map of catalog
 
@@ -2077,6 +2077,8 @@ class EQCatalog:
 		:param edge_color:
 			matplotlib color specification, earthquake marker edge color
 			(default: 'r')
+		:param edge_width:
+			earthquake marker edge width (default: 1)
 		:param fill_color:
 			matplotlib color specification, earthquake marker fill color
 			(default: None)
@@ -2148,7 +2150,7 @@ class EQCatalog:
 		if title is None:
 			title = self.name
 
-		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, sm_label_colname=sm_label_colname, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], edge_widths=[edge_width], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, sm_label_colname=sm_label_colname, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation=None, completeness=default_completeness, b_val=None, verbose=False):
 		"""
@@ -3479,6 +3481,19 @@ class EQCatalog:
 			distances[i] = eq.hypocentral_distance((lon, lat))
 		return distances
 
+	def sort(self, key="datetime"):
+		"""
+		Sort catalog
+
+		:param key:
+			str, property of :class:`EQRecord` to use as sort key
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key))
+		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name)
+
 
 EQCollection = EQCatalog
 
@@ -4179,7 +4194,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	return map
 
 
-def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_size=11, sm_label_colname="ShortName", sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation=None, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_size=11, sm_label_colname="ShortName", sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	Plot multiple catalogs on a map
 
@@ -4195,6 +4210,9 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 	:param fill_colors:
 		List containing symbol fill colors for each catalog
 		(matplotlib color specifications)
+		(default: [])
+	:param edge_widths:
+		List containing symbol edge width for each catalog
 		(default: [])
 	:param labels:
 		List containing plot labels, one for each catalog (default: [])
@@ -4286,6 +4304,8 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		edge_colors = ("r", "g", "b", "c", "m", "k")
 	if not fill_colors:
 		fill_colors = ["None"]
+	if not edge_widths:
+		edge_widths = [1]
 	if not labels:
 		labels = [None]
 
@@ -4366,6 +4386,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		fill_color = fill_colors[i%len(fill_colors)]
 		if fill_color is None:
 			fill_color = "None"
+		edge_width = edge_widths[i%len(edge_widths)]
 		label = labels[i%len(labels)]
 		if label is None:
 			label = catalog.name
@@ -4385,7 +4406,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 		if len(catalog.eq_list) > 0:
 			lons, lats = catalog.get_longitudes(), catalog.get_latitudes()
 			x, y = map(lons, lats)
-			map.scatter(x, y, s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color, label=label)
+			map.scatter(x, y, s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color, linewidth=edge_width, label=label)
 
 	## Sites
 	for i, site in enumerate(sites):
@@ -4592,7 +4613,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], labe
 #	else:
 #		pylab.show()
 
-def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, tick_unit=None, tick_freq=None, tick_by=None, tick_form=None, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, tick_unit=None, tick_freq=None, tick_by=None, tick_form=None, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	:param catalogs:
 		List containing instances of :class:`EQCatalog`
@@ -4606,6 +4627,9 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 	:param fill_colors:
 		List containing symbol fill colors for each catalog
 		(matplotlib color specifications)
+		(default: [])
+	:param edge_widths:
+		List containing symbol edge widths for each catalog
 		(default: [])
 	:param labels:
 		List containing plot labels, one for each catalog (default: [])
@@ -4678,6 +4702,8 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		edge_colors = ("r", "g", "b", "c", "m", "k")
 	if not fill_colors:
 		fill_colors = ["None"]
+	if not edge_widths:
+		edge_widths = [1]
 	if not labels:
 		labels = [None]
 
@@ -4690,6 +4716,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		fill_color = fill_colors[i%len(fill_colors)]
 		if fill_color is None:
 			fill_color = "None"
+		edge_width = edge_widths[i%len(edge_widths)]
 		label = labels[i%len(labels)]
 		if label is None:
 			label = catalog.name
@@ -4698,7 +4725,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 			x = catalog.get_datetimes()
 		else:
 			x = catalog.get_fractional_years()
-		plt.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color)
+		plt.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color, linewidth=edge_width)
 
 	## crop x axis to data when using fractional years
 	if not plot_date:
