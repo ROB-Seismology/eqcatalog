@@ -114,7 +114,7 @@ class EQCatalog:
 		Indexing --> instance of :class:`LocalEarthquake`
 		Slicing --> instance of :class:`EQCatalog`
 		"""
-		if isinstance(item, int):
+		if isinstance(item, (int, np.int32, np.int64)):
 			return self.eq_list.__getitem__(item)
 		elif isinstance(item, slice):
 			return EQCatalog(self.eq_list.__getitem__(item), start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name + " %s" % item)
