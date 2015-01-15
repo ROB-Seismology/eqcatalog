@@ -526,7 +526,7 @@ class EQCatalog:
 				M0rate += subcatalog.get_M0_total(Mrelation=Mrelation) / subcatalog.timespan()
 		return M0rate
 
-	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, Mtype="MW", Mrelation=None, include_right_edges=True):
+	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, attr_val=(), Mtype="MW", Mrelation=None, include_right_edges=True):
 		"""
 		Make a subselection from the catalog.
 
@@ -549,6 +549,8 @@ class EQCatalog:
 			Float, minimum depth in km to extract (default: None)
 		:param max_depth:
 			Float, maximum depth in km to extract (default: None)
+		:param attr_val:
+			(attribute, value) tuple (default: ())
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation:
@@ -609,6 +611,9 @@ class EQCatalog:
 				eq_list = [eq for eq in eq_list if eq.depth <= max_depth]
 			else:
 				eq_list = [eq for eq in eq_list if eq.depth < max_depth]
+		if len(attr_val) == 2:
+			attr, val = attr_val
+			eq_list = [eq for eq in eq_list if getattr(eq, attr) == val]
 
 		## Update catalog information
 		if region is None:
@@ -3594,7 +3599,7 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
-def read_catalogGIS(gis_filespec, column_map, verbose=True):
+def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False, verbose=True):
 	"""
 	Read catalog from GIS file
 
@@ -3603,10 +3608,13 @@ def read_catalogGIS(gis_filespec, column_map, verbose=True):
 	:param column_map:
 		dict, mapping properties ('date', 'year', 'month', 'day', 'time',
 			'hour', 'minute', 'second', 'lon', 'lat', 'depth', 'MW', 'MS', 'ML',
-			'name', 'intensity_max', 'macro_radius', 'errh', 'errz', 'errt', 'errM')
+			'name', 'intensity_max', 'macro_radius', 'errh', 'errz', 'errt', 'errM', 'zone')
 			to column names in the GIS file.
 			If 'lon' or 'lat' are not specified, they will be derived from
 			the geographic object.
+	:param fix_zero_days_and_months:
+		bool, if True, zero days and months are replaced with ones
+		(default: False)
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -3636,10 +3644,14 @@ def read_catalogGIS(gis_filespec, column_map, verbose=True):
 				year = rec[column_map['year']]
 			if column_map.has_key('month'):
 				month = rec[column_map['month']]
+				if month == 0 and fix_zero_days_and_months:
+					month = 1
 			else:
 				month = 1
 			if column_map.has_key('day'):
 				day = rec[column_map['day']]
+				if day == 0 and fix_zero_days_and_months:
+					day = 1
 			else:
 				day = 1
 		try:
@@ -3737,9 +3749,14 @@ def read_catalogGIS(gis_filespec, column_map, verbose=True):
 		else:
 			errM = 0.
 
+		if column_map.has_key('zone'):
+			zone = rec[column_map['zone']]
+		else:
+			zone = ""
+
 		#print ID, date, time, lon, lat, depth, ML, MS, MW
 		try:
-			eq = LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW, name, intensity_max=intensity_max, macro_radius=macro_radius, errh=errh, errz=errz, errt=errt, errM=errM)
+			eq = LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW, name, intensity_max=intensity_max, macro_radius=macro_radius, errh=errh, errz=errz, errt=errt, errM=errM, zone=zone)
 		except:
 			skipped += 1
 		else:
@@ -3755,12 +3772,15 @@ def read_catalogGIS(gis_filespec, column_map, verbose=True):
 	return eqc
 
 
-def read_named_catalog(catalog_name, verbose=True):
+def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=True):
 	"""
 	Read a known catalog (corresponding files should be in standard location)
 
 	:param catalog_name:
 		Str, name of catalog ("SHEEC", "CENEC", "ISC-GEM", "CEUS-SCR", "BGS"):
+	:param fix_zero_days_and_months:
+		bool, if True, zero days and months are replaced with ones
+		(default: False)
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -3779,7 +3799,7 @@ def read_named_catalog(catalog_name, verbose=True):
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
 	elif catalog_name.upper() == "CEUS-SCR":
 		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
-		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E[M]', 'errM': 'sigma_M'}
+		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
 	elif catalog_name.upper() == "BGS":
 		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
 		column_map = {'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR', 'hour': 'HR', 'minute': 'MN', 'second': 'SECS', 'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'ID': 'ID', 'name': 'LOCALITY', 'intensity_max': 'INT'}
@@ -3788,7 +3808,7 @@ def read_named_catalog(catalog_name, verbose=True):
 
 	if not os.path.exists(gis_filespec):
 		raise Exception("Catalog file not found: %s" % gis_filespec)
-	eqc = read_catalogGIS(gis_filespec, column_map, verbose=verbose)
+	eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months, verbose=verbose)
 	eqc.name = catalog_name
 	return eqc
 

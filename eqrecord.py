@@ -61,8 +61,10 @@ class LocalEarthquake:
 		Float, uncertainty on origin time, in s (default: 0)
 	:param errM:
 		Float, uncertainty on magnitude (default: 0)
+	:param zone:
+		Str, seismotectonic zone the earthquake belongs to (default: "")
 	"""
-	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0.):
+	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0., zone=""):
 		self.ID = ID
 		if isinstance(date, datetime.date) and isinstance(time, datetime.time):
 			self.datetime = datetime.datetime.combine(date, time)
@@ -111,6 +113,7 @@ class LocalEarthquake:
 		self.errz = errz
 		self.errt = errt
 		self.errM = errM
+		self.zone = str(zone)
 
 	@classmethod
 	def from_json(self, s):
