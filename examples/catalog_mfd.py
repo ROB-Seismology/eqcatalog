@@ -6,13 +6,13 @@ import eqcatalog
 
 
 ## Selection parameters
-region = (-1.25, 8.75, 49.15, 53.30)
+region = (0, 8, 49.15, 52)
 start_date = datetime.date(1350, 1, 1)
-end_date = datetime.date(2012, 12, 31)
+end_date = datetime.date(2014, 12, 31)
 
 ## Magnitude scaling
 Mtype = "MW"
-Mrelation = {"ML": "Ahorner1983", "MS": "Geller1976"}
+Mrelation = {"ML": "Ahorner1983", "MS": "Utsu2002"}
 
 ## Completeness
 completeness = eqcatalog.completeness.Completeness_MW_201303a
@@ -35,6 +35,7 @@ dc_catalog = raw_catalog.subselect_declustering(method=dc_method, window=dc_wind
 							fa_ratio=dc_fa_ratio, Mtype=Mtype, Mrelation=Mrelation)
 cc_catalog = dc_catalog.subselect_completeness(completeness=completeness,
 								Mtype=Mtype, Mrelation=Mrelation, verbose=True)
+cc_catalog.name = "ROB Catalog 1350-2014 (declustered)"
 
 catalog_observed_mfd = cc_catalog.get_incremental_MFD(Mmin_mfd, Mmax, mfd_bin_width)
 catalog_weichert_mfd = cc_catalog.get_estimated_MFD(Mmin_mfd, Mmax, mfd_bin_width,
@@ -43,5 +44,8 @@ catalog_weichert_mfd = cc_catalog.get_estimated_MFD(Mmin_mfd, Mmax, mfd_bin_widt
 
 catalog_weichert_mfd.print_report()
 
+#fig_filespec = None
+fig_filespec = r"C:\Temp\Catalog_MFD.png"
 cc_catalog.plot_MFD(Mmin_mfd, Mmax, dM=mfd_bin_width, method="Weichert", Mtype=Mtype,
-                    Mrelation=Mrelation, completeness=completeness, verbose=False)
+					Mrelation=Mrelation, completeness=completeness, verbose=False,
+					fig_filespec=fig_filespec)
