@@ -81,7 +81,8 @@ class Completeness:
 		try:
 			index = np.where(self.min_dates <= date)[0][-1]
 		except IndexError:
-			return None
+			## Date before completeness start date
+			return 10
 		else:
 			return self.min_mags[index]
 
@@ -98,7 +99,9 @@ class Completeness:
 		try:
 			index = np.where(M >= self.min_mags)[0][0]
 		except:
-			return None
+			## Magnitude below smallest completeness magnitude
+			## Return date very far in the future
+			return mxDateTime.Date(1000000, 1, 1)
 		else:
 			return self.min_dates[index]
 
@@ -132,7 +135,25 @@ class Completeness:
 		completeness_dates = [self.get_completeness_date(M) for M in magnitudes]
 		completeness_timespans = [timespan(start_date, end_date) for start_date in completeness_dates]
 		#completeness_timespans = [((end_date - start_date).days + 1) / 365.25 for start_date in completeness_dates]
-		return np.array(completeness_timespans)
+		completeness_timespans = np.array(completeness_timespans)
+		## Replace negative timespans with zeros
+		completeness_timespans[np.where(completeness_timespans < 0)] = 0
+		return completeness_timespans
+
+	def get_total_timespan(self, end_date):
+		"""
+		Give total timespan represented by completeness object
+
+		:param end_date:
+			datetime.date object or int, end date or year with respect to which
+			timespan has to be computed
+
+		:return:
+			float, timespan in fractional years
+		"""
+		if isinstance(end_date, int):
+			end_date = mxDateTime.Date(end_date, 12, 31)
+		return timespan(self.start_date, end_date)
 
 	def to_hmtk_table(self, Mmax=None):
 		"""
