@@ -1377,7 +1377,7 @@ class EQCatalog:
 		pylab.plot(mags, likelihood, 'g', lw=2, label="Regional likelihood")
 		pylab.plot(mags, posterior.weights, 'r', lw=2, label="Posterior")
 		if num_discretizations:
-			binned_posterior = posterior.rebin_equal_weight(dM, num_discretizations)
+			binned_posterior = posterior.rebin_equal_weight(num_discretizations)
 			weights = binned_posterior.weights.astype('d')
 			## Apply some rescaling
 			weights /=  posterior.max()
