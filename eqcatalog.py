@@ -91,10 +91,10 @@ class EQCatalog:
 		self.end_date = end_date
 		if not end_date:
 			self.end_date = Tmax
-		if isinstance(self.start_date, (datetime.datetime, mxDateTime.DateTimeType)):
+		if isinstance(self.start_date, (datetime.datetime, datetime.date, mxDateTime.DateTimeType)):
 			year, month, day = self.start_date.timetuple()[:3]
 			self.start_date = mxDateTime.Date(year, month, day)
-		if isinstance(self.end_date, (datetime.datetime, mxDateTime.DateTimeType)):
+		if isinstance(self.end_date, (datetime.datetime, datetime.date, mxDateTime.DateTimeType)):
 			year, month, day = self.end_date.timetuple()[:3]
 			self.end_date = mxDateTime.Date(year, month, day)
 		self.region = region
