@@ -2120,6 +2120,7 @@ class EQCatalog:
 			Float, parallel interval in degrees (default: 1.)
 		:param source_model:
 			String, name of source model to overlay on the plot
+			or full path to GIS file containing source model
 			(default: None)
 		:param sm_color:
 			matplotlib color specification to plot source model
@@ -2526,7 +2527,7 @@ class EQCatalog:
 		"""
 		f = open(filespec, "w")
 		for eq in self.eq_list:
-			M = self.get_M(Mtype, Mrelation)
+			M = eq.get_M(Mtype, Mrelation)
 			f.write("%f  %f  %d  %d  %d  %.1f %.2f %d %d\n" % (eq.lon, eq.lat, eq.datetime.year, eq.datetime.month, eq.datetime.day, M, eq.depth, eq.datetime.hour, eq.datetime.minute))
 		f.close()
 
@@ -4040,6 +4041,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		If None, continents/oceans will not be drawn (default: None)
 	:param source_model:
 		String, name of source model to overlay on the plot
+		or full path to GIS file containing source model
 		(default: None)
 	:param sm_style:
 		instance of :class:`LineStyle`, :class:`PolygonStyle`,
@@ -4142,7 +4144,10 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 
 	## Source model
 	if source_model:
-		gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
+		try:
+			gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
+		except:
+			gis_filespec = source_model
 		data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
 		if isinstance(sm_style, dict):
 			if sm_style.has_key("fill_color"):
