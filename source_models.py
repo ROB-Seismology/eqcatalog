@@ -446,12 +446,16 @@ SHARE_AS_Belgium = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = SHARE_AS_Belgium
 
 
-def read_source_model(source_model_name, verbose=True):
+def read_source_model(source_model_name, ID_colname="", verbose=True):
 	"""
 	Read source-zone model stored in a GIS (MapInfo) table.
 
 	:param source_model_name:
 		String, name of source-zone model containing area sources
+		or else full path to GIS file containing area sources
+	:param ID_colname:
+		String, name of GIS column containing record ID
+		Required if source_model_name is GIS filespec (default: "")
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -465,8 +469,15 @@ def read_source_model(source_model_name, verbose=True):
 	## Read zone model from MapInfo file
 	#source_model_table = ZoneModelTables[source_model_name.lower()]
 	#gis_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
-	gis_filespec = rob_source_models_dict[source_model_name]["gis_filespec"]
-	ID_colname = rob_source_models_dict[source_model_name]["column_map"]["id"]
+	try:
+		gis_filespec = rob_source_models_dict[source_model_name]["gis_filespec"]
+	except:
+		gis_filespec = source_model_name
+		if not ID_colname:
+			raise Exception("Need to specify ID_colname!")
+	else:
+		if not ID_colname:
+			ID_colname = rob_source_models_dict[source_model_name]["column_map"]["id"]
 
 	zone_records = read_GIS_file(gis_filespec, verbose=verbose)
 	zone_ids = [rec[ID_colname] for rec in zone_records]

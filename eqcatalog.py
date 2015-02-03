@@ -2845,13 +2845,17 @@ class EQCatalog:
 			region = (min(lons), max(lons), min(lats), max(lats))
 			return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
 
-	def split_into_zones(self, source_model_name, verbose=True):
+	def split_into_zones(self, source_model_name, ID_colname="", verbose=True):
 		"""
 		Split catalog into subcatalogs according to a
 		source-zone model stored in a GIS (MapInfo) table.
 
 		:param source_model_name:
 			String, name of source-zone model containing area sources
+			or else full path to GIS file containing area sources
+		:param ID_colname:
+			String, name of GIS column containing record ID
+			Required if source_model_name is GIS filespec (default: "")
 		:param verbose:
 			Boolean, whether or not to print information while reading
 			GIS table (default: True)
@@ -2860,7 +2864,7 @@ class EQCatalog:
 			ordered dict {String sourceID: EQCatalog}
 		"""
 		## Read zone model from MapInfo file
-		model_data = read_source_model(source_model_name, verbose=verbose)
+		model_data = read_source_model(source_model_name, ID_colname=ID_colname, verbose=verbose)
 
 		zone_catalogs = OrderedDict()
 		for zoneID, zone_data in model_data.items():
@@ -3848,32 +3852,57 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				year, month, day = map(int, date.split("-"))
 			else:
 				if "year" in column_map:
-					year = int(line[column_map["year"]])
+					try:
+						year = int(line[column_map["year"]])
+					except ValueError:
+						## Skip record if year is invalid
+						print("Invalid year in line %d: %s" % (i, line[column_map["year"]]))
+						continue
 				else:
-					year = 1.
+					year = 1
 				if "month" in column_map:
-					month = int(line[column_map["month"]])
+					try:
+						month = max(1, int(line[column_map["month"]]))
+					except:
+						print("Invalid month in line %d: %s. Set to 1." % (i, line[column_map["month"]]))
+						month = 1
 				else:
-					month = 1.
+					month = 1
 				if "day" in column_map:
-					day = int(line[column_map["day"]])
+					try:
+						day = max(1, int(line[column_map["day"]]))
+					except:
+						print("Invalid day in line %d: %s. Set to 1." % (i, line[column_map["day"]]))
+						day = 1
 				else:
-					day = 1.
-			date = mxDateTime.Date(year, month, day)
+					day = 1
+			try:
+				date = mxDateTime.Date(year, month, day)
+			except:
+				print line
 			if "time" in column_map:
 				time = line[column_map["time"]]
 				hour, minute, second = map(int, time.split(":"))
 			else:
 				if "hour" in column_map:
-					hour = int(line[column_map["hour"]])
+					try:
+						hour = int(line[column_map["hour"]])
+					except:
+						hour = 0
 				else:
 					hour = 0
 				if "minute" in column_map:
-					minute = int(line[column_map["minute"]])
+					try:
+						minute = int(line[column_map["minute"]])
+					except:
+						minute = 0
 				else:
 					minute = 0
 				if "second" in column_map:
-					second = int(line[column_map["second"]])
+					try:
+						second = int(line[column_map["second"]])
+					except:
+						second = 0
 				else:
 					second = 0
 			time = mxDateTime.Time(hour, minute, second)
@@ -3886,22 +3915,62 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 			else:
 				lat = 0.
 			if "depth" in column_map:
-				depth = float(line[column_map["depth"]])
+				try:
+					depth = float(line[column_map["depth"]])
+				except:
+					depth = 0
 			else:
 				depth = 0.
 			if "ML" in column_map:
-				ML = float(line[column_map["ML"]])
+				try:
+					ML = float(line[column_map["ML"]])
+				except ValueError:
+					print("Invalid ML in line %d: %s" % (i, line[column_map["ML"]]))
+					ML = 0.
 			else:
 				ML = 0.
 			if "MS" in column_map:
-				MS = float(line[column_map["MS"]])
+				try:
+					MS = float(line[column_map["MS"]])
+				except ValueError:
+					print("Invalid MS in line %d: %s" % (i, line[column_map["MS"]]))
+					MS = 0.
 			else:
 				MS = 0.
 			if "MW" in column_map:
-				MW = float(line[column_map["MW"]])
+				try:
+					MW = float(line[column_map["MW"]])
+				except ValueError:
+					print("Invalid MW in line %d: %s" % (i, line[column_map["MW"]]))
+					MW = 0.
 			else:
 				MW = 0.
-			earthquakes.append(LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW))
+			if "name" in column_map:
+				name = line[column_map["name"]]
+			else:
+				name = ""
+			if "intensity_max" in column_map:
+				try:
+					intensity_max = float(line[column_map["intensity_max"]])
+				except:
+					intensity_max = 0.
+			else:
+				intensity_max = 0.
+			if "macro_radius" in column_map:
+				try:
+					macro_radius = float(line[column_map["macro_radius"]])
+				except:
+					macro_radius = 0.
+			else:
+				macro_radius = 0.
+			if "zone" in column_map:
+				zone =  line[column_map["zone"]]
+			else:
+				zone = ""
+
+			earthquakes.append(LocalEarthquake(ID, date, time, lon, lat, depth,
+							ML, MS, MW, name=name, intensity_max=intensity_max,
+							macro_radius=macro_radius, zone=zone))
 	catalog = EQCatalog(earthquakes)
 	return catalog
 
