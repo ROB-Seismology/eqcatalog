@@ -455,7 +455,7 @@ def read_source_model(source_model_name, ID_colname="", verbose=True):
 		or else full path to GIS file containing area sources
 	:param ID_colname:
 		String, name of GIS column containing record ID
-		Required if source_model_name is GIS filespec (default: "")
+		(default: "")
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -473,14 +473,15 @@ def read_source_model(source_model_name, ID_colname="", verbose=True):
 		gis_filespec = rob_source_models_dict[source_model_name]["gis_filespec"]
 	except:
 		gis_filespec = source_model_name
-		if not ID_colname:
-			raise Exception("Need to specify ID_colname!")
 	else:
 		if not ID_colname:
 			ID_colname = rob_source_models_dict[source_model_name]["column_map"]["id"]
 
 	zone_records = read_GIS_file(gis_filespec, verbose=verbose)
-	zone_ids = [rec[ID_colname] for rec in zone_records]
+	if ID_colname:
+		zone_ids = [rec[ID_colname] for rec in zone_records]
+	else:
+		zone_ids = range(1, len(zone_records)+1)
 
 	zone_data = OrderedDict()
 	for id, rec in zip(zone_ids, zone_records):

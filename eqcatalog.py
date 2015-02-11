@@ -2856,7 +2856,7 @@ class EQCatalog:
 			or else full path to GIS file containing area sources
 		:param ID_colname:
 			String, name of GIS column containing record ID
-			Required if source_model_name is GIS filespec (default: "")
+			(default: "")
 		:param verbose:
 			Boolean, whether or not to print information while reading
 			GIS table (default: True)
