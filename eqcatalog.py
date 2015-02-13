@@ -4710,7 +4710,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 #	else:
 #		pylab.show()
 
-def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, Mrange=(None, None), completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, tick_unit=None, tick_freq=None, tick_by=None, tick_form=None, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, start_year=None, Mrange=(None, None), completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, tick_unit=None, tick_freq=None, tick_by=None, tick_form=None, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
 	"""
 	:param catalogs:
 		List containing instances of :class:`EQCatalog`
@@ -4738,6 +4738,9 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		{str: str} dict, mapping name of magnitude conversion relation
 		to magnitude type ("MW", "MS" or "ML") (default: None, will
 		select the default relation for the given Mtype)
+	:param start_year:
+		float or int, year to start x axis (does not work when plot_date is True)
+		(default: None)
 	:param Mrange:
 		tuple of floats representing minimum and maximu magnitude in y axis
 		(default: None, None)
@@ -4830,7 +4833,10 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 	## crop X axis to data when using fractional years
 	xmin, xmax, ymin, ymax = plt.axis()
 	if not plot_date:
-		xmin = min(catalog.start_date.year for catalog in catalogs)
+		if start_year:
+			xmin = start_year
+		else:
+			xmin = min(catalog.start_date.year for catalog in catalogs)
 		xmax = max(catalog.end_date.year for catalog in catalogs)+1
 
 	## Set range of Y axis
