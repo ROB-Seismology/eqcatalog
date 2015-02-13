@@ -3066,7 +3066,7 @@ class EQCatalog:
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		colors = ['b', 'g', 'r', 'y', 'm', 'c']
+		colors = ['b', 'g', 'r', 'y', 'm', 'c', 'k']
 		max_mag = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
 		start_year_index = None
 		for i, magnitude in enumerate(magnitudes):
@@ -3077,8 +3077,8 @@ class EQCatalog:
 				start_year_index = np.abs(bins_Years - start_year).argmin()
 			bins_Years = bins_Years[start_year_index:]
 			bins_N_cumul = bins_N_cumul[start_year_index:]
-			plt.plot(bins_Years, bins_N_cumul, colors[i], label= '%.1f' % magnitude)
-			plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i], label='_nolegend_')
+			plt.plot(bins_Years, bins_N_cumul, colors[i%len(colors)], label= '%.1f' % magnitude)
+			plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i%len(colors)], label='_nolegend_')
 			if magnitude == reg_line and year1 != None:
 				index = np.abs(bins_Years - year1).argmin()
 				bins_Years = bins_Years[index:]
