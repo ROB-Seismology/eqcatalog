@@ -116,6 +116,29 @@ class Ambraseys1985(MSCE_ML_MS):
 		return sigma
 
 
+class Benouar1994(MSCE_ML_MS):
+	"""
+	Conversion ML -> MS
+	Published in:
+	Benouar, D., 1994, Materials for the investigation of the seismicity of
+	Algeria and adjacent regions during the twentieth century: Annali Di
+	Geofisica XXXVII:4
+	
+	Validity range: Not known
+	Region: Algeria
+	"""
+	def get_mean(self, ML):
+		input_type = type(ML)
+		ML = np.array(ML, copy=False, ndmin=1)
+		MS = 1.40 + 0.76 * ML
+		if input_type != np.ndarray:
+			MS = input_type(MS)
+		return MS
+	
+	def get_sigma(self, ML=None):
+		return None
+
+
 class AmbraseysFree1997(MSCE_MS_MW):
 	"""
 	Conversion MS -> log seismic moment
