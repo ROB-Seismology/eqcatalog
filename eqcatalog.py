@@ -3035,7 +3035,7 @@ class EQCatalog:
 		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
 		return Completeness(Min_Years, Min_Mags, Mtype=Mtype)
 
-	def analyse_completeness_CUVI(self, magnitudes, start_year, dYear, year1=None, year2=None, reg_line=None, Mtype="MW", Mrelation=None, fig_filespec="", fig_width=0, dpi=300):
+	def analyse_completeness_CUVI(self, magnitudes, start_year, dYear, year1=None, year2=None, reg_line=None, Mtype="MW", Mrelation=None, title=None, fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Analyze catalog completeness with the CUVI method (Mulargia, 1987).
 
@@ -3057,6 +3057,8 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
+		:param title:
+			str, title of plot (default: None, automatic title is used)
 		:param fig_filespec:
 			String, full path to output image file, if None plot to screen
 			(default: None)
@@ -3097,8 +3099,8 @@ class EQCatalog:
 		plt.xlabel('Time (years)', fontsize='large')
 		plt.ylabel('Cumulative number of events since' + ' %d' % self.start_date.year,
 			fontsize='large')
-		plt.title('Completeness Analysis with CUVI method for magnitudes %.1f - %.1f'
-			% (magnitudes[0], magnitudes[-1]), fontsize='x-large')
+		title = title or 'Completeness Analysis with CUVI method for magnitudes %.1f - %.1f' % (magnitudes[0], magnitudes[-1])
+		plt.title(title, fontsize='x-large')
 		plt.legend(loc=0)
 		plt.grid()
 		if fig_filespec:
