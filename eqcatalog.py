@@ -4469,7 +4469,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 				lons, lats, _ = zip(*line)
 				x, y = map(lons, lats)
 				if i == 0 and j == 0:
-					label = source_model
+					label = source_model_name
 				else:
 					label = "_nolegend_"
 				map.plot(x, y, ls=sm_line_style, lw=sm_line_width, color=sm_color, label=label)
