@@ -4150,6 +4150,10 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
 		except:
 			gis_filespec = source_model
+			source_model_name = os.path.splitext(os.path.split(source_model)[1])[0]
+		else:
+			source_model_name = source_model
+
 		data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
 		if isinstance(sm_style, dict):
 			if sm_style.has_key("fill_color"):
@@ -4172,7 +4176,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		elif polygon_style and not polygon_style.label_style:
 			polygon_style.label_style = lbm.TextStyle(color=polygon_style.line_color, font_size=8)
 		style = lbm.CompositeStyle(line_style=line_style, polygon_style=polygon_style)
-		layer = lbm.MapLayer(data, style, legend_label={'lines': source_model + " faults", 'polygons': source_model + " zones"})
+		layer = lbm.MapLayer(data, style, legend_label={'lines': source_model_name + " faults", 'polygons': source_model_name + " zones"})
 		layers.append(layer)
 
 	## Earthquakes
