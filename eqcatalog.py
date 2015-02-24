@@ -4444,6 +4444,12 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 
 	## Source model
 	if source_model:
+		try:
+			rob_source_models_dict[source_model_name]["gis_filespec"]
+		except:
+			source_model_name = os.path.splitext(os.path.split(source_model)[1])[0]
+		else:
+			source_model_name = source_model
 		model_data = read_source_model(source_model)
 		for i, zone_data in enumerate(model_data.values()):
 			geom = zone_data['obj']
