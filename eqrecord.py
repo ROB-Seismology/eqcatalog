@@ -516,6 +516,7 @@ class FocMecRecord(LocalEarthquake):
 		self.rake = rake
 
 	def get_focmec(self):
+		import eqgeology.FocMec.MomentTensor as MT
 		return MT.FaultGeometry(self.strike, self.dip, self.rake, Mw=self.get_MW())
 
 	def get_mtensor(self):
