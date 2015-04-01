@@ -1400,7 +1400,8 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW", Mrelation=None, title=None, fig_filespec=None, verbose=False):
+	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW",
+		Mrelation=None, color="b", title=None, fig_filespec=None, verbose=False):
 		"""
 		Plot magnitude histogram of earthquakes in collection.
 		:param Mmin:
@@ -1418,6 +1419,8 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
+		:param color:
+			matplotlib color specification (default: "b")
 		:param title:
 			String, plot title (None = default title, "" = no title)
 			(default: None)
@@ -1426,7 +1429,7 @@ class EQCatalog:
 			If None (default), histogram is displayed on screen.
 		"""
 		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
-		pylab.bar(bins_Mag, bins_N, width=dM)
+		pylab.bar(bins_Mag, bins_N, width=dM, color=color)
 		pylab.xlabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
 		pylab.ylabel("Number of events", fontsize="x-large")
 		ax = pylab.gca()
