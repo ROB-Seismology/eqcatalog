@@ -1844,7 +1844,7 @@ class EQCatalog:
 				edge_colors.append('r')
 			else:
 				edge_colors.append('k')
-		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness, completeness_color="r", vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness, completeness_color=completeness_color, vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def DailyNightlyMean(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, day=(7, 19)):
 		"""
