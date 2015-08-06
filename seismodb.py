@@ -42,6 +42,51 @@ except:
 __all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord", "query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID", "query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog", "query_ROB_Web_MacroCatalog", "get_last_earthID"]
 
 
+def read_table(table_name, column_clause="*", where_clause="", having_clause="",
+				order_clause="", verbose=False):
+	"""
+	Read table from seismodb database, returning each record as a dict
+
+	:param table_name:
+		str, name of database table
+	:param column_clause:
+		str, column clause (default: "*")
+	:param where_clause:
+		str, where clause (default: "")
+	:param having_clause:
+		str, having clause (default: "")
+	:param order_clause:
+		str, order clause (default: "")
+	:param verbose:
+		bool, whether or not to print the query (default: False)
+
+	:return:
+		generator object, yielding a dictionary for each record
+	"""
+	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database,
+			port=port, cursorclass=MySQLdb.cursors.DictCursor, use_unicode=True)
+	c = db.cursor()
+	query = 'SELECT %s from %s' % (column_clause, table_name)
+	if where_clause:
+		if where_clause[:5].upper() == "WHERE":
+			where_clause = where_clause[5:].lstrip()
+		query += ' WHERE %s' % where_clause
+	if having_clause:
+		if having_clause[:6].upper() == "HAVING":
+			having_clause = having_clause[6:].lstrip()
+		query += ' HAVING %s' % having_clause
+	if order_clause:
+		if order_clause[:8].upper() == "ORDER BY":
+			order_clause = order_clause[8:].lstrip()
+		query += ' ORDER BY %s' % order_clause
+
+	if verbose:
+		print query
+
+	c.execute(query)
+	return c.fetchall()
+
+
 def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", convert_NULL=True, verbose=False, errf=None):
 	"""
 	Query ROB catalog of local earthquakes.
