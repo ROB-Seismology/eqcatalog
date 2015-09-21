@@ -436,7 +436,10 @@ class EQCatalog:
 		"""
 		Return (w, e, s, n) tuple with geographic extent of catalog
 		"""
-		return self.lon_minmax() + self.lat_minmax()
+		try:
+			return self.lon_minmax() + self.lat_minmax()
+		except:
+			return None
 
 	def get_Mmin(self, Mtype="MW", Mrelation=None):
 		"""

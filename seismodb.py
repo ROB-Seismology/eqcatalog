@@ -302,7 +302,10 @@ def query_ROB_LocalEQCatalogByID(id_earth, verbose=False, errf=None):
 			intensity_max = 0
 		if macro_radius == None:
 			macro_radius = 0
-	eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, ML, MS, MW, name, intensity_max, macro_radius)
+
+	mb = 0.
+
+	eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, ML, MS, MW, mb, name, intensity_max, macro_radius)
 
 	return eq
 
