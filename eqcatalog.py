@@ -2852,7 +2852,7 @@ class EQCatalog:
 			region = (min(lons), max(lons), min(lats), max(lats))
 			return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
 
-	def split_into_zones(self, source_model_name, ID_colname="", verbose=True):
+	def split_into_zones(self, source_model_name, ID_colname="", fix_mi_lambert=True, verbose=True):
 		"""
 		Split catalog into subcatalogs according to a
 		source-zone model stored in a GIS (MapInfo) table.
@@ -2863,6 +2863,10 @@ class EQCatalog:
 		:param ID_colname:
 			String, name of GIS column containing record ID
 			(default: "")
+		:param fix_mi_lambert:
+			bool, whether or not to apply spatial reference system fix for
+			old MapInfo files in Lambert 1972 system
+			(default: True)
 		:param verbose:
 			Boolean, whether or not to print information while reading
 			GIS table (default: True)
@@ -2871,7 +2875,7 @@ class EQCatalog:
 			ordered dict {String sourceID: EQCatalog}
 		"""
 		## Read zone model from MapInfo file
-		model_data = read_source_model(source_model_name, ID_colname=ID_colname, verbose=verbose)
+		model_data = read_source_model(source_model_name, ID_colname=ID_colname, fix_mi_lambert=fix_mi_lambert, verbose=verbose)
 
 		zone_catalogs = OrderedDict()
 		for zoneID, zone_data in model_data.items():

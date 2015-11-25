@@ -446,7 +446,7 @@ SHARE_AS_Belgium = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = SHARE_AS_Belgium
 
 
-def read_source_model(source_model_name, ID_colname="", verbose=True):
+def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True, verbose=True):
 	"""
 	Read source-zone model stored in a GIS (MapInfo) table.
 
@@ -456,6 +456,10 @@ def read_source_model(source_model_name, ID_colname="", verbose=True):
 	:param ID_colname:
 		String, name of GIS column containing record ID
 		(default: "")
+	:param fix_mi_lambert:
+		bool, whether or not to apply spatial reference system fix for
+		old MapInfo files in Lambert 1972 system
+		(default: True)
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -477,7 +481,7 @@ def read_source_model(source_model_name, ID_colname="", verbose=True):
 		if not ID_colname:
 			ID_colname = rob_source_models_dict[source_model_name]["column_map"]["id"]
 
-	zone_records = read_GIS_file(gis_filespec, verbose=verbose)
+	zone_records = read_GIS_file(gis_filespec, verbose=verbose, encoding=None)
 	if ID_colname:
 		zone_ids = [rec[ID_colname] for rec in zone_records]
 	else:
