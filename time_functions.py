@@ -5,6 +5,9 @@ Useful time functions
 import mx.DateTime as mxDateTime
 
 
+avg_secs_per_year = 31557600
+
+
 def timespan(start_date, end_date):
 	"""
 	Return total time span in years between start date and end date.
@@ -20,7 +23,7 @@ def timespan(start_date, end_date):
 	num_intervening_years = end_date.year - start_date.year
 	if num_intervening_years == 0:
 		year = end_date.year
-		timespan = (end_date - start_date).days * 1. / (datetime.date(year+1,1,1) - datetime.date(year,1,1)).days
+		timespan = (end_date - start_date).days * 1. / (mxDateTime.Date(year+1,1,1) - mxDateTime.Date(year,1,1)).days
 	else:
 		end_of_last_year = mxDateTime.Date(end_date.year-1,12,31)
 		end_of_this_year = mxDateTime.Date(end_date.year,12,31)

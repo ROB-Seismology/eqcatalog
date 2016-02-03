@@ -65,6 +65,15 @@ class Completeness:
 		num_days = np.array([td.days for td in time_deltas], 'f')
 		return years + num_days / year_num_days
 
+	def are_mags_monotonously_decreasing(self):
+		"""
+		Determine whether completeness magnitudes are monotonously decreasing
+
+		:return:
+			bool
+		"""
+		return (np.diff(self.min_mags) <= 0).all()
+
 	def get_completeness_magnitude(self, date):
 		"""
 		Return completeness magnitude for given date, this is the lowest
@@ -86,7 +95,7 @@ class Completeness:
 		else:
 			return self.min_mags[index]
 
-	def get_completeness_date(self, M):
+	def get_initial_completeness_date(self, M):
 		"""
 		Return initial date of completeness for given magnitude
 
@@ -105,7 +114,7 @@ class Completeness:
 		else:
 			return self.min_dates[index]
 
-	def get_completeness_year(self, M):
+	def get_initial_completeness_year(self, M):
 		"""
 		Return initial year of completeness for given magnitude
 
@@ -115,11 +124,32 @@ class Completeness:
 		:return:
 			Int, initial year of completeness for given magnitude
 		"""
-		return self.get_completeness_date(M).year
+		return self.get_initial_completeness_date(M).year
 
 	def get_completeness_timespans(self, magnitudes, end_date):
 		"""
-		Compute completeness timespans in fractional years for list of magnitudes
+		Select correct method to compute completeness timespans in
+		fractional years for a list of magnitudes, depending on whether
+		completeness magnitudes are monotonously decreasing or not
+
+		:param magnitudes:
+			list or numpy array, magnitudes
+		:param end_date:
+			datetime.date object or int, end date or year with respect to which
+			timespan has to be computed
+
+		:return:
+			numpy float array, completeness timespans (fractional years)
+		"""
+		if self.are_mags_monotonously_decreasing():
+			return self.get_completeness_timespans_monotonous(magnitudes, end_date)
+		else:
+			return self.get_completeness_timespans_non_monotonous(magnitudes, end_date)
+
+	def get_completeness_timespans_monotonous(self, magnitudes, end_date):
+		"""
+		Compute completeness timespans in fractional years for list of magnitudes.
+		Works only if completeness magnitudes are monotonously decreasing.
 
 		:param magnitudes:
 			list or numpy array, magnitudes
@@ -132,12 +162,51 @@ class Completeness:
 		"""
 		if isinstance(end_date, int):
 			end_date = mxDateTime.Date(end_date, 12, 31)
-		completeness_dates = [self.get_completeness_date(M) for M in magnitudes]
+		completeness_dates = [self.get_initial_completeness_date(M) for M in magnitudes]
 		completeness_timespans = [timespan(start_date, end_date) for start_date in completeness_dates]
 		#completeness_timespans = [((end_date - start_date).days + 1) / 365.25 for start_date in completeness_dates]
 		completeness_timespans = np.array(completeness_timespans)
 		## Replace negative timespans with zeros
 		completeness_timespans[np.where(completeness_timespans < 0)] = 0
+		return completeness_timespans
+
+	def get_completeness_timespans_non_monotonous(self, magnitudes, end_date):
+		"""
+		Compute completeness timespans in fractional years for list of
+		magnitudes. This method can cope with non-monotonously decreasing
+		completeness magnitudes.
+
+		:param magnitudes:
+			list or numpy array, magnitudes
+		:param end_date:
+			datetime.date object or int, end date or year with respect to which
+			timespan has to be computed
+
+		:return:
+			numpy float array, completeness timespans (fractional years)
+		"""
+		if isinstance(end_date, int):
+			end_date = mxDateTime.Date(end_date, 12, 31)
+		are_mags_complete = np.zeros((len(self.min_mags), len(magnitudes)), dtype=bool)
+		for i, min_mag in enumerate(self.min_mags):
+			are_mags_complete[i] = (magnitudes >= min_mag)
+		completeness_timespans = np.zeros_like(magnitudes)
+		for m, M in enumerate(magnitudes):
+			ts = 0
+			is_mag_complete = are_mags_complete[:,m]
+			try:
+				start_idx = np.where(is_mag_complete == True)[0][0]
+			except IndexError:
+				start_idx = len(self)
+			for i in range(start_idx, len(self)):
+				if is_mag_complete[i]:
+					interval_start = self.min_dates[i]
+					if i < len(self) - 1:
+						interval_end = self.min_dates[i+1] - mxDateTime.TimeDelta(hours=24)
+					else:
+						interval_end = end_date
+					ts += timespan(interval_start, interval_end)
+			completeness_timespans[m] = ts
 		return completeness_timespans
 
 	def get_total_timespan(self, end_date):

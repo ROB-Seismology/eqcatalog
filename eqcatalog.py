@@ -1089,9 +1089,9 @@ class EQCatalog:
 
 		return bins_N, bins_Mag
 
-	def get_completeness_dates(self, magnitudes, completeness=default_completeness):
+	def get_initial_completeness_dates(self, magnitudes, completeness=default_completeness):
 		"""
-		Compute date of completeness for list of magnitudes
+		Compute initial date of completeness for list of magnitudes
 
 		:param magnitudes:
 			list or numpy array, magnitudes
@@ -1107,8 +1107,8 @@ class EQCatalog:
 		if completeness:
 			completeness_dates = []
 			for M in magnitudes:
-				start_date = max(self.start_date, completeness.get_completeness_date(M))
-				#start_date = completeness.get_completeness_date(M)
+				start_date = max(self.start_date, completeness.get_initial_completeness_date(M))
+				#start_date = completeness.get_initial_completeness_date(M)
 				completeness_dates.append(start_date)
 		else:
 			print("Warning: no completeness object provided. Using catalog length!")
@@ -3436,7 +3436,7 @@ class EQCatalog:
 
 		## Apply completeness constraint, and truncate result to completeness
 		## year for specified minimum magnitude
-		min_date = completeness.get_completeness_date(Mmin)
+		min_date = completeness.get_initial_completeness_date(Mmin)
 		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
 
