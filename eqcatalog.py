@@ -3995,8 +3995,8 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 					sm_label_colname="ShortName",
 					sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
 					circles=[], circle_styles=[],
-					projection="merc", region=None, origin=(None, None), grid_interval=(1., 1.), resolution="i", annot_axes="SE",
-					title=None, legend_style={}, border_style={}):
+					projection="merc", region=None, origin=(None, None), graticule_interval=(1., 1.), resolution="i",
+					graticule_style={"annot_axes": "SE"}, title=None, legend_style={}, border_style={}):
 	"""
 	Construct map of multiple catalogs.
 
@@ -4089,16 +4089,19 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	:param origin:
 		(lon, lat) tuple defining map origin. Needed for some
 		projections (default: None)
-	:param grid_interval:
+	:param graticule_interval:
 		(dlon, dlat) tuple defining meridian and parallel interval in
 		degrees (default: (1., 1.)
 	:param resolution:
 		String, map resolution (coastlines and country borders):
 		'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
 		(default: 'i')
-	:param annot_axes:
-		String, containing up to 4 characters ('W', 'E', 'S' and/or 'N'),
-		defining which axes should be annotated (default: "SE")
+	:param graticule_style:
+		instance of :class:`GraticuleStyle` or dictionary containing
+		GraticuleStyle attributes as keys, defining graticule style of map
+		(default: {"annot_axes": "SE"}
+		annot_axes: string, containing up to 4 characters ('W', 'E', 'S' and/or 'N'),
+		defining which axes should be annotated
 	:param title:
 		String, plot title (default: None)
 	:param legend_style:
@@ -4284,6 +4287,8 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		legend_style = lbm.LegendStyle.from_dict(legend_style)
 	if isinstance(border_style, dict):
 		border_style = lbm.MapBorderStyle.from_dict(border_style)
+	if isinstance(graticule_style, dict):
+		graticule_style = lbm.GraticuleStyle.from_dict(graticule_style)
 
 	## Determine map extent if necessary
 	if not region:
@@ -4303,7 +4308,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 				north = n
 		region = (west, east, south, north)
 
-	map = lbm.LayeredBasemap(layers, title, projection, region=region, origin=origin, grid_interval=grid_interval, resolution=resolution, annot_axes=annot_axes, legend_style=legend_style)
+	map = lbm.LayeredBasemap(layers, title, projection, region=region, origin=origin, graticule_interval=graticule_interval, resolution=resolution, graticule_style=graticule_style, legend_style=legend_style)
 	return map
 
 
