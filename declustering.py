@@ -19,9 +19,9 @@ class DeclusteringMethod():
 	Class implementing a declustering method, which splits earthquakes in
 	dependant and independant ones.
 	"""
-	
+
 	__metaclass__ = abc.ABCMeta
-	
+
 	@abc.abstractmethod
 	def decluster(self):
 		"""
@@ -35,7 +35,7 @@ class WindowMethod(DeclusteringMethod):
 	"""
 	Class implementing window declustering method.
 	"""
-	
+
 	def decluster(self, magnitudes, datetimes, lons, lats, window, fa_ratio):
 		"""
 		:param magnitudes:
@@ -76,7 +76,7 @@ class WindowMethod(DeclusteringMethod):
 				in_window[i] = 0
 				## apply window to declustering index
 				d_index[in_window] = 0
-				
+
 		return d_index
 
 
@@ -84,7 +84,7 @@ class ClusterMethod(DeclusteringMethod):
 	"""
 	Class implementing cluster declustering method.
 	"""
-	
+
 	def decluster(self, magnitudes, datetimes, lons, lats, window, fa_ratio):
 		"""
 		:param magnitudes:
@@ -133,20 +133,20 @@ class DeclusteringWindow():
 	"""
 	Class implementing declustering window
 	"""
-	
+
 	__metaclass__ = abc.ABCMeta
-	
+
 	@abc.abstractmethod
 	def get(self, magnitude):
 		"""
 		:param magnitude:
 			float, magnitude for wich to calculate window.
-		
+
 		:returns:
 			(float, float), defining time window (in days) and distance window (in km)
 		"""
 		pass
-	
+
 
 class GardnerKnopoff1974Window(DeclusteringWindow):
 	"""
@@ -178,9 +178,14 @@ class Gruenthal2009Window(DeclusteringWindow):
 	def get(self, magnitude):
 		if magnitude >= 6.5:
 			t_window = 10**(2.8+0.024*magnitude)
-		else:
+		elif magnitude > 0:
 			t_window = np.exp(-3.95+np.sqrt(0.62+17.32*magnitude))
-		s_window = np.exp(1.77+np.sqrt(0.037+1.02*magnitude))
+		else:
+			t_window = 0
+		if magnitude > 0:
+			s_window = np.exp(1.77+np.sqrt(0.037+1.02*magnitude))
+		else:
+			s_window = 0
 		return t_window, s_window
 
 

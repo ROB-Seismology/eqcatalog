@@ -4496,7 +4496,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 				if centroid and sm_label_size:
 					x, y = map(centroid.GetX(), centroid.GetY())
 					if isinstance(sm_label_colname, (str, unicode)):
-						zone_label = zone_data[sm_label_colname]
+						zone_label = zone_data.get("sm_label_colname", "")
 					else:
 						zone_label = " / ".join([str(zone_data[colname]) for colname in sm_label_colname])
 					pylab.text(x, y, zone_label, color=sm_color, fontsize=sm_label_size, fontweight='bold', ha='center', va='center')
