@@ -42,15 +42,15 @@ except:
 __all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord", "query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID", "query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog", "query_ROB_Web_MacroCatalog", "get_last_earthID"]
 
 
-def read_table(table_name, column_clause="*", where_clause="", having_clause="",
+def read_table(table_clause, column_clause="*", where_clause="", having_clause="",
 				order_clause="", verbose=False):
 	"""
 	Read table from seismodb database, returning each record as a dict
 
-	:param table_name:
-		str, name of database table
+	:param table_clause:
+		str or list of strings, name(s) of database table(s)
 	:param column_clause:
-		str, column clause (default: "*")
+		str or list of strings, column clause or list of columns (default: "*")
 	:param where_clause:
 		str, where clause (default: "")
 	:param having_clause:
@@ -66,7 +66,11 @@ def read_table(table_name, column_clause="*", where_clause="", having_clause="",
 	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database,
 			port=port, cursorclass=MySQLdb.cursors.DictCursor, use_unicode=True)
 	c = db.cursor()
-	query = 'SELECT %s from %s' % (column_clause, table_name)
+	if isinstance(table_clause, (list, tuple)):
+		table_clause = ','.join(table_clause)
+	if isinstance(column_clause, (list, tuple)):
+		column_clause = ','.join(column_clause)
+	query = 'SELECT %s from %s' % (column_clause, table_clause)
 	if where_clause:
 		if where_clause[:5].upper() == "WHERE":
 			where_clause = where_clause[5:].lstrip()
@@ -562,6 +566,60 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii", min_va
 			macro_info.append(MacroseismicRecord(id_com, I, num_replies))
 
 	return macro_info
+
+
+def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
+	"""
+	Query the ROB station database
+
+	:param network:
+		str, seismic network code
+		(default: 'UCC')
+	:param activity_date_time:
+		datetime object, time of activity
+		(default: None)
+	:param verbose:
+		bool, if True the query string will be echoed to standard output
+
+	:return:
+		generator object, yielding a dictionary for each record
+	"""
+	table_clause = ["station", "station_place", "station_sismometer", "station_sismometer_type"]
+
+	where_clause = "station.id_place=station_place.id_place"
+	where_clause += " AND station.id_sismometer=station_sismometer.id_sismometer"
+	where_clause += " AND station_sismometer.id_type=station_sismometer_type.id_type"
+	if network:
+		where_clause += " AND network='%s'" % network
+	if activity_date_time:
+		where_clause += " AND station.begin <= '%s'" % activity_date_time.isoformat()
+		where_clause += " AND (station.end >= '%s' OR station.end IS NULL)" % activity_date_time.isoformat()
+
+	column_clause = ["id_station",
+					"station_place.code",
+					"code_sup",
+					"station_place.international_code",
+					"station_place.name",
+					"station_place.country",
+					"station.type",
+					"network",
+					"kind",
+					"project",
+					"station.begin",
+					"NULLIF(station.end, DATE('0000-00-00 00:00:00')) as end",
+					"station_place.longitude",
+					"station_place.latitude",
+					"station_place.altitude",
+					"station_sismometer_type.code as instrument_code",
+					"station_sismometer_type.type as instrument_type",
+					"station_sismometer_type.description",
+					"station_sismometer_type.component_z",
+					"station_sismometer_type.component_ns",
+					"station_sismometer_type.component_ew"]
+
+	return read_table(table_clause, column_clause=column_clause,
+				where_clause=where_clause, verbose=verbose)
+
 
 
 def get_last_earthID():
