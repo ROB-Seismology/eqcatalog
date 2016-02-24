@@ -606,7 +606,7 @@ def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
 					"kind",
 					"project",
 					"station.begin",
-					"NULLIF(station.end, DATE('0000-00-00 00:00:00')) as end",
+					"station.end",
 					"station_place.longitude",
 					"station_place.latitude",
 					"station_place.altitude",
