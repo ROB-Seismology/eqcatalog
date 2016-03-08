@@ -3830,7 +3830,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 	return eqc
 
 
-def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9}, header=True, **fmtparams):
+def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9},
+                    header=True, date_sep='-', time_sep=':', **fmtparams):
 	"""
 	Read ROB local earthquake catalog from csv file.
 
@@ -3843,6 +3844,11 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		(default: {"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9})
 	:param header:
 		bool, if one-line header is present (default: True).
+	:param date_sep:
+		str, character separating date elements
+		(default: '-')
+	:param time_sep:
+		str, character separating time elements
 	:param **fmtparams:
 		kwargs for csv reader (e.g. "delimiter" and "quotechar")
 
@@ -3862,7 +3868,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				ID = i+1
 			if "date" in column_map:
 				date = line[column_map["date"]]
-				year, month, day = map(int, date.split("-"))
+				year, month, day = map(int, date.split(date_sep))
 			else:
 				if "year" in column_map:
 					try:
@@ -3895,7 +3901,9 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				print line
 			if "time" in column_map:
 				time = line[column_map["time"]]
-				hour, minute, second = map(int, time.split(":"))
+				hour, minute, second = time.split(time_sep)
+				hour, minute = int(hour), int(minute)
+				second = float(second)
 			else:
 				if "hour" in column_map:
 					try:
