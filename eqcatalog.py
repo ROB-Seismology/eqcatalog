@@ -3831,7 +3831,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 
 
 def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9},
-                    header=True, date_sep='-', time_sep=':', **fmtparams):
+					header=True, date_sep='-', time_sep=':', **fmtparams):
 	"""
 	Read ROB local earthquake catalog from csv file.
 

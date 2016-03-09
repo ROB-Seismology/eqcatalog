@@ -70,6 +70,8 @@ class LocalEarthquake:
 		self.ID = ID
 		if isinstance(date, datetime.date) and isinstance(time, datetime.time):
 			self.datetime = datetime.datetime.combine(date, time)
+		elif isinstance(date, mxDateTime.DateTimeType) and isinstance(time, mxDateTime.DateTimeDeltaType):
+			self.datetime = date + time
 		elif isinstance(date, datetime.datetime) or isinstance(date, mxDateTime.DateTimeType):
 			self.datetime = date
 		elif isinstance(time, datetime.datetime) or isinstance(time, mxDateTime.DateTimeType):
@@ -229,7 +231,11 @@ class LocalEarthquake:
 	def date(self):
 		if isinstance(self.datetime, mxDateTime.DateTimeType):
 			year, month, day = self.datetime.timetuple()[:3]
-			return mxDateTime.Date(year, month, day)
+			try:
+				date = datetime.date(year, month, day)
+			except ValueError:
+				date = mxDateTime.Date(year, month, day)
+			return date
 		else:
 			return self.datetime.date()
 
