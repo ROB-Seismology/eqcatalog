@@ -1764,7 +1764,7 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_magnitude_time(self, symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50, Mtype="MW", Mrelation=None, Mrange=(None, None), overlay_catalog=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+	def plot_magnitude_time(self, symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50, Mtype="MW", Mrelation=None, Mrange=(None, None), overlay_catalog=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300, ax=None):
 		"""
 		Plot time versus magnitude
 
@@ -1837,6 +1837,9 @@ class EQCatalog:
 			respect to default figure width (default: 0)
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
+		:param ax:
+			matplotlib Axes instance
+			(default: None)
 		"""
 		# TODO: check plot_dates, style parameters and labels from decluster names
 		catalogs = [self]
@@ -1847,7 +1850,7 @@ class EQCatalog:
 				edge_colors.append('r')
 			else:
 				edge_colors.append('k')
-		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness, completeness_color=completeness_color, vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness, completeness_color=completeness_color, vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi, ax=ax)
 
 	def DailyNightlyMean(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation=None, start_year=None, end_year=None, day=(7, 19)):
 		"""
@@ -4745,7 +4748,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 #	else:
 #		pylab.show()
 
-def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, start_year=None, Mrange=(None, None), completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, tick_unit=None, tick_freq=None, tick_by=None, tick_form=None, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, start_year=None, Mrange=(None, None), completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, tick_unit=None, tick_freq=None, tick_by=None, tick_form=None, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300, ax=None):
 	"""
 	:param catalogs:
 		List containing instances of :class:`EQCatalog`
@@ -4832,7 +4835,13 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		respect to default figure width (default: 0)
 	:param dpi:
 		Int, image resolution in dots per inch (default: 300)
+	:param ax:
+		matplotlib Axes instance
+		(default: None)
 	"""
+	if ax is None:
+		ax = pylab.axes()
+
 	## symbols, colors, and labels
 	if not symbols:
 		symbols = ["o"]
@@ -4863,10 +4872,10 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 			x = catalog.get_datetimes()
 		else:
 			x = catalog.get_fractional_years()
-		plt.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color, linewidth=edge_width)
+		ax.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color, linewidth=edge_width)
 
 	## crop X axis to data when using fractional years
-	xmin, xmax, ymin, ymax = plt.axis()
+	xmin, xmax, ymin, ymax = ax.axis()
 	if not plot_date:
 		if start_year:
 			xmin = start_year
@@ -4884,10 +4893,9 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 			ymin = Mmin
 		if Mmax != None:
 			ymax = Mmax
-	plt.axis((xmin, xmax, ymin, ymax))
+	ax.axis((xmin, xmax, ymin, ymax))
 
 	## plot ticks
-	ax = plt.gca()
 	if plot_date:
 		if tick_unit:
 			tick_unit_loc_map = {'year': mdates.YearLocator, 'month': mdates.MonthLocator, 'weekday': mdates.WeekdayLocator, 'monthday': mdates.DayLocator}
@@ -4924,8 +4932,8 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		xlabel = {"en": "Time (years)", "nl": "Tijd (jaar)"}[lang]
 	else:
 		xlabel = {"en": "Date", "nl": "Datum"}[lang]
-	plt.xlabel(xlabel, fontsize="x-large")
-	plt.ylabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
+	ax.set_xlabel(xlabel, fontsize="x-large")
+	ax.set_ylabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
 
 	## plot vertical lines
 	if vlines:
@@ -4936,9 +4944,9 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 			else:
 				if not plot_date:
 					vlines[i] = vline.year
-		ymin, ymax = plt.ylim()
-		plt.vlines(vlines, ymin=ymin, ymax=ymax, colors='b')
-		plt.ylim(ymin, ymax)
+		ymin, ymax = ax.get_ylim()
+		ax.vlines(vlines, ymin=ymin, ymax=ymax, colors='b')
+		ax.set_ylim(ymin, ymax)
 
 	## plot completeness
 	# TODO: implement completeness dates rather than years
@@ -4947,22 +4955,23 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		x = np.append(x, max([catalog.end_date for catalog in catalogs]).year+1)
 		if plot_date:
 			x = [datetime.datetime(year, 1, 1) for year in x]
-		xmin, xmax, ymin, ymax = plt.axis()
-		plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors=completeness_color)
-		plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors=completeness_color, lw=2)
-		plt.axis((xmin, xmax, ymin, ymax))
+		xmin, xmax, ymin, ymax = ax.axis()
+		ax.hlines(y, xmin=x[:-1], xmax=x[1:], colors=completeness_color)
+		ax.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors=completeness_color, lw=2)
+		ax.axis((xmin, xmax, ymin, ymax))
 
 	if grid:
-		plt.grid()
+		ax.grid()
 
 	if title:
-		plt.title(title)
+		ax.set_title(title)
 
-	plt.legend(loc=legend_location)
+	ax.legend(loc=legend_location)
 
-	plt.tight_layout()
-
-	if fig_filespec:
+	if fig_filespec == "hold":
+		pass
+	elif fig_filespec:
+		plt.tight_layout()
 		default_figsize = plt.rcParams['figure.figsize']
 		default_dpi = plt.rcParams['figure.dpi']
 		if fig_width:
