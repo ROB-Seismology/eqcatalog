@@ -3858,6 +3858,8 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	:returns:
 		instance of :class:`EQCatalog`
 	"""
+	from time_functions import parse_isoformat_datetime
+
 	earthquakes = []
 	with open(filespec, "r") as f:
 		lines = csv.reader(f, **fmtparams)
@@ -3869,67 +3871,73 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				ID = int(line[column_map["id"]])
 			else:
 				ID = i+1
-			if "date" in column_map:
-				date = line[column_map["date"]]
-				year, month, day = map(int, date.split(date_sep))
+			if "datetime" in column_map:
+				dt = parse_isoformat_datetime(line[column_map["datetime"]])
+				date = dt.date()
+				time = dt.time()
 			else:
-				if "year" in column_map:
-					try:
-						year = int(line[column_map["year"]])
-					except ValueError:
-						## Skip record if year is invalid
-						print("Invalid year in line %d: %s" % (i, line[column_map["year"]]))
-						continue
+				if "date" in column_map:
+					date = line[column_map["date"]]
+					year, month, day = map(int, date.split(date_sep))
 				else:
-					year = 1
-				if "month" in column_map:
-					try:
-						month = max(1, int(line[column_map["month"]]))
-					except:
-						print("Invalid month in line %d: %s. Set to 1." % (i, line[column_map["month"]]))
+					if "year" in column_map:
+						try:
+							year = int(line[column_map["year"]])
+						except ValueError:
+							## Skip record if year is invalid
+							print("Invalid year in line %d: %s" % (i, line[column_map["year"]]))
+							continue
+					else:
+						year = 1
+					if "month" in column_map:
+						try:
+							month = max(1, int(line[column_map["month"]]))
+						except:
+							print("Invalid month in line %d: %s. Set to 1." % (i, line[column_map["month"]]))
+							month = 1
+					else:
 						month = 1
-				else:
-					month = 1
-				if "day" in column_map:
-					try:
-						day = max(1, int(line[column_map["day"]]))
-					except:
-						print("Invalid day in line %d: %s. Set to 1." % (i, line[column_map["day"]]))
+					if "day" in column_map:
+						try:
+							day = max(1, int(line[column_map["day"]]))
+						except:
+							print("Invalid day in line %d: %s. Set to 1." % (i, line[column_map["day"]]))
+							day = 1
+					else:
 						day = 1
+				try:
+					date = mxDateTime.Date(year, month, day)
+				except:
+					print line
+				if "time" in column_map:
+					time = line[column_map["time"]]
+					hour, minute, second = time.split(time_sep)
+					hour, minute = int(hour), int(minute)
+					second = float(second)
 				else:
-					day = 1
-			try:
-				date = mxDateTime.Date(year, month, day)
-			except:
-				print line
-			if "time" in column_map:
-				time = line[column_map["time"]]
-				hour, minute, second = time.split(time_sep)
-				hour, minute = int(hour), int(minute)
-				second = float(second)
-			else:
-				if "hour" in column_map:
-					try:
-						hour = int(line[column_map["hour"]])
-					except:
+					if "hour" in column_map:
+						try:
+							hour = int(line[column_map["hour"]])
+						except:
+							hour = 0
+					else:
 						hour = 0
-				else:
-					hour = 0
-				if "minute" in column_map:
-					try:
-						minute = int(line[column_map["minute"]])
-					except:
+					if "minute" in column_map:
+						try:
+							minute = int(line[column_map["minute"]])
+						except:
+							minute = 0
+					else:
 						minute = 0
-				else:
-					minute = 0
-				if "second" in column_map:
-					try:
-						second = int(line[column_map["second"]])
-					except:
+					if "second" in column_map:
+						try:
+							second = int(line[column_map["second"]])
+						except:
+							second = 0
+					else:
 						second = 0
-				else:
-					second = 0
-			time = mxDateTime.Time(hour, minute, second)
+				time = mxDateTime.Time(hour, minute, second)
+
 			if "lon" in column_map:
 				lon = float(line[column_map["lon"]])
 			else:

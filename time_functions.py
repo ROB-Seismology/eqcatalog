@@ -2,6 +2,7 @@
 Useful time functions
 """
 
+import datetime
 import mx.DateTime as mxDateTime
 
 
@@ -72,3 +73,31 @@ def fractional_year(date):
 	fraction = yearElapsed/yearDuration
 
 	return date.year + fraction
+
+
+def parse_isoformat_datetime(isodatetime):
+	"""
+	Parse ISO-8601 formatted timestamps like 2016-01-31T04:39:48.230Z
+	Source: http://stackoverflow.com/questions/127803/how-to-parse-an-iso-8601-formatted-date-in-python
+
+	:param isodatetime:
+		str, ISO-8601 formatted timestamp
+
+	:return:
+		instance of :class:`datetime.datetime`
+	"""
+	try:
+		return datetime.datetime.strptime(isodatetime, '%Y-%m-%dT%H:%M:%S.%f')
+	except ValueError:
+		pass
+	try:
+		return datetime.datetime.strptime(isodatetime, '%Y-%m-%dT%H:%M:%S.%fZ')
+	except ValueError:
+		pass
+	try:
+		return datetime.datetime.strptime(isodatetime, '%Y-%m-%dT%H:%M:%S')
+	except ValueError:
+		pass
+	pat = r'(.*?[+-]\d{2}):(\d{2})'
+	temp = re.sub(pat, r'\1\2', isodatetime)
+	return datetime.datetime.strptime(temp, '%Y-%m-%dT%H:%M:%S.%f%z')
