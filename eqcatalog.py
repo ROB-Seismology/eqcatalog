@@ -3833,8 +3833,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 	return eqc
 
 
-def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9},
-					header=True, date_sep='-', time_sep=':', **fmtparams):
+def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ML": 7, "MS": 8, "MW": 9},
+					header=True, date_sep='-', time_sep=':', date_order='YMD', ignore_warnings=False, **fmtparams):
 	"""
 	Read ROB local earthquake catalog from csv file.
 
@@ -3844,7 +3844,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		lon, lat, depth, ML, MS and MW. All are optional.
 	:param column_map:
 		Dictionary, mapping attributes to number of column (starting from 0).
-		(default: {"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ml": 7, "MS": 8, "MW": 9})
+		(default: {"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ML": 7, "MS": 8, "MW": 9})
 	:param header:
 		bool, if one-line header is present (default: True).
 	:param date_sep:
@@ -3852,6 +3852,12 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		(default: '-')
 	:param time_sep:
 		str, character separating time elements
+	:param date_order:
+		str, order of year (Y), month (M), day (D) in date string
+		(default: 'YMD')
+	:param ignore_warnings:
+		bool, whether or not to print warnings when fields cannot be parsed
+		(default: False, will print warnings)
 	:param **fmtparams:
 		kwargs for csv reader (e.g. "delimiter" and "quotechar")
 
@@ -3860,6 +3866,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	"""
 	from time_functions import parse_isoformat_datetime
 
+	date_order = date_order.upper()
 	earthquakes = []
 	with open(filespec, "r") as f:
 		lines = csv.reader(f, **fmtparams)
@@ -3878,14 +3885,18 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 			else:
 				if "date" in column_map:
 					date = line[column_map["date"]]
-					year, month, day = map(int, date.split(date_sep))
+					date_elements = date.split(date_sep)
+					year = int(date_elements[date_order.index('Y')])
+					month = int(date_elements[date_order.index('M')])
+					day = int(date_elements[date_order.index('D')])
 				else:
 					if "year" in column_map:
 						try:
 							year = int(line[column_map["year"]])
 						except ValueError:
 							## Skip record if year is invalid
-							print("Invalid year in line %d: %s" % (i, line[column_map["year"]]))
+							if not ignore_warnings:
+								print("Invalid year in line %d: %s" % (i, line[column_map["year"]]))
 							continue
 					else:
 						year = 1
@@ -3893,7 +3904,8 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 						try:
 							month = max(1, int(line[column_map["month"]]))
 						except:
-							print("Invalid month in line %d: %s. Set to 1." % (i, line[column_map["month"]]))
+							if not ignore_warnings:
+								print("Invalid month in line %d: %s. Set to 1." % (i, line[column_map["month"]]))
 							month = 1
 					else:
 						month = 1
@@ -3901,7 +3913,8 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 						try:
 							day = max(1, int(line[column_map["day"]]))
 						except:
-							print("Invalid day in line %d: %s. Set to 1." % (i, line[column_map["day"]]))
+							if not ignore_warnings:
+								print("Invalid day in line %d: %s. Set to 1." % (i, line[column_map["day"]]))
 							day = 1
 					else:
 						day = 1
@@ -3911,9 +3924,19 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 					print line
 				if "time" in column_map:
 					time = line[column_map["time"]]
-					hour, minute, second = time.split(time_sep)
-					hour, minute = int(hour), int(minute)
-					second = float(second)
+					time_elements = time.split(time_sep)
+					try:
+						hour = int(time_elements[0])
+					except (IndexError, ValueError):
+						hour = 0
+					try:
+						minute = int(time_elements[1])
+					except (IndexError, ValueError):
+						minute = 0
+					try:
+						second = float(time_elements[2])
+					except (IndexError, ValueError):
+						second = 0.
 				else:
 					if "hour" in column_map:
 						try:
@@ -3957,7 +3980,8 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				try:
 					ML = float(line[column_map["ML"]])
 				except ValueError:
-					print("Invalid ML in line %d: %s" % (i, line[column_map["ML"]]))
+					if not ignore_warnings:
+						print("Invalid ML in line %d: %s" % (i, line[column_map["ML"]]))
 					ML = 0.
 			else:
 				ML = 0.
@@ -3965,7 +3989,8 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				try:
 					MS = float(line[column_map["MS"]])
 				except ValueError:
-					print("Invalid MS in line %d: %s" % (i, line[column_map["MS"]]))
+					if not ignore_warnings:
+						print("Invalid MS in line %d: %s" % (i, line[column_map["MS"]]))
 					MS = 0.
 			else:
 				MS = 0.
@@ -3973,7 +3998,8 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				try:
 					MW = float(line[column_map["MW"]])
 				except ValueError:
-					print("Invalid MW in line %d: %s" % (i, line[column_map["MW"]]))
+					if not ignore_warnings:
+						print("Invalid MW in line %d: %s" % (i, line[column_map["MW"]]))
 					MW = 0.
 			else:
 				MW = 0.
@@ -4188,7 +4214,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 
 		data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
 		if isinstance(sm_style, dict):
-			if sm_style.has_key("fill_color"):
+			if sm_style.has_key("fill_color") and not sm_style["fill_color"] in ("None", None):
 				polygon_style = lbm.PolygonStyle.from_dict(sm_style)
 				line_style = None
 			else:
