@@ -8,7 +8,7 @@ import time
 import json
 import numpy as np
 
-## Third-part modules
+## Third-party modules
 import mx.DateTime as mxDateTime
 
 ## Import ROB modules

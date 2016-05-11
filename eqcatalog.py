@@ -2816,14 +2816,50 @@ class EQCatalog:
 		cPickle.dump(self, f)
 		f.close()
 
+	def get_bbox(self):
+		"""
+		Compute bounding box of earthquake catalog
+
+		:return:
+			(lonmin, lonmax, latmin, latmax) tuple
+		"""
+		lons = self.get_longitudes()
+		lats = self.get_latitudes()
+		return (lons.min(), lons.max(), lats.min(), lats.max())
+
+	def subselect_distance(self, point, distance, catalog_name=""):
+		"""
+		Subselect earthquakes in a given radius around a given point
+
+		:param point:
+			(lon, lat) tuple
+		:param distance:
+			float, distance in km
+		:param catalog_name:
+			Str, name of resulting catalog
+			(default: "")
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		from itertools import compress
+
+		distances = self.get_epicentral_distances(*point)
+		eq_list = list(compress(self.eq_list, distances <= distance))
+		if not catalog_name:
+			catalog_name = self.name + " (%s km radius from %s)" % (distance, point)
+		region = self.get_bbox()
+		return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
+
 	def subselect_polygon(self, poly_obj, catalog_name=""):
 		"""
 		Subselect earthquakes from catalog situated inside a polygon
 
 		:param poly_obj:
-			polygon object (osr geometry object)
+			polygon or closed linestring object (osr geometry object)
 		:param catalog_name:
 			Str, name of resulting catalog
+			(default: "")
 
 		:return:
 			instance of :class:`EQCatalog`
@@ -2838,8 +2874,19 @@ class EQCatalog:
 		point = ogr.Geometry(ogr.wkbPoint)
 		point.AssignSpatialReference(wgs84)
 
-		if poly_obj.GetGeometryName() == "POLYGON":
-			## Objects other than polygons will be skipped
+		if poly_obj.GetGeometryName() in ("POLYGON", "LINESTRING"):
+			## Objects other than polygons or closed polylines will be skipped
+			if poly_obj.GetGeometryName() == "LINESTRING":
+				line_obj = poly_obj
+				if line_obj.IsRing():
+					# Note: Could not find a way to convert linestrings to polygons
+					# The following only works for linearrings (what is the difference??)
+					#poly_obj = ogr.Geometry(ogr.wkbPolygon)
+					#poly_obj.AddGeometry(line_obj)
+					wkt = line_obj.ExportToWkt().replace("LINESTRING (", "POLYGON ((") + ")"
+					poly_obj = ogr.CreateGeometryFromWkt(wkt)
+				else:
+					return None
 			eq_list = []
 			for i, eq in enumerate(self.eq_list):
 				point.SetPoint(0, eq.lon, eq.lat)
@@ -2883,7 +2930,7 @@ class EQCatalog:
 		zone_catalogs = OrderedDict()
 		for zoneID, zone_data in model_data.items():
 			zone_poly = zone_data['obj']
-			if zone_poly.GetGeometryName() == "POLYGON":
+			if zone_poly.GetGeometryName() == "POLYGON" or zone_poly.IsRing():
 				## Fault sources will be skipped
 				zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
 
@@ -3496,6 +3543,7 @@ class EQCatalog:
 	def get_epicentral_distances(self, lon, lat):
 		"""
 		"""
+		# TODO: use more efficient computation with arrays (see supy.geodetic)
 		distances = np.zeros(len(self))
 		for i, eq in enumerate(self):
 			distances[i] = eq.epicentral_distance((lon, lat))
