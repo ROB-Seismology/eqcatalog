@@ -6,9 +6,10 @@
 import datetime
 import time
 import json
-import numpy as np
+from collections import OrderedDict
 
 ## Third-party modules
+import numpy as np
 import mx.DateTime as mxDateTime
 
 ## Import ROB modules
@@ -20,6 +21,13 @@ from time_functions import fractional_year
 __all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
 
 # TODO: allow nan values instead of zeros
+
+
+default_Mrelations = {
+	'ML': {},
+	'MS': {"ML": "Ambraseys1985"},
+	'MW': OrderedDict([("MS", "Geller1976"), ("ML", "Ahorner1983")])
+}
 
 
 class LocalEarthquake:
@@ -41,6 +49,8 @@ class LocalEarthquake:
 		Float, latitude of epicenter in decimal degrees
 	:param depth:
 		Float, hypocentral depth in km
+	:param mag:
+		dict, mapping magnitude types (str) to magnitude values (floats)
 	:param ML:
 		Float, local magnitude
 	:param MS:
@@ -66,7 +76,7 @@ class LocalEarthquake:
 	:param zone:
 		Str, seismotectonic zone the earthquake belongs to (default: "")
 	"""
-	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, mb=0, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0., zone=""):
+	def __init__(self, ID, date, time, lon, lat, depth, mag, ML=np.nan, MS=np.nan, MW=np.nan, mb=np.nan, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0., zone=""):
 		self.ID = ID
 		if isinstance(date, datetime.date) and isinstance(time, datetime.time):
 			self.datetime = datetime.datetime.combine(date, time)
@@ -80,10 +90,15 @@ class LocalEarthquake:
 		self.lon = lon
 		self.lat = lat
 		self.depth = depth
-		self.ML = ML
-		self.MS = MS
-		self.MW = MW
-		self.mb = mb
+		self.mag = mag
+		if ML != None:
+			self.mag['ML'] = ML
+		if MS != None:
+			self.mag['MS'] = MS
+		if MW != None:
+			self.mag['MW'] = MW
+		if mb != None:
+			self.mag['mb'] = mb
 
 		"""
 		try:
@@ -117,6 +132,7 @@ class LocalEarthquake:
 		self.errh = errh
 		self.errz = errz
 		self.errt = errt
+		# TODO: errM should be dict as well
 		self.errM = errM
 		self.zone = str(zone)
 
@@ -227,6 +243,8 @@ class LocalEarthquake:
 
 		return HYPDAT(latitude, longitude, year, month, day, minutes, tseconds, depth, magnitude, 0, 0, 0)
 
+	## date-time-related methods
+
 	@property
 	def date(self):
 		if isinstance(self.datetime, mxDateTime.DateTimeType):
@@ -260,14 +278,138 @@ class LocalEarthquake:
 		if isinstance(self.datetime, mxDateTime.DateTimeType):
 			self.datetime = self.datetime.pydatetime()
 
-	def get_ML(self, Mrelation=None):
+	def get_fractional_year(self):
+		"""
+		Compute fractional year of event
+
+		:return:
+			Float, fractional year
+		"""
+		return fractional_year(self.datetime)
+
+	def get_fractional_hour(self):
+		"""
+		Compute fractional hour of event
+
+		:return:
+			Float, fractional hour
+		"""
+		return self.datetime.hour + self.datetime.minute/60.0 + self.datetime.second/3600.0
+
+	## Magnitude-related methods
+
+	@property
+	def ML(self):
+		"""Local magnitude"""
+		return self.get_mag('ML')
+
+	@property
+	def MS(self):
+		"""Surface-wave magnitude"""
+		return self.get_mag('MS')
+
+	@property
+	def MW(self):
+		"""Moment magnitude"""
+		return self.get_mag('MW')
+
+	@property
+	def mb(self):
+		"""Body-wave magnitude"""
+		return self.get_mag('mb')
+
+	def has_mag(self, Mtype):
+		"""
+		Determine whether particular magnitude type is defined
+
+		:param Mtype:
+			str, magnitude type to check
+
+		:return:
+			bool
+		"""
+		if self.mag.has_key(Mtype) and not np.isnan(self.mag[Mtype]):
+			return True
+		else:
+			return False
+
+	def get_Mtypes(self):
+		"""
+		Get defined magnitude types
+
+		:return:
+			list of strings
+		"""
+		return [Mtype for Mtype in self.mag.keys() if not np.isnan(self.mag[Mtype])]
+
+	def get_mag(self, Mtype):
+		"""
+		Return particular magnitude without conversion.
+		If magnitude type is not defined, NaN is returned.
+
+		:param Mtype:
+			str, magnitude type to return
+
+		:return:
+			float or np.nan, magnitude
+		"""
+		return self.mag.get(Mtype, np.nan)
+
+	def get_or_convert_mag(self, Mtype, Mrelation={}):
+		"""
+		Return particular magnitude. If the magnitude type is not defined,
+		it will be converted.
+
+		:param Mtype:
+			str, magnitude type to return
+		:param Mrelation:
+			{str: str} dict, mapping magnitude types to names of magnitude
+			conversion relations
+			Note: use an ordered dict if more than 1 magnitude type is
+			specified, as the first magnitude type that is defined will
+			be used for conversion.
+			If specified as "default" or None, the default Mrelation
+			for the given Mtype will be selected.
+			(default: {})
+		"""
+		if self.has_mag(Mtype):
+			return self.mag[Mtype]
+		else:
+			if Mrelation in (None, "default"):
+				Mrelation = default_Mrelations.get(Mtype, {})
+			return self.convert_mag(Mrelation)
+
+	def convert_mag(self, Mrelation):
+		"""
+		Return magnitude based on conversion.
+
+		:param Mrelation:
+			{str: str} dict, mapping magnitude types to names of magnitude
+			conversion relations
+			Note: use an ordered dict if more than 1 magnitude type is
+			specified, as the first magnitude type that is defined will
+			be used for conversion
+			(default: {})
+		"""
+		for Mtype, msce_name in Mrelation.items():
+			if self.has_mag(Mtype):
+				msce = getattr(msc, msce_name)()
+				return msce.get_mean(self.get_mag(Mtype))
+
+		## If Mrelation is empty or none of the Mtype's match
+		return np.nan
+
+	def get_ML(self, Mrelation="default"):
 		"""
 		Return ML
 		Not yet implemented!
 		"""
-		return self.ML
+		if Mrelation in (None, "default"):
+			Mrelation = default_Mrelations['ML']
 
-	def get_MS(self, Mrelation={"ML": "ambraseys"}):
+		return self.get_or_convert_mag('ML', Mrelation)
+
+	def get_MS(self, Mrelation="default"):
 		"""
 		Return MS.
 		If MS is None or zero, calculate it using the specified
@@ -287,11 +429,14 @@ class LocalEarthquake:
 			Float, surface-wave magnitude
 		"""
 		## Set default conversion relation
-		if Mrelation is None:
-			Mrelation={"ML": "Ambraseys1985"}
+		if Mrelation in (None, "default"):
+			Mrelation = default_Mrelations['MS']
 
-		if not self.MS:
-			if self.ML and Mrelation.has_key("ML"):
+		return self.get_or_convert_mag('MS', Mrelation)
+
+		"""
+		if not self.has_mag('MS'):
+			if self.has_mag('ML') and Mrelation.has_key("ML"):
 				msce = getattr(msc, Mrelation["ML"])()
 				return msce.get_mean(self.ML)
 			# TODO: add relation for MW
@@ -299,8 +444,9 @@ class LocalEarthquake:
 				return 0.
 		else:
 			return self.MS
+		"""
 
-	def get_MW(self, Mrelation={"MS": "Geller1976", "ML": "Ahorner1983"}):
+	def get_MW(self, Mrelation="default"):
 		"""
 		Return MW.
 		If MW is None or zero, calculate it using the specified
@@ -334,14 +480,17 @@ class LocalEarthquake:
 			Float, moment magnitude
 		"""
 		## Set default conversion relation
-		if Mrelation is None:
-			Mrelation={"MS": "Geller1976", "ML": "Ahorner1983"}
+		if Mrelation in (None, "default"):
+			Mrelation = default_Mrelations['MW']
 
-		if not self.MW:
-			if self.MS and Mrelation.has_key("MS"):
+		return self.get_or_convert_mag('MW', Mrelation)
+
+		"""
+		if not self.has_mag('MW'):
+			if self.has_mag('MS') and Mrelation.has_key("MS"):
 				msce = getattr(msc, Mrelation["MS"])()
 				MW = msce.get_mean(self.MS)
-			elif self.ML and Mrelation.has_key("ML"):
+			elif self.has_mag('ML') and Mrelation.has_key("ML"):
 				msce = getattr(msc, Mrelation["ML"])()
 				MW = msce.get_mean(self.ML)
 			else:
@@ -349,8 +498,9 @@ class LocalEarthquake:
 		else:
 			MW = self.MW
 		return MW
+		"""
 
-	def get_M(self, Mtype, Mrelation=None):
+	def get_M(self, Mtype, Mrelation="default"):
 		"""
 		Wrapper for get_ML, get_MS, and get_MW functions
 
@@ -366,7 +516,7 @@ class LocalEarthquake:
 		"""
 		return getattr(self, "get_"+Mtype)(Mrelation=Mrelation)
 
-	def get_M0(self, Mrelation=None):
+	def get_M0(self, Mrelation="default"):
 		"""
 		Compute seismic moment.
 		If MW is None or zero, it will be computed using the specified
@@ -381,24 +531,6 @@ class LocalEarthquake:
 			Float, scalar seismic moment in N.m
 		"""
 		return 10**((self.get_MW(Mrelation=Mrelation) + 6.06) * 3.0 / 2.0)
-
-	def get_fractional_year(self):
-		"""
-		Compute fractional year of event
-
-		:return:
-			Float, fractional year
-		"""
-		return fractional_year(self.datetime)
-
-	def get_fractional_hour(self):
-		"""
-		Compute fractional hour of event
-
-		:return:
-			Float, fractional hour
-		"""
-		return self.datetime.hour + self.datetime.minute/60.0 + self.datetime.second/3600.0
 
 	def epicentral_distance(self, pt):
 		"""
