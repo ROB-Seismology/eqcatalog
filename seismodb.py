@@ -19,6 +19,7 @@ Required modules:
 import datetime
 
 ## Import third-party modules
+import numpy as np
 import MySQLdb
 import MySQLdb.cursors
 
@@ -239,11 +240,11 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 			if depth == None:
 				depth = 0.0
 			if ML == None:
-				ML = 0.0
+				ML = np.nan
 			if MS == None:
-				MS = 0.0
+				MS = np.nan
 			if MW == None:
-				MW = 0.0
+				MW = np.nan
 			if intensity_max == None:
 				intensity_max = 0
 			if macro_radius == None:
@@ -257,7 +258,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 			if errM == None:
 				errM = 0.
 
-			mb = 0
+			mb = np.nan
 
 		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, mb, name, intensity_max, macro_radius, errh, errz, errt, errM)
 		eq_list.append(eq)
@@ -297,17 +298,17 @@ def query_ROB_LocalEQCatalogByID(id_earth, verbose=False, errf=None):
 	if depth == None:
 		depth = 0.0
 	if ML == None:
-		ML = 0.0
+		ML = np.nan
 	if MS == None:
-		MS = 0.0
+		MS = np.nan
 	if MW == None:
-		MW = 0.0
-		if intensity_max == None:
-			intensity_max = 0
-		if macro_radius == None:
-			macro_radius = 0
+		MW = np.nan
+	if intensity_max == None:
+		intensity_max = 0
+	if macro_radius == None:
+		macro_radius = 0
 
-	mb = 0.
+	mb = np.nan
 
 	eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, mb, name, intensity_max, macro_radius)
 

@@ -645,8 +645,8 @@ class FocMecRecord(LocalEarthquake):
 	"""
 	Container class to hold information of records retrieved from the focal_mechanisms database table.
 	"""
-	def __init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, strike, dip, rake, name="", intensity_max=None, macro_radius=None):
-		LocalEarthquake.__init__(self, ID, date, time, lon, lat, depth, ML, MS, MW, name=name, intensity_max=intensity_max, macro_radius=macro_radius)
+	def __init__(self, ID, date, time, lon, lat, depth, mag, ML, MS, MW, strike, dip, rake, name="", intensity_max=None, macro_radius=None):
+		LocalEarthquake.__init__(self, ID, date, time, lon, lat, depth, mag, ML, MS, MW, name=name, intensity_max=intensity_max, macro_radius=macro_radius)
 		#MT.FaultGeometry.__init__(self, strike, dip, rake)
 		self.Mw = self.get_MW()
 		self.strike = strike

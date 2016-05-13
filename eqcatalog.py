@@ -641,10 +641,10 @@ class EQCatalog:
 			else:
 				eq_list = [eq for eq in eq_list if eq.date < end_date]
 		if Mmin != None:
-			Mags = [eq.get_M(Mtype, Mrelation) for eq in eq_list]
+			Mags = self.get_magnitudes(Mtype, Mrelation)
 			eq_list = [eq_list[i] for i in range(len(eq_list)) if Mmin <= Mags[i]]
 		if Mmax != None:
-			Mags = [eq.get_M(Mtype, Mrelation) for eq in eq_list]
+			Mags = self.get_magnitudes(Mtype, Mrelation)
 			if include_right_edges:
 				eq_list = [eq_list[i] for i in range(len(eq_list)) if Mags[i] <= Mmax]
 			else:
@@ -780,7 +780,7 @@ class EQCatalog:
 		if completeness:
 			eq_list = []
 			for eq in self.eq_list:
-				M = eq.get_M(Mtype, Mrelation)
+				M = eq.get_or_convert_mag(Mtype, Mrelation)
 				if M >= completeness.get_completeness_magnitude(eq.date):
 					eq_list.append(eq)
 		else:
@@ -1708,7 +1708,7 @@ class EQCatalog:
 			bins_Num.append(np.zeros(len(bins_Dates), 'd'))
 
 		for eq in subcatalog:
-			M = eq.get_M(Mtype, Mrelation)
+			M = eq.get_or_convert_mag(Mtype, Mrelation)
 			try:
 				im = np.where(M < mag_limits)[0][0]
 			except IndexError:
@@ -2591,7 +2591,7 @@ class EQCatalog:
 		"""
 		f = open(filespec, "w")
 		for eq in self.eq_list:
-			M = eq.get_M(Mtype, Mrelation)
+			M = eq.get_or_convert_mag(Mtype, Mrelation)
 			f.write("%f  %f  %d  %d  %d  %.1f %.2f %d %d\n" % (eq.lon, eq.lat, eq.datetime.year, eq.datetime.month, eq.datetime.day, M, eq.depth, eq.datetime.hour, eq.datetime.minute))
 		f.close()
 
@@ -2630,7 +2630,7 @@ class EQCatalog:
 			else:
 				eq_name = ""
 			if Mtype:
-				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.get_M(Mtype, Mrelation), eq.intensity_max, eq.macro_radius))
+				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.get_or_convert_mag(Mtype, Mrelation), eq.intensity_max, eq.macro_radius))
 			else:
 				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%.2f,%.2f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
 		if csv_filespec != None:
@@ -2843,7 +2843,7 @@ class EQCatalog:
 		f.write("SCALARS Magnitude float 1\n")
 		f.write("LOOKUP_TABLE default\n")
 		for eq in self:
-			f.write("%.2f\n" % eq.get_M(Mtype, Mrelation))
+			f.write("%.2f\n" % eq.get_or_convert_mag(Mtype, Mrelation))
 		f.close()
 
 	def export_HY4(self, filespec):
@@ -3295,7 +3295,7 @@ class EQCatalog:
 			])
 			data_flt.append([
 				float(eq.datetime.second),
-				float(eq.get_M(Mtype, Mrelation)),
+				float(eq.get_or_convert_mag(Mtype, Mrelation)),
 				float(eq.lon),
 				float(eq.lat),
 			])
@@ -3462,7 +3462,7 @@ class EQCatalog:
 				float(eq.lon),
 				float(eq.lat),
 				float(eq.depth),
-				float(eq.get_M(Mtype=Mtype, Mrelation=Mrelation)),
+				float(eq.get_or_convert_mag(Mtype=Mtype, Mrelation=Mrelation)),
 			])
 			data_int.append([
 				int(eq.datetime.year),
@@ -4302,7 +4302,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			style = lbm.PolygonStyle.from_dict(continent_style)
 		else:
 			style = continent_style
-		layers.append(lbm.MapLayer(data, style))
+		layers.append(lbm.MapLayer(data, style, name="continents"))
 
 	## Coastlines
 	if coastline_style != None:
@@ -4311,7 +4311,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			style = lbm.LineStyle.from_dict(coastline_style)
 		else:
 			style = coastline_style
-		layers.append(lbm.MapLayer(data, style))
+		layers.append(lbm.MapLayer(data, style, name="coastlines"))
 
 	## Country borders
 	if country_style != None:
@@ -4320,7 +4320,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			style = lbm.LineStyle.from_dict(country_style)
 		else:
 			style = country_style
-		layers.append(lbm.MapLayer(data, style))
+		layers.append(lbm.MapLayer(data, style, name="countries"))
 
 	## Rivers
 	if river_style != None:
@@ -4329,7 +4329,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			style = lbm.LineStyle.from_dict(river_style)
 		else:
 			style = country_style
-		layers.append(lbm.MapLayer(data, style))
+		layers.append(lbm.MapLayer(data, style, name="rivers"))
 
 	## Source model
 	if source_model:
@@ -4363,7 +4363,8 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		elif polygon_style and not polygon_style.label_style:
 			polygon_style.label_style = lbm.TextStyle(color=polygon_style.line_color, font_size=8)
 		style = lbm.CompositeStyle(line_style=line_style, polygon_style=polygon_style)
-		layer = lbm.MapLayer(data, style, legend_label={'lines': source_model_name + " faults", 'polygons': source_model_name + " zones"})
+		legend_label = {'lines': source_model_name + " faults", 'polygons': source_model_name + " zones"}
+		layer = lbm.MapLayer(data, style, legend_label=legend_label, name="source model")
 		layers.append(layer)
 
 	## Earthquakes
@@ -4420,7 +4421,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 
 		point_data = lbm.MultiPointData(catalog.get_longitudes(), catalog.get_latitudes(), values=values)
 
-		layer = lbm.MapLayer(point_data, style, legend_label=labels[i])
+		layer = lbm.MapLayer(point_data, style, legend_label=labels[i], name="earthquakes")
 		layers.append(layer)
 
 	## Sites
@@ -4440,7 +4441,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			site_labels.append(name)
 
 		point_data = lbm.MultiPointData(site_lons, site_lats, labels=site_labels)
-		layer = lbm.MapLayer(point_data, site_style, site_legend)
+		layer = lbm.MapLayer(point_data, site_style, site_legend, name="sites")
 		layers.append(layer)
 
 	## Circles
@@ -4454,7 +4455,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		for circle in circles:
 			lon, lat, radius = circle
 			circle_data = lbm.CircleData([lon], [lat], [radius])
-			layer = lbm.MapLayer(circle_data, circle_styles[i%len(circle_styles)])
+			layer = lbm.MapLayer(circle_data, circle_styles[i%len(circle_styles)], name="circles")
 			layers.append(layer)
 
 	if isinstance(legend_style, dict):
