@@ -728,6 +728,13 @@ class EQCatalog:
 		lons = self.get_longitudes()
 		lats = self.get_latitudes()
 
+		## Remove NaN magnitudes
+		idxs = -np.isnan(magnitudes)
+		magnitudes = magnitudes[idxs]
+		datetimes = datetimes[idxs]
+		lons = lons[idxs]
+		lats = lats[idxs]
+
 		d_index = methods[method].decluster(magnitudes, datetimes, lons, lats,
 			windows[window], fa_ratio)
 
@@ -3286,19 +3293,21 @@ class EQCatalog:
 		keys_flt = ["second", "magnitude", "longitude", "latitude"]
 		data_int, data_flt = [], []
 		for eq in self:
-			data_int.append([
-				int(eq.datetime.year),
-				int(eq.datetime.month),
-				int(eq.datetime.day),
-				int(eq.datetime.hour),
-				int(eq.datetime.minute),
-			])
-			data_flt.append([
-				float(eq.datetime.second),
-				float(eq.get_or_convert_mag(Mtype, Mrelation)),
-				float(eq.lon),
-				float(eq.lat),
-			])
+			mag = eq.get_or_convert_mag(Mtype, Mrelation)
+			if not np.isnan(mag):
+				data_int.append([
+					int(eq.datetime.year),
+					int(eq.datetime.month),
+					int(eq.datetime.day),
+					int(eq.datetime.hour),
+					int(eq.datetime.minute),
+				])
+				data_flt.append([
+					float(eq.datetime.second),
+					float(mag),
+					float(eq.lon),
+					float(eq.lat),
+				])
 		ec.load_from_array(keys_int, np.array(data_int, dtype=np.int16))
 		ec.load_from_array(keys_flt, np.array(data_flt, dtype=np.float64))
 
