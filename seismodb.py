@@ -397,7 +397,7 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None, Mmin=
 			intensity_max = 0
 		if macro_radius == None:
 			macro_radius = 0
-		eq = FocMecRecord(id_earth, date, time, lon, lat, depth, ML, MS, MW, strike, dip, rake, name, intensity_max, macro_radius)
+		eq = FocMecRecord(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, strike, dip, rake, name, intensity_max, macro_radius)
 		catalogue.append(eq)
 
 	return catalogue
