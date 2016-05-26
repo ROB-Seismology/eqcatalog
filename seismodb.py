@@ -32,21 +32,18 @@ from eqrecord import LocalEarthquake, MacroseismicRecord, FocMecRecord
 #reload(eqcatalog)
 from eqcatalog import EQCatalog
 
-## Database information
-from seismodb_secrets import host, user, passwd, database
-try:
-	from seismodb_secrets import port
-except:
-	port = 3306
 
 
 __all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord", "query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID", "query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog", "query_ROB_Web_MacroCatalog", "get_last_earthID"]
 
 
-def read_table(table_clause, column_clause="*", where_clause="", having_clause="",
-				order_clause="", verbose=False):
+# TODO: Move generic functions to a db module, and add sqlite stuff from parse_abem_db
+
+
+def build_sql_query(table_clause, column_clause="*", where_clause="",
+					having_clause="", order_clause="", group_clause=""):
 	"""
-	Read table from seismodb database, returning each record as a dict
+	Build SQL query from component clauses
 
 	:param table_clause:
 		str or list of strings, name(s) of database table(s)
@@ -58,48 +55,187 @@ def read_table(table_clause, column_clause="*", where_clause="", having_clause="
 		str, having clause (default: "")
 	:param order_clause:
 		str, order clause (default: "")
+	:param group_clause:
+		str, group clause (default: "")
+
+	:return:
+		str, SQL query
+	"""
+	if isinstance(table_clause, (list, tuple)):
+		table_clause = ', '.join(table_clause)
+	if isinstance(column_clause, (list, tuple)):
+		column_clause = ', '.join(column_clause)
+	query = 'SELECT %s from %s' % (column_clause, table_clause)
+	if where_clause:
+		if where_clause.lstrip()[:5].upper() == "WHERE":
+			where_clause = where_clause.lstrip()[5:]
+		query += ' WHERE %s' % where_clause
+	if group_clause:
+		if group_clause.lstrip()[:8].upper() == "GROUP BY":
+			group_clause = group_clause.lstrip()[8:]
+		query += ' GROUP BY %s' % group_clause
+	if having_clause:
+		if having_clause.lstrip()[:6].upper() == "HAVING":
+			having_clause = having_clause.lstrip()[6:]
+		query += ' HAVING %s' % having_clause
+	if order_clause:
+		if order_clause.lstrip()[:8].upper() == "ORDER BY":
+			order_clause = order_clause.lstrip()[8:]
+		query += ' ORDER BY %s' % order_clause
+
+	return query
+
+
+def query_mysql_table_generic(db, host, user, passwd, query, port=3306, verbose=False, errf=None):
+	"""
+	Generic query of MySQL database table, returning each record as a dict
+
+	:param db:
+		str, database name
+	:param host:
+		str, name of server where database is stored
+	:param user:
+		str, user name that can access the database
+	:param passwd:
+		str, password for user
+	:param query:
+		str, SQL query
+	:param port:
+		int, MySQL server port number
+		(default: 3306)
 	:param verbose:
 		bool, whether or not to print the query (default: False)
+	:param errf:
+		file object, where to print errors
 
 	:return:
 		generator object, yielding a dictionary for each record
 	"""
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database,
+	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=db,
 			port=port, cursorclass=MySQLdb.cursors.DictCursor, use_unicode=True)
 	c = db.cursor()
-	if isinstance(table_clause, (list, tuple)):
-		table_clause = ','.join(table_clause)
-	if isinstance(column_clause, (list, tuple)):
-		column_clause = ','.join(column_clause)
-	query = 'SELECT %s from %s' % (column_clause, table_clause)
-	if where_clause:
-		if where_clause[:5].upper() == "WHERE":
-			where_clause = where_clause[5:].lstrip()
-		query += ' WHERE %s' % where_clause
-	if having_clause:
-		if having_clause[:6].upper() == "HAVING":
-			having_clause = having_clause[6:].lstrip()
-		query += ' HAVING %s' % having_clause
-	if order_clause:
-		if order_clause[:8].upper() == "ORDER BY":
-			order_clause = order_clause[8:].lstrip()
-		query += ' ORDER BY %s' % order_clause
 
-	if verbose:
+	if errf !=None:
+		errf.write("%s\n" % query)
+		errf.flush()
+	elif verbose:
 		print query
 
 	c.execute(query)
 	return c.fetchall()
 
 
-def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", convert_NULL=True, verbose=False, errf=None):
+def query_mysql_table(db, host, user, passwd, table_clause, column_clause="*",
+				where_clause="", having_clause="", order_clause="",
+				group_clause="", port=3306, verbose=False, errf=None):
+	"""
+	Read table from seismodb database, returning each record as a dict
+
+	:param db:
+		str, database name
+	:param host:
+		str, name of server where database is stored
+	:param user:
+		str, user name that can access the database
+	:param passwd:
+		str, password for user
+	:param table_clause:
+		str or list of strings, name(s) of database table(s)
+	:param column_clause:
+		str or list of strings, column clause or list of columns (default: "*")
+	:param where_clause:
+		str, where clause (default: "")
+	:param having_clause:
+		str, having clause (default: "")
+	:param order_clause:
+		str, order clause (default: "")
+	:param group_clause:
+		str, group clause (default: "")
+	:param port:
+		int, MySQL server port number
+		(default: 3306)
+	:param verbose:
+		bool, whether or not to print the query (default: False)
+	:param errf:
+		file object, where to print errors
+
+	:return:
+		generator object, yielding a dictionary for each record
+	"""
+	query = build_sql_query(table_clause, column_clause, where_clause,
+							having_clause, order_clause, group_clause)
+	return query_mysql_table_generic(db, host, user, passwd, query, port=port,
+									verbose=verbose, errf=errf)
+
+
+def query_seismodb_table_generic(query, verbose=False, errf=None):
+	"""
+	Query MySQL table using clause components, returning each record as a dict
+
+	:param query:
+		str, SQL query
+	:param verbose:
+		bool, whether or not to print the query (default: False)
+	:param errf:
+		file object, where to print errors
+
+	:return:
+		generator object, yielding a dictionary for each record
+	"""
+	## Database information
+	from seismodb_secrets import host, user, passwd, database
+	try:
+		from seismodb_secrets import port
+	except:
+		port = 3306
+
+	return query_mysql_table_generic(database, host, user, passwd, query, port=port,
+									verbose=verbose, errf=errf)
+
+
+def query_seismodb_table(table_clause, column_clause="*", where_clause="",
+						having_clause="", order_clause="", group_clause="",
+						verbose=False, errf=None):
+	"""
+	Query seismodb table using clause components
+
+	:param table_clause:
+		str or list of strings, name(s) of database table(s)
+	:param column_clause:
+		str or list of strings, column clause or list of columns (default: "*")
+	:param where_clause:
+		str, where clause (default: "")
+	:param having_clause:
+		str, having clause (default: "")
+	:param order_clause:
+		str, order clause (default: "")
+	:param group_clause:
+		str, group clause (default: "")
+	:param verbose:
+		bool, whether or not to print the query (default: False)
+	:param errf:
+		file object, where to print errors
+
+	:return:
+		generator object, yielding a dictionary for each record
+	"""
+	query = build_sql_query(table_clause, column_clause, where_clause,
+							having_clause, order_clause, group_clause)
+
+	return query_seismodb_table_generic(query, verbose=verbose, errf=errf)
+
+
+def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
+						Mmin=None, Mmax=None, min_depth=None, max_depth=None,
+						id_earth=None, sort_key="date", sort_order="asc",
+						event_type="ke", convert_NULL=True, verbose=False, errf=None):
 	"""
 	Query ROB catalog of local earthquakes.
 
 	Notes:
 	Magnitude used for selection is based on MW first, then MS, then ML.
-	NULL values in the database are converted to 0.0 (this may change in the future)
-	Only real earthquakes are extracted (type = "ke" and is_true = 1).
+	NULL values in the database are converted to NaN values (magnitudes) or zeros.
+	Only real earthquakes are extracted (is_true = 1).
 
 	:param region:
 		(w, e, s, n) tuple specifying rectangular region of interest in
@@ -127,6 +263,9 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		or "mag" (= "size") (default: "date")
 	:param sort_order:
 		String, sort order, either "asc" or "desc" (default: "asc")
+	:param event_type:
+		str, event type
+		(default: "ke" = known earthquakes)
 	:param convert_NULL:
 		Bool, whether or not to convert NULL values to zero values
 		(default: True)
@@ -157,59 +296,73 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		end_date = datetime.datetime.now().date()
 
 	## Construct SQL query
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port, cursorclass=MySQLdb.cursors.DictCursor, use_unicode=True)
-	c = db.cursor()
-	query = 'SELECT id_earth, DATE_FORMAT(date, "%Y-%m-%d") as date, TIME_FORMAT(time, "%H:%i:%s") as time,'
-	query += ' longitude, latitude, depth, ML, MS, MW,'
-	query += ' IF(MW, MW, IF(MS, MS, ML)) as M,'
-	query += ' intensity_max, macro_radius, errh, errz, errt, errM,'
-	query += ' name from earthquakes'
-	query += ' Where '
+	table_clause = "earthquakes"
+	column_clause = [
+		'id_earth',
+		'DATE_FORMAT(date, "%Y-%m-%d") as date',
+		'TIME_FORMAT(time, "%H:%i:%s") as time',
+		'longitude',
+		'latitude',
+		'depth',
+		'ML',
+		'MS',
+		'MW',
+		'IF(MW, MW, IF(MS, MS, ML)) as M',
+		'intensity_max',
+		'macro_radius',
+		'errh',
+		'errz',
+		'errt',
+		'errM',
+		'name']
+
+	where_clause = ""
 	if id_earth:
-		query += ' id_earth in (%s)' % ",".join([str(item) for item in id_earth])
+		where_clause += 'id_earth in (%s)' % ",".join([str(item) for item in id_earth])
 	else:
-		query += ' type = "ke"'
-		query += ' and is_true = 1'
+		where_clause += 'type = "%s"' % event_type
+		where_clause += ' and is_true = 1'
 	if region:
 		w, e, s, n = region
-		query += ' and longitude Between %f and %f' % (w, e)
-		query += ' and latitude Between %f and %f' % (s, n)
+		where_clause += ' and longitude Between %f and %f' % (w, e)
+		where_clause += ' and latitude Between %f and %f' % (s, n)
 	if start_date or end_date:
 		if not end_date:
 			end_date = datetime.datetime.now()
 		if not start_date:
 			start_date = datetime.datetime(100, 1, 1)
-		query += ' and date Between "%s" and "%s"' % (start_date.isoformat(), end_date.isoformat())
+		where_clause += ' and date Between "%s" and "%s"' % (start_date.isoformat(), end_date.isoformat())
 	if min_depth:
-		query += ' and depth >= %f' % min_depth
+		where_clause += ' and depth >= %f' % min_depth
 	if max_depth:
-		query += ' and depth <= %f' % max_depth
-	if Mmin or Mmax:
-		if not Mmin:
+		where_clause += ' and depth <= %f' % max_depth
+
+	having_clause = ""
+	if Mmax or Mmin != None:
+		if Mmin is None:
 			Mmin = 0.0
 		if not Mmax:
-			Mmax = 8.0
-		#query += ' and ML Between %f and %f' % (Mmin, Mmax)
-		query += ' HAVING M Between %f and %f' % (Mmin, Mmax)
+			Mmax = 10.0
+		having_clause += 'HAVING M Between %f and %f' % (Mmin, Mmax)
+
 	if sort_order.lower()[:3] == "asc":
 		sort_order = "asc"
 	else:
 		sort_order = "desc"
+	order_clause = ""
 	if sort_key.lower() in ("date", "time"):
-		query += ' Order By date %s, time %s' % (sort_order, sort_order)
+		order_clause += 'date %s, time %s' % (sort_order, sort_order)
 	elif sort_key.lower() in ("size", "mag"):
-		query += ' Order By M %s' % sort_order
+		order_clause += 'M %s' % sort_order
 
 	if errf !=None:
-		errf.write("%s\n" % query)
-		errf.flush()
-	elif verbose:
-		print query
+		errf.write("Querying KSB-ORB local earthquake catalog:\n")
 
 	## Fetch records
-	c.execute(query)
 	eq_list = []
-	for rec in c.fetchall():
+	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
+					where_clause=where_clause, having_clause=having_clause,
+					order_clause=order_clause, verbose=verbose, errf=errf):
 		id_earth, name = rec["id_earth"], rec["name"]
 		date, time = rec["date"], rec["time"]
 		lon, lat = rec["longitude"], rec["latitude"]
@@ -218,7 +371,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 		intensity_max, macro_radius = rec["intensity_max"], rec["macro_radius"]
 		errh, errz, errt, errM = rec["errh"], rec["errz"], rec["errt"], rec["errM"]
 
-		if name == lon == lat == depth == ML == None:
+		if name == lon == lat == depth == M == None:
 			continue
 
 		year, month, day = [int(s) for s in date.split("-")]
@@ -268,119 +421,130 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None, Mmin=N
 
 
 def query_ROB_LocalEQCatalogByID(id_earth, verbose=False, errf=None):
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port)
-	c = db.cursor()
-	query = 'SELECT id_earth, DATE_FORMAT(date, "%Y-%m-%d"), TIME_FORMAT(time, "%H:%i:%s"),'
-	query += ' longitude, latitude, depth, ML, MS, MW,'
-	query += ' IF(MW, MW, IF(MS, MS, ML)) as M,'
-	query += ' intensity_max, macro_radius,'
-	query += ' name from earthquakes'
-	query += ' Where '
-	query += ' id_earth = %d' % id_earth
-
-	if errf !=None:
-		errf.write("%s\n" % query)
-		errf.flush()
-	elif verbose:
-		print query
-
-	c.execute(query)
-	recs = c.fetchall()
-	id_earth, date, time, lon, lat, depth, ML, MS, MW, M, intensity_max, macro_radius, name = recs[0]
-	year, month, day = [int(s) for s in date.split("-")]
-	date = datetime.date(year, month, day)
-	hour, minutes, seconds = [int(s) for s in time.split(":")]
-	time = datetime.time(hour, minutes, seconds)
-	if lon == None:
-		lon = 0.0
-	if lat == None:
-		lat = 0.0
-	if depth == None:
-		depth = 0.0
-	if ML == None:
-		ML = np.nan
-	if MS == None:
-		MS = np.nan
-	if MW == None:
-		MW = np.nan
-	if intensity_max == None:
-		intensity_max = 0
-	if macro_radius == None:
-		macro_radius = 0
-
-	mb = np.nan
-
-	eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, mb, name, intensity_max, macro_radius)
-
-	return eq
+	return query_ROB_LocalEQCatalog(id_earth=id_earth, verbose=verbose, errf=errf)
 
 
-def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, id_earth=None, sort_key="Mag", sort_order="asc", verbose=False, errf=None):
-	global MT
+def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
+							Mmin=None, Mmax=None, id_earth=None, sort_key="Mag",
+							sort_order="asc", verbose=False, errf=None):
+	"""
+	Query ROB focal mechanism database
+
+	:param region:
+		(w, e, s, n) tuple specifying rectangular region of interest in
+		geographic coordinates (default: None)
+	:param start_date:
+		Int or date or datetime object specifying start of time window of interest
+		If integer, start_date is interpreted as start year
+		(default: None)
+	:param end_date:
+		Int or date or datetime object specifying end of time window of interest
+		If integer, end_date is interpreted as end year
+		(default: None)
+	:param Mmin:
+		Float, minimum magnitude to extract (default: None)
+	:param Mmax:
+		Float, maximum magnitude to extract (default: None)
+	:param id_earth:
+		Int or List, ID(s) of event to extract (default: None)
+	:param sort_key":
+		String, property name to sort results with: "date" (= "time")
+		or "mag" (= "size") (default: "date")
+	:param sort_order:
+		String, sort order, either "asc" or "desc" (default: "asc")
+	:param verbose:
+		Bool, if True the query string will be echoed to standard output
+	:param errf:
+		File object, where to print errors
+
+	:return:
+		list with instances of :class:`FocMecRecord`
+	"""
+	#global MT
 	import eqgeology.FocMec.MomentTensor as MT
 
-	catalogue = []
 	if type(id_earth) in (type(1), type(1L)):
 		id_earth = [id_earth]
 
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port)
-	c = db.cursor()
+	## Construct SQL query
+	table_clause = ['focal_mechanisms', 'earthquakes']
 
-	query = 'SELECT earthquakes.id_earth, DATE_FORMAT(earthquakes.date, "%Y-%m-%d") as date, TIME_FORMAT(earthquakes.time, "%H:%i:%s") as time,'
-	query += ' earthquakes.longitude, earthquakes.latitude, earthquakes.depth, earthquakes.ML as ML, earthquakes.MS as MS, earthquakes.MW as MW,'
-	query += ' IF(MW, MW, IF(MS, MS, ML)) as M,'
-	query += ' strike, dip, slip,'
-	query += ' earthquakes.intensity_max, earthquakes.macro_radius,'
-	query += ' earthquakes.name'
-	query += ' from focal_mechanisms, earthquakes'
-	query += ' Where'
-	query += ' focal_mechanisms.id_earth = earthquakes.id_earth'
-	query += ' and earthquakes.type = "ke"'
-	query += ' and earthquakes.is_true = 1'
+	column_clause = [
+		'earthquakes.id_earth',
+		'DATE_FORMAT(earthquakes.date, "%Y-%m-%d") as date',
+		'TIME_FORMAT(earthquakes.time, "%H:%i:%s") as time',
+		'earthquakes.longitude',
+		'earthquakes.latitude',
+		'earthquakes.depth',
+		'earthquakes.ML',
+		'earthquakes.MS',
+		'earthquakes.MW',
+		'IF(MW, MW, IF(MS, MS, ML)) as M',
+		'strike',
+		'dip',
+		'slip',
+		'earthquakes.intensity_max',
+		'earthquakes.macro_radius',
+		'earthquakes.name']
+
+	where_clause = 'focal_mechanisms.id_earth = earthquakes.id_earth'
+	where_clause += ' and earthquakes.type = "ke"'
+	where_clause += ' and earthquakes.is_true = 1'
 	if id_earth:
-		query += ' and earthquakes.id_earth in (%s)' % ",".join([str(item) for item in id_earth])
+		where_clause += ' and earthquakes.id_earth in (%s)' % ",".join([str(item) for item in id_earth])
 	if region:
 		w, e, s, n = region
-		query += ' and earthquakes.longitude Between %f and %f' % (w, e)
-		query += ' and earthquakes.latitude Between %f and %f' % (s, n)
+		where_clause += ' and earthquakes.longitude Between %f and %f' % (w, e)
+		where_clause += ' and earthquakes.latitude Between %f and %f' % (s, n)
 	if start_date or end_date:
 		if not end_date:
 			end_date = datetime.datetime.now()
 		if not start_date:
 			start_date = datetime.datetime(100, 1, 1)
-		query += ' and earthquakes.date Between "%s" and "%s"' % (start_date.isoformat(), end_date.isoformat())
-	if Mmin or Mmax:
-		if not Mmin:
+		where_clause += ' and earthquakes.date Between "%s" and "%s"' % (start_date.isoformat(), end_date.isoformat())
+
+	having_clause = ""
+	if Mmax or Mmin != None:
+		if Mmin:
 			Mmin = 0.0
 		if not Mmax:
 			Mmax = 8.0
-		#query += ' and ML Between %f and %f' % (Mmin, Mmax)
-		query += ' HAVING M Between %f and %f' % (Mmin, Mmax)
+		having_clause += ' HAVING M Between %f and %f' % (Mmin, Mmax)
+
 	if sort_order.lower()[:3] == "asc":
 		sort_order = "asc"
 	else:
 		sort_order = "desc"
+	order_clause = ""
 	if sort_key.lower() in ("date", "time"):
-		query += ' Order By date %s, time %s' % (sort_order, sort_order)
+		order_clause += 'date %s, time %s' % (sort_order, sort_order)
 	elif sort_key.lower() in ("size", "mag"):
-		query += ' Order By M %s' % sort_order
+		order_clause += 'M %s' % sort_order
 
 	if errf !=None:
 		errf.write("Querying KSB-ORB focal mechanism catalog:\n")
-		errf.write("  %s\n" % query)
-		errf.flush()
-	elif verbose:
-		print query
 
-	c.execute(query)
-	for rec in c.fetchall():
-		id_earth, date, time, lon, lat, depth, ML, MS, MW, M, strike, dip, rake, intensity_max, macro_radius, name = rec
-		if name == lon == lat == depth == ML == None:
+	## Fetch records
+	focmec_list = []
+	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
+					where_clause=where_clause, having_clause=having_clause,
+					order_clause=order_clause, verbose=verbose, errf=errf):
+
+		id_earth, name = rec["id_earth"], rec["name"]
+		date, time = rec["date"], rec["time"]
+		lon, lat = rec["longitude"], rec["latitude"]
+		depth = rec["depth"]
+		ML, MS, MW, M = rec["ML"], rec["MS"], rec["MW"], rec["M"]
+		intensity_max, macro_radius = rec["intensity_max"], rec["macro_radius"]
+		strike, dip, rake = rec["strike"], rec["dip"], rec["slip"]
+
+		if name == lon == lat == depth == M == None:
 			continue
 		year, month, day = [int(s) for s in date.split("-")]
 		date = datetime.date(year, month, day)
 		hour, minutes, seconds = [int(s) for s in time.split(":")]
 		time = datetime.time(hour, minutes, seconds)
+
 		if lon == None:
 			lon = 0.0
 		if lat == None:
@@ -388,26 +552,55 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None, Mmin=
 		if depth == None:
 			depth = 0.0
 		if ML == None:
-			ML = 0.0
+			ML = np.nan
 		if MS == None:
-			MS = 0.0
+			MS = np.nan
 		if MW == None:
-			MW = 0.0
+			MW = np.nan
 		if intensity_max == None:
 			intensity_max = 0
 		if macro_radius == None:
 			macro_radius = 0
+
 		eq = FocMecRecord(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, strike, dip, rake, name, intensity_max, macro_radius)
-		catalogue.append(eq)
+		focmec_list.append(eq)
 
-	return catalogue
+	return focmec_list
 
 
-def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1, group_by_main_village=False, agg_function="maximum", lonlat=False, verbose=False, errf=None):
-	import eqmapperdb_secrets
-	macro_info = {}
+def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
+					group_by_main_village=False, agg_function="maximum",
+					verbose=False, errf=None):
+	"""
+	Query ROB "official" macroseismic catalog (= commune inquiries)
+
+	:param id_earth:
+		int, earthquake ID
+	:param Imax:
+		bool, if True, intensity_max is returned, else intensity_min
+		(default: True)
+	:param min_val:
+		float, minimum intensity to return
+		(default: 1)
+	:param group_by_main_village:
+		bool, whether or not to aggregate the results by main village
+		(default: False)
+	:param agg_function:
+		str, aggregation function to use if :param:`group_by_main_village`
+		is True, one of "minimum", "maximum" or "average"
+		(default: "maximum")
+	:param verbose:
+		Bool, if True the query string will be echoed to standard output
+	:param errf:
+		File object, where to print errors
+
+	:return:
+		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
+	"""
 
 	if id_earth == 18280223:
+		# TODO: check how this can be integrated in seismodb
+		import eqmapperdb_secrets
 		db = MySQLdb.connect(host=eqmapperdb_secrets.host, user=eqmapperdb_secrets.user, passwd=eqmapperdb_secrets.passwd, db=eqmapperdb_secrets.database)
 		c = db.cursor()
 		query = 'SELECT id_com_main,'
@@ -418,49 +611,96 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1, group_by_mai
 		query += ' from Macro18280223 Where country = "BE"'
 
 	else:
-		db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port)
-		c = db.cursor()
-		if group_by_main_village == False:
-			query = 'SELECT macro_detail.id_com,'
+		## Construct SQL query
+		table_clause = ['macro_detail', 'communes']
+		column_clause = [
+			'macro_detail.id_com',
+			'communes.longitude',
+			'communes.latitude']
+
+		if group_by_main_village:
+			agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "MAX")
 			if Imax:
-				query += ' macro_detail.intensity_max as "Intensity"'
+				column_clause.append('%s(macro_detail.intensity_max) as "Intensity"' % agg_function)
 			else:
-				query += ' macro_detail.intensity_min as "Intensity"'
-			if lonlat:
-				query += ' , communes.longitude, communes.latitude'
-			query += ' from macro_detail'
-			if lonlat:
-				query += ', communes'
-			query +=' Where macro_detail.id_earth = %d' % id_earth
-			query += ' and macro_detail.fiability != 0'
-			if lonlat:
-				query += ' and macro_detail.id_com = communes.id'
-			query += ' HAVING Intensity >= %d' % min_val
-			query += ' Order By Intensity asc'
+				column_clause.append('%s(macro_detail.intensity_min) as "Intensity"' % agg_function)
+			group_clause = 'communes.id_main'
 		else:
-			agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}[agg_function.lower()]
-			query = 'SELECT communes.id_main,'
 			if Imax:
-				query += ' %s(macro_detail.intensity_max) as "Intensity"' % agg_function
+				column_clause.append('macro_detail.intensity_max as "Intensity"')
 			else:
-				query += ' %s(macro_detail.intensity_min) as "Intensity"' % agg_function
-			if lonlat:
-				query += ' , communes.longitude, communes.latitude'
-			query += ' from macro_detail, communes'
-			query += ' Where macro_detail.id_earth = %d' % id_earth
-			query += ' and macro_detail.fiability != 0'
-			query += ' and macro_detail.id_com = communes.id'
-			query += ' GROUP BY communes.id_main'
-			query += ' HAVING Intensity >= %d' % min_val
-			query += ' Order By Intensity asc'
+				column_clause.append('macro_detail.intensity_min as "Intensity"')
+			group_clause = ""
+
+		where_clause = 'macro_detail.id_earth = %d' % id_earth
+		where_clause += ' and macro_detail.fiability != 0'
+		where_clause += ' and macro_detail.id_com = communes.id'
+
+		having_clause = 'Intensity >= %d' % min_val
+		order_clause = ''
 
 	if errf !=None:
-		errf.write("%s\n" % query)
-		errf.flush()
-	elif verbose:
-		print query
+		errf.write("Querying KSB-ORB official macroseismic catalog:\n")
 
+	## Fetch records
+	macro_info = {}
+	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
+					where_clause=where_clause, having_clause=having_clause,
+					order_clause=order_clause, group_clause=group_clause,
+					verbose=verbose, errf=errf):
+		id_com = rec['id_com']
+		I = rec['Intensity']
+		lon, lat = rec['longitude'], rec['latitude']
+		macro_info[id_com] = MacroseismicRecord(id_com, I, num_replies=1, lon=lon, lat=lat)
+
+	return macro_info
+
+	"""
+	from seismodb_secrets import host, user, passwd, database
+	port = 3306
+	lonlat = True
+
+	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port)
+	c = db.cursor()
+	if group_by_main_village == False:
+		query = 'SELECT macro_detail.id_com,'
+		if Imax:
+			query += ' macro_detail.intensity_max as "Intensity"'
+		else:
+			query += ' macro_detail.intensity_min as "Intensity"'
+		if lonlat:
+			query += ' , communes.longitude, communes.latitude'
+		query += ' from macro_detail'
+		if lonlat:
+			query += ', communes'
+		query +=' Where macro_detail.id_earth = %d' % id_earth
+		query += ' and macro_detail.fiability != 0'
+		if lonlat:
+			query += ' and macro_detail.id_com = communes.id'
+		query += ' HAVING Intensity >= %d' % min_val
+		query += ' Order By Intensity asc'
+	else:
+		agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}[agg_function.lower()]
+		query = 'SELECT communes.id_main,'
+		if Imax:
+			query += ' %s(macro_detail.intensity_max) as "Intensity"' % agg_function
+		else:
+			query += ' %s(macro_detail.intensity_min) as "Intensity"' % agg_function
+		if lonlat:
+			query += ' , communes.longitude, communes.latitude'
+		query += ' from macro_detail, communes'
+		query += ' Where macro_detail.id_earth = %d' % id_earth
+		query += ' and macro_detail.fiability != 0'
+		query += ' and macro_detail.id_com = communes.id'
+		query += ' GROUP BY communes.id_main'
+		query += ' HAVING Intensity >= %d' % min_val
+		query += ' Order By Intensity asc'
+
+	if verbose:
+		print query
 	c.execute(query)
+
+	macro_info = {}
 	if lonlat:
 		for rec in c.fetchall():
 			id_com, I, lon, lat = rec
@@ -476,14 +716,92 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1, group_by_mai
 			macro_info[id_com] = I
 
 	return macro_info
-
-	"""
-	Example how to aggregate by main village
-	SELECT id_com, AVG(intensity_max) ... GROUP BY id_com
 	"""
 
 
-def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", lonlat=False, sort_key="intensity", sort_order="asc", verbose=False, errf=None):
+def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
+					min_val=1, min_fiability=10.0, group_by_main_village=False,
+					agg_function="average", verbose=False, errf=None):
+	"""
+	Query ROB web macroseismic catalog (= online inquiries)
+
+	:param id_earth:
+		int, earthquake ID
+	:param min_replies:
+		int, minimum number of replies
+		(default: 3)
+	:param query_info:
+		str, either "cii" or "manual_intensity"
+		(default: "cii")
+	:param min_val:
+		float, minimum intensity to return
+		(default: 1)
+	:param min_fiability:
+		float, minimum fiability of enquiry
+		(default: 10.)
+	:param group_by_main_village:
+		bool, whether or not to aggregate the results by main village
+		(default: False)
+	:param agg_function:
+		str, aggregation function to use, one of "minimum", "maximum" or
+		"average". If :param:`group_by_main_village` is False, aggregation
+		applies to the enquiries within a given (sub)commune.
+		(default: "average")
+	:param verbose:
+		Bool, if True the query string will be echoed to standard output
+	:param errf:
+		File object, where to print errors
+
+	:return:
+		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
+	"""
+	## Construct SQL query
+	table_clause = ['web_analyse', 'communes']
+	column_clause = [
+		'web_analyse.id_com',
+		'COUNT(*) as "Num_Replies"',
+		'communes.longitude',
+		'communes.latitude']
+
+	agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "AVG")
+	if query_info.lower() == "manual_intensity":
+		column_clause.append('%s(web_analyse.MI) as "Intensity"' % agg_function)
+	elif query_info.lower() == "cii":
+		column_clause.append('%s(web_analyse.CII) as "Intensity"' % agg_function)
+
+	if group_by_main_village:
+		group_clause = 'communes.id_main'
+	else:
+		group_clause = "web_analyse.id_com"
+
+	where_clause = 'web_analyse.id_earth = %d' % id_earth
+	where_clause += ' and web_analyse.m_fiability > %.1f' % float(min_fiability)
+	where_clause += ' and web_analyse.deleted = false'
+	where_clause += ' and web_analyse.id_com = communes.id'
+
+	having_clause = 'Num_Replies >= %d' % min_replies
+	if query_info.lower() in ("cii", "manual_intensity"):
+		having_clause += ' and Intensity >= %d' % min_val
+
+	order_clause = ''
+
+	if errf !=None:
+		errf.write("Querying KSB-ORB web macroseismic catalog:\n")
+
+	## Fetch records
+	macro_info = {}
+	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
+					where_clause=where_clause, having_clause=having_clause,
+					order_clause=order_clause, group_clause=group_clause,
+					verbose=verbose, errf=errf):
+		id_com = rec['id_com']
+		I = rec['Intensity']
+		lon, lat = rec['longitude'], rec['latitude']
+		macro_info[id_com] = MacroseismicRecord(id_com, I, num_replies=1, lon=lon, lat=lat)
+
+	return macro_info
+
+	"""
 	macro_info = []
 
 	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port)
@@ -567,6 +885,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii", min_va
 			macro_info.append(MacroseismicRecord(id_com, I, num_replies))
 
 	return macro_info
+	"""
 
 
 def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
@@ -618,28 +937,31 @@ def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
 					"station_sismometer_type.component_ns",
 					"station_sismometer_type.component_ew"]
 
-	return read_table(table_clause, column_clause=column_clause,
+	return query_seismodb_table(table_clause, column_clause=column_clause,
 				where_clause=where_clause, verbose=verbose)
 
 
-
 def get_last_earthID():
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database)
-	c = db.cursor()
+	"""
+	Return ID of most recently added earthquake in database
+
+	:return:
+		int, earthquake ID
+	"""
 	query = 'SELECT id_earth FROM earthquakes WHERE type="ke" and is_true = 1 ORDER BY id_earth DESC LIMIT 0 , 1'
-	c.execute(query)
-	rec = c.fetchone()
-	id_earth = rec[0]
+	id_earth = query_seismodb_table_generic(query)[0]['id_earth']
 	return id_earth
 
 
 def zip2ID(zip_code):
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database)
-	c = db.cursor()
+	"""
+	Look up ID corresponding to ZIP code in database
+
+	:return:
+		int, commune ID
+	"""
 	query = 'SELECT id FROM communes WHERE code_p = %d' % zip_code
-	c.execute(query)
-	rec = c.fetchone()
-	id_com = rec[0]
+	id_com = query_seismodb_table_generic(query)[0]['id']
 	return id_com
 
 
@@ -650,5 +972,3 @@ if __name__ == "__main__":
 	catalogue_length = (end_date.year - start_date.year) * 1.0
 	catalogue = query_ROB_LocalEQCatalog(start_date=start_date, end_date=end_date)
 	print "%d events" % len(catalogue)
-	for eq in catalogue:
-		print eq.getMW()
