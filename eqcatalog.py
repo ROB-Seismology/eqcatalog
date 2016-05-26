@@ -448,7 +448,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		"""
 		Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
-		return (Mags.nanmin(), Mags.nanmax())
+		return (np.nanmin(Mags), np.nanmax(Mags))
 
 	def depth_minmax(self):
 		"""
