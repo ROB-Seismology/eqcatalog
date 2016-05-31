@@ -35,8 +35,8 @@ from collections import OrderedDict
 ## Import third-party modules
 ## Kludge because matplotlib is broken on seissrv3.
 import numpy as np
+import matplotlib
 if platform.uname()[1] == "seissrv3":
-	import matplotlib
 	matplotlib.use('AGG')
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -641,10 +641,12 @@ class EQCatalog:
 			else:
 				eq_list = [eq for eq in eq_list if eq.date < end_date]
 		if Mmin != None:
-			Mags = self.get_magnitudes(Mtype, Mrelation)
+			cat2 = EQCatalog(eq_list)
+			Mags = cat2.get_magnitudes(Mtype, Mrelation)
 			eq_list = [eq_list[i] for i in range(len(eq_list)) if Mmin <= Mags[i]]
 		if Mmax != None:
-			Mags = self.get_magnitudes(Mtype, Mrelation)
+			cat2 = EQCatalog(eq_list)
+			Mags = cat2.get_magnitudes(Mtype, Mrelation)
 			if include_right_edges:
 				eq_list = [eq_list[i] for i in range(len(eq_list)) if Mags[i] <= Mmax]
 			else:
@@ -1002,7 +1004,17 @@ class EQCatalog:
 		bins_N, junk = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
-	def bin_depth(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default", start_year=None, end_year=None):
+	def bin_depth(self,
+		min_depth=0,
+		max_depth=30,
+		bin_width=2,
+		depth_error=None,
+		Mmin=None,
+		Mmax=None,
+		Mtype="MW",
+		Mrelation="default",
+		start_date=None,
+		end_date=None):
 		"""
 		Bin earthquakes into depth bins
 
@@ -1024,23 +1036,23 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param start_year:
-			Int, lower year to bin (default: None)
-		:param end_year:
-			Int, upper year to bin (default: None)
+		:param start_date:
+			Int or datetime.date, lower year or date to bin (default: None)
+		:param end_date:
+			Int or datetime.date, upper year or date to bin (default: None)
 
 		:return:
 			tuple (bins_N, bins_depth)
 			bins_N: array containing number of earthquakes for each bin
 			bins_depth: array containing lower depth value of each interval
 		"""
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		if depth_error:
 			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0) and 0 < eq.errz < depth_error]
 		else:
 			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
-		bins_N, junk = np.histogram(depths, bins_depth)
+		bins_N, _ = np.histogram(depths, bins_depth)
 		return bins_N, bins_depth[:-1]
 
 	def bin_depth_by_M0(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mrelation="default", start_year=None, end_year=None):
@@ -1985,7 +1997,25 @@ class EQCatalog:
 		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
-	def plot_DepthHistogram(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, normalized=False, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default", start_year=None, end_year=None, color='b', title=None, fig_filespec="", fig_width=0, dpi=300):
+	def plot_depth_histogram(self,
+		min_depth=0,
+		max_depth=30,
+		bin_width=2,
+		depth_error=None,
+		normalized=False,
+		Mmin=None,
+		Mmax=None,
+		dM=None,
+		Mtype="MW",
+		Mrelation="default",
+		start_date=None,
+		end_date=None,
+		color='b',
+		title=None,
+		fig_filespec="",
+		fig_width=0,
+		dpi=300,
+		ax=None):
 		"""
 		Plot histogram with number of earthquakes versus depth.
 
@@ -2003,18 +2033,23 @@ class EQCatalog:
 			Float, minimum magnitude (inclusive) (default: None)
 		:param Mmax:
 			Float, maximum magnitude (inclusive) (default: None)
+		:param dM:
+			Float, magnitude binning interval
+			If set, a stacked histogram will be plotted
+			(default: None)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param start_year:
-			Int, lower year to bin (default: None)
-		:param end_year:
-			Int, upper year to bin (default: None)
+		:param start_date:
+			Int or datetime.date, lower year or date to bin (default: None)
+		:param end_date:
+			Int or datetime.date, upper year or date to bin (default: None)
 		:param color:
 			String, matplotlib color specification for histogram bars
+			if :param:`dM` is set, this may also be a list of color specs
 			(default: 'b')
 		:param title:
 			String, title (None = default title, empty string = no title)
@@ -2027,35 +2062,66 @@ class EQCatalog:
 			respect to default figure width (default: 0)
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
+		:param ax:
+			matplotlib Axes instance
+			(default: None)
 		"""
-		bins_N, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mtype, Mrelation, start_year, end_year)
+		if ax is None:
+			ax = pylab.axes()
+
+		if dM:
+			## Compute depth histogram for each magnitude bin
+			assert not None in (Mmin, Mmax)
+			_, bins_mag = self.bin_mag(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation)
+			bins_N = []
+			for mmin in bins_mag[::-1]:
+				mmax = mmin + dM
+				bins_n, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date)
+				bins_N.append(bins_n)
+			if isinstance(color, list):
+				colors = color
+			else:
+				colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
+
+		else:
+			bins_N, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date)
+			bins_N = [bins_N]
+			colors = [color]
+			bins_mag = [Mmin]
+
 		if normalized:
-			total_num = np.add.reduce(bins_N) * 1.0
-			bins_N = bins_N.astype('f') / total_num
-		pylab.barh(bins_depth, bins_N, height=bin_width, color=color)
-		xmin, xmax, ymin, ymax = pylab.axis()
-		pylab.axis((xmin, xmax, min_depth, max_depth))
-		pylab.ylabel("Depth (km)", fontsize='x-large')
+			total_num = np.sum(map(np.sum, bins_N)) * 1.0
+			bins_N = [bins_n.astype('f') / total_num for bins_n in bins_N]
+
+		left = 0
+		for bins_n, mmin, color in zip(bins_N, bins_mag, colors):
+			print left
+			if dM:
+				label = "M %.1f - %.1f" % (mmin, mmin + dM)
+			else:
+				label = "_nolegend_"
+			ax.barh(bins_depth, bins_n, height=bin_width, left=left, color=color, label=label)
+			left += bins_n
+
+		xmin, xmax, ymin, ymax = ax.axis()
+		ax.axis((xmin, xmax, min_depth, max_depth))
+		ax.set_ylabel("Depth (km)", fontsize='x-large')
 		xlabel = "Number of events"
 		if normalized:
 			xlabel += " (%)"
-		pylab.xlabel(xlabel, fontsize='x-large')
-		ax = pylab.gca()
+		ax.set_xlabel(xlabel, fontsize='x-large')
 		ax.invert_yaxis()
 		for label in ax.get_xticklabels() + ax.get_yticklabels():
 			label.set_size('large')
 
 		if title is None:
-			if not start_year:
-				start_year = self.start_date.year
-			if not end_year:
-				end_year = self.end_date.year
 			if Mmin is None:
-				Mmin = self.get_Mmin()
+				Mmin = self.get_Mmin(Mtype=Mtype, Mrelation=Mrelation)
 			if Mmax is None:
-				Mmax = self.get_Mmax()
-			title = "Depth Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax)
-		pylab.title(title)
+				Mmax = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
+			title = "Depth histogram: M %.1f - %.1f" % (Mmin, Mmax)
+		ax.set_title(title)
+		ax.legend()
 
 		if fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
