@@ -20,10 +20,10 @@ import datetime
 
 ## Import third-party modules
 import numpy as np
-import MySQLdb
-import MySQLdb.cursors
 
 ## Import ROB modules
+from db.simpledb import (build_sql_query, query_mysql_db_generic)
+
 #import eqrecord
 #reload(eqrecord)
 from eqrecord import LocalEarthquake, MacroseismicRecord, FocMecRecord
@@ -35,137 +35,6 @@ from eqcatalog import EQCatalog
 
 
 __all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord", "query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID", "query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog", "query_ROB_Web_MacroCatalog", "get_last_earthID"]
-
-
-# TODO: Move generic functions to a db module, and add sqlite stuff from parse_abem_db
-
-
-def build_sql_query(table_clause, column_clause="*", where_clause="",
-					having_clause="", order_clause="", group_clause=""):
-	"""
-	Build SQL query from component clauses
-
-	:param table_clause:
-		str or list of strings, name(s) of database table(s)
-	:param column_clause:
-		str or list of strings, column clause or list of columns (default: "*")
-	:param where_clause:
-		str, where clause (default: "")
-	:param having_clause:
-		str, having clause (default: "")
-	:param order_clause:
-		str, order clause (default: "")
-	:param group_clause:
-		str, group clause (default: "")
-
-	:return:
-		str, SQL query
-	"""
-	if isinstance(table_clause, (list, tuple)):
-		table_clause = ', '.join(table_clause)
-	if isinstance(column_clause, (list, tuple)):
-		column_clause = ', '.join(column_clause)
-	query = 'SELECT %s from %s' % (column_clause, table_clause)
-	if where_clause:
-		if where_clause.lstrip()[:5].upper() == "WHERE":
-			where_clause = where_clause.lstrip()[5:]
-		query += ' WHERE %s' % where_clause
-	if group_clause:
-		if group_clause.lstrip()[:8].upper() == "GROUP BY":
-			group_clause = group_clause.lstrip()[8:]
-		query += ' GROUP BY %s' % group_clause
-	if having_clause:
-		if having_clause.lstrip()[:6].upper() == "HAVING":
-			having_clause = having_clause.lstrip()[6:]
-		query += ' HAVING %s' % having_clause
-	if order_clause:
-		if order_clause.lstrip()[:8].upper() == "ORDER BY":
-			order_clause = order_clause.lstrip()[8:]
-		query += ' ORDER BY %s' % order_clause
-
-	return query
-
-
-def query_mysql_table_generic(db, host, user, passwd, query, port=3306, verbose=False, errf=None):
-	"""
-	Generic query of MySQL database table, returning each record as a dict
-
-	:param db:
-		str, database name
-	:param host:
-		str, name of server where database is stored
-	:param user:
-		str, user name that can access the database
-	:param passwd:
-		str, password for user
-	:param query:
-		str, SQL query
-	:param port:
-		int, MySQL server port number
-		(default: 3306)
-	:param verbose:
-		bool, whether or not to print the query (default: False)
-	:param errf:
-		file object, where to print errors
-
-	:return:
-		generator object, yielding a dictionary for each record
-	"""
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=db,
-			port=port, cursorclass=MySQLdb.cursors.DictCursor, use_unicode=True)
-	c = db.cursor()
-
-	if errf !=None:
-		errf.write("%s\n" % query)
-		errf.flush()
-	elif verbose:
-		print query
-
-	c.execute(query)
-	return c.fetchall()
-
-
-def query_mysql_table(db, host, user, passwd, table_clause, column_clause="*",
-				where_clause="", having_clause="", order_clause="",
-				group_clause="", port=3306, verbose=False, errf=None):
-	"""
-	Read table from seismodb database, returning each record as a dict
-
-	:param db:
-		str, database name
-	:param host:
-		str, name of server where database is stored
-	:param user:
-		str, user name that can access the database
-	:param passwd:
-		str, password for user
-	:param table_clause:
-		str or list of strings, name(s) of database table(s)
-	:param column_clause:
-		str or list of strings, column clause or list of columns (default: "*")
-	:param where_clause:
-		str, where clause (default: "")
-	:param having_clause:
-		str, having clause (default: "")
-	:param order_clause:
-		str, order clause (default: "")
-	:param group_clause:
-		str, group clause (default: "")
-	:param port:
-		int, MySQL server port number
-		(default: 3306)
-	:param verbose:
-		bool, whether or not to print the query (default: False)
-	:param errf:
-		file object, where to print errors
-
-	:return:
-		generator object, yielding a dictionary for each record
-	"""
-	query = build_sql_query(table_clause, column_clause, where_clause,
-							having_clause, order_clause, group_clause)
-	return query_mysql_table_generic(db, host, user, passwd, query, port=port,
-									verbose=verbose, errf=errf)
 
 
 def query_seismodb_table_generic(query, verbose=False, errf=None):
@@ -189,7 +58,7 @@ def query_seismodb_table_generic(query, verbose=False, errf=None):
 	except:
 		port = 3306
 
-	return query_mysql_table_generic(database, host, user, passwd, query, port=port,
+	return query_mysql_db_generic(database, host, user, passwd, query, port=port,
 									verbose=verbose, errf=errf)
 
 
