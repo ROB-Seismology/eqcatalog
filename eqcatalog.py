@@ -2015,6 +2015,7 @@ class EQCatalog:
 		fig_filespec="",
 		fig_width=0,
 		dpi=300,
+		legend_location=0,
 		ax=None):
 		"""
 		Plot histogram with number of earthquakes versus depth.
@@ -2062,12 +2063,17 @@ class EQCatalog:
 			respect to default figure width (default: 0)
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
+		:param legend_location:
+			Int, matplotlib legend location code
+			(default: 0)
 		:param ax:
 			matplotlib Axes instance
 			(default: None)
 		"""
 		if ax is None:
 			ax = pylab.axes()
+		else:
+			fig_filespec = "hold"
 
 		if dM:
 			## Compute depth histogram for each magnitude bin
@@ -2078,8 +2084,11 @@ class EQCatalog:
 				mmax = mmin + dM
 				bins_n, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date)
 				bins_N.append(bins_n)
-			if isinstance(color, list):
+			if isinstance(color, (list, np.ndarray)):
 				colors = color
+			elif isinstance(color, matplotlib.colors.Colormap):
+				values = np.linspace(0, 1, len(bins_mag))
+				colors = color(values)
 			else:
 				colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 
@@ -2094,8 +2103,7 @@ class EQCatalog:
 			bins_N = [bins_n.astype('f') / total_num for bins_n in bins_N]
 
 		left = 0
-		for bins_n, mmin, color in zip(bins_N, bins_mag, colors):
-			print left
+		for bins_n, mmin, color in zip(bins_N, bins_mag[::-1], colors):
 			if dM:
 				label = "M %.1f - %.1f" % (mmin, mmin + dM)
 			else:
@@ -2121,9 +2129,11 @@ class EQCatalog:
 				Mmax = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
 			title = "Depth histogram: M %.1f - %.1f" % (Mmin, Mmax)
 		ax.set_title(title)
-		ax.legend()
+		ax.legend(loc=legend_location)
 
-		if fig_filespec:
+		if fig_filespec == "hold":
+			return
+		elif fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
 			default_dpi = pylab.rcParams['figure.dpi']
 			if fig_width:
