@@ -329,9 +329,6 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 	:return:
 		list with instances of :class:`FocMecRecord`
 	"""
-	#global MT
-	import eqgeology.FocMec.MomentTensor as MT
-
 	if type(id_earth) in (type(1), type(1L)):
 		id_earth = [id_earth]
 
