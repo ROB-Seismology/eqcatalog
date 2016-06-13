@@ -91,13 +91,13 @@ class LocalEarthquake:
 		self.lat = lat
 		self.depth = depth
 		self.mag = mag
-		if ML != None:
+		if not ML in (None, np.nan):
 			self.mag['ML'] = ML
-		if MS != None:
+		if not MS in (None, np.nan):
 			self.mag['MS'] = MS
-		if MW != None:
+		if not MW in (None, np.nan):
 			self.mag['MW'] = MW
-		if mb != None:
+		if not mb in (None, np.nan):
 			self.mag['mb'] = mb
 
 		"""
