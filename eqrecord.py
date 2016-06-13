@@ -86,6 +86,11 @@ class LocalEarthquake:
 			self.datetime = date
 		elif isinstance(time, datetime.datetime) or isinstance(time, mxDateTime.DateTimeType):
 			self.datetime = time
+		elif isinstance(date, datetime.date):
+			time = datetime.time(0, 0, 0)
+			self.datetime = datetime.datetime.combine(date, time)
+		else:
+			raise TypeError("date or time not of correct type")
 
 		self.lon = lon
 		self.lat = lat
