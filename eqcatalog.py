@@ -643,14 +643,16 @@ class EQCatalog:
 		if Mmin != None:
 			cat2 = EQCatalog(eq_list)
 			Mags = cat2.get_magnitudes(Mtype, Mrelation)
-			eq_list = [eq_list[i] for i in range(len(eq_list)) if Mmin <= Mags[i]]
+			is_selected = Mmin <= Mags
+			eq_list = [eq_list[i] for i in range(len(eq_list)) if is_selected[i]]
 		if Mmax != None:
 			cat2 = EQCatalog(eq_list)
 			Mags = cat2.get_magnitudes(Mtype, Mrelation)
 			if include_right_edges:
-				eq_list = [eq_list[i] for i in range(len(eq_list)) if Mags[i] <= Mmax]
+				is_selected = Mmax >= Mags
 			else:
-				eq_list = [eq_list[i] for i in range(len(eq_list)) if Mags[i] < Mmax]
+				is_selected = Mmax > Mags
+			eq_list = [eq_list[i] for i in range(len(eq_list)) if is_selected[i]]
 		if min_depth != None:
 			eq_list = [eq for eq in eq_list if min_depth <= eq.depth]
 		if max_depth != None:
