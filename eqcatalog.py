@@ -5233,6 +5233,99 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 	else:
 		pylab.show()
 
+
+def plot_depth_statistics(
+	catalogs,
+	labels=[],
+	dmin=0,
+	dmax=30,
+	Mmin=None,
+	Mtype="MW",
+	Mrelation="default",
+	title="",
+	fig_filespec="",
+	fig_width=0,
+	dpi=300,
+	ax=None):
+	"""
+	Plot depth statistics for different catalogs.
+
+	:param catalogs:
+		List containing instances of :class:`EQCatalog`
+	:param labels:
+		List containing catalog labels
+		(default: [])
+	:param dmin:
+		float, minimum depth
+		(default: 0)
+	:param dmax:
+		float, maximum depth
+		(default: 30)
+	:param Mtype:
+		String, magnitude type for magnitude scaling (default: "MW")
+	:param Mrelation:
+		{str: str} dict, mapping name of magnitude conversion relation
+		to magnitude type ("MW", "MS" or "ML")
+		(default: "default", will select the default relation for the
+		given Mtype)
+	:param title:
+		String, plot title (default: None)
+	:param fig_filespec:
+		String, full path of image to be saved.
+		If None (default), map is displayed on screen.
+	:param fig_width:
+		Float, figure width in cm, used to recompute :param:`dpi` with
+		respect to default figure width
+		(default: 0)
+	:param dpi:
+		Int, image resolution in dots per inch
+		(default: 300)
+	:param ax:
+		matplotlib Axes instance
+		(default: None)
+	"""
+	if ax is None:
+		ax = pylab.axes()
+	else:
+		fig_filespec = "hold"
+
+	if not labels:
+		labels = [catalog.name for catalog in catalogs]
+	for i, catalog in enumerate(catalogs):
+		if Mmin != None:
+			catalog = catalog.subselect(Mmin=Mmin, Mtype=Mtype, Mrelation=Mrelation)
+		depths = catalog.get_depths()
+
+		ax.boxplot(depths, positions=[i], widths=0.15)
+		ax.plot([i], [np.nanmean(depths)], marker='d', mfc='g', ms=8)
+		ax.plot([i], [np.percentile(depths, 2.5)], marker='v', mfc='g', ms=8)
+		ax.plot([i], [np.percentile(depths, 97.5)], marker='^', mfc='g', ms=8)
+
+	ax.set_ylim(dmin, dmax)
+	ax.invert_yaxis()
+	ax.set_xlim(-0.5, 2.5)
+	ax.set_xticks(np.arange(len(catalogs)))
+	ax.set_xticklabels(labels)
+	ax.set_xlabel("Catalog", fontsize="x-large")
+	ax.set_ylabel("Depth (km)", fontsize="x-large")
+	if title is None:
+		title = 'Depth statistics  (M>=%.1f)' % Mmin
+	ax.set_title(title)
+
+	if fig_filespec == "hold":
+		return
+	elif fig_filespec:
+		default_figsize = pylab.rcParams['figure.figsize']
+		default_dpi = pylab.rcParams['figure.dpi']
+		if fig_width:
+			fig_width /= 2.54
+			dpi = dpi * (fig_width / default_figsize[0])
+		pylab.savefig(fig_filespec, dpi=dpi)
+		pylab.clf()
+	else:
+		pylab.show()
+
+
 # TODO: revise the following two functions
 
 

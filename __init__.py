@@ -42,7 +42,7 @@ reload(eqcatalog)
 
 from eqcatalog import (EQCatalog, read_catalogSQL, read_catalogGIS,
 	concatenate_catalogs, read_named_catalog, read_catalogTXT, plot_catalogs_map,
-	get_catalogs_map, plot_catalogs_magnitude_time)
+	get_catalogs_map, plot_catalogs_magnitude_time, plot_depth_statistics)
 
 import composite_catalog
 reload(composite_catalog)
