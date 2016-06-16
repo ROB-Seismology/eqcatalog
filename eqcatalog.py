@@ -3018,7 +3018,7 @@ class EQCatalog:
 			## Objects other than polygons or closed polylines will be skipped
 			if poly_obj.GetGeometryName() == "LINESTRING":
 				line_obj = poly_obj
-				if line_obj.IsRing():
+				if line_obj.IsRing() and line_obj.GetPointCount() > 3:
 					# Note: Could not find a way to convert linestrings to polygons
 					# The following only works for linearrings (what is the difference??)
 					#poly_obj = ogr.Geometry(ogr.wkbPolygon)
@@ -5303,7 +5303,7 @@ def plot_depth_statistics(
 
 	ax.set_ylim(dmin, dmax)
 	ax.invert_yaxis()
-	ax.set_xlim(-0.5, 2.5)
+	ax.set_xlim(-0.5, len(catalogs) - 0.5)
 	ax.set_xticks(np.arange(len(catalogs)))
 	ax.set_xticklabels(labels)
 	ax.set_xlabel("Catalog", fontsize="x-large")
