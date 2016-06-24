@@ -568,6 +568,24 @@ class EQCatalog:
 				M0rate += subcatalog.get_M0_total(Mrelation=Mrelation) / subcatalog.timespan()
 		return M0rate
 
+	def get_sorted(self, eq_attr, reverse=False):
+		"""
+		Get copy of catalog sorted by earthquake attribute.
+
+		:param eq_attr:
+			str, attribute of :class:`LocalEarthquake`
+		:param reverse:
+			bool, whether to sort ascending (False) or descending (True)
+			(default: False)
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		eq_list = sorted(self.eq_list, key=lambda eq:getattr(eq, eq_attr, None),
+						reverse=reverse)
+		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date,
+						region=self.region, name=self.name)
+
 	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, attr_val=(), Mtype="MW", Mrelation="default", include_right_edges=True, catalog_name=""):
 		"""
 		Make a subselection from the catalog.
