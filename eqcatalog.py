@@ -3705,15 +3705,38 @@ class EQCatalog:
 
 	def get_epicentral_distances(self, lon, lat):
 		"""
+		Compute epicentral distances between catalog earthquakes and a
+		given point.
+
+		:param lon:
+			float, longitude of reference point
+		:param lat:
+			float, latitude of reference point
+
+		:return:
+			float, epicentral distance in km
 		"""
 		distances = geodetic.spherical_distance(lon, lat, self.get_longitudes(), self.get_latitudes())
 		return distances / 1000.
 
-	def get_hypocentral_distances(self, lon, lat):
+	def get_hypocentral_distances(self, lon, lat, z=0):
 		"""
+		Compute hypocentral distances between catalog earthquakes and a
+		given point.
+
+		:param lon:
+			float, longitude of reference point
+		:param lat:
+			float, latitude of reference point
+		:param z:
+			float, depth of reference point in km
+			(default: 0)
+
+		:return:
+			float, hypocentral distance in km
 		"""
 		d_epi = self.get_epicentral_distances(lon, lat)
-		d_hypo = np.sqrt(d_epi**2 + self.get_depths()**2)
+		d_hypo = np.sqrt(d_epi**2 + (self.get_depths() - z)**2)
 		return d_hypo
 
 	def sort(self, key="datetime"):
