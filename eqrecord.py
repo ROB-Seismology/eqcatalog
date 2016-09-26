@@ -549,7 +549,7 @@ class LocalEarthquake:
 		"""
 		if isinstance(pt, LocalEarthquake):
 			pt = (pt.lon, pt.lat)
-		return geodetic.distance((self.lon, self.lat), pt)
+		return geodetic.spherical_distance(self.lon, self.lat, pt[0], pt[1]) / 1000.
 
 	def hypocentral_distance(self, pt):
 		"""
@@ -578,7 +578,7 @@ class LocalEarthquake:
 		"""
 		if isinstance(pt, LocalEarthquake):
 			pt = (pt.lon, pt.lat)
-		return geodetic.bearing((self.lon, self.lat), pt)
+		return geodetic.spherical_azimuth(self.lon, self.lat, pt[0], pt[1])
 
 	def azimuth_from(self, pt):
 		"""
@@ -592,7 +592,7 @@ class LocalEarthquake:
 		"""
 		if isinstance(pt, LocalEarthquake):
 			pt = (pt.lon, pt.lat)
-		return geodetic.bearing(pt, (self.lon, self.lat))
+		return geodetic.spherical_azimuth(pt[0], pt[1], self.lon, self.lat)
 
 	def get_point_at(self, distance, azimuth):
 		"""
@@ -603,8 +603,11 @@ class LocalEarthquake:
 			Float, distance in km
 		:param azimuth:
 			Float, azimuth in decimal degrees
+
+		:return:
+			...
 		"""
-		return geodetic.get_point_at((self.lon, self.lat), distance, azimuth)
+		return geodetic.spherical_point_at(self.lon, self.lat, distance, azimuth)
 
 	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", verbose=False):
 		from seismodb import query_ROB_Web_MacroCatalog

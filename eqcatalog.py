@@ -60,6 +60,7 @@ import hazard.rshalib.mfd.mfd as mfd
 from source_models import read_source_model
 from completeness import *
 from time_functions import timespan
+import mapping.geo.geodetic as geodetic
 
 
 
@@ -3705,19 +3706,15 @@ class EQCatalog:
 	def get_epicentral_distances(self, lon, lat):
 		"""
 		"""
-		# TODO: use more efficient computation with arrays (see supy.geodetic)
-		distances = np.zeros(len(self))
-		for i, eq in enumerate(self):
-			distances[i] = eq.epicentral_distance((lon, lat))
-		return distances
+		distances = geodetic.spherical_distance(lon, lat, self.get_longitudes(), self.get_latitudes())
+		return distances / 1000.
 
 	def get_hypocentral_distances(self, lon, lat):
 		"""
 		"""
-		distances = np.zeros(len(self))
-		for i, eq in enumerate(self):
-			distances[i] = eq.hypocentral_distance((lon, lat))
-		return distances
+		d_epi = self.get_epicentral_distances(lon, lat)
+		d_hypo = np.sqrt(d_epi**2 + self.get_depths()**2)
+		return d_hypo
 
 	def sort(self, key="datetime"):
 		"""
