@@ -4076,7 +4076,9 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		Dictionary, mapping attributes to number of column (starting from 0).
 		(default: {"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ML": 7, "MS": 8, "MW": 9})
 	:param header:
-		bool, if one-line header is present (default: True).
+		bool, if one-line header is present
+		or int, number of header lines
+		(default: True).
 	:param date_sep:
 		str, character separating date elements
 		(default: '-')
@@ -4102,10 +4104,9 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	earthquakes = []
 	with open(filespec, "r") as f:
 		lines = csv.reader(f, **fmtparams)
-		if header:
-			for line in lines:
-				break
 		for i, line in enumerate(lines):
+			if i < header:
+				continue
 			if hasattr(column_map, "id"):
 				ID = int(line[column_map["id"]])
 			else:
