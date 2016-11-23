@@ -3739,17 +3739,21 @@ class EQCatalog:
 		d_hypo = np.sqrt(d_epi**2 + (self.get_depths() - z)**2)
 		return d_hypo
 
-	def sort(self, key="datetime"):
+	def sort(self, key="datetime", order="asc"):
 		"""
 		Sort catalog
 
 		:param key:
 			str, property of :class:`EQRecord` to use as sort key
+		:param order:
+			str, sorting order: "asc" or "desc"
+			(default: "asc")
 
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key))
+		reverse = {"asc": False, "desc": True}[order]
+		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key), reverse=reverse)
 		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name)
 
 
@@ -4110,7 +4114,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 			if hasattr(column_map, "id"):
 				ID = int(line[column_map["id"]])
 			else:
-				ID = i+1
+				ID = i - header + 1
 			if "datetime" in column_map:
 				dt = parse_isoformat_datetime(line[column_map["datetime"]])
 				date = dt.date()
