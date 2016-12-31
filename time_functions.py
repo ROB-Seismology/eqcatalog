@@ -101,3 +101,16 @@ def parse_isoformat_datetime(isodatetime):
 	pat = r'(.*?[+-]\d{2}):(\d{2})'
 	temp = re.sub(pat, r'\1\2', isodatetime)
 	return datetime.datetime.strptime(temp, '%Y-%m-%dT%H:%M:%S.%f%z')
+
+
+def time_delta_to_days(td):
+	"""
+	Convert timedelta to fractional number of days
+
+	:param td:
+		instance of :class:`datetime.timedelta`
+
+	:return:
+		float, fractional number of days corresponding to timedelta
+	"""
+	return td.days + td.seconds / 86400.

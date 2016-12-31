@@ -255,6 +255,20 @@ class EQCatalog:
 			start_datetime = mxDateTime.Date(year, month, day)
 		return [eq.datetime - start_datetime for eq in self]
 
+	def get_inter_event_times(self):
+		"""
+		Return time interval in days between each subsequent event
+
+		:return:
+			float array, inter-event times
+		"""
+		from time_functions import time_delta_to_days
+
+		sorted_catalog = self.sort()
+		date_times = sorted_catalog.get_datetimes()
+		time_deltas = np.diff(date_times)
+		return np.array([time_delta_to_days(td) for td in time_deltas])
+
 	def timespan(self):
 		"""
 		Return total time span of catalog as number of fractional years.
@@ -3638,14 +3652,12 @@ class EQCatalog:
 			Bool, whether or not to print additional information
 		"""
 		from scipy.misc import factorial
+		from time_functions import time_delta_to_days
 
 		def poisson(n, t, tau):
 			## Probability of n events in period t
 			## given average recurrence interval tau
 			return (t / tau)**n * np.exp(-t/tau) / factorial(n)
-
-		def time_delta_to_days(td):
-			return td.days + td.seconds / 86400.
 
 		## Apply completeness constraint, and truncate result to completeness
 		## year for specified minimum magnitude
