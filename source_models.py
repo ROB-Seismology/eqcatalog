@@ -411,6 +411,8 @@ column_map = {
 	'hypo_distribution': [('HYPODEPTH1', 'WHDEPTH1'),
 							('HYPODEPTH2', 'WHDEPTH2'),
 							('HYPODEPTH3', 'WHDEPTH3')],
+	'min_hypo_depth': 'MINDEPTH',
+	'max_hypo_depth': 'MAXDEPTH',
 	'min_dip': 'DIP1',
 	'max_dip': 'DIP3',
 	'Ss': 'SS',

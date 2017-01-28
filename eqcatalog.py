@@ -4307,7 +4307,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fill_colors=[],
 					labels=[], mag_size_inc=4,  Mtype="MW", Mrelation="default",
 					coastline_style={}, country_style={}, river_style=None, continent_style=None,
-					source_model=None, sm_style={"line_color": 'k', "line_style": '-', "line_width": 2, "fill_color": "None"},
+					source_model=None, sm_style={"line_color": 'k', "line_pattern": '-', "line_width": 2},
 					sm_label_colname="ShortName",
 					sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
 					circles=[], circle_styles=[],
@@ -4820,34 +4820,35 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 
 	## Catalogs
 	for i, catalog in enumerate(catalogs):
-		symbol = symbols[i%len(symbols)]
-		edge_color = edge_colors[i%len(edge_colors)]
-		if edge_color is None:
-			edge_color = "None"
-		fill_color = fill_colors[i%len(fill_colors)]
-		if fill_color is None:
-			fill_color = "None"
-		edge_width = edge_widths[i%len(edge_widths)]
-		label = labels[i%len(labels)]
-		if label is None:
-			label = catalog.name
+		if len(catalog):
+			symbol = symbols[i%len(symbols)]
+			edge_color = edge_colors[i%len(edge_colors)]
+			if edge_color is None:
+				edge_color = "None"
+			fill_color = fill_colors[i%len(fill_colors)]
+			if fill_color is None:
+				fill_color = "None"
+			edge_width = edge_widths[i%len(edge_widths)]
+			label = labels[i%len(labels)]
+			if label is None:
+				label = catalog.name
 
-		## Earthquake symbol size varying with magnitude
-		if not symbol_size_inc:
-			symbol_sizes = symbol_size ** 2
-		else:
-			magnitudes = catalog.get_magnitudes(Mtype, Mrelation)
-			symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
-			symbol_sizes = symbol_sizes ** 2
-			if symbol_sizes.min() <= 0:
-				print "Warning: negative or zero symbol size encountered"
-			#print symbol_sizes.min(), symbol_sizes.max()
+			## Earthquake symbol size varying with magnitude
+			if not symbol_size_inc:
+				symbol_sizes = symbol_size ** 2
+			else:
+				magnitudes = catalog.get_magnitudes(Mtype, Mrelation)
+				symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
+				symbol_sizes = symbol_sizes ** 2
+				if symbol_sizes.min() <= 0:
+					print "Warning: negative or zero symbol size encountered"
+				#print symbol_sizes.min(), symbol_sizes.max()
 
-		## Earthquake epicenters
-		if len(catalog.eq_list) > 0:
-			lons, lats = catalog.get_longitudes(), catalog.get_latitudes()
-			x, y = map(lons, lats)
-			map.scatter(x, y, s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color, linewidth=edge_width, label=label)
+			## Earthquake epicenters
+			if len(catalog.eq_list) > 0:
+				lons, lats = catalog.get_longitudes(), catalog.get_latitudes()
+				x, y = map(lons, lats)
+				map.scatter(x, y, s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color, linewidth=edge_width, label=label)
 
 	## Sites
 	for i, site in enumerate(sites):
