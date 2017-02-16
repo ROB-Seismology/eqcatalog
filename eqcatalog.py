@@ -137,6 +137,31 @@ class EQCatalog:
 	def mags(self):
 		return self.get_magnitudes()
 
+	def print_report(self):
+		"""
+		Print some useful information about the catalog.
+		"""
+		print("Name: %s" % self.name)
+		print("Earthquake number: %d" % len(self))
+		print("Start time: %s" % self.start_date)
+		print("End time :  %s" % self.end_date)
+		for Mtype, count in self.get_Mtype_counts().items():
+			mags = self.get_magnitudes(Mtype=Mtype, Mrelation={})
+			mags = mags[np.isfinite(mags)]
+			if len(mags):
+				if mags.min() == 0:
+					mags = mags[mags > 0]
+				print("%s: n=%d, min=%.1f, max=%.1f" % (Mtype, count, mags.min(), mags.max()))
+		lons = self.get_longitudes()
+		lons = lons[np.isfinite(lons)]
+		print("Longitude bounds: %.4f - %.4f" % (lons.min(), lons.max()))
+		lats = self.get_latitudes()
+		lats = lats[np.isfinite(lats)]
+		print("Latitude bounds: %.4f - %.4f" % (lats.min(), lats.max()))
+		depths = self.get_depths()
+		depths = depths[np.isfinite(depths)]
+		print("Depth range %.1f - %.1f km" % (depths.min(), depths.max()))
+
 	def get_record(self, ID):
 		"""
 		Fetch record with given ID
@@ -2343,7 +2368,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], edge_widths=[edge_width], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, sm_label_colname=sm_label_colname, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, weighted=False, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
@@ -2367,6 +2392,10 @@ class EQCatalog:
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (default: None)
 			This parameter is currently ignored.
+		:param weighted:
+			bool, whether or not magnitude bins should be weighted by the
+			number of events in them
+			(default: False)
 		:param verbose:
 			Bool, whether some messages should be printed or not (default: False)
 
@@ -2378,11 +2407,18 @@ class EQCatalog:
 			- stdb: standard deviation on b value
 		"""
 		from calcGR import calcGR_LSQ
+		if weighted:
+			bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+			weights = bins_N
+		else:
+			weights = None
+
 		if cumul:
 			rates, magnitudes = self.get_cumulative_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
 		else:
 			rates, magnitudes = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
-		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, verbose=verbose)
+
+		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, weights=weights, verbose=verbose)
 		if not cumul:
 			a += mfd.get_a_separation(b, dM)
 		return a, b, stda, stdb
@@ -2568,7 +2604,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "Aki", "LSQc" or "LSQi"
+			String, computation method, either "Weichert", "Aki", "LSQc", "LSQc", "LSQi", "wLSQc" or "wLSQi"
 			(default: "Weichert")
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
@@ -2587,13 +2623,18 @@ class EQCatalog:
 		:return:
 			instance of :class:`mfd.TruncatedGRMFD`
 		"""
-		if method == "LSQc":
-			kwargs = {'cumul': True}
-		elif method == "LSQi":
-			kwargs = {'cumul': False}
-		else:
-			kwargs = {}
-		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQc": self.calcGR_LSQ, "LSQi": self.calcGR_LSQ}[method]
+		kwargs = {}
+		if "LSQc" in method:
+			kwargs['cumul'] = True
+		elif "LSQi" in method:
+			kwargs['cumul'] = False
+		if "LSQ" in method:
+			if method[0] == 'w':
+				kwargs['weighted'] = True
+			else:
+				kwargs['weighted'] = False
+			method = "LSQ"
+		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
 		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose, **kwargs)
 		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
 
@@ -2608,7 +2649,7 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "Aki" or "LSQ"
+			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi", "wLSQc" or "wLSQi"
 			(default: "Weichert"). If None, only observed MFD will be plotted.
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
@@ -3029,7 +3070,8 @@ class EQCatalog:
 		Subselect earthquakes from catalog situated inside a polygon
 
 		:param poly_obj:
-			polygon or closed linestring object (osr geometry object)
+			polygon or closed linestring object (ogr geometry object
+			or oqhazlib.geo.polygon.Polygon object)
 		:param catalog_name:
 			Str, name of resulting catalog
 			(default: "")
@@ -3039,43 +3081,59 @@ class EQCatalog:
 		"""
 		import osr, ogr
 
-		## Construct WGS84 projection system corresponding to earthquake coordinates
-		wgs84 = osr.SpatialReference()
-		wgs84.SetWellKnownGeogCS("WGS84")
+		if isinstance(poly_obj, ogr.Geometry):
+			## Construct WGS84 projection system corresponding to earthquake coordinates
+			wgs84 = osr.SpatialReference()
+			wgs84.SetWellKnownGeogCS("WGS84")
 
-		## Point object that will be used to test if earthquake is inside zone
-		point = ogr.Geometry(ogr.wkbPoint)
-		point.AssignSpatialReference(wgs84)
+			## Point object that will be used to test if earthquake is inside zone
+			point = ogr.Geometry(ogr.wkbPoint)
+			point.AssignSpatialReference(wgs84)
 
-		if poly_obj.GetGeometryName() in ("POLYGON", "LINESTRING"):
-			## Objects other than polygons or closed polylines will be skipped
-			if poly_obj.GetGeometryName() == "LINESTRING":
-				line_obj = poly_obj
-				if line_obj.IsRing() and line_obj.GetPointCount() > 3:
-					# Note: Could not find a way to convert linestrings to polygons
-					# The following only works for linearrings (what is the difference??)
-					#poly_obj = ogr.Geometry(ogr.wkbPolygon)
-					#poly_obj.AddGeometry(line_obj)
-					wkt = line_obj.ExportToWkt().replace("LINESTRING (", "POLYGON ((") + ")"
-					poly_obj = ogr.CreateGeometryFromWkt(wkt)
-				else:
-					return None
-			eq_list = []
-			for i, eq in enumerate(self.eq_list):
-				point.SetPoint(0, eq.lon, eq.lat)
-				if point.Within(poly_obj):
-					eq_list.append(eq)
+			if poly_obj.GetGeometryName() in ("POLYGON", "LINESTRING"):
+				## Objects other than polygons or closed polylines will be skipped
+				if poly_obj.GetGeometryName() == "LINESTRING":
+					line_obj = poly_obj
+					if line_obj.IsRing() and line_obj.GetPointCount() > 3:
+						# Note: Could not find a way to convert linestrings to polygons
+						# The following only works for linearrings (what is the difference??)
+						#poly_obj = ogr.Geometry(ogr.wkbPolygon)
+						#poly_obj.AddGeometry(line_obj)
+						wkt = line_obj.ExportToWkt().replace("LINESTRING (", "POLYGON ((") + ")"
+						poly_obj = ogr.CreateGeometryFromWkt(wkt)
+					else:
+						return None
+				eq_list = []
+				for i, eq in enumerate(self.eq_list):
+					point.SetPoint(0, eq.lon, eq.lat)
+					if point.Within(poly_obj):
+						eq_list.append(eq)
 
-			## Determine bounding box (region)
-			linear_ring = poly_obj.GetGeometryRef(0)
-			## In some versions of ogr, GetPoints method does not exist
-			#points = linear_ring.GetPoints()
-			points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
-			lons, lats = zip(*points)[:2]
+				## Determine bounding box (region)
+				linear_ring = poly_obj.GetGeometryRef(0)
+				## In some versions of ogr, GetPoints method does not exist
+				#points = linear_ring.GetPoints()
+				points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
+				lons, lats = zip(*points)[:2]
+
+		else:
+			import openquake.hazardlib as oqhazlib
+			if isinstance(poly_obj, oqhazlib.geo.Polygon):
+				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(), depths=None)
+				intersects = poly_obj.intersects(mesh)
+				idxs = np.argwhere(intersects == True)
+				zone_catalog = self.__getitem__(idxs)
+				lons = zone_catalog.get_longitudes()
+				lats = zone_catalog.get_latitudes()
+				eq_list = zone_catalog.eq_list
+
+		if len(eq_list):
 			region = (min(lons), max(lons), min(lats), max(lats))
-			if not catalog_name:
-				catalog_name = self.name + " (inside polygon)"
-			return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
+		else:
+			region = None
+		if not catalog_name:
+			catalog_name = self.name + " (inside polygon)"
+		return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
 
 	def split_into_zones(self, source_model_name, ID_colname="", fix_mi_lambert=True, verbose=True):
 		"""
@@ -3085,6 +3143,7 @@ class EQCatalog:
 		:param source_model_name:
 			String, name of source-zone model containing area sources
 			or else full path to GIS file containing area sources
+			or rshalib SourceModel object
 		:param ID_colname:
 			String, name of GIS column containing record ID
 			(default: "")
@@ -3099,15 +3158,26 @@ class EQCatalog:
 		:return:
 			ordered dict {String sourceID: EQCatalog}
 		"""
-		## Read zone model from MapInfo file
-		model_data = read_source_model(source_model_name, ID_colname=ID_colname, fix_mi_lambert=fix_mi_lambert, verbose=verbose)
-
 		zone_catalogs = OrderedDict()
-		for zoneID, zone_data in model_data.items():
-			zone_poly = zone_data['obj']
-			if zone_poly.GetGeometryName() == "POLYGON" or zone_poly.IsRing():
-				## Fault sources will be skipped
-				zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
+
+		if isinstance(source_model_name, (str, unicode)):
+			## Read zone model from GIS file
+			model_data = read_source_model(source_model_name, ID_colname=ID_colname, fix_mi_lambert=fix_mi_lambert, verbose=verbose)
+
+			for zoneID, zone_data in model_data.items():
+				zone_poly = zone_data['obj']
+				if zone_poly.GetGeometryName() == "POLYGON" or zone_poly.IsRing():
+					## Fault sources will be skipped
+					zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
+		else:
+			import hazard.rshalib as rshalib
+			if isinstance(source_model_name, rshalib.source.SourceModel):
+				source_model = source_model_name
+				for src in source_model.sources:
+					if isinstance(src, rshalib.source.AreaSource):
+						zone_poly = src.polygon
+						zoneID = src.source_id
+						zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
 
 		return zone_catalogs
 
@@ -3316,7 +3386,7 @@ class EQCatalog:
 			bins_N_cumul = bins_N_cumul[start_year_index:]
 			plt.plot(bins_Years, bins_N_cumul, colors[i%len(colors)], label= '%.1f' % magnitude)
 			plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i%len(colors)], label='_nolegend_')
-			if magnitude == reg_line and year1 != None:
+			if np.allclose(magnitude, reg_line) and year1 != None:
 				index = np.abs(bins_Years - year1).argmin()
 				bins_Years = bins_Years[index:]
 				bins_N_cumul = bins_N_cumul[index:]
@@ -3334,7 +3404,7 @@ class EQCatalog:
 		plt.xlabel('Time (years)', fontsize='large')
 		plt.ylabel('Cumulative number of events since' + ' %d' % self.start_date.year,
 			fontsize='large')
-		title = title or 'Completeness Analysis with CUVI method for magnitudes %.1f - %.1f' % (magnitudes[0], magnitudes[-1])
+		title = title or 'CUVI completeness analysis for magnitudes %.1f - %.1f' % (magnitudes[0], magnitudes[-1])
 		plt.title(title, fontsize='x-large')
 		plt.legend(loc=0)
 		plt.grid()
@@ -4478,12 +4548,41 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		try:
 			gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
 		except:
-			gis_filespec = source_model
-			source_model_name = os.path.splitext(os.path.split(source_model)[1])[0]
+			if isinstance(source_model, (str, unicode)):
+				gis_filespec = source_model
+				source_model_name = os.path.splitext(os.path.split(source_model)[1])[0]
+			else:
+				import hazard.rshalib as rshalib
+				if isinstance(source_model, rshalib.source.SourceModel):
+					gis_filespec = None
+					source_model_name = source_model.name
 		else:
 			source_model_name = source_model
 
-		data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
+		if gis_filespec:
+			data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
+		else:
+			# TODO: implement line and point sources too
+			point_lons, point_lats, point_labels = [], [], []
+			line_lons, line_lats, line_labels = [], [], []
+			polygon_lons, polygon_lats, polygon_labels = [], [], []
+			for src in source_model:
+				if isinstance(src, rshalib.source.AreaSource):
+					polygon_lons.append(src.polygon.lons)
+					polygon_lats.append(src.polygon.lats)
+					polygon_labels.append(getattr(src, sm_label_colname, ""))
+				elif isinstance(src, rshalib.source.PointSource):
+					point_lons.append(src.location.longitude)
+					point_lats.append(src.location.latitude)
+					point_labels.append(getattr(src, sm_label_colname, ""))
+				elif isinstance(src, rshalib.source.SimpleFaultSource):
+					line_lons.append([pt.lon for pt in src.fault_trace.points])
+					line_lats.append([pt.lat for pt in src.fault_trace.points])
+					line_labels.append(getattr(src, sm_label_colname, ""))
+			point_data = lbm.MultiPointData(point_lons, point_lats, labels=point_labels)
+			line_data = lbm.MultiLineData(line_lons, line_lats, labels=line_labels)
+			polygon_data = lbm.MultiPolygonData(polygon_lons, polygon_lats, labels=polygon_labels)
+			data = lbm.CompositeData(points=point_data, lines=line_data, polygons=polygon_data)
 		if isinstance(sm_style, dict):
 			if sm_style.has_key("fill_color") and not sm_style["fill_color"] in ("None", None):
 				polygon_style = lbm.PolygonStyle.from_dict(sm_style)
