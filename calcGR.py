@@ -119,7 +119,7 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 	return A, B, STDA, STDB
 
 
-def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
+def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=False):
 	"""
 	Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
@@ -130,6 +130,9 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 		corresponding to magnitude bins
 	:param b_val:
 		Float, fixed b value to constrain LSQ estimation (default: None)
+	:param weights:
+		weights to be applied to occurrence rates
+		(default: None)
 	:param verbose:
 		Bool, whether some messages should be printed or not (default: False)
 
@@ -143,6 +146,8 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 	## Do not consider magnitudes with zero occurrence rates
 	idxs = np.where(occurrence_rates > 0)
 	occurrence_rates = occurrence_rates[idxs]
+	if not weights is None:
+		weights = np.asarray(weights)[idxs]
 	log_occurrence_rates = np.log10(occurrence_rates)
 	magnitudes = magnitudes[idxs]
 
@@ -150,7 +155,10 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, verbose=False):
 		return (np.nan, np.nan, 0, 0)
 
 	if not b_val:
-		b_val, a_val, r, ttprob, stderr = stats.linregress(magnitudes, log_occurrence_rates)
+		if not weights is None:
+			b_val, a_val = np.polyfit(magnitudes, log_occurrence_rates, 1, w=weights)
+		else:
+			b_val, a_val, r, ttprob, stderr = stats.linregress(magnitudes, log_occurrence_rates)
 		## In earlier versions of linregress, stderr was the standard error
 		## of the estimate (see), in newer versions, it is the standard error
 		## of the slope (b_sigma). To be on the safe side, we ignore it, and
