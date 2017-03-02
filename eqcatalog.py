@@ -3935,7 +3935,8 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
-def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False, verbose=True):
+def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
+					convert_zero_magnitudes=False, verbose=True):
 	"""
 	Read catalog from GIS file
 
@@ -3950,6 +3951,9 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False, ve
 			the geographic object.
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
+		(default: False)
+	:param convert_zero_magnitudes:
+		bool, whether or not to convert zero magnitudes to NaN values
 		(default: False)
 	:param verbose:
 		Boolean, whether or not to print information while reading
@@ -4035,20 +4039,24 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False, ve
 		else:
 			depth = 0
 
+		mag = {}
 		if column_map.has_key('ML'):
 			ML = rec[column_map['ML']]
-		else:
-			ML = 0
+			if convert_zero_magnitudes:
+				ML = ML or np.nan
+			mag['ML'] = ML
 
 		if column_map.has_key('MS'):
 			MS = rec[column_map['MS']]
-		else:
-			MS = 0
+			if convert_zero_magnitudes:
+				MS = MS or np.nan
+			mag['MS'] = MS
 
 		if column_map.has_key('MW'):
 			MW = rec[column_map['MW']]
-		else:
-			MW = 0
+			if convert_zero_magnitudes:
+				MW = MW or np.nan
+			mag['MW'] = MW
 
 		if column_map.has_key('name'):
 			name = rec[column_map['name']]
@@ -4092,7 +4100,9 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False, ve
 
 		#print ID, date, time, lon, lat, depth, ML, MS, MW
 		try:
-			eq = LocalEarthquake(ID, date, time, lon, lat, depth, {}, ML, MS, MW, name, intensity_max=intensity_max, macro_radius=macro_radius, errh=errh, errz=errz, errt=errt, errM=errM, zone=zone)
+			eq = LocalEarthquake(ID, date, time, lon, lat, depth, mag, name=name,
+							intensity_max=intensity_max, macro_radius=macro_radius,
+							errh=errh, errz=errz, errt=errt, errM=errM, zone=zone)
 		except:
 			skipped += 1
 		else:
@@ -4127,24 +4137,30 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 	if catalog_name.upper() == "SHEEC":
 		gis_filespec = os.path.join(GIS_root, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
 		column_map = {'lon': 'Lon', 'lat': 'Lat', 'year': 'Year', 'month': 'Mo', 'day': 'Da', 'hour': 'Ho', 'minute': 'Mi', 'second': 'Se', 'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
+		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "CENEC":
 		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "CENEC", "CENEC 2008.TAB")
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'Date', 'hour': 'hour', 'minute': 'minute', 'MW': 'Mw', 'depth': 'depth'}
+		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "ISC-GEM":
 		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "ISC-GEM", "isc-gem-cat.TAB")
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
+		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "CEUS-SCR":
 		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
 		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
+		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "BGS":
 		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
 		column_map = {'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR', 'hour': 'HR', 'minute': 'MN', 'second': 'SECS', 'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'ID': 'ID', 'name': 'LOCALITY', 'intensity_max': 'INT'}
+		convert_zero_magnitudes = True
 	else:
 		raise Exception("Catalog not recognized: %s" % catalog_name)
 
 	if not os.path.exists(gis_filespec):
 		raise Exception("Catalog file not found: %s" % gis_filespec)
-	eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months, verbose=verbose)
+	eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months,
+						convert_zero_magnitudes=convert_zero_magnitudes, verbose=verbose)
 	eqc.name = catalog_name
 	return eqc
 
@@ -4175,6 +4191,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		(default: 'YMD')
 	:param convert_zero_magnitudes:
 		bool, whether or not to convert zero magnitudes to NaN values
+		(default: False)
 	:param ignore_warnings:
 		bool, whether or not to print warnings when fields cannot be parsed
 		(default: False, will print warnings)
