@@ -396,6 +396,8 @@ class LocalEarthquake:
 			be used for conversion
 			(default: {})
 		"""
+		if len(Mrelation) > 1 and not isinstance(Mrelation, OrderedDict):
+			print("Warning: Mrelation should be ordered dictionary!")
 		for Mtype, msce_name in Mrelation.items():
 			if self.has_mag(Mtype):
 				msce = getattr(msc, msce_name)()
