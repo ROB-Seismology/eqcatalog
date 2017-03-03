@@ -3936,7 +3936,7 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 
 
 def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
-					convert_zero_magnitudes=False, verbose=True):
+					convert_zero_magnitudes=False, ID_prefix="", verbose=True):
 	"""
 	Read catalog from GIS file
 
@@ -3955,6 +3955,9 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 	:param convert_zero_magnitudes:
 		bool, whether or not to convert zero magnitudes to NaN values
 		(default: False)
+	:param ID_prefix:
+		str, prefix to add to earthquake IDs
+		(default: "")
 	:param verbose:
 		Boolean, whether or not to print information while reading
 		GIS table (default: True)
@@ -3972,6 +3975,8 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 			ID = rec[column_map['ID']]
 		else:
 			ID = i
+		if ID_prefix:
+			ID = ID_prefix + str(ID)
 
 		if column_map.has_key('date'):
 			date = rec[column_map['date']]
@@ -4159,14 +4164,15 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 
 	if not os.path.exists(gis_filespec):
 		raise Exception("Catalog file not found: %s" % gis_filespec)
+	ID_prefix = catalog_name + "-"
 	eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months,
-						convert_zero_magnitudes=convert_zero_magnitudes, verbose=verbose)
+						convert_zero_magnitudes=convert_zero_magnitudes, ID_prefix=ID_prefix, verbose=verbose)
 	eqc.name = catalog_name
 	return eqc
 
 
 def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ML": 7, "MS": 8, "MW": 9},
-					header=True, date_sep='-', time_sep=':', date_order='YMD', convert_zero_magnitudes=False, ignore_warnings=False, **fmtparams):
+					header=True, date_sep='-', time_sep=':', date_order='YMD', convert_zero_magnitudes=False, ignore_warnings=False, ID_prefix="", **fmtparams):
 	"""
 	Read ROB local earthquake catalog from csv file.
 
@@ -4195,6 +4201,9 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	:param ignore_warnings:
 		bool, whether or not to print warnings when fields cannot be parsed
 		(default: False, will print warnings)
+	:param ID_prefix:
+		str, prefix to add to earthquake IDs
+		(default: "")
 	:param **fmtparams:
 		kwargs for csv reader (e.g. "delimiter" and "quotechar")
 
@@ -4214,6 +4223,9 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				ID = int(line[column_map["id"]])
 			else:
 				ID = i - header + 1
+			if ID_prefix:
+				ID = ID_prefix + str(ID)
+
 			if "datetime" in column_map:
 				dt = parse_isoformat_datetime(line[column_map["datetime"]])
 				date = dt.date()
