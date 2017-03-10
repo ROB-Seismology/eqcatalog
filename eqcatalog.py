@@ -3856,6 +3856,10 @@ def concatenate_catalogs(catalog_list, name=""):
 	"""
 	if not name:
 		name = "Concatenated catalog"
+
+	## Remove empty catalogs
+	catalog_list = [catalog for catalog in catalog_list if catalog and len(catalog)]
+
 	catalog0 = catalog_list[0]
 	eq_list = catalog0.eq_list[:]
 	start_date = catalog0.start_date
