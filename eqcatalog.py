@@ -56,7 +56,6 @@ else:
 
 ## Import ROB modules
 from eqrecord import LocalEarthquake
-import hazard.rshalib.mfd.mfd as mfd
 from source_models import read_source_model
 from completeness import *
 from time_functions import timespan
@@ -1337,10 +1336,11 @@ class EQCatalog:
 		:return:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
+		from hazard.rshalib.mfd import EvenlyDiscretizedMFD
 		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim, verbose=verbose)
 		## Mmin may have changed depending on completeness
 		Mmin = bins_Mag[0]
-		return mfd.EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
+		return EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
 
 	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation="default", completeness=default_completeness, trim=False, verbose=True):
 		"""
@@ -2623,6 +2623,8 @@ class EQCatalog:
 		:return:
 			instance of :class:`mfd.TruncatedGRMFD`
 		"""
+		from hazard.rshalib.mfd import TruncatedGRMFD
+
 		kwargs = {}
 		if "LSQc" in method:
 			kwargs['cumul'] = True
@@ -2636,7 +2638,7 @@ class EQCatalog:
 			method = "LSQ"
 		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
 		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose, **kwargs)
-		return mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
+		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
 
 	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
@@ -2692,6 +2694,8 @@ class EQCatalog:
 		:param verbose:
 			Bool, whether some messages should be printed or not (default: False)
 		"""
+		from hazard.rshalib.mfd import plot_MFD
+
 		mfd_list, labels, colors, styles = [], [], [], []
 		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
 		observed_mfd = cc_catalog.get_incremental_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
@@ -2733,7 +2737,7 @@ class EQCatalog:
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
 		end_year = self.end_date.year
-		mfd.plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation="default"):
 		"""
