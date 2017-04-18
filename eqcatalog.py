@@ -1249,6 +1249,10 @@ class EQCatalog:
 		completeness_dates = np.array(completeness_dates)
 		return completeness_dates
 
+	def get_uniform_completeness(self, Mmin, Mtype="MW"):
+		min_date = self.start_date.year
+		return Completeness([min_date], [Mmin], Mtype=Mtype)
+
 	def get_completeness_timespans(self, magnitudes, completeness=default_completeness):
 		"""
 		Compute completeness timespans for list of magnitudes
@@ -4180,7 +4184,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 
 
 def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name": 3, "lon": 4, "lat": 5, "depth": 6, "ML": 7, "MS": 8, "MW": 9},
-					header=True, date_sep='-', time_sep=':', date_order='YMD', convert_zero_magnitudes=False, ignore_warnings=False, ID_prefix="", **fmtparams):
+					header=True, date_sep='-', time_sep=':', date_order='YMD', convert_zero_magnitudes=False, ignore_warnings=False, ID_prefix="",
+					ignore_chars=[], **fmtparams):
 	"""
 	Read ROB local earthquake catalog from csv file.
 
@@ -4212,6 +4217,11 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	:param ID_prefix:
 		str, prefix to add to earthquake IDs
 		(default: "")
+	:param ignore_chars:
+		list containing characters or strings that may sometimes be
+		present in a column and should be ignored
+		(e.g., '*')
+		(default: [])
 	:param **fmtparams:
 		kwargs for csv reader (e.g. "delimiter" and "quotechar")
 
@@ -4227,6 +4237,9 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		for i, line in enumerate(lines):
 			if i < header:
 				continue
+			for j in range(len(line)):
+				for ic in ignore_chars:
+					line[j] = line[j].replace(ic, '')
 			if hasattr(column_map, "id"):
 				ID = int(line[column_map["id"]])
 			else:
