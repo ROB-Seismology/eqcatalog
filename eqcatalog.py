@@ -3130,6 +3130,7 @@ class EQCatalog:
 				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(), depths=None)
 				intersects = poly_obj.intersects(mesh)
 				idxs = np.argwhere(intersects == True)
+				idxs = [idx[0] for idx in idxs]
 				zone_catalog = self.__getitem__(idxs)
 				lons = zone_catalog.get_longitudes()
 				lats = zone_catalog.get_latitudes()
