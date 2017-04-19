@@ -3394,7 +3394,7 @@ class EQCatalog:
 			bins_N_cumul = bins_N_cumul[start_year_index:]
 			plt.plot(bins_Years, bins_N_cumul, colors[i%len(colors)], label= '%.1f' % magnitude)
 			plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i%len(colors)], label='_nolegend_')
-			if np.allclose(magnitude, reg_line) and year1 != None:
+			if reg_line and np.allclose(magnitude, reg_line) and year1 != None:
 				index = np.abs(bins_Years - year1).argmin()
 				bins_Years = bins_Years[index:]
 				bins_N_cumul = bins_N_cumul[index:]
