@@ -283,12 +283,12 @@ column_map = {
 	'max_mag': 'MaxMag',
 	'upper_seismogenic_depth': 'MinDepth',
 	'lower_seismogenic_depth': 'MaxDepth',
-	'min_dip': 'DipMin',
-	'max_dip': 'DipMax',
-	'min_rake': 'RakeMin',
-	'max_rake': 'RakeMax',
-	'min_slip_rate': 'SlipRateMin',
-	'max_slip_rate': 'SlipRateMax',
+	'dip_distribution': [('DipMin', 0.5),
+							('DipMax', 0.5)],
+	'rake_distribution': [('RakeMin', 0.5),
+							('RakeMax', 0.5)],
+	'slip_rate_distribution': [('SlipRateMin', 0.5),
+								('SlipRateMax', 0.5)],
 	'bg_zone': None}
 RVRS_CSS = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = RVRS_CSS
