@@ -319,10 +319,12 @@ column_map = {
 	'Nf': 'Nf',
 	'Tf': 'Tf',
 	'length': 'Length',
-	'min_rake': 'min_rake',
-	'max_rake': 'max_rake',
-	'min_slip_rate': 'min_slip_rate',
-	'max_slip_rate': 'max_slip_rate',
+	'dip_distribution': [('min_dip', 0.5),
+							('max_dip', 0.5)],
+	'rake_distribution': [('min_rake', 0.5),
+							('max_rake', 0.5)],
+	'slip_rate_distribution': [('min_slip_rate', 0.5),
+								('max_slip_rate', 0.5)],
 	'bg_zone': 'BG_zone',
 	'area': 'Area'}
 Seismotectonic_Hybrid = SourceModelDefinition(name, gis_filespec, column_map)
@@ -354,10 +356,12 @@ column_map = {
 	'Nf': 'Nf',
 	'Tf': 'Tf',
 	'length': 'Length',
-	'min_rake': 'min_rake',
-	'max_rake': 'max_rake',
-	'min_slip_rate': 'min_slip_rate',
-	'max_slip_rate': 'max_slip_rate',
+	'dip_distribution': [('min_dip', 0.5),
+							('max_dip', 0.5)],
+	'rake_distribution': [('min_rake', 0.5),
+							('max_rake', 0.5)],
+	'slip_rate_distribution': [('min_slip_rate', 0.5),
+								('max_slip_rate', 0.5)],
 	'bg_zone': 'BG_zone',
 	'area': 'Area'}
 Seismotectonic_Hybrid_v2 = SourceModelDefinition(name, gis_filespec, column_map)
