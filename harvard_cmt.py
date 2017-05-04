@@ -1,66 +1,75 @@
+import os
 import datetime
-from collections import OrderedDict
+import urllib2
 
 import numpy as np
 
 import db.simpledb as simpledb
 
 
-HarvardCMTColDef = OrderedDict([
-	('ID', 'STRING'),
-	('ref_catalog', 'STRING'),
-	('hypo_date_time', 'TIMESTAMP'),
-	('hypo_lon', 'REAL'),
-	('hypo_lat', 'REAL'),
-	('hypo_depth', 'REAL'),
-	('ref_mb', 'REAL'),
-	('ref_MS', 'REAL'),
-	('location', 'STRING'),
-	('source_type', 'STRING'),
-	('mrf_type', 'STRING'),
-	('mrf_duration', 'REAL'),
-	('centroid_reltime', 'REAL'),
-	('centroid_reltime_sigma', 'REAL'),
-	('centroid_lon', 'REAL'),
-	('centroid_lon_sigma', 'REAL'),
-	('centroid_lat', 'REAL'),
-	('centroid_lat_sigma', 'REAL'),
-	('centroid_depth', 'REAL'),
-	('centroid_depth_sigma', 'REAL'),
-	('centroid_depth_type', 'STRING'),
-	('exp', 'INTEGER'),
-	('Mrr', 'REAL'),
-	('Mrr_sigma', 'REAL'),
-	('Mtt', 'REAL'),
-	('Mtt_sigma', 'REAL'),
-	('Mpp', 'REAL'),
-	('Mpp_sigma', 'REAL'),
-	('Mrt', 'REAL'),
-	('Mrt_sigma', 'REAL'),
-	('Mrp', 'REAL'),
-	('Mrp_sigma', 'REAL'),
-	('Mtp', 'REAL'),
-	('Mtp_sigma', 'REAL'),
-	('eva1', 'REAL'),
-	('pl1', 'INTEGER'),
-	('az1', 'INTEGER'),
-	('eva2', 'REAL'),
-	('pl2', 'INTEGER'),
-	('az2', 'INTEGER'),
-	('eva3', 'REAL'),
-	('pl3', 'INTEGER'),
-	('az3', 'INTEGER'),
-	('moment', 'REAL'),
-	('strike1', 'INTEGER'),
-	('dip1', 'INTEGER'),
-	('rake1', 'INTEGER'),
-	('strike2', 'INTEGER'),
-	('dip2', 'INTEGER'),
-	('rake2', 'INTEGER')
-])
+ROOT_FOLDER = r"D:\seismo-gis\collections\Harvard_CMT"
+
+
+HarvardCMTColDef = [
+	dict(name='ID', type='STRING', notnull=1, pk=1),
+	dict(name='ref_catalog', type='STRING'),
+	dict(name='hypo_date_time', type='TIMESTAMP'),
+	dict(name='hypo_lon', type='REAL'),
+	dict(name='hypo_lat', type='REAL'),
+	dict(name='hypo_depth', type='REAL'),
+	dict(name='ref_mb', type='REAL'),
+	dict(name='ref_MS', type='REAL'),
+	dict(name='location', type='STRING'),
+	dict(name='source_type', type='STRING'),
+	dict(name='mrf_type', type='STRING'),
+	dict(name='mrf_duration', type='REAL'),
+	dict(name='centroid_reltime', type='REAL'),
+	dict(name='centroid_reltime_sigma', type='REAL'),
+	dict(name='centroid_lon', type='REAL'),
+	dict(name='centroid_lon_sigma', type='REAL'),
+	dict(name='centroid_lat', type='REAL'),
+	dict(name='centroid_lat_sigma', type='REAL'),
+	dict(name='centroid_depth', type='REAL'),
+	dict(name='centroid_depth_sigma', type='REAL'),
+	dict(name='centroid_depth_type', type='STRING'),
+	dict(name='exp', type='INTEGER'),
+	dict(name='Mrr', type='REAL'),
+	dict(name='Mrr_sigma', type='REAL'),
+	dict(name='Mtt', type='REAL'),
+	dict(name='Mtt_sigma', type='REAL'),
+	dict(name='Mpp', type='REAL'),
+	dict(name='Mpp_sigma', type='REAL'),
+	dict(name='Mrt', type='REAL'),
+	dict(name='Mrt_sigma', type='REAL'),
+	dict(name='Mrp', type='REAL'),
+	dict(name='Mrp_sigma', type='REAL'),
+	dict(name='Mtp', type='REAL'),
+	dict(name='Mtp_sigma', type='REAL'),
+	dict(name='eva1', type='REAL'),
+	dict(name='pl1', type='INTEGER'),
+	dict(name='az1', type='INTEGER'),
+	dict(name='eva2', type='REAL'),
+	dict(name='pl2', type='INTEGER'),
+	dict(name='az2', type='INTEGER'),
+	dict(name='eva3', type='REAL'),
+	dict(name='pl3', type='INTEGER'),
+	dict(name='az3', type='INTEGER'),
+	dict(name='moment', type='REAL'),
+	dict(name='strike1', type='INTEGER'),
+	dict(name='dip1', type='INTEGER'),
+	dict(name='rake1', type='INTEGER'),
+	dict(name='strike2', type='INTEGER'),
+	dict(name='dip2', type='INTEGER'),
+	dict(name='rake2', type='INTEGER')]
+
+
+def get_coltype(colname):
+	for col_def in HarvardCMTColDef:
+		if col_def['name'] == colname:
+			return col_def['type']
 
 def cnv_coltype(colname, value):
-	func = {'INTEGER': int, 'REAL': float, 'STRING': str, 'TIMESTAMP': lambda x:x}[HarvardCMTColDef[colname]]
+	func = {'INTEGER': int, 'REAL': float, 'STRING': str, 'TIMESTAMP': lambda x:x}[get_coltype(colname)]
 	return func(value)
 
 
@@ -274,8 +283,10 @@ class HarvardCMTCatalog:
 		"""
 		cmt_records = []
 		if ndk_filespec_or_url[:4] == "http":
-			import urllib
-			ndk = urllib.urlopen(ndk_filespec_or_url)
+			try:
+				ndk = urllib2.urlopen(ndk_filespec_or_url)
+			except urllib2.HTTPError:
+				return []
 		else:
 			ndk = open(ndk_filespec_or_url)
 
@@ -297,11 +308,28 @@ class HarvardCMTCatalog:
 		if clear_db:
 			self.db.drop_table(self.table_name)
 		if not self.table_name in self.db.list_tables():
-			self.db.create_table(self.table_name, HarvardCMTColDef, 'ID')
+			self.db.create_table(self.table_name, HarvardCMTColDef)
 		for ndk_filespec in ndk_filespecs:
 			print ndk_filespec
 			recs = self.parse_ndk_file(ndk_filespec)
-			self.db.add_records(self.table_name, [rec.to_dict() for rec in recs if rec.hypo_date >= start_date])
+			if recs:
+				self.db.add_records(self.table_name, [rec.to_dict() for rec in recs if rec.hypo_date >= start_date])
+			else:
+				break
+
+	def download_ndk_file(self, url, overwrite=False):
+		filename = url.split('/')[-1]
+		filespec = os.path.join(ROOT_FOLDER, "NDK", filename)
+		if not os.path.exists(filespec) or overwrite:
+			try:
+				ndk = urllib2.urlopen(url)
+			except urllib2.HTTPError:
+				return None
+			else:
+				f = open(filespec, "w")
+				f.write(ndk.read())
+				f.close()
+		return filespec
 
 	def read_from_web(self, clear_db=False):
 		base_url = "http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog"
@@ -324,11 +352,24 @@ class HarvardCMTCatalog:
 				url = "NEW_MONTHLY/%d/%s%d.ndk" % (year, months[m], year-2000)
 				ndk_urls.append(url)
 
+		## Download NDK files if necessary, then import them
 		ndk_urls = [base_url + '/' + url for url in ndk_urls]
-		self.import_ndk(ndk_urls, clear_db=clear_db)
+		ndk_files = []
+		for ndk_url in ndk_urls:
+			ndk_filespec = self.download_ndk_file(ndk_url)
+			if ndk_filespec:
+				ndk_files.append(ndk_filespec)
+			else:
+				basename = os.path.splitext(ndk_url.split('/')[-1])[0]
+				m, yr = basename[:3], int(basename[3:])
+				m = months.index(m) + 1
+				yr += 2000
+				start_date = datetime.date(yr, m, 1)
+		self.import_ndk(ndk_files, clear_db=clear_db)
 
 		## Add Quick CMTs
 		ndk_url = base_url + '/NEW_QUICK/qcmt.ndk'
+		"""
 		if current_month == 12:
 			start_month = 1
 			start_year = current_year + 1
@@ -336,10 +377,20 @@ class HarvardCMTCatalog:
 			start_month = current_month + 1
 			start_year = current_year
 		start_date = datetime.date(start_year, start_month, 1)
+		"""
 		self.import_ndk([ndk_url], start_date=start_date)
+
+		## Create SpatiaLite geometries
+		if self.db.has_spatialite:
+			self.db.init_spatialite()
+			self.db.add_geometry_column('harvard_cmt', 'geom')
+			self.db.create_points_from_columns('harvard_cmt', 'hypo_lon', 'hypo_lat')
 
 	def get_records(self):
 		for rec in self.db.query(self.table_name):
+			rec = rec.to_dict()
+			if rec.has_key('geom'):
+				del rec['geom']
 			yield HarvardCMTRecord.from_sql_record(rec)
 
 	def to_eq_catalog(self):
@@ -353,6 +404,12 @@ class HarvardCMTCatalog:
 
 
 if __name__ == "__main__":
+	db_filespec = os.path.join(ROOT_FOLDER, "SQLite", "HarvardCMT.sqlite")
+	harvard_cmt = HarvardCMTCatalog(db_filespec)
+	harvard_cmt.read_from_web(clear_db=True)
+
+	exit()
+
 	ndk_records = """
 	PDE  2005/01/01 01:20:05.4  13.78  -88.78 193.1 5.0 0.0 EL SALVADOR
 	C200501010120A   B:  4    4  40 S: 27   33  50 M:  0    0   0 CMT: 1 TRIHD:  0.6
