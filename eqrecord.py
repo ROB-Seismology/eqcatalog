@@ -95,7 +95,14 @@ class LocalEarthquake:
 		self.lon = lon
 		self.lat = lat
 		self.depth = depth
-		self.mag = mag
+		#self.mag = mag
+		if not mag:
+			self.mag = {}
+		elif isinstance(mag, dict):
+			self.mag = mag
+		else:
+			raise Exception("mag must be a dictionary!")
+
 		if not ML in (None, np.nan):
 			self.mag['ML'] = ML
 		if not MS in (None, np.nan):
@@ -174,7 +181,22 @@ class LocalEarthquake:
 			dct['date'] = dt.date()
 			dct['time'] = dt.time()
 			del dct['datetime']
+		if not 'mag' in dct:
+			dct['mag'] = {}
+			for key in dct.keys():
+				if key[0].upper() == 'M' and len(key) == 2:
+					dct['mag'][key] = dct[key]
+					del dct[key]
 		return LocalEarthquake(**dct)
+
+	def to_dict(self):
+		"""
+		Convert to a dictionary
+
+		:return:
+			instance of :class:`dict`
+		"""
+		return self.__dict__.copy()
 
 	def dump_json(self):
 		"""

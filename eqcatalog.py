@@ -78,7 +78,6 @@ class EQCatalog:
 	:param region:
 		(lon0, lon1, lat0, lat1) tuple with geographic coordinates of
 		bounding box (default: None)
-
 	:param name:
 		String, catalog name (default: "")
 	"""
@@ -1250,6 +1249,19 @@ class EQCatalog:
 		return completeness_dates
 
 	def get_uniform_completeness(self, Mmin, Mtype="MW"):
+		"""
+		Construct completeness object with uniform completeness
+		since start of catalog.
+
+		:param Mmin:
+			float, minimum magnitude of completeness
+		:param Mtype:
+			string, magnitude type for :param:`Mmin`
+			(default: "MW")
+
+		:return:
+			instance of :class:`Completeness`
+		"""
 		min_date = self.start_date.year
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
@@ -3038,41 +3050,96 @@ class EQCatalog:
 		cPickle.dump(self, f)
 		f.close()
 
-	def export_sqlite(self, sqlite_file, table_name):
+	def export_sqlite(self, sqlite_filespec, table_name=None):
 		"""
+		Export catalog to sqlite (if possible: SpatiaLite) file.
+
+		:param sqlite_filespec:
+			string, full path to SQLite database
+		:param table_name:
+			string, name of database table containing catalog
+			(default: None, assumes table name corresponds to
+			basename of :param:`sqlite_filespec`)
 		"""
 		import db.simpledb as simpledb
 
-		db = simpledb.SQLiteDB(sqlite_file)
-		col_info = [{'name': 'ID', 'type': 'TEXT', 'pk': 1},
-						{'name': 'datetime', 'type': 'TEXT'},
-						{'name': 'lon', 'type': 'NUMERIC'},
-						{'name': 'lat', 'type': 'NUMERIC'},
-						{'name': 'depth', 'type': 'NUMERIC'}]
-		for Mtype in self.get_Mtypes():
-			col_info.append({'name': Mtype, 'type': 'NUMERIC'})
-		col_info.extend([{'name': 'name', 'type': 'TEXT'},
-						{'name': 'intensity_max', 'type': 'NUMERIC'},
-						{'name': 'macro_radius', 'type': 'NUMERIC'},
-						{'name': 'errh', 'type': 'NUMERIC'},
-						{'name': 'errz', 'type': 'NUMERIC'},
-						{'name': 'errt', 'type': 'NUMERIC'},
-						{'name': 'zone', 'type': 'TEXT'}]
-		db.create_table(table_name, col_info)
+		if not table_name:
+			table_name = os.path.splitext(os.path.split(sqlite_filespec)[1])[0]
 
-		recs = []
-		for eq in self:
-			json = eq.dump_json()
-			recs.append(json.values()[0])
-		db.add_records(table_name, recs)
+		if len(self):
+			db = simpledb.SQLiteDB(sqlite_file)
+			if table_name in db.list_tables():
+				db.drop_table(table_name)
+			eq = self.eq_list[-1]
+			if isinstance(eq.ID, (int, long)):
+				# Note: declare type as INT instead of INTEGER,
+				# otherwise rowid will be replaced with ID!
+				# See https://sqlite.org/lang_createtable.html#rowid
+				col_info = [{'name': 'ID', 'type': 'INT', 'pk': 1}]
+			else:
+				col_info = [{'name': 'ID', 'type': 'TEXT', 'pk': 1}]
+			col_info.extend([{'name': 'datetime', 'type': 'TIMESTAMP'},
+							{'name': 'lon', 'type': 'NUMERIC'},
+							{'name': 'lat', 'type': 'NUMERIC'},
+							{'name': 'depth', 'type': 'NUMERIC'}])
+			for Mtype in self.get_Mtypes():
+				col_info.append({'name': Mtype, 'type': 'NUMERIC'})
+			col_info.extend([{'name': 'name', 'type': 'TEXT'},
+							{'name': 'intensity_max', 'type': 'NUMERIC'},
+							{'name': 'macro_radius', 'type': 'NUMERIC'},
+							{'name': 'errh', 'type': 'NUMERIC'},
+							{'name': 'errz', 'type': 'NUMERIC'},
+							{'name': 'errt', 'type': 'NUMERIC'},
+							{'name': 'errM', 'type': 'NUMERIC'},
+							{'name': 'zone', 'type': 'TEXT'}])
+			db.create_table(table_name, col_info)
 
-		if db.has_spatialite:
-			db.init_spatialite("wgs84")
-			db.add_geometry_column(table_name)
-			db.create_points_from_columns(table_name, 'lon', 'lat')
+			recs = []
+			for eq in self:
+				dic = eq.to_dict()
+				del dic['mag']
+				for Mtype in eq.get_Mtypes():
+					dic[Mtype] = eq.mag[Mtype]
+				recs.append(dic)
+			db.add_records(table_name, recs)
 
-		db.close()
+			if db.has_spatialite:
+				db.init_spatialite("wgs84")
+				db.add_geometry_column(table_name)
+				db.create_points_from_columns(table_name, 'lon', 'lat')
 
+			db.close()
+
+	@classmethod
+	def from_sqlite(cls, sqlite_filespec, table_name=None):
+		"""
+		Import catalog from SQLite database.
+
+		:param sqlite_filespec:
+			string, full path to SQLite database
+		:param table_name:
+			string, name of database table containing catalog
+			(default: None, assumes table name corresponds to
+			basename of :param:`sqlite_filespec`)
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		import db.simpledb as simpledb
+
+		if not table_name:
+			table_name = os.path.splitext(os.path.split(sqlite_filespec)[1])[0]
+
+		eq_list = []
+		db = simpledb.SQLiteDB(sqlite_filespec)
+		for rec in db.query(table_name):
+			dic = rec.to_dict()
+			if dic.has_key('geom'):
+				del dic['geom']
+			eq = LocalEarthquake.from_dict(dic)
+			eq_list.append(eq)
+
+		return cls(eq_list, name=table_name)
 
 	def get_bbox(self):
 		"""
