@@ -11,8 +11,6 @@ import sys
 
 from collections import OrderedDict
 
-from openquake.hazardlib.geo.geodetic import geodetic_distance as distance
-
 
 class DeclusteringMethod():
 	"""
@@ -51,6 +49,8 @@ class WindowMethod(DeclusteringMethod):
 		:fa_ratio:
 			float, ratio of foreshock window to aftershock window
 		"""
+		from openquake.hazardlib.geo.geodetic import geodetic_distance as distance
+
 		## get order of descending magnitudes
 		order = np.argsort(magnitudes)[::-1]
 		## create declustering index
@@ -100,6 +100,8 @@ class ClusterMethod(DeclusteringMethod):
 		:fa_ratio:
 			float, ratio of foreshock window to aftershock window
 		"""
+		from openquake.hazardlib.geo.geodetic import geodetic_distance as distance
+
 		## create declustering index
 		declustering = np.ones_like(magnitudes)
 		## loop over magnitudes
