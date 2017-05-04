@@ -3038,6 +3038,42 @@ class EQCatalog:
 		cPickle.dump(self, f)
 		f.close()
 
+	def export_sqlite(self, sqlite_file, table_name):
+		"""
+		"""
+		import db.simpledb as simpledb
+
+		db = simpledb.SQLiteDB(sqlite_file)
+		col_info = [{'name': 'ID', 'type': 'TEXT', 'pk': 1},
+						{'name': 'datetime', 'type': 'TEXT'},
+						{'name': 'lon', 'type': 'NUMERIC'},
+						{'name': 'lat', 'type': 'NUMERIC'},
+						{'name': 'depth', 'type': 'NUMERIC'}]
+		for Mtype in self.get_Mtypes():
+			col_info.append({'name': Mtype, 'type': 'NUMERIC'})
+		col_info.extend([{'name': 'name', 'type': 'TEXT'},
+						{'name': 'intensity_max', 'type': 'NUMERIC'},
+						{'name': 'macro_radius', 'type': 'NUMERIC'},
+						{'name': 'errh', 'type': 'NUMERIC'},
+						{'name': 'errz', 'type': 'NUMERIC'},
+						{'name': 'errt', 'type': 'NUMERIC'},
+						{'name': 'zone', 'type': 'TEXT'}]
+		db.create_table(table_name, col_info)
+
+		recs = []
+		for eq in self:
+			json = eq.dump_json()
+			recs.append(json.values()[0])
+		db.add_records(table_name, recs)
+
+		if db.has_spatialite:
+			db.init_spatialite("wgs84")
+			db.add_geometry_column(table_name)
+			db.create_points_from_columns(table_name, 'lon', 'lat')
+
+		db.close()
+
+
 	def get_bbox(self):
 		"""
 		Compute bounding box of earthquake catalog
