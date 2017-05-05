@@ -305,7 +305,7 @@ class HarvardCMTCatalog:
 		return cmt_records
 
 	def import_ndk(self, ndk_filespecs, start_date=datetime.date(1900, 1, 1), clear_db=False):
-		if clear_db:
+		if clear_db and self.table_name in self.db.list_tables():
 			self.db.drop_table(self.table_name)
 		if not self.table_name in self.db.list_tables():
 			self.db.create_table(self.table_name, HarvardCMTColDef)
