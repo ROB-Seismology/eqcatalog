@@ -3,10 +3,7 @@ Magnitude Scale Conversion (MSC) module
 """
 
 
-import matplotlib.pyplot as plt
 import numpy as np
-
-from matplotlib.ticker import MultipleLocator
 
 
 
@@ -123,7 +120,7 @@ class Benouar1994(MSCE_ML_MS):
 	Benouar, D., 1994, Materials for the investigation of the seismicity of
 	Algeria and adjacent regions during the twentieth century: Annali Di
 	Geofisica XXXVII:4
-	
+
 	Validity range: Not known
 	Region: Algeria
 	"""
@@ -134,7 +131,7 @@ class Benouar1994(MSCE_ML_MS):
 		if input_type != np.ndarray:
 			MS = input_type(MS)
 		return MS
-	
+
 	def get_sigma(self, ML=None):
 		return None
 
