@@ -133,7 +133,8 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 	:param sort_order:
 		String, sort order, either "asc" or "desc" (default: "asc")
 	:param event_type:
-		str, event type
+		str, event type (one of "all", "cb", "ex", "ke", "ki", "km",
+		"kr", "kx", "qb", "sb", "se", "si", "sm", "sr", "sx" or "uk")
 		(default: "ke" = known earthquakes)
 	:param convert_NULL:
 		Bool, whether or not to convert NULL values to zero values
@@ -183,14 +184,16 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 		'errz',
 		'errt',
 		'errM',
-		'name']
+		'name',
+		'type']
 
 	where_clause = ""
 	if id_earth:
 		where_clause += 'id_earth in (%s)' % ",".join([str(item) for item in id_earth])
 	else:
-		where_clause += 'type = "%s"' % event_type
-		where_clause += ' and is_true = 1'
+		where_clause += 'is_true = 1'
+		if event_type != "all":
+			where_clause += ' and type = "%s"' % event_type
 	if region:
 		w, e, s, n = region
 		where_clause += ' and longitude Between %f and %f' % (w, e)
@@ -239,6 +242,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 		ML, MS, MW, M = rec["ML"], rec["MS"], rec["MW"], rec["M"]
 		intensity_max, macro_radius = rec["intensity_max"], rec["macro_radius"]
 		errh, errz, errt, errM = rec["errh"], rec["errz"], rec["errt"], rec["errM"]
+		etype = rec["type"]  ## Avoid conflict with event_type parameter!
 
 		if name == lon == lat == depth == M == None:
 			continue
@@ -282,7 +286,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 
 			mb = np.nan
 
-		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, mb, name, intensity_max, macro_radius, errh, errz, errt, errM)
+		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, mb, name, intensity_max, macro_radius, errh, errz, errt, errM, event_type=etype)
 		eq_list.append(eq)
 
 	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
