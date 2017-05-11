@@ -2,13 +2,10 @@
 
 import sys, os
 
-#pythondir = "/datas2/apache/htdocs/EQMapper/python"
-#sys.path.insert(0, pythondir)
-try:
-	#import users.kris.Seismo.db.seismodb as seismodb
-	import eqcatalog.seismodb as seismodb
-except:
-	import seismodb
+pythondir = "/var/www/EQMapper/python"
+sys.path.insert(0, pythondir)
+
+import eqcatalog.seismodb as seismodb
 
 
 #Response.ContentType = "text/xml"
