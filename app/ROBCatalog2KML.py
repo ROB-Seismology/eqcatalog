@@ -5,6 +5,11 @@ import sys, os
 pythondir = "/var/www/EQMapper/python"
 sys.path.insert(0, pythondir)
 
+## Avoid matplotlib RuntimeError: Failed to create .matplotlib
+## when run from web server
+import tempfile
+os.environ['MPLCONFIGDIR'] = tempfile.mkdtemp()
+
 import eqcatalog.seismodb as seismodb
 
 
@@ -127,7 +132,7 @@ if __name__ == "__main__":
 					help="Whether or not to color earthquakes by depth")
 
 	args = parser.parse_args()
-	exit(rob_catalog_to_kml(**vars(args)))
+	print(rob_catalog_to_kml(**vars(args)))
 
 	"""
 	start_date = datetime.date(1350,1,1)
