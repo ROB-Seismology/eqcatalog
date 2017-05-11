@@ -7,7 +7,7 @@ from collections import OrderedDict
 if platform.uname()[0] == "Windows":
 	GIS_root = r"D:\GIS-data"
 else:
-	GIS_root = os.path.join(os.environ["HOME"], "gis-data")
+	GIS_root = os.path.join(os.environ.get("HOME"), "gis-data")
 
 ROB_directory = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models")
 SHARE_directory = os.path.join(GIS_root, "SHARE")
