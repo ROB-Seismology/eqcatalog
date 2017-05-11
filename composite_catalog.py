@@ -3,7 +3,8 @@
 import numpy as np
 from completeness import default_completeness
 from eqcatalog import EQCatalog, read_source_model
-import hazard.rshalib.mfd.mfd as mfd
+
+#import hazard.rshalib.mfd.mfd as mfd
 
 
 
@@ -187,6 +188,8 @@ class CompositeEQCatalog:
 		:return:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 		"""
+		import hazard.rshalib.mfd.mfd as mfd
+
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
@@ -213,6 +216,8 @@ class CompositeEQCatalog:
 		:return:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 		"""
+		import hazard.rshalib.mfd.mfd as mfd
+
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
@@ -249,6 +254,8 @@ class CompositeEQCatalog:
 			Dict, mapping zone id's (str) to instances of :class:`TruncatedGRMFD`
 			or (if num_sigma > 0) to lists of instances of :class:`TruncatedGRMFD`
 		"""
+		import hazard.rshalib.mfd.mfd as mfd
+
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_min_SCR_MFDs = self._get_min_SCR_zone_MFDs()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
@@ -341,6 +348,8 @@ class CompositeEQCatalog:
 			instances of :class:`TruncatedGRMFD` (if num_sigma == 0)
 			or list of instances of :class:`TruncatedGRMFD` (if num_sigma > 0)
 		"""
+		import hazard.rshalib.mfd.mfd as mfd
+
 		if num_sigma > 0:
 			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(method=method, num_sigma=num_sigma)
 		else:
@@ -387,6 +396,7 @@ class CompositeEQCatalog:
 			values
 		"""
 		import scipy.stats
+		import hazard.rshalib.mfd.mfd as mfd
 
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
 
@@ -509,6 +519,7 @@ class CompositeEQCatalog:
 			values
 		"""
 		import scipy.stats
+		import hazard.rshalib.mfd.mfd as mfd
 
 		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
 
@@ -663,6 +674,7 @@ class CompositeEQCatalog:
 			values
 		"""
 		import scipy.stats
+		import hazard.rshalib.mfd.mfd as mfd
 
 		zone_catalogs = self.zone_catalogs
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
