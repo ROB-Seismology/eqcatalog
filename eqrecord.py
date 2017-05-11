@@ -76,7 +76,27 @@ class LocalEarthquake:
 	:param zone:
 		Str, seismotectonic zone the earthquake belongs to (default: "")
 	"""
-	def __init__(self, ID, date, time, lon, lat, depth, mag, ML=np.nan, MS=np.nan, MW=np.nan, mb=np.nan, name="", intensity_max=None, macro_radius=None, errh=0., errz=0., errt=0., errM=0., zone=""):
+	def __init__(self,
+			ID,
+			date,
+			time,
+			lon,
+			lat,
+			depth,
+			mag,
+			ML=np.nan,
+			MS=np.nan,
+			MW=np.nan,
+			mb=np.nan,
+			name="",
+			intensity_max=None,
+			macro_radius=None,
+			errh=0.,
+			errz=0.,
+			errt=0.,
+			errM=0.,
+			zone="",
+			event_type="ke"):
 		self.ID = ID
 		if isinstance(date, datetime.date) and isinstance(time, datetime.time):
 			self.datetime = datetime.datetime.combine(date, time)
@@ -146,7 +166,9 @@ class LocalEarthquake:
 		self.errt = errt
 		# TODO: errM should be dict as well
 		self.errM = errM
-		self.zone = str(zone)
+
+		self.zone = unicode(zone)
+		self.event_type = event_type
 
 	@classmethod
 	def from_json(self, s):
@@ -165,7 +187,7 @@ class LocalEarthquake:
 		#return LocalEarthquake.__init__(self, **json.loads(s))
 
 	@classmethod
-	def from_dict(self, dct):
+	def from_dict(cls, dct):
 		"""
 		Generate instance of :class:`LocalEarthquake` from a dictionary
 
@@ -187,7 +209,7 @@ class LocalEarthquake:
 				if key[0].upper() == 'M' and len(key) == 2:
 					dct['mag'][key] = dct[key]
 					del dct[key]
-		return LocalEarthquake(**dct)
+		return cls(**dct)
 
 	def to_dict(self):
 		"""
@@ -632,6 +654,21 @@ class LocalEarthquake:
 			...
 		"""
 		return geodetic.spherical_point_at(self.lon, self.lat, distance, azimuth)
+
+	def get_rob_hash(self):
+		"""
+		Generate hash from earthquake ID as used on ROB website
+
+		:return:
+			string, hash
+		"""
+		import hashids
+		salt = "8dffaf6e-fb3a-11e5-86aa-5e5517507c66"
+		min_length = 9
+		alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
+		hi = hashids.Hashids(salt=salt, min_length=min_length, alphabet=alphabet)
+		hash = hi.encode(self.ID)
+		return hash
 
 	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", verbose=False):
 		from seismodb import query_ROB_Web_MacroCatalog
