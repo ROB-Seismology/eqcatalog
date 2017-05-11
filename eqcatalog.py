@@ -2830,6 +2830,9 @@ class EQCatalog:
 			is True) (default: 1910)
 		:param color_by_depth:
 			Bool, whether or not to color earthquakes by depth (default: False)
+
+		:return:
+			str, KML code (if :param:`kml_filespec` is not set)
 		"""
 		import mapping.kml.mykml as mykml
 
@@ -2838,10 +2841,18 @@ class EQCatalog:
 		#start_time = datetime.datetime(year, month, day)
 		start_time = datetime.datetime.now()
 		kmldoc.addTimeStamp(start_time)
+		current_year = start_time.year
+		eq_years = self.get_years()
+		eq_centuries = sorted(set((eq_years // 100) * 100))
+
+		event_types = set([eq.event_type for eq in self])
+		nt_folder = None
 
 		if time_folders:
 			hist_folder = kmldoc.addFolder("Historical", visible=False, open=False)
 			inst_folder = kmldoc.addFolder("Instrumental", visible=True, open=False)
+			if len(event_types) > 1 and "ke" in event_types:
+				nt_folder = kmldoc.addFolder("Non-tectonic", visible=True, open=False)
 
 			folder_24h = kmldoc.createFolder("Past 24 hours", visible=True, open=False)
 			inst_folder.appendChild(folder_24h)
@@ -2849,45 +2860,57 @@ class EQCatalog:
 			inst_folder.appendChild(folder_2w)
 			folder_lastyear = kmldoc.createFolder("Past year", visible=True, open=False)
 			inst_folder.appendChild(folder_lastyear)
-			folder_2000 = kmldoc.createFolder("2000 -", visible=True, open=False)
-			inst_folder.appendChild(folder_2000)
-			folder_1990 = kmldoc.createFolder("1990 - 2000", visible=True, open=False)
-			inst_folder.appendChild(folder_1990)
-			folder_1980 = kmldoc.createFolder("1980 - 1990", visible=True, open=False)
-			inst_folder.appendChild(folder_1980)
-			folder_1970 = kmldoc.createFolder("1970 - 1980", visible=True, open=False)
-			inst_folder.appendChild(folder_1970)
-			folder_1960 = kmldoc.createFolder("1960 - 1970", visible=True, open=False)
-			inst_folder.appendChild(folder_1960)
-			folder_1950 = kmldoc.createFolder("1950 - 1960", visible=True, open=False)
-			inst_folder.appendChild(folder_1950)
-			folder_1940 = kmldoc.createFolder("1940 - 1950", visible=True, open=False)
-			inst_folder.appendChild(folder_1940)
-			folder_1930 = kmldoc.createFolder("1930 - 1940", visible=True, open=False)
-			inst_folder.appendChild(folder_1930)
-			folder_1920 = kmldoc.createFolder("1920 - 1930", visible=True, open=False)
-			inst_folder.appendChild(folder_1920)
-			folder_1910 = kmldoc.createFolder("1910 - 1920", visible=True, open=False)
-			inst_folder.appendChild(folder_1910)
-			folder_1900 = kmldoc.createFolder("1900 - 1910", visible=True, open=False)
-			inst_folder.appendChild(folder_1900)
+
+			decade_folders = {}
+			for decade in range(max(instrumental_start_year, eq_years.min()), current_year, 10)[::-1]:
+				folder_name = "%d - %d" % (decade, min(current_year - 1, decade + 9))
+				decade_folder = kmldoc.createFolder(folder_name, visible=True, open=False)
+				inst_folder.appendChild(decade_folder)
+				decade_folders[decade] = decade_folder
+
+			century_folders = {}
+			last_century = ((instrumental_start_year - 1) // 100) * 100
+			for century in eq_centuries:
+				if century <= last_century:
+					folder_name = "%d - %d" % (century, min(instrumental_start_year, century + 99))
+					century_folder = kmldoc.createFolder(folder_name, visible=True, open=False)
+					hist_folder.appendChild(century_folder)
+					century_folders[century] = century_folder
+
 		else:
 			topfolder = kmldoc.addFolder("Earthquake catalog", visible=True, open=False)
+			ke_folder = topfolder
+			if len(event_types) > 1 and "ke" in event_types:
+				ke_folder = kmldoc.addFolder("Tectonic", visible=True, open=False)
+				topfolder.appendChild(ke_folder)
+				nt_folder = kmldoc.addFolder("Non-tectonic", visible=True, open=False)
+				topfolder.appendChild(nt_folder)
 
 		for eq in self:
-			if eq.datetime.year < instrumental_start_year:
-				Mtype = "MS"
-			else:
-				Mtype = "ML"
-			if time_folders:
+			if eq.event_type == "ke":
 				if eq.datetime.year < instrumental_start_year:
-					folder = hist_folder
-					visible = False
-					color = (0, 255, 0)
 					Mtype = "MS"
 				else:
-					visible = True
 					Mtype = "ML"
+			else:
+				Mtype = "ML"
+
+			if nt_folder and eq.event_type != "ke":
+				folder = nt_folder
+				visible = True
+				color = (0, 0, 0)
+				#Mtype = "ML"
+
+			elif time_folders:
+				if eq.datetime.year < instrumental_start_year:
+					century = (eq.datetime.year // 100) * 100
+					folder = century_folders[century]
+					visible = True
+					color = (0, 255, 0)
+					#Mtype = "MS"
+				else:
+					visible = True
+					#Mtype = "ML"
 					if start_time - eq.datetime <= datetime.timedelta(1, 0, 0):
 						folder = folder_24h
 						color = (255, 0, 0)
@@ -2897,38 +2920,15 @@ class EQCatalog:
 					elif start_time - eq.datetime <= datetime.timedelta(365, 0, 0):
 						folder = folder_lastyear
 						color = (255, 255, 0)
-					elif eq.datetime.year >= 2000:
-						folder = folder_2000
-						color = (192, 0, 192)
-					elif 1990 <= eq.datetime.year < 2000:
-						folder = folder_1990
-						color = (0, 0, 255)
-					elif 1980 <= eq.datetime.year < 1990:
-						folder = folder_1980
-						color = (0, 0, 255)
-					elif 1970 <= eq.datetime.year < 1980:
-						folder = folder_1970
-						color = (0, 0, 255)
-					elif 1960 <= eq.datetime.year < 1970:
-						folder = folder_1960
-						color = (0, 0, 255)
-					elif 1950 <= eq.datetime.year < 1960:
-						folder = folder_1950
-						color = (0, 0, 255)
-					elif 1940 <= eq.datetime.year < 1950:
-						folder = folder_1940
-						color = (0, 0, 255)
-					elif 1930 <= eq.datetime.year < 1940:
-						folder = folder_1930
-						color = (0, 0, 255)
-					elif 1920 <= eq.datetime.year < 1930:
-						folder = folder_1920
-						color = (0, 0, 255)
-					elif 1910 <= eq.datetime.year < 1920:
-						folder = folder_1910
-						color = (0, 0, 255)
+					else:
+						decade = (eq.datetime.year // 10) * 10
+						folder = decade_folders[decade]
+						if eq.datetime.year >= 2000:
+							color = (192, 0, 192)
+						else:
+							color = (0, 0, 255)
 			else:
-				folder = topfolder
+				folder = ke_folder
 				color = (255, 128, 0)
 				visible = True
 
@@ -2949,7 +2949,14 @@ class EQCatalog:
 					color = (255, 0, 0)
 
 			t = eq.datetime.time()
-			url = '<a href="http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d">ROB web page</a>' % eq.ID
+			#url = '<a href="http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d">ROB web page</a>' % eq.ID
+			try:
+				hash = eq.get_rob_hash()
+			except:
+				url = None
+			else:
+				url = '<a href="http://seismologie.oma.be/en/seismology/earthquakes-in-belgium/%s">ROB web page</a>' % hash
+
 			values = OrderedDict()
 			values['ID'] = eq.ID
 			try:
@@ -2964,6 +2971,8 @@ class EQCatalog:
 			values['Lon'] = eq.lon
 			values['Lat'] = eq.lat
 			values['Depth'] = eq.depth
+			if len(event_types) > 1:
+				values['Event type'] = eq.event_type
 			values[None] = url
 			name = "%s %.1f %s %s %s" % (Mtype, values[Mtype], values['Date'], values['Time'], values['Name'])
 			labelstyle = kmldoc.createLabelStyle(scale=0)
@@ -3091,7 +3100,8 @@ class EQCatalog:
 							{'name': 'errz', 'type': 'NUMERIC'},
 							{'name': 'errt', 'type': 'NUMERIC'},
 							{'name': 'errM', 'type': 'NUMERIC'},
-							{'name': 'zone', 'type': 'TEXT'}])
+							{'name': 'zone', 'type': 'TEXT'},
+							{'name': 'event_type', 'type': 'TEXT'}])
 			db.create_table(table_name, col_info)
 
 			recs = []
@@ -4001,7 +4011,7 @@ def concatenate_catalogs(catalog_list, name=""):
 	return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region, name=name)
 
 
-def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", convert_NULL=True, verbose=False, errf=None):
+def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", event_type="ke", convert_NULL=True, verbose=False, errf=None):
 	"""
 	Query ROB local earthquake catalog through the online database.
 
@@ -4036,6 +4046,9 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 		or "mag" (= "size") (default: "date")
 	:param sort_order:
 		String, sort order, either "asc" or "desc" (default: "asc")
+	:param event_type:
+		str, event type
+		(default: "ke" = known earthquakes)
 	:param convert_NULL:
 		Bool, whether or not to convert NULL values to zero values
 		(default: True)
@@ -4048,7 +4061,7 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 		instance of :class:`EQCatalog`
 	"""
 	import seismodb
-	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
+	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, event_type=event_type, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
 def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
