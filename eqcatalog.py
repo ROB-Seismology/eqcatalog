@@ -4657,7 +4657,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		instance of :class:`LayeredBasemap`
 	"""
 	from source_models import rob_source_models_dict
-	import mapping.Basemap as lbm
+	import mapping.layeredbasemap as lbm
 
 	layers = []
 
