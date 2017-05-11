@@ -50,7 +50,7 @@ import mx.DateTime as mxDateTime
 if platform.uname()[0] == "Windows":
 	GIS_root = r"D:\GIS-data"
 else:
-	GIS_root = os.path.join(os.environ.get("HOME"), "gis-data")
+	GIS_root = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
 
 
