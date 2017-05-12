@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 
 
 
@@ -142,8 +143,6 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=F
 		- a_sigma: standard deviation of a value
 		- b_sigma: standard deviation of b value
 	"""
-	from scipy import stats
-
 	## Do not consider magnitudes with zero occurrence rates
 	idxs = np.where(occurrence_rates > 0)
 	occurrence_rates = occurrence_rates[idxs]
