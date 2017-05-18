@@ -5,9 +5,13 @@ import datetime
 
 ## Add python path to allow running from cron on linux machine
 if platform.uname()[0] == "Linux":
-	pythondir = os.path.join(os.environ["HOME"], "python", "seismo")
+	home_folder = os.environ["HOME"]
+	if not home_folder:
+		home_folder = '/home/kris'
+	pythondirs = [os.path.join(home_folder, "python", folder)
+					for folder in ("seismo", "thirdparty")]
 	sys.path.insert(0, pythondir)
-	logfile = os.path.join(os.environ["HOME"], "tmp", "ROBneweq.log")
+	logfile = os.path.join(home_folder, "tmp", "ROBneweq.log")
 else:
 	logfile = r"C:\Temp\ROBneweq.log"
 
@@ -58,7 +62,10 @@ try:
 except:
 	prev_last_earthID = 0
 else:
-	prev_last_earthID = int(logf.readline())
+	try:
+		prev_last_earthID = int(logf.readline())
+	except:
+		prev_last_earthID = 0
 	logf.close()
 
 
