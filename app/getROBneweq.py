@@ -6,17 +6,15 @@ import datetime
 ## Add python path to allow running from cron on linux machine
 if platform.uname()[0] == "Linux":
 	home_folder = os.environ["HOME"]
-	if not home_folder:
-		home_folder = '/home/kris'
 	pythondirs = [os.path.join(home_folder, "python", folder)
 					for folder in ("seismo", "thirdparty")]
-	sys.path.insert(0, pythondir)
+	for pythondir in pythondirs:
+		sys.path.insert(0, pythondir)
 	logfile = os.path.join(home_folder, "tmp", "ROBneweq.log")
 else:
 	logfile = r"C:\Temp\ROBneweq.log"
 
 from thirdparty.recipes.sendmail import sendmail
-#import users.kris.Seismo.db.seismodb as seismodb
 import eqcatalog.seismodb as seismodb
 
 
