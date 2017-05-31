@@ -469,7 +469,7 @@ def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True, ver
 		ordered dict {String sourceID: dict {String column_name: value}}
 		Note: special key 'obj' contains instance of :class:`osgeo.ogr.Geometry`}
 	"""
-	from mapping.geo.readGIS import read_GIS_file
+	from mapping.geotools.readGIS import read_GIS_file
 
 	## Read zone model from MapInfo file
 	#source_model_table = ZoneModelTables[source_model_name.lower()]

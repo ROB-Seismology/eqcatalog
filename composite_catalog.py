@@ -121,7 +121,7 @@ class CompositeEQCatalog:
 			Dict, mapping zone id's (str) to surface areas (float)
 		"""
 		import osr
-		from mapping.geo.coordtrans import wgs84, get_utm_spec, get_utm_srs
+		from mapping.geotools.coordtrans import wgs84, get_utm_spec, get_utm_srs
 
 		zone_areas = dict.fromkeys(self.zone_catalogs.keys())
 		model_data = read_source_model(self.source_model_name, verbose=False)

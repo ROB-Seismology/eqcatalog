@@ -59,7 +59,7 @@ from eqrecord import LocalEarthquake
 from source_models import read_source_model
 from completeness import *
 from time_functions import timespan
-import mapping.geo.geodetic as geodetic
+import mapping.geotools.geodetic as geodetic
 
 
 
@@ -440,7 +440,7 @@ class EQCatalog:
 		:return:
 			List with (easting, northing) tuples
 		"""
-		import mapping.geo.coordtrans as coordtrans
+		import mapping.geotools.coordtrans as coordtrans
 		lons, lats = self.get_longitudes(), self.get_latitudes()
 		coord_list = zip(lons, lats)
 		if proj == "lambert1972":
@@ -4094,7 +4094,7 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	from mapping.geo.readGIS import read_GIS_file
+	from mapping.geotools.readGIS import read_GIS_file
 
 	data = read_GIS_file(gis_filespec, verbose=verbose)
 	eq_list = []

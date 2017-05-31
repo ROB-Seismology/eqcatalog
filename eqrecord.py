@@ -13,7 +13,7 @@ import numpy as np
 import mx.DateTime as mxDateTime
 
 ## Import ROB modules
-import mapping.geo.geodetic as geodetic
+import mapping.geotools.geodetic as geodetic
 import msc
 from time_functions import fractional_year
 
