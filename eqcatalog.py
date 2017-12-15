@@ -1279,6 +1279,10 @@ class EQCatalog:
 		:return:
 			numpy float array, completeness timespans (fractional years)
 		"""
+		if not completeness:
+			min_date = self.start_date
+			min_mag = np.min(magnitudes)
+			completeness = Completeness([min_date], [min_mag], Mtype="MW")
 		return completeness.get_completeness_timespans(magnitudes, self.end_date)
 
 	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default", completeness=default_completeness, trim=False, verbose=True):
