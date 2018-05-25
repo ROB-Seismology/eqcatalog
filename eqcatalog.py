@@ -3187,8 +3187,11 @@ class EQCatalog:
 		eq_list = list(compress(self.eq_list, distances <= distance))
 		if not catalog_name:
 			catalog_name = self.name + " (%s km radius from %s)" % (distance, point)
-		region = self.get_bbox()
-		return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
+		lons, lats = geodetic.spherical_point_at(*point, distance=distance*1000,
+												azimuth=np.arange(0, 360, 90))
+		region = (lons.min(), lons.max(), lats.min(), lats.max())
+		subcat = EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
+		return subcat
 
 	def subselect_polygon(self, poly_obj, catalog_name=""):
 		"""
