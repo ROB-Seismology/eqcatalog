@@ -160,6 +160,38 @@ class EQCatalog:
 		depths = depths[np.isfinite(depths)]
 		print("Depth range %.1f - %.1f km" % (depths.min(), depths.max()))
 
+	def print_list(self):
+		"""
+		Print list of earthquakes in catalog
+		"""
+		try:
+			from prettytable import PrettyTable
+		except:
+			has_prettytable = False
+		else:
+			has_prettytable = True
+
+		col_names = ["ID", "Date", "Time", "Name", "Lon", "Lat", "Depth", "ML", "MS", "MW"]
+		if has_prettytable:
+			tab = PrettyTable(col_names)
+		else:
+			tab = []
+		for eq in self.eq_list:
+			row = [eq.ID, eq.date, eq.time, eq.name,
+					"%.4f" % eq.lon, "%.4f" % eq.lat, "%.1f" % eq.depth,
+					"%.1f" % eq.ML, "%.1f" % eq.MS, "%.1f" % eq.MW]
+			if has_prettytable:
+				tab.add_row(row)
+			else:
+				tab.append(row)
+
+		if has_prettytable:
+			print(tab)
+		else:
+			print '\t'.join(col_names)
+			for row in tab:
+				print '\t'.join(row)
+
 	def get_record(self, ID):
 		"""
 		Fetch record with given ID
@@ -812,6 +844,9 @@ class EQCatalog:
 			return dc, tc
 		else:
 			return dc
+
+		# TODO: implement get_dependent_events, get_foreshocks, get_aftershocks
+		# methods in LocalEarthquake class
 
 	def subselect_completeness(self, completeness=default_completeness, Mtype="MW", Mrelation="default", catalog_name="", verbose=True):
 		"""
