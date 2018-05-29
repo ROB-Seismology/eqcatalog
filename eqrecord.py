@@ -678,6 +678,10 @@ class LocalEarthquake:
 		from seismodb import query_ROB_Official_MacroCatalog
 		return query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val, group_by_main_village=group_by_main_village, agg_function=agg_function, verbose=verbose)
 
+	def get_macroseismic_enquiries(self, min_fiability=20, verbose=False):
+		from seismodb import query_ROB_Web_enquiries
+		return query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability, verbose=verbose)
+
 	def get_focal_mechanism(self, verbose=False):
 		from seismodb import query_ROB_FocalMechanisms
 		try:
@@ -695,18 +699,25 @@ class MacroseismicRecord:
 	"""
 	Container class to hold information of records retrieved from the macrocatalog database table.
 	Currently has the following properties:
+		id_earth
 		id_com
 		I
 		lon
 		lat
 		num_replies
 	"""
-	def __init__(self, id_com, I, num_replies=1, lon=0, lat=0):
+	def __init__(self, id_earth, id_com, I, num_replies=1, lon=0, lat=0):
+		self.id_earth = id_earth
 		self.id_com = id_com
 		self.I = I
 		self.num_replies = num_replies
 		self.lon = lon
 		self.lat = lat
+
+	def get_enquiries(self, min_fiability=20, verbose=False):
+		from seismodb import query_ROB_Web_enquiries
+		return query_ROB_Web_enquiries(self.id_earth, id_com=self.id_com,
+								min_fiability=min_fiability, verbose=verbose)
 
 
 #class FocMecRecord(LocalEarthquake, MT.FaultGeometry):
