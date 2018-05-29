@@ -18,7 +18,8 @@ import msc
 from time_functions import fractional_year
 
 
-__all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord"]
+__all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord",
+			"MacroseismicDataPoint", "MacroseismicEnquiryEnsemble"]
 
 # TODO: allow nan values instead of zeros
 
@@ -746,3 +747,56 @@ class FocMecRecord(LocalEarthquake):
 	#property(focmec, get_focmec)
 
 
+class MacroseismicEnquiryEnsemble():
+	"""
+	:param id_earth:
+		int, ID of earthquake in ROB database
+	:param recs:
+		list of dicts representing enquiries from the database
+	"""
+	def __init__(self, id_earth, recs):
+		self.id_earth = id_earth
+		self.recs = recs
+		self._gen_arrays()
+
+	def __len__(self):
+		return len(self.recs)
+
+	def __iter__(self):
+		return self.recs.__iter__()
+
+	def _gen_arrays(self):
+		for prop in ["felt", "asleep", "noise", "duration"]:
+			ar = np.array([rec[prop] for rec in forms], dtype='float')
+			setattr(self, prop, ar)
+
+	def plot_histogram(self, prop, fig_filespec=None):
+		pylab.clf()
+		ar = getattr(self, prop)
+
+		if prop in ("asleep", "noise"):
+			bins = np.arange(np.nanmin(ar) - 0.5, np.nanmax(ar) + 1.5)
+			range = (np.nanmin(ar), np.nanmax(ar) + 1.5)
+			ticks = bins[:-1] + 0.5
+			print pylab.histogram(ar[self.felt == 1], bins=bins, range=range)
+			pylab.hist(ar, bins=bins, range=range)
+
+		elif prop == "duration":
+			print(np.nanmin(ar[ar>0]), np.nanmean(ar[ar>0]), np.nanmax(ar[ar>0]))
+			bins = np.arange(21)
+			ticks = None
+			pylab.hist(ar[ar>0], bins=bins)
+
+		else:
+			print("Don't know how to plot %s" % prop)
+			return
+
+		pylab.title(prop.title())
+		#pylab.xlim(xmin=-0.5)
+		if not ticks is None:
+			pylab.xticks(ticks)
+
+		if fig_filespec:
+			pylab.savefig(fig_filespec)
+		else:
+			pylab.show()
