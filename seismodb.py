@@ -34,7 +34,10 @@ from eqcatalog import EQCatalog
 
 
 
-__all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord", "query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID", "query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog", "query_ROB_Web_MacroCatalog", "get_last_earthID"]
+__all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord",
+			"query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID",
+			"query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog",
+			"query_ROB_Web_MacroCatalog", "get_last_earthID", "query_ROB_Web_enquiries"]
 
 
 def query_seismodb_table_generic(query, verbose=False, errf=None):
@@ -521,7 +524,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
-		macro_info[id_com] = MacroseismicRecord(id_com, I, num_replies=1, lon=lon, lat=lat)
+		macro_info[id_com] = MacroseismicRecord(id_earth, id_com, I, num_replies=1, lon=lon, lat=lat)
 
 	return macro_info
 
@@ -590,7 +593,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 
 
 def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
-					min_val=1, min_fiability=10.0, group_by_main_village=False,
+					min_val=1, min_fiability=20.0, group_by_main_village=False,
 					agg_function="average", verbose=False, errf=None):
 	"""
 	Query ROB web macroseismic catalog (= online inquiries)
@@ -608,7 +611,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		(default: 1)
 	:param min_fiability:
 		float, minimum fiability of enquiry
-		(default: 10.)
+		(default: 20.)
 	:param group_by_main_village:
 		bool, whether or not to aggregate the results by main village
 		(default: False)
@@ -667,7 +670,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
-		macro_info[id_com] = MacroseismicRecord(id_com, I, num_replies=1, lon=lon, lat=lat)
+		macro_info[id_com] = MacroseismicRecord(id_earth, id_com, I, num_replies=1, lon=lon, lat=lat)
 
 	return macro_info
 
@@ -756,6 +759,32 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 
 	return macro_info
 	"""
+
+
+def query_ROB_Web_enquiries(id_earth, id_com=None, zip_code=None, min_fiability=20,
+							verbose=False, errf=None):
+	"""
+	:param min_fiability:
+		float, minimum fiability of enquiry
+		(default: 20.)
+	"""
+	table_clause = ['web_input', 'web_analyse']
+
+	where_clause = 'web_analyse.id_earth = %d' % id_earth
+	where_clause += ' AND web_input.id_web=web_analyse.id_web'
+	where_clause += ' AND web_analyse.m_fiability > %.1f' % float(min_fiability)
+	where_clause += ' AND web_analyse.deleted = false'
+	if id_com is not None:
+		where_clause += ' AND web_analyse.id_com=%d' % id_com
+	elif zip_code:
+		where_clause += ' AND web_input.zip=%d' % zip_code
+
+	if errf !=None:
+		errf.write("Querying KSB-ORB web macroseismic enquiries:\n")
+
+	## Fetch records
+	return query_seismodb_table(table_clause, where_clause=where_clause,
+								verbose=verbose, errf=errf)
 
 
 def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
