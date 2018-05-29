@@ -19,7 +19,13 @@ import eqcatalog.seismodb as seismodb
 
 
 ## Users
-USERS = [dict(email="kris.vanneste@oma.be", tel="+32473499229")]
+USERS = [dict(name="Kris", email="kris.vanneste@oma.be", tel="+32473499229"),
+		dict(name="Thomas", tel="+32496952990"),
+		dict(name="Michel", email="mvc@oma.be", tel="+32473518241"),
+		dict(name="Fabienne", tel="+32497430189"),
+		dict(name="Bart", email="bart.vleminckx@outlook.com", tel="+32495943247"),
+		dict(name="Henri", email="henri.martin.skq@gmail.com", tel="+32487615250"),
+		dict(name="Koen Van Noten", email="koen.vannoten@gmail.com", tel="+32486056357")]
 
 
 ## Mail settings
@@ -27,7 +33,7 @@ mailserverURL = "smtp.oma.be"
 sender = "seismo@oma.be"
 #recipients = ["kris.vanneste@proximus.be", "kris.vanneste@oma.be"]
 recipients = ["smsmail@oma.be"]
-subject = ', '.join([user['tel'] for user in USERS])
+subject = ', '.join([user['tel'] for user in USERS if user.has_key('tel')])
 
 
 def construct_msg(eq):
@@ -80,7 +86,9 @@ if last_earthID != prev_last_earthID:
 		if last_eq.name != None and last_eq.ML >= 1.0:
 			mail_body = construct_msg(last_eq)
 			sendmail(mailserverURL, sender, recipients, subject=subject, text=mail_body)
-			sendmail(mailserverURL, sender, [user['email'] for user in USERS], subject="ROB New Earthquake", text=mail_body)
+			sendmail(mailserverURL, sender,
+					[user['email'] for user in USERS if user.has_key('email')],
+					subject="ROB New Earthquake", text=mail_body)
 			logf = open(logfile, "w")
 			logf.write("%d\n" % last_earthID)
 			logf.close()
