@@ -671,7 +671,7 @@ class LocalEarthquake:
 		hash = hi.encode(self.ID)
 		return hash
 
-	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=10.0, group_by_main_village=False, agg_function="", verbose=False):
+	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=20.0, group_by_main_village=False, agg_function="", verbose=False):
 		from seismodb import query_ROB_Web_MacroCatalog
 		return query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, agg_function=agg_function, verbose=verbose)
 
@@ -681,7 +681,8 @@ class LocalEarthquake:
 
 	def get_macroseismic_enquiries(self, min_fiability=20, verbose=False):
 		from seismodb import query_ROB_Web_enquiries
-		return query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability, verbose=verbose)
+		recs = query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability, verbose=verbose)
+		return MacroseismicEnquiryEnsemble(self.ID, recs)
 
 	def get_focal_mechanism(self, verbose=False):
 		from seismodb import query_ROB_FocalMechanisms
@@ -717,8 +718,9 @@ class MacroseismicRecord:
 
 	def get_enquiries(self, min_fiability=20, verbose=False):
 		from seismodb import query_ROB_Web_enquiries
-		return query_ROB_Web_enquiries(self.id_earth, id_com=self.id_com,
+		recs = query_ROB_Web_enquiries(self.id_earth, id_com=self.id_com,
 								min_fiability=min_fiability, verbose=verbose)
+		return MacroseismicEnquiryEnsemble(self.id_earth, recs)
 
 
 #class FocMecRecord(LocalEarthquake, MT.FaultGeometry):
@@ -767,19 +769,41 @@ class MacroseismicEnquiryEnsemble():
 
 	def _gen_arrays(self):
 		for prop in ["felt", "asleep", "noise", "duration"]:
-			ar = np.array([rec[prop] for rec in forms], dtype='float')
+			ar = np.array([rec[prop] for rec in self.recs], dtype='float')
 			setattr(self, prop, ar)
 
 	def plot_histogram(self, prop, fig_filespec=None):
+		import pylab
+
 		pylab.clf()
 		ar = getattr(self, prop)
 
 		if prop in ("asleep", "noise"):
-			bins = np.arange(np.nanmin(ar) - 0.5, np.nanmax(ar) + 1.5)
+			bins = np.sort(np.unique(ar))
+			bin_edges = np.arange(bins[0] - 0.5, bins[-1] + 1.5)
+			print bins, bin_edges
 			range = (np.nanmin(ar), np.nanmax(ar) + 1.5)
-			ticks = bins[:-1] + 0.5
-			print pylab.histogram(ar[self.felt == 1], bins=bins, range=range)
-			pylab.hist(ar, bins=bins, range=range)
+			#ticks = bins[:-1] + 0.5
+			#pylab.hist(ar[self.felt == 1], bins=bin_edges, range=range)
+			#pylab.xlim(xmin=-0.5)
+			#if not ticks is None:
+			#	pylab.xticks(ticks)
+
+			sizes, bin_edges = pylab.histogram(ar[ar != np.nan], bins=bin_edges, range=range)
+			#sizes = np.bincount(ar.astype('int'))
+			print bins, sizes
+			colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
+			labels = ["%d" % b for b in bins]
+			pylab.pie(sizes, colors=colors, labels=labels, autopct='%1.1f%%',
+						startangle=90)
+			#draw circle
+			#centre_circle = pylab.Circle((0,0), 0.70, fc='white')
+			#fig = pylab.gcf()
+			#fig.gca().add_artist(centre_circle)
+
+			# Equal aspect ratio ensures that pie is drawn as a circle
+			pylab.axis('equal')
+			pylab.tight_layout()
 
 		elif prop == "duration":
 			print(np.nanmin(ar[ar>0]), np.nanmean(ar[ar>0]), np.nanmax(ar[ar>0]))
@@ -792,9 +816,6 @@ class MacroseismicEnquiryEnsemble():
 			return
 
 		pylab.title(prop.title())
-		#pylab.xlim(xmin=-0.5)
-		if not ticks is None:
-			pylab.xticks(ticks)
 
 		if fig_filespec:
 			pylab.savefig(fig_filespec)
