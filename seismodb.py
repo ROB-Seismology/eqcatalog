@@ -629,12 +629,13 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
 	"""
 	## Construct SQL query
-	table_clause = ['web_analyse', 'communes']
+	table_clause = ['web_analyse', 'web_input', 'communes']
 
 	if group_by_main_village:
 		group_clause = 'communes.id_main'
 	else:
-		group_clause = "web_analyse.id_com"
+		#group_clause = "web_analyse.id_com"
+		group_clause = "communes.id"
 
 	column_clause = [
 		group_clause + ' as id_com',
@@ -651,7 +652,11 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	where_clause = 'web_analyse.id_earth = %d' % id_earth
 	where_clause += ' and web_analyse.m_fiability >= %.1f' % float(min_fiability)
 	where_clause += ' and web_analyse.deleted = false'
-	where_clause += ' and web_analyse.id_com = communes.id'
+	where_clause += ' and web_analyse.id_web = web_input.id_web'
+	## Hack to include enquiries where ZIP code is given but not matched in web_analyse
+	where_clause += ' and ((web_analyse.id_com != 0 and web_analyse.id_com = communes.id)'
+	where_clause += ' or (web_input.zip = communes.code_p and communes.id = communes.id_main))'
+	#where_clause += ' and id_com LIKE CASE WHEN web_analyse.id_com = 0 THEN
 
 	having_clause = 'Num_Replies >= %d' % min_replies
 	if query_info.lower() in ("cii", "manual_intensity"):
