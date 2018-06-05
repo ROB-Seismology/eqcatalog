@@ -630,8 +630,14 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	"""
 	## Construct SQL query
 	table_clause = ['web_analyse', 'communes']
+
+	if group_by_main_village:
+		group_clause = 'communes.id_main'
+	else:
+		group_clause = "web_analyse.id_com"
+
 	column_clause = [
-		'web_analyse.id_com',
+		group_clause + ' as id_com',
 		'COUNT(*) as "Num_Replies"',
 		'communes.longitude',
 		'communes.latitude']
@@ -642,13 +648,8 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	elif query_info.lower() == "cii":
 		column_clause.append('%s(web_analyse.CII) as "Intensity"' % agg_function)
 
-	if group_by_main_village:
-		group_clause = 'communes.id_main'
-	else:
-		group_clause = "web_analyse.id_com"
-
 	where_clause = 'web_analyse.id_earth = %d' % id_earth
-	where_clause += ' and web_analyse.m_fiability > %.1f' % float(min_fiability)
+	where_clause += ' and web_analyse.m_fiability >= %.1f' % float(min_fiability)
 	where_clause += ' and web_analyse.deleted = false'
 	where_clause += ' and web_analyse.id_com = communes.id'
 
@@ -670,7 +671,9 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
-		macro_info[id_com] = MacroseismicRecord(id_earth, id_com, I, num_replies=1, lon=lon, lat=lat)
+		num_replies = rec['Num_Replies']
+		macro_info[id_com] = MacroseismicRecord(id_earth, id_com, I,
+									num_replies=num_replies, lon=lon, lat=lat)
 
 	return macro_info
 
