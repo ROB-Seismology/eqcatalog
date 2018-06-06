@@ -65,9 +65,9 @@ def query_seismodb_table_generic(query, verbose=False, errf=None):
 									verbose=verbose, errf=errf)
 
 
-def query_seismodb_table(table_clause, column_clause="*", where_clause="",
-						having_clause="", order_clause="", group_clause="",
-						verbose=False, errf=None):
+def query_seismodb_table(table_clause, column_clause="*", join_clause="",
+						where_clause="", having_clause="", order_clause="",
+						group_clause="", verbose=False, errf=None):
 	"""
 	Query seismodb table using clause components
 
@@ -75,6 +75,9 @@ def query_seismodb_table(table_clause, column_clause="*", where_clause="",
 		str or list of strings, name(s) of database table(s)
 	:param column_clause:
 		str or list of strings, column clause or list of columns (default: "*")
+	:param join_clause:
+		str or list of (join_type, table_name, condition) tuples,
+		join clause (default: "")
 	:param where_clause:
 		str, where clause (default: "")
 	:param having_clause:
@@ -91,7 +94,7 @@ def query_seismodb_table(table_clause, column_clause="*", where_clause="",
 	:return:
 		generator object, yielding a dictionary for each record
 	"""
-	query = build_sql_query(table_clause, column_clause, where_clause,
+	query = build_sql_query(table_clause, column_clause, join_clause, where_clause,
 							having_clause, order_clause, group_clause)
 
 	return query_seismodb_table_generic(query, verbose=verbose, errf=errf)
@@ -629,19 +632,28 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
 	"""
 	## Construct SQL query
-	table_clause = ['web_analyse', 'web_input', 'communes']
+	table_clause = ['web_analyse']
+
+	## Hack to include enquiries where ZIP code is given but not matched in web_analyse
+	join_clause = [('JOIN', 'web_input', 'web_analyse.id_web = web_input.id_web'),
+				('LEFT JOIN', 'communes comm1', 'web_analyse.id_com != 0  AND web_analyse.id_com = comm1.id'),
+				('LEFT JOIN', 'communes comm2', 'web_analyse.id_com = 0 AND web_input.zip = comm2.code_p AND comm2.id = comm2.id_main')]
 
 	if group_by_main_village:
-		group_clause = 'communes.id_main'
+		column_clause = ['COALESCE(comm1.id_main, comm2.id_main) AS id_comm']
 	else:
+		column_clause = ['COALESCE(comm1.id, comm2.id) AS id_comm']
+	#	group_clause = 'communes.id_main'
+	#else:
 		#group_clause = "web_analyse.id_com"
-		group_clause = "communes.id"
 
-	column_clause = [
-		group_clause + ' as id_com',
-		'COUNT(*) as "Num_Replies"',
-		'communes.longitude',
-		'communes.latitude']
+	column_clause += [
+		'COUNT(*) as "num_replies"',
+		'COALESCE(comm1.longitude, comm2.longitude) AS lon',
+		'COALESCE(comm1.latitude, comm2.latitude) AS lat',
+		'GROUP_CONCAT(web_input.id_web SEPARATOR ",") AS id_web']
+
+	group_clause = "id_comm"
 
 	agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "AVG")
 	if query_info.lower() == "manual_intensity":
@@ -652,17 +664,12 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	where_clause = 'web_analyse.id_earth = %d' % id_earth
 	where_clause += ' and web_analyse.m_fiability >= %.1f' % float(min_fiability)
 	where_clause += ' and web_analyse.deleted = false'
-	where_clause += ' and web_analyse.id_web = web_input.id_web'
-	## Hack to include enquiries where ZIP code is given but not matched in web_analyse
-	where_clause += ' and ((web_analyse.id_com != 0 and web_analyse.id_com = communes.id)'
-	where_clause += ' or (web_input.zip = communes.code_p and communes.id = communes.id_main))'
-	#where_clause += ' and id_com LIKE CASE WHEN web_analyse.id_com = 0 THEN
 
-	having_clause = 'Num_Replies >= %d' % min_replies
+	having_clause = 'num_replies >= %d' % min_replies
 	if query_info.lower() in ("cii", "manual_intensity"):
 		having_clause += ' and Intensity >= %d' % min_val
 
-	order_clause = ''
+	order_clause = 'num_replies DESC'
 
 	if errf !=None:
 		errf.write("Querying KSB-ORB web macroseismic catalog:\n")
@@ -670,15 +677,17 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	## Fetch records
 	macro_info = {}
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
-					where_clause=where_clause, having_clause=having_clause,
-					order_clause=order_clause, group_clause=group_clause,
-					verbose=verbose, errf=errf):
-		id_com = rec['id_com']
+					join_clause=join_clause, where_clause=where_clause,
+					having_clause=having_clause, order_clause=order_clause,
+					group_clause=group_clause, verbose=verbose, errf=errf):
+		id_com = rec['id_comm']
 		I = rec['Intensity']
-		lon, lat = rec['longitude'], rec['latitude']
-		num_replies = rec['Num_Replies']
+		lon, lat = rec['lon'], rec['lat']
+		num_replies = rec['num_replies']
+		web_ids = map(int, rec['id_web'].split(','))
 		macro_info[id_com] = MacroseismicRecord(id_earth, id_com, I,
-									num_replies=num_replies, lon=lon, lat=lat)
+									num_replies=num_replies, lon=lon, lat=lat,
+									web_ids=web_ids)
 
 	return macro_info
 
