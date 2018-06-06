@@ -708,13 +708,14 @@ class MacroseismicRecord:
 		lat
 		num_replies
 	"""
-	def __init__(self, id_earth, id_com, I, num_replies=1, lon=0, lat=0):
+	def __init__(self, id_earth, id_com, I, num_replies=1, lon=0, lat=0, web_ids=[]):
 		self.id_earth = id_earth
 		self.id_com = id_com
 		self.I = I
 		self.num_replies = num_replies
 		self.lon = lon
 		self.lat = lat
+		self.web_ids = web_ids
 
 	def get_enquiries(self, min_fiability=20, verbose=False):
 		from seismodb import query_ROB_Web_enquiries
