@@ -3290,6 +3290,8 @@ class EQCatalog:
 				lons = zone_catalog.get_longitudes()
 				lats = zone_catalog.get_latitudes()
 				eq_list = zone_catalog.eq_list
+			else:
+				raise Exception("poly_obj not recognized!")
 
 		if len(eq_list):
 			region = (min(lons), max(lons), min(lats), max(lats))
