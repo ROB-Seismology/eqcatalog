@@ -16,7 +16,8 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 				graticule_interval=(1, 1), min_replies=3, query_info="cii", min_val=1,
 				min_fiability=20.0, group_by_main_village=False, agg_function="average",
 				round_function="floor", symbol_style=None, cmap="rob",
-				color_gradient="discontinuous", title="", verbose=True):
+				color_gradient="discontinuous", event_style="default",
+				radii=[], title="", verbose=True):
 	"""
 	:param round_func:
 		str, "floor", "round" or "ceil"
@@ -103,8 +104,9 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 			#exit()
 
 	colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d", title=cb_title)
+	#colorbar_style = None
 	tfc.colorbar_style = colorbar_style
-	thematic_legend_style = lbm.LegendStyle()
+	thematic_legend_style = lbm.LegendStyle(location=1)
 
 	if not symbol_style:
 		## Plot polygons
@@ -140,6 +142,30 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 	province_layer = lbm.MapLayer(data, gis_style, legend_label={"polygons": ""})
 	layers.append(province_layer)
 
+	## Plot event
+	if event_style == "default":
+		label_style = lbm.TextStyle(font_size=9)
+		event_style = lbm.PointStyle('*', size=14, fill_color='magenta',
+								line_color=None, label_style=label_style)
+	if event_style:
+		#label = "%s - ML=%.1f" % (eq.date.isoformat(), eq.ML)
+		label = ""
+		event_data = lbm.PointData(eq.lon, eq.lat, label=label)
+		event_layer = lbm.MapLayer(event_data, event_style, legend_label="Epicenter")
+		layers.append(event_layer)
+
+	## Plot radii around epicenter
+	if radii:
+		color = "brown"
+		if event_style and event_style.fill_color:
+			color = event_style.fill_color
+		n = len(radii)
+		circle_data = lbm.CircleData([eq.lon]*n, [eq.lat]*n, radii)
+		circle_style = lbm.LineStyle(line_width=1, line_color=color)
+		circle_layer = lbm.MapLayer(circle_data, circle_style,
+									legend_label="%s-km radius" % radii)
+		layers.append(circle_layer)
+
 	map = lbm.LayeredBasemap(layers, title, projection, region=region,
 							graticule_interval=graticule_interval)
 	fig_filespec = None
@@ -160,11 +186,13 @@ if __name__ == "__main__":
 	min_fiability = 20
 	group_by_main_village = False
 	color_gradient = "discontinuous"
-	symbol_style = lbm.PointStyle(shape='D', size=5)
-	#symbol_style = None
+	#symbol_style = lbm.PointStyle(shape='D', size=5)
+	symbol_style = None
+	radii = [10, 25, 50]
 	title = "Kinrooi 25/05/2018"
 	plot_macroseismic_map(id_earth, region=region, projection=projection,
 					graticule_interval=graticule_interval, min_replies=min_replies,
 					query_info=query_info, min_fiability=min_fiability,
 					color_gradient=color_gradient, symbol_style=symbol_style,
-					group_by_main_village=group_by_main_village, title=title)
+					group_by_main_village=group_by_main_village, radii=radii,
+					title=title)
