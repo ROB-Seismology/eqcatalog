@@ -86,8 +86,9 @@ def create_buffer_polygon(gis_file, buffer_distance, show_plot=False):
 	buffer_pg.lons = lons
 	buffer_pg.lats = lats
 
-	#pylab.plot(buffer_pg.lons, buffer_pg.lats)
-	#pylab.show()
+	if show_plot:
+		pylab.plot(buffer_pg.lons, buffer_pg.lats)
+		pylab.show()
 
 	return buffer_pg.to_ogr_geom()
 
@@ -140,9 +141,11 @@ cc_catalog.name = "ROB Catalog 1350-2014 (declustered)"
 #cc_catalog = cc_catalog.sort()
 print("Catalog: n=%d, Mmax=%.1f" % (len(raw_catalog), raw_catalog.get_Mmax(Mtype=Mtype,
 										Mrelation=Mrelation)))
+cc_catalog.print_list()
 
 ## Construct MFD
-mag_bins = np.arange(Mmin_mfd, Mmax, mfd_bin_width)
+num_bins = int(round((Mmax - Mmin_mfd) / mfd_bin_width)) + 1
+mag_bins = np.linspace(Mmin_mfd, Mmax, num_bins)
 inc_numbers = np.zeros_like(mag_bins)
 elapsed_years = np.zeros_like(mag_bins)
 
@@ -152,12 +155,21 @@ for m, mag in enumerate(mag_bins):
 	subcatalog = cc_catalog.subselect(Mmin=mag, Mmax=mag+mfd_bin_width-1E-5,
 									Mtype=Mtype, Mrelation=Mrelation)
 	buffer_distance = get_declustering_distance(mag, dist_window)
-	buffer_pg = create_buffer_polygon(gis_file, buffer_distance)
+	show_plot = False
+	#if m == len(mag_bins) - 1:
+	#if mag == 5.3:
+	#	show_plot = True
+	buffer_pg = create_buffer_polygon(gis_file, buffer_distance, show_plot=show_plot)
 	subcatalog = subcatalog.subselect_polygon(buffer_pg)
 	subcatalog = subcatalog.sort()
+	if 987 in [eq.ID for eq in subcatalog]:
+		print("  Roermond in catalog!")
 	inc_numbers[m] = len(subcatalog)
 	if len(subcatalog):
 		et = end_date.year + 1 - subcatalog.get_fractional_years()[-1]
+		last_eq = subcatalog[-1]
+		print("%s - %s - ML=%.1f, MS=%.1f, MW=%.1f" % (last_eq.datetime.isoformat(),
+				last_eq.name, last_eq.ML, last_eq.MS, last_eq.MW))
 	else:
 		et = np.nan
 	elapsed_years[m] = et
@@ -170,8 +182,8 @@ inc_freqs = inc_numbers / bins_timespans
 observed_mfd = rshalib.mfd.EvenlyDiscretizedMFD(Mmin_mfd+mfd_bin_width/2,
 											mfd_bin_width, inc_freqs, Mtype)
 ## wLSQc fit is better for lower magnitudes
-#fit_method = "Weichert"
-fit_method = "wLSQc"
+fit_method = "Weichert"
+#fit_method = "wLSQc"
 fitted_mfd = observed_mfd.to_truncated_GR_mfd(completeness, end_date, method=fit_method)
 fitted_mfd.print_report()
 
@@ -196,7 +208,7 @@ fitted_mfd = observed_mfd.to_truncated_GR_mfd(completeness, end_date, method="We
 sigma_mfd1 = fitted_mfd.get_mfd_from_b_val(fitted_mfd.b_val + fitted_mfd.b_sigma)
 sigma_mfd2 = fitted_mfd.get_mfd_from_b_val(fitted_mfd.b_val - fitted_mfd.b_sigma)
 
-col_names = ["Magnitude", "Return period (yr)", "Elapsed time (yr)", "P (Poisson)", "P (time-dep)"]
+col_names = ["Magnitude", "Return period", "Elapsed time", "P (Poisson)", "P (time-dep)"]
 tab_inc = PrettyTable(col_names)
 tab_cumul = PrettyTable(col_names)
 
@@ -245,7 +257,7 @@ for scen_mag in scenario_mags:
 			"%.5f" % Pcond_inc]
 	tab_inc.add_row(row)
 
-	row = ["%.1f" % scen_mag,
+	row = [">=%.1f" % scen_mag,
 			"%.1f +/- %.1f" % (Tcumul, Tcumul_sigma),
 			"%.1f" % ET,
 			"%.5f" % Ppois_cumul,
@@ -253,8 +265,8 @@ for scen_mag in scenario_mags:
 	tab_cumul.add_row(row)
 
 
-print("Using incremental rates:")
-print(tab_inc)
-print()
+#print("Using incremental rates:")
+#print(tab_inc)
+#print()
 print("Using cumulative rates:")
 print(tab_cumul)
