@@ -24,14 +24,6 @@ import numpy as np
 ## Import ROB modules
 from db.simpledb import (build_sql_query, query_mysql_db_generic)
 
-#import eqrecord
-#reload(eqrecord)
-from eqrecord import LocalEarthquake, MacroseismicRecord, FocMecRecord
-
-#import eqcatalog
-#reload(eqcatalog)
-from eqcatalog import EQCatalog
-
 
 
 __all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord",
@@ -60,6 +52,13 @@ def query_seismodb_table_generic(query, verbose=False, errf=None):
 		from seismodb_secrets import port
 	except:
 		port = 3306
+
+	## Avoid Warning: Row XXX was cut by GROUP_CONCAT()
+	## For 32bit systems, the maximum value is 4294967295
+	if "GROUP_CONCAT" in query.upper():
+		query0 = 'SET SESSION group_concat_max_len=4294967295'
+		query_mysql_db_generic(database, host, user, passwd, query0, port=port,
+									verbose=verbose, errf=errf)
 
 	return query_mysql_db_generic(database, host, user, passwd, query, port=port,
 									verbose=verbose, errf=errf)
@@ -153,6 +152,9 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 	:return:
 		instance of :class:`EQCatalog`
 	"""
+	from eqrecord import LocalEarthquake
+	from eqcatalog import EQCatalog
+
 	## Convert input arguments, if necessary
 	if isinstance(id_earth, (int, long)):
 		id_earth = [id_earth]
@@ -339,6 +341,8 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 	:return:
 		list with instances of :class:`FocMecRecord`
 	"""
+	from eqrecord import FocMecRecord
+
 	if type(id_earth) in (type(1), type(1L)):
 		id_earth = [id_earth]
 
@@ -473,6 +477,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 	:return:
 		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
 	"""
+	from macrorecord import MacroseismicRecord
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
@@ -607,7 +612,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		int, minimum number of replies
 		(default: 3)
 	:param query_info:
-		str, either "cii" or "manual_intensity"
+		str, either "cii", "cdi" or "mi"
 		(default: "cii")
 	:param min_val:
 		float, minimum intensity to return
@@ -631,21 +636,20 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	:return:
 		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
 	"""
+	from macrorecord import MacroseismicRecord
+
 	## Construct SQL query
 	table_clause = ['web_analyse']
 
 	## Hack to include enquiries where ZIP code is given but not matched in web_analyse
 	join_clause = [('JOIN', 'web_input', 'web_analyse.id_web = web_input.id_web'),
 				('LEFT JOIN', 'communes comm1', 'web_analyse.id_com != 0  AND web_analyse.id_com = comm1.id'),
-				('LEFT JOIN', 'communes comm2', 'web_analyse.id_com = 0 AND web_input.zip = comm2.code_p AND comm2.id = comm2.id_main')]
+				('LEFT JOIN', 'communes comm2', 'web_analyse.id_com = 0 AND web_input.zip = comm2.code_p AND web_input.country = comm2.country AND comm2.id = comm2.id_main')]
 
 	if group_by_main_village:
 		column_clause = ['COALESCE(comm1.id_main, comm2.id_main) AS id_comm']
 	else:
 		column_clause = ['COALESCE(comm1.id, comm2.id) AS id_comm']
-	#	group_clause = 'communes.id_main'
-	#else:
-		#group_clause = "web_analyse.id_com"
 
 	column_clause += [
 		'COUNT(*) as "num_replies"',
@@ -656,17 +660,14 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	group_clause = "id_comm"
 
 	agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "AVG")
-	if query_info.lower() == "manual_intensity":
-		column_clause.append('%s(web_analyse.MI) as "Intensity"' % agg_function)
-	elif query_info.lower() == "cii":
-		column_clause.append('%s(web_analyse.CII) as "Intensity"' % agg_function)
+	column_clause.append('%s(web_analyse.%s) as "Intensity"' % (agg_function, query_info.upper()))
 
 	where_clause = 'web_analyse.id_earth = %d' % id_earth
 	where_clause += ' and web_analyse.m_fiability >= %.1f' % float(min_fiability)
 	where_clause += ' and web_analyse.deleted = false'
 
 	having_clause = 'num_replies >= %d' % min_replies
-	if query_info.lower() in ("cii", "manual_intensity"):
+	if query_info.lower() in ("cii", "cdi", "mi"):
 		having_clause += ' and Intensity >= %d' % min_val
 
 	order_clause = 'num_replies DESC'
@@ -781,17 +782,46 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None, min_fiability=20,
 							web_ids=[], verbose=False, errf=None):
 	"""
+	Query internet enquiries.
+
+	:param id_earth:
+		int, ROB earthquake ID or 'all'
+		(default: None)
+	:param id_com:
+		int, ROB commune ID
+		(default: None)
+	:param zip_code:
+		int, ZIP code
+		(default: None)
 	:param min_fiability:
 		float, minimum fiability of enquiry
 		(default: 20.)
+	:param web_ids:
+		list of IDs of individual questionnaires
+		(default: [])
+	:param verbose:
+		bool, if True the query string will be echoed to standard output
+		(default: False)
+	:param errf:
+		File object, where to print errors
+		(default: None)
+
+	:return:
+		instance of :class:`MacroseismicEnquiryEnsemble`
 	"""
+	from macrorecord import MacroseismicEnquiryEnsemble
+
 	table_clause = ['web_input']
 
-	join_clause = [('JOIN', 'web_analyse', 'web_input.id_web=web_analyse.id_web')]
+	join_clause = [('JOIN', 'web_analyse', 'web_input.id_web=web_analyse.id_web'),
+					('LEFT JOIN', 'web_location', 'web_input.id_web=web_location.id_web')]
 
 	if id_earth:
-		where_clause = 'web_analyse.id_earth = %d' % id_earth
-		where_clause += ' AND web_analyse.m_fiability > %.1f' % float(min_fiability)
+		if id_earth != "all":
+			where_clause = 'web_analyse.id_earth = %d AND ' % id_earth
+		else:
+			where_clause = ''
+		where_clause += 'web_analyse.m_fiability >= %.1f' % float(min_fiability)
 		where_clause += ' AND web_analyse.deleted = false'
 		if id_com is not None:
 			where_clause += ' AND web_analyse.id_com=%d' % id_com
@@ -804,8 +834,10 @@ def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None, min_fiabi
 		errf.write("Querying KSB-ORB web macroseismic enquiries:\n")
 
 	## Fetch records
-	return query_seismodb_table(table_clause, join_clause=join_clause,
+	recs = query_seismodb_table(table_clause, join_clause=join_clause,
 						where_clause=where_clause, verbose=verbose, errf=errf)
+
+	return MacroseismicEnquiryEnsemble(id_earth, recs)
 
 
 def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
