@@ -164,7 +164,11 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			list
 		"""
-		return [rec[prop] if rec[prop] is not None else np.nan for rec in self.recs]
+		if len(self.recs) and isinstance(self.recs[0][prop], (str, unicode)):
+			none_val = u""
+		else:
+			none_val = np.nan
+		return [rec[prop] if rec[prop] is not None else none_val for rec in self.recs]
 
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
@@ -261,13 +265,16 @@ class MacroseismicEnquiryEnsemble():
 		zip_country_tuples = set(self.get_zip_country_tuples())
 		return list(zip_country_tuples)
 
-	def get_communes_from_db(self, comm_key='id_com'):
+	def get_communes_from_db(self, comm_key='id_com', verbose=False):
 		"""
 		Extract communes from database
 
 		:param comm_key:
 			string, commune key, one of "id_com', 'id_main', 'zip'
 			(default: 'id_com')
+		:param verbose:
+			bool, whether or not to print SQL queries
+			(default: False)
 
 		:return:
 			dict, mapping comm_key values to database records (dicts)
@@ -288,20 +295,73 @@ class MacroseismicEnquiryEnsemble():
 			comm_rec_dict = {}
 			column_clause = ['*']
 			for country in ("BE", "NL", "DE", "FR", "LU", "GB"):
+				## Some tables have commune, some city, some both...
+				## BE, LU, NL: city < commune
+				## DE, FR: commune
+				## GB: city
+				if country in ("BE", "LU", "NL", "GB"):
+					com_col = 'city'
+				else:
+					com_col = 'commune'
+
+				if country == "BE":
+					com_tables = ['com_zip_BE_fr', 'com_zip_BE_nl']
+				elif country == "LU":
+					com_tables = ['com_zip_LU_de', 'com_zip_LU_fr']
+				else:
+					com_tables = ['com_zip_%s' % country]
+				#table_clause = 'com_zip_%s' % country
+				#if country in ("BE", "LU"):
+				#	table_clause += '_fr'
+
 				ensemble = self.subselect_by_property('country', [country])
 				unique_zips = sorted(set(ensemble.get_list('zip')))
-				table_clause = 'com_zip_%s' % country
-				if country in ("BE", "LU"):
-					table_clause += '_fr'
+				unique_zip_cities = set(zip(ensemble.get_list('zip'), ensemble.get_list('city')))
 				#join_clause = [('RIGHT JOIN', 'communes', '%s.id = communes.id_main' % table_clause)]
+
 				if len(unique_zips):
+					country_comm_rec_dict = {}
 					if country == "NL":
-						query_values = ','.join(['"%s AA"' % ZIP for ZIP in unique_zips])
+						query_values = '|'.join(['%s' % ZIP for ZIP in unique_zips])
+						where_clause = 'zip REGEXP "%s"' % query_values
 					else:
 						query_values = ','.join(['"%s"' % ZIP for ZIP in unique_zips])
-					where_clause = 'zip in (%s)' % query_values
-					comm_recs = query_seismodb_table(table_clause,
-						column_clause=column_clause, where_clause=where_clause)
+						where_clause = 'zip IN (%s)' % query_values
+					for table in com_tables:
+						table_clause = table
+						comm_recs = query_seismodb_table(table_clause,
+							column_clause=column_clause, where_clause=where_clause,
+							verbose=verbose)
+						if country == "NL":
+							comm_recs = {(country, rec['zip'][:-3], rec[com_col]): rec for rec in comm_recs}
+						else:
+							comm_recs = {(country, rec['zip'], rec[com_col]): rec for rec in comm_recs}
+						country_comm_rec_dict.update(comm_recs)
+
+					for (ZIP, city) in unique_zip_cities:
+						try:
+							key = (country, ZIP, city.title())
+						except:
+							key = (country, ZIP, city)
+						rec = country_comm_rec_dict.get(key)
+						if rec:
+							## Zip and commune name matched
+							comm_rec_dict[key] = rec
+						else:
+							## Only zip matched, keep only smallest id_com
+							country, ZIP, city = key
+							matching_zips = []
+							for k in country_comm_rec_dict.keys():
+								if k[1] == ZIP:
+									matching_zips.append(country_comm_rec_dict[k])
+							id_coms = [r['id_com'] for r in matching_zips]
+							if len(matching_zips):
+								idx = np.argmin(id_coms)
+								comm_rec_dict[key] = matching_zips[idx]
+							else:
+								## Unmatched ZIP, probably wrong
+								pass
+					"""
 					for rec in comm_recs:
 						if country == "NL":
 							ZIP = rec['zip'][:-3]
@@ -313,25 +373,46 @@ class MacroseismicEnquiryEnsemble():
 						else:
 							## There may be more than one record with the same ZIP...
 							## The lowest id_com should correspond to id_main
+							# TODO: try matching name first (city/commune, city, we will also need lang...)
 							if rec['id_com'] < comm_rec_dict[key]['id_com']:
 								comm_rec_dict[key] = rec
+					"""
 		return comm_rec_dict
 
-	def fix_commune_ids(self):
+	def fix_commune_ids(self, keep_existing=True, keep_unmatched=False):
 		"""
 		Reset commune ID of all records based on ZIP and country
+
+		:param keep_existing:
+			bool, whether or not to keep existing (= non-zero) commune ids
+			(default: True)
+		:param keep_unmatched:
+			bool, whether or not to keep current commune id of unmatched
+			records
+			(default: False)
 
 		:return:
 			None, 'id_com' values of :prop:`recs` are modified in place
 		"""
 		comm_rec_dict = self.get_communes_from_db(comm_key='zip')
 		for rec in self.recs:
-			comm_rec = comm_rec_dict.get((rec['zip'], rec['country']))
-			if comm_rec:
-				rec['id_com'] = comm_rec['id_com']
-			else:
-				## Don't modify
-				pass
+			if not (rec['id_com'] and keep_existing):
+				#comm_rec = comm_rec_dict.get((rec['zip'], rec['country']))
+				comm_name = rec['city']
+				if comm_name:
+					comm_name = comm_name.title()
+				comm_rec = comm_rec_dict.get((rec['country'], rec['zip'], comm_name))
+				if comm_rec:
+					## Zip and name matched
+					rec['id_com'] = comm_rec['id_com']
+				else:
+					comm_rec = comm_rec_dict.get((rec['country'], rec['zip'], u''))
+					if comm_rec:
+						## Only zip matched
+						rec['id_com'] = comm_rec['id_com']
+					elif not keep_unmatched:
+						## Nothing matched
+						rec['id_com'] = 0
 
 	def get_main_commune_ids(self):
 		"""
