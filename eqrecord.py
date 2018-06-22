@@ -18,8 +18,7 @@ import msc
 from time_functions import fractional_year
 
 
-__all__ = ["LocalEarthquake", "FocMecRecord", "MacroseismicRecord",
-			"MacroseismicDataPoint", "MacroseismicEnquiryEnsemble"]
+__all__ = ["LocalEarthquake", "FocMecRecord"]
 
 # TODO: allow nan values instead of zeros
 
@@ -680,9 +679,10 @@ class LocalEarthquake:
 		return query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val, group_by_main_village=group_by_main_village, agg_function=agg_function, verbose=verbose)
 
 	def get_macroseismic_enquiries(self, min_fiability=20, verbose=False):
+		from macrorecord import MacroseismicEnquiryEnsemble
 		from seismodb import query_ROB_Web_enquiries
-		recs = query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability, verbose=verbose)
-		return MacroseismicEnquiryEnsemble(self.ID, recs)
+		ensemble = query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability, verbose=verbose)
+		return ensemble
 
 	def get_focal_mechanism(self, verbose=False):
 		from seismodb import query_ROB_FocalMechanisms
@@ -691,37 +691,6 @@ class LocalEarthquake:
 		except IndexError:
 			return None
 
-
-
-class MacroseismicDataPoint:
-	pass
-
-
-class MacroseismicRecord:
-	"""
-	Container class to hold information of records retrieved from the macrocatalog database table.
-	Currently has the following properties:
-		id_earth
-		id_com
-		I
-		lon
-		lat
-		num_replies
-	"""
-	def __init__(self, id_earth, id_com, I, num_replies=1, lon=0, lat=0, web_ids=[]):
-		self.id_earth = id_earth
-		self.id_com = id_com
-		self.I = I
-		self.num_replies = num_replies
-		self.lon = lon
-		self.lat = lat
-		self.web_ids = web_ids
-
-	def get_enquiries(self, min_fiability=20, verbose=False):
-		from seismodb import query_ROB_Web_enquiries
-		recs = query_ROB_Web_enquiries(self.id_earth, id_com=self.id_com,
-								min_fiability=min_fiability, verbose=verbose)
-		return MacroseismicEnquiryEnsemble(self.id_earth, recs)
 
 
 #class FocMecRecord(LocalEarthquake, MT.FaultGeometry):
@@ -749,76 +718,3 @@ class FocMecRecord(LocalEarthquake):
 
 	#property(focmec, get_focmec)
 
-
-class MacroseismicEnquiryEnsemble():
-	"""
-	:param id_earth:
-		int, ID of earthquake in ROB database
-	:param recs:
-		list of dicts representing enquiries from the database
-	"""
-	def __init__(self, id_earth, recs):
-		self.id_earth = id_earth
-		self.recs = recs
-		self._gen_arrays()
-
-	def __len__(self):
-		return len(self.recs)
-
-	def __iter__(self):
-		return self.recs.__iter__()
-
-	def _gen_arrays(self):
-		for prop in ["felt", "asleep", "noise", "duration"]:
-			ar = np.array([rec[prop] for rec in self.recs], dtype='float')
-			setattr(self, prop, ar)
-
-	def plot_histogram(self, prop, fig_filespec=None):
-		import pylab
-
-		pylab.clf()
-		ar = getattr(self, prop)
-
-		if prop in ("asleep", "noise"):
-			bins = np.sort(np.unique(ar))
-			bin_edges = np.arange(bins[0] - 0.5, bins[-1] + 1.5)
-			print bins, bin_edges
-			range = (np.nanmin(ar), np.nanmax(ar) + 1.5)
-			#ticks = bins[:-1] + 0.5
-			#pylab.hist(ar[self.felt == 1], bins=bin_edges, range=range)
-			#pylab.xlim(xmin=-0.5)
-			#if not ticks is None:
-			#	pylab.xticks(ticks)
-
-			sizes, bin_edges = pylab.histogram(ar[ar != np.nan], bins=bin_edges, range=range)
-			#sizes = np.bincount(ar.astype('int'))
-			print bins, sizes
-			colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
-			labels = ["%d" % b for b in bins]
-			pylab.pie(sizes, colors=colors, labels=labels, autopct='%1.1f%%',
-						startangle=90)
-			#draw circle
-			#centre_circle = pylab.Circle((0,0), 0.70, fc='white')
-			#fig = pylab.gcf()
-			#fig.gca().add_artist(centre_circle)
-
-			# Equal aspect ratio ensures that pie is drawn as a circle
-			pylab.axis('equal')
-			pylab.tight_layout()
-
-		elif prop == "duration":
-			print(np.nanmin(ar[ar>0]), np.nanmean(ar[ar>0]), np.nanmax(ar[ar>0]))
-			bins = np.arange(21)
-			ticks = None
-			pylab.hist(ar[ar>0], bins=bins)
-
-		else:
-			print("Don't know how to plot %s" % prop)
-			return
-
-		pylab.title(prop.title())
-
-		if fig_filespec:
-			pylab.savefig(fig_filespec)
-		else:
-			pylab.show()

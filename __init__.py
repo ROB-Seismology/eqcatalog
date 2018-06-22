@@ -30,11 +30,18 @@ reload(source_models)
 
 from source_models import (read_source_model, rob_source_models_dict)
 
+## No internal dependencies
+import macrorecord
+reload(macrorecord)
+
+from macrorecord import (MacroseismicRecord, MacroseismicEnquiryEnsemble,
+						MacroseismicDataPoint)
+
 ## Depends on time_functions, msc
 import eqrecord
 reload(eqrecord)
 
-from eqrecord import (LocalEarthquake, FocMecRecord, MacroseismicDataPoint, MacroseismicRecord)
+from eqrecord import (LocalEarthquake, FocMecRecord)
 
 ## Depends on time_functions, eqrecord, declustering, source_models
 import eqcatalog
@@ -49,6 +56,6 @@ reload(composite_catalog)
 
 from composite_catalog import CompositeEQCatalog
 
-## Depends on eqrecord, eqcatalog
+## Depends on macrorecord, eqrecord, eqcatalog
 import seismodb
 reload(seismodb)
