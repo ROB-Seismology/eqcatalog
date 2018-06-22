@@ -431,7 +431,7 @@ class MacroseismicEnquiryEnsemble():
 				main_commune_ids.append(None)
 		return main_commune_ids
 
-	def set_main_commune_ids(self):
+	def set_main_commune_ids(self, keep_existing=True):
 		"""
 		Set main commune ID of all records based on id_com
 
@@ -441,7 +441,8 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		main_commune_ids = self.get_main_commune_ids()
 		for r, rec in enumerate(self.recs):
-			rec['id_main'] = main_commune_ids[r]
+			if not (rec['id_main'] and keep_existing):
+				rec['id_main'] = main_commune_ids[r]
 
 	def set_locations_from_communes(self, comm_key="id_com", keep_unmatched=True):
 		"""

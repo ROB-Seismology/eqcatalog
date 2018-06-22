@@ -270,7 +270,7 @@ if __name__ == "__main__":
 	min_replies = 1
 	query_info = "cii"
 	min_fiability = 20
-	group_by_main_village = False
+	group_by_main_village = True
 	color_gradient = "continuous"
 	symbol_style = lbm.PointStyle(shape='D', size=5)
 	#symbol_style = None
