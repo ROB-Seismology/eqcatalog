@@ -15,7 +15,7 @@ GIS_FOLDER = r"D:\seismo-gis\collections\Bel_administrative_ROB\TAB"
 def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tmerc",
 				graticule_interval=(1, 1), min_replies=3, query_info="cii", min_val=1,
 				min_fiability=20.0, filter_floors=(0, 4), group_by_main_village=False, agg_function="average",
-				int_conversion="floor", symbol_style=None, cmap="rob",
+				int_conversion="round", symbol_style=None, cmap="rob",
 				color_gradient="discontinuous", event_style="default",
 				radii=[], recalc=False, plot_pie=None, title="", ax=None, verbose=True):
 	"""
@@ -23,6 +23,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 
 	:param int_conversion:
 		str, "floor", "round" or "ceil"
+		(default: "round", corresponding to the convention of Wald et al.)
 	"""
 
 	[eq] = eqcatalog.seismodb.query_ROB_LocalEQCatalogByID(id_earth)
@@ -43,6 +44,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 		ensemble = eqcatalog.seismodb.query_ROB_Web_enquiries(id_earth,
 						min_fiability=min_fiability, verbose=verbose)
 		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
+		ensemble.fix_felt_is_none()
 		ensemble.fix_commune_ids()
 		ensemble.set_main_commune_ids()
 		comm_key = {False: 'id_com', True: 'id_main'}[group_by_main_village]
@@ -57,7 +59,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 			num_replies = len(comm_ensemble_dict[key])
 			lon = comm_ensemble_dict[key].recs[0]['longitude']
 			lat = comm_ensemble_dict[key].recs[0]['latitude']
-			web_ids = comm_ensemble_dict[key].get_list('id_web')
+			web_ids = comm_ensemble_dict[key].get_prop_values('id_web')
 			if query_info == 'cii':
 				I = comm_ensemble_dict[key].calc_cii()
 			elif query_info == 'cdi':
@@ -260,6 +262,8 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 #def plot_macro_web(psf, region, proj, event_ID, min_replies=3, min_fiability=20.0, plot_info="Intensity", cpt="KVN_intensity_USGS", legend=True, group_by_main_village=False, agg_function="", min_intensity=1, symbol_style=None, symbol_size=0.25, symbol_size_fixed=True, verbose=True, errf=None):
 
 
+# TODO: plot number of replies, aggregate by grid
+
 
 if __name__ == "__main__":
 	#region = (2, 7, 49.25, 51.75)
@@ -270,10 +274,10 @@ if __name__ == "__main__":
 	min_replies = 1
 	query_info = "cii"
 	min_fiability = 20
-	group_by_main_village = True
+	group_by_main_village = False
 	color_gradient = "continuous"
-	symbol_style = lbm.PointStyle(shape='D', size=5)
-	#symbol_style = None
+	#symbol_style = lbm.PointStyle(shape='D', size=5)
+	symbol_style = None
 	radii = [10, 25, 50]
 	plot_pie = False
 	title = "Kinrooi 25/05/2018"
