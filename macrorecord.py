@@ -13,6 +13,21 @@ __all__ = ["MacroseismicRecord", "MacroseismicEnquiryEnsemble",
 			"MacroseismicDataPoint"]
 
 
+def strip_accents(unicode_string):
+	"""
+	Remove accents (diacritics) from unicode string
+
+	:param unicode_string:
+		unicode, input string
+
+	:return:
+		unicode, output string
+	"""
+	import unicodedata
+	if not isinstance(unicode_string, unicode):
+		unicode_string = unicode_string.decode("latin1")
+	nkfd_form = unicodedata.normalize('NFKD', unicode_string)
+	return "".join([c for c in nkfd_form if not unicodedata.combining(c)])
 
 
 class MacroseismicDataPoint:
@@ -84,9 +99,13 @@ class MacroseismicEnquiryEnsemble():
 		elif isinstance(spec, slice):
 			return MacroseismicEnquiryEnsemble(self.id_earth, self.recs[spec])
 		elif isinstance(spec, (list, np.ndarray)):
+			## spec can be list of indexes or list of bools
 			recs = []
-			for idx in spec:
-				recs.append(self.recs[idx])
+			if len(spec):
+				idxs = np.arange(len(self))
+				idxs = idxs[np.array(spec)]
+				for idx in idxs:
+					recs.append(self.recs[idx])
 			return MacroseismicEnquiryEnsemble(self.id_earth, recs)
 
 	def _gen_arrays(self):
@@ -154,7 +173,9 @@ class MacroseismicEnquiryEnsemble():
 		self.bins['CDI'] = self.bins['MI'] = self.bins['CII']
 		self.bins['duration'] = np.arange(0, 61, 5)
 
-	def get_list(self, prop):
+		self.bins['num_replies'] = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
+
+	def get_prop_values(self, prop):
 		"""
 		Get list of values for given property
 
@@ -164,11 +185,25 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			list
 		"""
-		if len(self.recs) and isinstance(self.recs[0][prop], (str, unicode)):
+		first_non_None_value = next((rec[prop] for rec in self.recs if rec[prop] is not None), None)
+		if len(self.recs) and isinstance(first_non_None_value, (str, unicode)):
 			none_val = u""
 		else:
 			none_val = np.nan
 		return [rec[prop] if rec[prop] is not None else none_val for rec in self.recs]
+
+	def get_unique_prop_values(self, prop):
+		"""
+		Get list of unique values for given property
+
+		:param prop:
+			string, name of property (that can only have certain values)
+
+		:return:
+			list
+		"""
+		prop_values = self.get_prop_values(prop)
+		return sorted(set(prop_values))
 
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
@@ -184,7 +219,7 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			instance of :class:`MacroseismicEnquiryEnsemble`
 		"""
-		values = self.get_list(prop)
+		values = self.get_prop_values(prop)
 		if isinstance(values[0], (str, unicode)):
 			prop_values = map(str, prop_values)
 		if not negate:
@@ -192,6 +227,22 @@ class MacroseismicEnquiryEnsemble():
 		else:
 			idxs = [i for i in range(len(values)) if not values[i] in prop_values]
 		return self.__getitem__(idxs)
+
+	def set_prop_values(self, prop, values):
+		"""
+		Set values of individual enquiries for given property
+
+		:param prop:
+			str, name of property
+		:values:
+			list or array, values of individual enquiries for given property
+		"""
+		if not isinstance(values, (list, tuple, np.ndarray)):
+			values = [values] * len(self)
+		assert len(values) == len(self)
+		for r, rec in enumerate(self.recs):
+			rec[prop] = values[r]
+		self._gen_arrays()
 
 	def subselect_by_distance(self, lon, lat, radius):
 		"""
@@ -221,8 +272,8 @@ class MacroseismicEnquiryEnsemble():
 			array, distances (in km)
 		"""
 		import mapping.geotools.geodetic as geodetic
-		rec_lons = np.array(self.get_list('longitude'))
-		rec_lats = np.array(self.get_list('latitude'))
+		rec_lons = np.array(self.get_prop_values('longitude'))
+		rec_lats = np.array(self.get_prop_values('latitude'))
 		return geodetic.spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
 
 	def subselect_by_zip_country_tuples(self, zip_country_tuples):
@@ -250,8 +301,8 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			list of (ZIP, country) tuples
 		"""
-		zips = self.get_list('zip')
-		countries = self.get_list('country')
+		zips = self.get_prop_values('zip')
+		countries = self.get_prop_values('country')
 		zip_country_tuples = zip(zips, countries)
 		return zip_country_tuples
 
@@ -282,7 +333,7 @@ class MacroseismicEnquiryEnsemble():
 		from seismodb import query_seismodb_table
 
 		if comm_key in ("id_com", "id_main"):
-			unique_ids = sorted(set(self.get_list(comm_key)))
+			unique_ids = sorted(set(self.get_prop_values(comm_key)))
 			table_clause = ['communes']
 			column_clause = ['*']
 			query_values = ','.join(map(str, unique_ids))
@@ -315,8 +366,10 @@ class MacroseismicEnquiryEnsemble():
 				#	table_clause += '_fr'
 
 				ensemble = self.subselect_by_property('country', [country])
-				unique_zips = sorted(set(ensemble.get_list('zip')))
-				unique_zip_cities = set(zip(ensemble.get_list('zip'), ensemble.get_list('city')))
+				zips = ensemble.get_prop_values('zip')
+				unique_zips = sorted(set(zips))
+				cities = [strip_accents(city).title() for city in ensemble.get_prop_values('city')]
+				unique_zip_cities = set(zip(zips, cities))
 				#join_clause = [('RIGHT JOIN', 'communes', '%s.id = communes.id_main' % table_clause)]
 
 				if len(unique_zips):
@@ -333,16 +386,16 @@ class MacroseismicEnquiryEnsemble():
 							column_clause=column_clause, where_clause=where_clause,
 							verbose=verbose)
 						if country == "NL":
-							comm_recs = {(country, rec['zip'][:-3], rec[com_col]): rec for rec in comm_recs}
+							comm_recs = {(country, rec['zip'][:-3], strip_accents(rec[com_col]).title()): rec for rec in comm_recs}
 						else:
-							comm_recs = {(country, rec['zip'], rec[com_col]): rec for rec in comm_recs}
+							comm_recs = {(country, rec['zip'], strip_accents(rec[com_col]).title()): rec for rec in comm_recs}
 						country_comm_rec_dict.update(comm_recs)
 
-					for (ZIP, city) in unique_zip_cities:
-						try:
-							key = (country, ZIP, city.title())
-						except:
-							key = (country, ZIP, city)
+					for (ZIP, city) in sorted(unique_zip_cities):
+						#try:
+						key = (country, ZIP, strip_accents(city).title())
+						#except:
+						#	key = (country, ZIP, city)
 						rec = country_comm_rec_dict.get(key)
 						if rec:
 							## Zip and commune name matched
@@ -358,9 +411,15 @@ class MacroseismicEnquiryEnsemble():
 							if len(matching_zips):
 								idx = np.argmin(id_coms)
 								comm_rec_dict[key] = matching_zips[idx]
-							else:
+								if verbose:
+									msg = "Commune %s-%s: name %s could not be matched"
+									msg %= (country, ZIP, city)
+									print(msg)
+							elif verbose:
 								## Unmatched ZIP, probably wrong
-								pass
+								msg = "Commune %s-%s (%s) could not be matched"
+								msg %= (country, ZIP, city)
+								print(msg)
 					"""
 					for rec in comm_recs:
 						if country == "NL":
@@ -441,7 +500,8 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		main_commune_ids = self.get_main_commune_ids()
 		for r, rec in enumerate(self.recs):
-			if not (rec['id_main'] and keep_existing):
+			## Note: records do not initially have 'id_main' key!
+			if not (rec.get('id_main') and keep_existing):
 				rec['id_main'] = main_commune_ids[r]
 
 	def set_locations_from_communes(self, comm_key="id_com", keep_unmatched=True):
@@ -485,7 +545,7 @@ class MacroseismicEnquiryEnsemble():
 
 		table_clause = ['web_location']
 		column_clause = ['*']
-		web_ids = self.get_list('id_web')
+		web_ids = self.get_prop_values('id_web')
 		query_values = ','.join(map(str, web_ids))
 		where_clause = 'id_web in (%s)' % query_values
 		db_recs = query_seismodb_table(table_clause,
@@ -523,7 +583,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		comm_rec_dict = self.get_communes_from_db(comm_key=comm_key)
 		if comm_key in ('id_com', 'id_main'):
-			all_comm_key_values = self.get_list(comm_key)
+			all_comm_key_values = self.get_prop_values(comm_key)
 		elif comm_key == "zip":
 			all_comm_key_values = self.get_zip_country_tuples()
 		comm_ensemble_dict = {}
@@ -546,8 +606,8 @@ class MacroseismicEnquiryEnsemble():
 			:class:`MacroseismicEnquiryEnsemble`
 		"""
 		import mapping.geotools.coordtrans as ct
-		lons = self.get_list('longitude')
-		lats = self.get_list('latitude')
+		lons = self.get_prop_values('longitude')
+		lats = self.get_prop_values('latitude')
 		mask = np.isnan(lons)
 		lons = np.ma.array(lons, mask=mask)
 		lats = np.ma.array(lats, mask=mask)
@@ -592,12 +652,46 @@ class MacroseismicEnquiryEnsemble():
 				rec['id_main'] = '0'
 				print("Warning: id_main not found for ZIP %s-%s" %
 						(rec['country'], rec['zip']))
-		unique_main_ids = np.unique(self.get_list('id_main'))
+		unique_main_ids = np.unique(self.get_prop_values('id_main'))
 		main_id_ensemble_dict = {}
 		for id_main in unique_main_ids:
 			ensemble = self.subselect_by_property('id_main', [id_main])
 			main_id_ensemble_dict[int(id_main)] = ensemble
 		return main_id_ensemble_dict
+
+	def fix_felt_is_none(self):
+		"""
+		Fix enquiries where 'felt' has not been filled out, based on
+		reply to 'asleep', 'mo(ion' and 'stand' questions.
+		"""
+		ensemble = self.subselect_by_property('felt', ['', np.nan])
+		## Slept through it --> not felt
+		ensemble[ensemble.asleep == 1].set_prop_values('felt', '0')
+		## Awoken --> felt
+		ensemble[ensemble.asleep == 2].set_prop_values('felt', '1')
+		## Awake and (difficult to stand or motion) --> felt
+		ensemble[(ensemble.asleep == 0) &
+				(ensemble.motion.filled(-1) > 0) &
+				(ensemble.stand.filled(-1) > 1)].set_prop_values('felt', '1')
+		self._gen_arrays()
+
+	def fix_none_replies(self):
+		"""
+		Fix properties for which there is a "No answer" option:
+		NOT NECESSARY !
+
+		building? ('No building' = no answer?)
+		motion ('', '_') --> OK
+		reaction ('', '_')
+		response ('', '_')
+		stand ('', '_')
+		furniture ('_')
+		heavy_appliance ('_')
+		walls ('_')
+		sway ('', '_')
+
+		"""
+		pass
 
 	def calc_felt_index(self, include_other_felt=True):
 		"""
@@ -657,7 +751,9 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			float array, damage indexes [range 0 - 3]
 		"""
-		damage_classes = np.array([0, 0.5, 0.5, 0.75, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3])
+		## Note that "one or several cracked windows" [0.5] has position 2 in
+		## Wald et al. (1999), but position 6 in our questionnaire!
+		damage_classes = np.array([0, 0.5, 0.75, 1, 1, 1, 0.5, 2, 2, 2, 3, 3, 3, 3])
 		damage_index = np.zeros(len(self), dtype='float')
 		for i in range(len(self)):
 			damage_index[i] = np.max(damage_classes[self.damage[i]])
@@ -711,8 +807,13 @@ class MacroseismicEnquiryEnsemble():
 		else:
 			ensemble = self
 		# TODO: if felt_index is zero, shouldn't CWS be zero as well?
+
 		if aggregate:
 			# TODO: remove outliers ? Not possible for these separate indexes!
+			## Masked (NaN) values are not taken into account to compute the mean
+			## If all values are masked, index is set to zero
+
+			# TODO: do not take into account records where felt_index is masked!
 			felt_index = ensemble.calc_felt_index(include_other_felt).mean()
 			if np.ma.is_masked(felt_index) and felt_index.mask:
 				felt_index = 0.
@@ -745,14 +846,25 @@ class MacroseismicEnquiryEnsemble():
 					+ 3 * furniture_index
 					+ 5 * damage_index)
 		else:
-			cws = (5 * ensemble.calc_felt_index(include_other_felt)
-					+ ensemble.motion
-					+ ensemble.reaction
-					+ 2 * ensemble.calc_stand_index()
-					+ 5 * ensemble.calc_shelf_index()
-					+ 2 * ensemble.calc_picture_index()
-					+ 3 * ensemble.furniture
-					+ 5 * ensemble.calc_damage_index())
+			## Masked (NaN) values are replaced with zeros (except felt)
+			felt_indexes = ensemble.calc_felt_index(include_other_felt)
+			motion_indexes = ensemble.motion.filled(0)
+			reaction_indexes = ensemble.reaction.filled(0)
+			stand_indexes = ensemble.calc_stand_index().filled(0)
+			shelf_indexes = ensemble.calc_shelf_index().filled(0)
+			picture_indexes = ensemble.calc_picture_index().filled(0)
+			furniture_indexes = ensemble.furniture.filled(0)
+			damage_indexes = ensemble.calc_damage_index()
+			cws = (5 * felt_indexes
+					+ motion_indexes
+					+ reaction_indexes
+					+ 2 * stand_indexes
+					+ 5 * shelf_indexes
+					+ 2 * picture_indexes
+					+ 3 * furniture_indexes
+					+ 5 * damage_indexes)
+			## NaN felt values have CWS zero
+			cws = cws.filled(0)
 		return cws
 
 	def calc_cdi(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True):
@@ -788,14 +900,36 @@ class MacroseismicEnquiryEnsemble():
 		cws = self.calc_cws(aggregate=aggregate, filter_floors=filter_floors,
 							include_other_felt=include_other_felt)
 		cii = 3.40 * np.log(cws) - 4.38
+
+		## Needed to recompute felt index
+		if filter_floors:
+			min_floor, max_floor = filter_floors
+			ensemble = self.filter_floors(min_floor, max_floor)
+		else:
+			ensemble = self
+
+		## We set a minimum CDI of 2 if the CWS is nonzero (so the result is at
+		## least 2 “Felt”, or 1 “Not felt”), and cap the result at 9.0
 		if aggregate:
-			if cws == 0:
+			felt_index = ensemble.calc_felt_index(include_other_felt).mean()
+			if np.ma.is_masked(felt_index) and felt_index.mask:
+				felt_index = 0.
+
+			## For 'not felt' responses, CII = 1
+			if cws == 0 or felt_index == 0:
 				cii = 1
-			elif cws > 0:
+			## For any 'felt' response, CII is at least 2
+			elif cws > 0 and felt_index > 0:
 				cii = np.maximum(2., cii)
 		else:
-			cii[cws == 0] = 1
-			cii[cws > 0] = np.maximum(2., cii[cws > 0])
+			felt_index = ensemble.calc_felt_index(include_other_felt=include_other_felt)
+			felt_index = felt_index.filled(0)
+			## For 'not felt' responses, CII = 1
+			cii[(cws == 0) | (felt_index == 0)] = 1.
+			## Note: the following is identical to setting CII = 2 for CWS < 6.53
+			## for any 'felt' response (Wald et al., 1999)
+			idxs = (cws > 0) & (felt_index > 0)
+			cii[idxs] = np.maximum(2., cii[idxs])
 		cii = np.minimum(9., cii)
 		return cii
 
@@ -809,19 +943,45 @@ class MacroseismicEnquiryEnsemble():
 		cii = cii[(cii >= pct0) & (cii <= pct1)]
 		return cii.mean()
 
-	def plot_cii_comparison(self, include_other_felt=True):
+	def plot_analysis_comparison(self, prop='CWS', include_other_felt=True):
+		"""
+
+		:return:
+			instance of :class:`MacroseismicEnquiryEnsemble`, containing
+			all enquiries where calculated property does not match the
+			value in the database
+		"""
 		import pylab
 
-		db_cii = self.CII
-		recalc_cii = self.calc_cii(aggregate=False, filter_floors=False,
+		db_result = getattr(self, prop.upper())
+		print db_result.min(), db_result.max()
+		func_name = 'calc_%s' % prop.lower()
+		func = getattr(self, func_name)
+		recalc_result = func(aggregate=False, filter_floors=False,
 								include_other_felt=include_other_felt)
-		idxs = np.argsort(db_cii)
-		pylab.plot([0,9], [0,9])
-		pylab.plot(db_cii[idxs], recalc_cii[idxs], '+')
-		pylab.xlabel('CII (database)')
-		pylab.ylabel('CII (recomputed)')
+		non_matching_ids = []
+		for i in range(len(self)):
+			db_val = db_result[i]
+			recalc_val = recalc_result[i]
+			id_web = self.recs[i]['id_web']
+			try:
+				if not np.allclose(db_val, recalc_val):
+					print("#%d: %s != %s" % (id_web, db_val, recalc_val))
+					non_matching_ids.append(id_web)
+			except:
+				print("#%d: %s != %s" % (id_web, db_val, recalc_val))
+				non_matching_ids.append(id_web)
+
+		pylab.plot(db_result, recalc_result, 'r+', ms=10)
+		xmin, xmax, ymin, ymax = pylab.axis()
+		max_val = max(xmax, ymax)
+		pylab.plot([0, max_val], [0, max_val], 'k--')
+		pylab.xlabel('%s (database)' % prop.upper())
+		pylab.ylabel('%s (recomputed)' % prop.upper())
 		pylab.grid()
 		pylab.show()
+
+		return self.subselect_by_property('id_web', non_matching_ids)
 
 	def bincount(self, prop, bins=None, include_nan=True):
 		"""
@@ -829,8 +989,10 @@ class MacroseismicEnquiryEnsemble():
 
 		:param prop:
 			string, name of property (that can only have certain values)
+			or list or array
 		:param bins:
 			list or array of bins (values, not edges)
+			Should not be None if :param:`prop` corresponds to list or array
 			(default: None, will auto-determine)
 		:param include_nan:
 			bool, whether or not to count NaN values
@@ -839,10 +1001,13 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			(bins, counts) tuple
 		"""
-		try:
-			ar = getattr(self, prop)
-		except AttributeError:
-			ar = np.ma.array(self.get_list(prop))
+		if isinstance(prop, (list, np.ndarray)):
+			ar = prop
+		else:
+			try:
+				ar = getattr(self, prop)
+			except AttributeError:
+				ar = np.ma.array(self.get_prop_values(prop))
 		if bins is None:
 			bins = self.bins.get(prop, None)
 		if bins is None:
@@ -855,9 +1020,9 @@ class MacroseismicEnquiryEnsemble():
 		else:
 			if not include_nan:
 				#bins.pop(bins.index(np.nan))
-				bins = np.delete(bins, np.argwhere(bins == np.nan))
+				bins = np.delete(bins, np.argwhere(np.isnan(bins)))
 			counts = np.zeros(len(bins))
-			partial_counts = np.bincount(np.digitize(ar, bins, right=True))
+			partial_counts = np.bincount(np.digitize(ar.compressed(), bins, right=True))
 			counts[:len(partial_counts)] = partial_counts
 			if include_nan:
 				counts[-1] = np.sum(ar.mask)
@@ -869,14 +1034,22 @@ class MacroseismicEnquiryEnsemble():
 
 		:param prop:
 			string, name of property (that can have a range of values)
+			or list or array
 		:param bin_edges:
 			list or array of bin edges
+			Should not be None if :param:`prop` corresponds to list or array
 			(default: None, will auto-determine)
 
 		:return:
 			(bin_edges, counts) tuple
 		"""
-		ar = getattr(self, prop)
+		if isinstance(prop, (list, np.ndarray)):
+			ar = prop
+		else:
+			try:
+				ar = getattr(self, prop)
+			except AttributeError:
+				ar = np.ma.array(self.get_prop_values(prop))
 		if bin_edges is None:
 			bin_edges = self.bins.get(prop, None)
 		if bin_edges is None:
@@ -884,8 +1057,42 @@ class MacroseismicEnquiryEnsemble():
 		counts, bin_edges = np.histogram(ar, bins=bin_edges)
 		return bin_edges, counts
 
+	def get_prop_title_and_labels(self, prop, lang='EN'):
+		## Extract title and labels from PHP files for different languages
+		import os
+		from parse_php_vars import parse_php_vars
+
+		base_path = os.path.split(__file__)[0]
+		php_file = os.path.join(base_path, 'webenq', 'const_inq%s.php' % lang.upper())
+		php_var_dict = parse_php_vars(php_file)
+		if prop == 'felt':
+			title = php_var_dict['$form23']
+			labels = [php_var_dict['$no'], php_var_dict['$yes']]
+		elif prop == 'floor':
+			title = php_var_dict['$form21']
+			labels = []
+		elif prop == 'duration':
+			title = php_var_dict['$form25']
+			labels = []
+		else:
+			php_var_name = {'situation': 'sit',
+							'building': 'build',
+							'asleep': 'sleep',
+							'other_felt': 'ofelt',
+							'damage': 'd_text'}.get(prop, prop)
+			labels = php_var_dict.get('$o_' + php_var_name)
+			title = php_var_dict.get('$t_' + php_var_name)
+
+		## Move 'no answer' labels to end, to match with bincount
+		if prop in ["motion", "reaction", "response", "stand", "furniture",
+					"heavy_appliance", "walls", "sway", "creak", "shelf",
+					"picture"]:
+			labels.append(labels.pop(0))
+
+		return (title, labels)
+
 	def plot_pie(self, prop, bins=None, include_nan=True, start_angle=0,
-				colors=None, fig_filespec=None):
+				colors=None, label_lang='EN', fig_filespec=None):
 		"""
 		Plot pie chart for particular property
 
@@ -904,20 +1111,30 @@ class MacroseismicEnquiryEnsemble():
 		:param colors:
 			list of matplotlib color specs for pies
 			(default: None, will use matplotlib default colors)
+		:param label_lang":
+			string, label language ('EN', 'NL', 'FR' or 'DE')
+			(default: 'EN')
 		:param fig_filespec:
 			string, full path to output file
 			(default: None, will plot on screen)
 		"""
-		# TODO: extract title and labels from PHP files for different languages
 		import pylab
 
 		pylab.clf()
 		bins, counts = self.bincount(prop, bins=bins, include_nan=include_nan)
 		#colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
-		try:
-			labels = ["%.0f" % b for b in bins]
-		except TypeError:
-			labels = ["%s" % b for b in bins]
+
+		## Extract title and labels from PHP files for different languages
+		title, labels = self.get_prop_title_and_labels(prop, label_lang)
+		if len(labels) < len(bins):
+			labels.append('-')
+		if not labels:
+			try:
+				labels = ["%.0f" % b for b in bins]
+			except TypeError:
+				labels = ["%s" % b for b in bins]
+		if not title:
+			title = prop.title()
 		pylab.pie(counts, colors=colors, labels=labels, autopct='%1.1f%%',
 					startangle=start_angle)
 		#draw circle
@@ -928,7 +1145,7 @@ class MacroseismicEnquiryEnsemble():
 		# Equal aspect ratio ensures that pie is drawn as a circle
 		pylab.axis('equal')
 		#pylab.tight_layout()
-		pylab.title(prop.title())
+		pylab.title(title)
 
 		if fig_filespec:
 			pylab.savefig(fig_filespec)
@@ -936,27 +1153,31 @@ class MacroseismicEnquiryEnsemble():
 			pylab.show()
 
 	def plot_histogram(self, prop, bin_edges=None, fig_filespec=None):
-		# TODO: plot number of communes / number of replies histogram
 		import pylab
 
 		pylab.clf()
 
-		ar = getattr(self, prop)
-		bin_edges, counts = self.get_histogram(prop, bin_edges=bin_edges)
+		if prop == "num_replies":
+			## Histogram of number of communes / number of replies
+			comm_rec_dict = self.aggregate_by_commune(comm_key='id_com')
+			ar = np.array([ensemble.num_replies for ensemble in comm_rec_dict.values()])
+			bin_edges = self.bins['num_replies']
+		else:
+			ar = getattr(self, prop)
+		bin_edges, counts = self.get_histogram(ar, bin_edges=bin_edges)
+
 		pylab.bar(bin_edges[:-1], counts, width=np.diff(bin_edges))
 		#pylab.hist(ar[ar>0], bins=bin_edges)
 
-		pylab.title(prop.title())
+		title = prop.title()
+		pylab.title(title)
 
 		if fig_filespec:
 			pylab.savefig(fig_filespec)
 		else:
 			pylab.show()
 
-		if prop in ("asleep", "noise"):
-			pass
-
-		elif prop == "duration":
+		if prop == "duration":
 			print(np.nanmin(ar[ar>0]), np.nanmean(ar[ar>0]), np.nanmax(ar[ar>0]))
 			bins = np.arange(21)
 			ticks = None
