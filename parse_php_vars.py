@@ -4,6 +4,15 @@ Parse variables from PHP file.
 """
 
 def parse_php_vars(php_file):
+	"""
+	Parse PHP file to extract variables and their values
+
+	:param php_file:
+		str, full path to file containing PHP code
+
+	:return:
+		dict, mapping variable names (with leading '$') to values
+	"""
 	with open(php_file) as fp:
 		php = fp.read()
 
