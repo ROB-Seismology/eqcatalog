@@ -79,6 +79,7 @@ class MacroseismicEnquiryEnsemble():
 		self.id_earth = id_earth
 		self.recs = recs
 		self._gen_arrays()
+		self._define_bins()
 
 	def __len__(self):
 		return len(self.recs)
@@ -120,7 +121,8 @@ class MacroseismicEnquiryEnsemble():
 					"reaction", "response", "stand", "furniture",
 					"heavy_appliance", "walls"]:
 			prop_list = [rec[prop] or None for rec in self.recs]
-			prop_list = [val if (val and (isinstance(val, int) or val.isdigit())) else None for val in prop_list]
+			prop_list = [val if (val and (isinstance(val, int) or val.isdigit()))
+						else None for val in prop_list]
 			try:
 				ar = np.array(prop_list, dtype='float')
 			except:
@@ -148,6 +150,7 @@ class MacroseismicEnquiryEnsemble():
 			damage = [1 if d == '*' else 0 for d in damage]
 			self.damage[r] = damage
 
+	def _define_bins(self):
 		self.bins = {}
 		self.bins['asleep'] = np.array([0, 1, 2])
 		self.bins['felt'] = np.array([0, 1, np.nan])
@@ -512,6 +515,7 @@ class MacroseismicEnquiryEnsemble():
 			see :meth:`get_communes_from_db`
 		:param keep_unmatched:
 			bool, whether or not to keep unmatched records untouched
+			(default: True)
 
 		:return:
 			None, 'longitude' and 'latitude' values of :prop:`recs`
@@ -536,6 +540,7 @@ class MacroseismicEnquiryEnsemble():
 
 		:param keep_unmatched:
 			bool, whether or not to keep unmatched records untouched
+			(default: True)
 
 		:return:
 			None, 'longitude' and 'latitude' values of :prop:`recs`
@@ -630,6 +635,7 @@ class MacroseismicEnquiryEnsemble():
 		return bin_rec_dict
 
 	def aggregate_by_zip(self):
+		# TODO: can be removed
 		all_zip_country_tuples = self.get_zip_country_tuples()
 		unique_zip_country_tuples = set(all_zip_country_tuples)
 		zip_ensemble_dict = {}
@@ -640,6 +646,7 @@ class MacroseismicEnquiryEnsemble():
 		return zip_ensemble_dict
 
 	def aggregate_by_main_zip(self):
+		# TODO: can be removed
 		comm_recs = self.get_communes_from_db()
 		zip_main_id_dict = {}
 		## Note: Store id_main as string property (required for subselect_by_property)
@@ -806,7 +813,6 @@ class MacroseismicEnquiryEnsemble():
 			ensemble = self.filter_floors(min_floor, max_floor)
 		else:
 			ensemble = self
-		# TODO: if felt_index is zero, shouldn't CWS be zero as well?
 
 		if aggregate:
 			# TODO: remove outliers ? Not possible for these separate indexes!
@@ -934,7 +940,22 @@ class MacroseismicEnquiryEnsemble():
 		return cii
 
 	def calc_mean_cii(self, filter_floors=(0, 4), include_other_felt=True,
-						remove_outliers=(5, 95)):
+						remove_outliers=(2.5, 97.5)):
+		"""
+		Compute mean CII value from CII values of individual enquiries,
+		ignoring outliers. This is an alternative to the aggregated
+		CII computation in :meth:`calc_cii`
+
+		:param filter_floors:
+		:param include_other_felt:
+			see :meth:`calc_cii`
+		:param remove_outliers:
+			(min_pct, max_pct) tuple, percentile range to use
+			(default: 2.5, 97.5)
+
+		:return:
+			float, mean CII
+		"""
 		cii = self.calc_cii(aggregate=False, filter_floors=filter_floors,
 					include_other_felt=include_other_felt)
 		min_pct, max_pct = remove_outliers
@@ -945,6 +966,14 @@ class MacroseismicEnquiryEnsemble():
 
 	def plot_analysis_comparison(self, prop='CWS', include_other_felt=True):
 		"""
+		Plot comparison between values in database and computation
+		in this module for analysis of individual enquiries.
+
+		:param prop:
+			str, property name, either 'CWS', 'CDI' or 'CII'
+			(default: 'CWS')
+		:param include_other_felt:
+			see :meth:`calc_cii`
 
 		:return:
 			instance of :class:`MacroseismicEnquiryEnsemble`, containing
@@ -1058,7 +1087,19 @@ class MacroseismicEnquiryEnsemble():
 		return bin_edges, counts
 
 	def get_prop_title_and_labels(self, prop, lang='EN'):
-		## Extract title and labels from PHP files for different languages
+		"""
+		Extract title and labels for given property from PHP enquiry
+		templates for different languages
+
+		:param prop:
+			str, name of property
+		:param lang:
+			str, language, one of 'EN', 'NL', 'FR', 'DE'
+			(default: 'EN')
+
+		:return:
+			(title, labels) tuple
+		"""
 		import os
 		from parse_php_vars import parse_php_vars
 
@@ -1153,6 +1194,19 @@ class MacroseismicEnquiryEnsemble():
 			pylab.show()
 
 	def plot_histogram(self, prop, bin_edges=None, fig_filespec=None):
+		"""
+		Plot histogram for given property
+
+		:param prop:
+			string, name of property
+		:param bin_edges:
+			list or array of bin edges
+			(default: None, will auto-determine)
+
+		:param fig_filespec:
+			string, full path to output file
+			(default: None, will plot on screen)
+		"""
 		import pylab
 
 		pylab.clf()
