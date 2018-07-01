@@ -334,6 +334,7 @@ class MacroseismicEnquiryEnsemble():
 			dict, mapping comm_key values to database records (dicts)
 		"""
 		from seismodb import query_seismodb_table
+		from difflib import SequenceMatcher as SM
 
 		if comm_key in ("id_com", "id_main"):
 			unique_ids = sorted(set(self.get_prop_values(comm_key)))
@@ -404,23 +405,36 @@ class MacroseismicEnquiryEnsemble():
 							## Zip and commune name matched
 							comm_rec_dict[key] = rec
 						else:
-							## Only zip matched, keep only smallest id_com
+							## Only zip matched, try fuzzy text matching
 							country, ZIP, city = key
-							matching_zips = []
+							matching_zips, match_ratios, id_coms = [], [], []
 							for k in country_comm_rec_dict.keys():
 								if k[1] == ZIP:
-									matching_zips.append(country_comm_rec_dict[k])
-							id_coms = [r['id_com'] for r in matching_zips]
+									#matching_zips.append(country_comm_rec_dict[k])
+									matching_zips.append(k)
+									match_ratios.append(SM(None, k[2], city).ratio())
+									id_coms.append(country_comm_rec_dict[k]['id_com'])
+							#id_coms = [r['id_com'] for r in matching_zips]
 							if len(matching_zips):
-								idx = np.argmin(id_coms)
-								comm_rec_dict[key] = matching_zips[idx]
-								if verbose:
-									msg = "Commune %s-%s: name %s could not be matched"
-									msg %= (country, ZIP, city)
-									print(msg)
+								idx = np.argmax(match_ratios)
+								if match_ratios[idx] >= 0.4:
+									comm_rec_dict[key] = country_comm_rec_dict[matching_zips[idx]]
+									if verbose:
+										msg = "Commune %s-%s: %s was fuzzy-matched with %s"
+										msg %= (country, ZIP, city, matching_zips[idx][2])
+										print(msg)
+								else:
+									## Take smallest id_com
+									idx = np.argmin(id_coms)
+									#comm_rec_dict[key] = matching_zips[idx]
+									comm_rec_dict[key] = country_comm_rec_dict[matching_zips[idx]]
+									if verbose:
+										msg = "Commune %s-%s: %s was matched with main commune %s"
+										msg %= (country, ZIP, city, matching_zips[idx][2])
+										print(msg)
 							elif verbose:
 								## Unmatched ZIP, probably wrong
-								msg = "Commune %s-%s (%s) could not be matched"
+								msg = "Commune %s-%s: %s could not be matched"
 								msg %= (country, ZIP, city)
 								print(msg)
 					"""
@@ -1217,7 +1231,8 @@ class MacroseismicEnquiryEnsemble():
 			ar = np.array([ensemble.num_replies for ensemble in comm_rec_dict.values()])
 			bin_edges = self.bins['num_replies']
 		else:
-			ar = getattr(self, prop)
+			#ar = getattr(self, prop)
+			ar = prop
 		bin_edges, counts = self.get_histogram(ar, bin_edges=bin_edges)
 
 		pylab.bar(bin_edges[:-1], counts, width=np.diff(bin_edges))
@@ -1230,13 +1245,3 @@ class MacroseismicEnquiryEnsemble():
 			pylab.savefig(fig_filespec)
 		else:
 			pylab.show()
-
-		if prop == "duration":
-			print(np.nanmin(ar[ar>0]), np.nanmean(ar[ar>0]), np.nanmax(ar[ar>0]))
-			bins = np.arange(21)
-			ticks = None
-			#pylab.hist(ar[ar>0], bins=bins)
-
-		else:
-			print("Don't know how to plot %s" % prop)
-			return
