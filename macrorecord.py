@@ -18,7 +18,7 @@ def strip_accents(unicode_string):
 	Remove accents (diacritics) from unicode string
 
 	:param unicode_string:
-		unicode, input string
+		unicode or str, input string
 
 	:return:
 		unicode, output string
@@ -188,12 +188,17 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			list
 		"""
-		first_non_None_value = next((rec[prop] for rec in self.recs if rec[prop] is not None), None)
-		if len(self.recs) and isinstance(first_non_None_value, (str, unicode)):
-			none_val = u""
+		if not self.recs[0].has_key(prop):
+			return []
 		else:
-			none_val = np.nan
-		return [rec[prop] if rec[prop] is not None else none_val for rec in self.recs]
+			first_non_None_value = next((rec[prop] for rec in self.recs
+										if rec[prop] is not None), None)
+			if len(self.recs) and isinstance(first_non_None_value, (str, unicode)):
+				none_val = u""
+			else:
+				none_val = np.nan
+			return [rec[prop] if rec[prop] is not None else none_val
+					for rec in self.recs]
 
 	def get_unique_prop_values(self, prop):
 		"""
@@ -341,11 +346,11 @@ class MacroseismicEnquiryEnsemble():
 			table_clause = ['communes']
 			column_clause = ['*']
 			query_values = ','.join(map(str, unique_ids))
-			db_key = {'id_com': 'id', 'id_main': 'id_main'}[comm_key]
-			where_clause = '%s in (%s)' % (db_key, query_values)
+			where_clause = 'id in (%s)' % query_values
 			comm_recs = query_seismodb_table(table_clause,
-						column_clause=column_clause, where_clause=where_clause)
-			comm_rec_dict = {rec[db_key]: rec for rec in comm_recs}
+						column_clause=column_clause, where_clause=where_clause,
+						verbose=verbose)
+			comm_rec_dict = {rec['id']: rec for rec in comm_recs}
 		elif comm_key == "zip":
 			comm_rec_dict = {}
 			column_clause = ['*']
