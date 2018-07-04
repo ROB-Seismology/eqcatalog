@@ -4,6 +4,7 @@ Plot intensity map
 
 import os
 import numpy as np
+import matplotlib
 
 import eqcatalog
 import mapping.layeredbasemap as lbm
@@ -17,7 +18,8 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 				min_fiability=20.0, filter_floors=(0, 4), group_by_main_village=False, agg_function="average",
 				int_conversion="round", symbol_style=None, cmap="rob",
 				color_gradient="discontinuous", event_style="default",
-				radii=[], recalc=False, plot_pie=None, title="", ax=None, verbose=True):
+				radii=[], recalc=False, plot_pie=None, title="", fig_filespec=None,
+				ax=None, verbose=True):
 	"""
 	Plot macroseismic map for given earthquake
 
@@ -25,13 +27,19 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 		str, "floor", "round" or "ceil"
 		(default: "round", corresponding to the convention of Wald et al.)
 	"""
+	# TODO: plot individual points, replace group_by_main_village with
+	# group_by option, allowing None
+	query_info = query_info.lower()
+	if query_info == 'num_replies':
+		min_replies = 1
 
 	[eq] = eqcatalog.seismodb.query_ROB_LocalEQCatalogByID(id_earth)
 
 	if not recalc:
 		# TODO: filter floors!
+		qi = query_info if query_info in ('cii', 'cdi') else 'cii'
 		recs = eq.get_macroseismic_data_aggregated_web(min_replies=min_replies,
-				query_info=query_info, min_val=min_val, min_fiability=min_fiability,
+				query_info=qi, min_val=min_val, min_fiability=min_fiability,
 				group_by_main_village=group_by_main_village, agg_function=agg_function,
 				verbose=verbose)
 		unassigned = recs.pop(None)
@@ -55,6 +63,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 		for key in comm_ensemble_dict.keys():
 			if comm_ensemble_dict[key].num_replies < min_replies:
 				comm_ensemble_dict.pop(key)
+				continue
 			id_com = comm_ensemble_dict[key].recs[0][comm_key]
 			num_replies = len(comm_ensemble_dict[key])
 			lon = comm_ensemble_dict[key].recs[0]['longitude']
@@ -62,8 +71,12 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 			web_ids = comm_ensemble_dict[key].get_prop_values('id_web')
 			if query_info == 'cii':
 				I = comm_ensemble_dict[key].calc_cii()
+				#I = comm_ensemble_dict[key].calc_mean_cii(filter_floors=None,
+				#				include_other_felt=False, remove_outliers=(0,100))
 			elif query_info == 'cdi':
 				I = comm_ensemble_dict[key].calc_cdi()
+			elif query_info == "num_replies":
+				I = 1
 			else:
 				print("Don't know how to recompute %s" % query_info)
 				exit()
@@ -99,7 +112,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 	else:
 		cmap = matplotlib.cm.get_cmap(cmap_name)
 
-	if query_info in ('cii', 'cdi', 'manual_intensity'):
+	if query_info in ('cii', 'cdi'):
 		intensities = np.array([rec.I for rec in macro_recs])
 
 		if color_gradient == "discontinuous":
@@ -120,55 +133,67 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 		lats = [rec.lat for rec in macro_recs]
 		values = {}
 		values[query_info] = [getattr(rec, query_info) for rec in macro_recs]
-		values['num_replies'] = [rec.num_replies for rec in macro_recs]
+		if query_info != 'num_replies':
+			values['num_replies'] = [rec.num_replies for rec in macro_recs]
 		commune_data = lbm.MultiPointData(lons, lats, values=values)
 	else:
 		key = "ID_ROB"
 		joined_attributes = {}
 		joined_attributes[query_info] = {'key': key,
 			'values': {rec.id_com: getattr(rec, query_info) for rec in macro_recs}}
-		joined_attributes['num_replies'] = {'key': key,
-			'values': {rec.id_com: rec.num_replies for rec in macro_recs}}
+		if query_info != 'num_replies':
+			joined_attributes['num_replies'] = {'key': key,
+				'values': {rec.id_com: rec.num_replies for rec in macro_recs}}
 		#print(joined_attributes)
 		if verbose:
 			Imax = np.nanmax(joined_attributes[query_info]['values'].values())
-			print("Max Intensity: %s" % Imax)
+			print("Max %s: %s" % (query_info, Imax))
 
 		commune_data = lbm.GisData(gis_filespec, joined_attributes=joined_attributes)
 		#_, _, polygon_data = commune_data.get_data()
 		#print [val for val in polygon_data.values['cii'] if val != None]
 
 
-	if query_info in ('cii', 'cdi', 'manual_intensity'):
+	if query_info in ('cii', 'cdi'):
 		classes = np.arange(1, cmap.N + 1)
-		if color_gradient == "discontinuous":
+		cb_title = {'cii': "Community Internet Intensity",
+					'cdi': "Community Decimal Intensity"}[query_info]
+	elif query_info == 'num_replies':
+		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
+		cb_title = "Number of replies"
+
+	if color_gradient == "discontinuous":
+		if query_info in ('cii', 'cdi'):
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=query_info,
-											labels=["%d" % val for val in classes],
-											style_under='w')
-			cb_title = "Community Internet Intensity"
+										labels=["%d" % val for val in classes],
+										style_under='w')
+		elif query_info == 'num_replies':
+			tfc = lbm.ThematicStyleRanges(classes, cmap, value_key=query_info,
+										labels=["%d" % val for val in classes],
+										style_under='w', style_bad='w')
+	elif color_gradient == "continuous":
+		tfc = lbm.ThematicStyleGradient(classes, cmap, value_key=query_info,
+								labels=["%d" % val for val in classes],
+								style_under='w')
 
-		elif color_gradient == "continuous":
-			tfc = lbm.ThematicStyleGradient(classes, cmap, value_key=query_info,
-									labels=["%d" % val for val in classes],
-									style_under='w')
-			cb_title = "Community Decimal Intensity"
-
-	colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d", title=cb_title)
+	colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d", title=cb_title,
+										spacing="uniform")
 	#colorbar_style = None
 	tfc.colorbar_style = colorbar_style
 	thematic_legend_style = lbm.LegendStyle(location=4)
 
 	if not symbol_style:
 		## Plot polygons
-		num_replies = [1, 3, 5, 10, 20, 50, 500]
-		tfh = lbm.ThematicStyleRanges(num_replies, ['', '.....', '....', '...', '..', ''],
-										value_key="num_replies")
+		ta = 1.
 		tfh = None
-		if color_gradient == "discontinuous":
-			ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
-										value_key="num_replies")
-		else:
-			ta = 1.
+		if query_info != 'num_replies':
+			## Set transparency (or hatching) in function of number of replies
+			num_replies = [1, 3, 5, 10, 20, 50, 500]
+			#tfh = lbm.ThematicStyleRanges(num_replies, ['', '.....', '....', '...', '..', ''],
+			#								value_key="num_replies")
+			if color_gradient == "discontinuous":
+				ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
+											value_key="num_replies")
 		polygon_style = lbm.PolygonStyle(fill_color=tfc, line_width=0.1,
 					fill_hatch=tfh, alpha=ta, thematic_legend_style=thematic_legend_style)
 		commune_style = lbm.CompositeStyle(polygon_style=polygon_style)
@@ -176,12 +201,13 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 	else:
 		## Plot points
 		## Symbol size in function of number of replies
-		num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
-		num_replies = num_replies[num_replies >= min_replies]
-		symbol_size = symbol_style.size
-		sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
-		ts = lbm.ThematicStyleGradient(num_replies, sizes, value_key="num_replies")
-		symbol_style.size = ts
+		if query_info != 'num_replies':
+			num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
+			num_replies = num_replies[num_replies >= min_replies]
+			symbol_size = symbol_style.size
+			sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
+			ts = lbm.ThematicStyleGradient(num_replies, sizes, value_key="num_replies")
+			symbol_style.size = ts
 		symbol_style.fill_color = tfc
 		#symbol_style.thematic_legend_style = thematic_legend_style
 		#commune_style = lbm.CompositeStyle(point_style=symbol_style)
@@ -255,9 +281,11 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 	map = lbm.LayeredBasemap(layers, title, projection, region=region,
 				graticule_interval=graticule_interval, legend_style=legend_style,
 				ax=ax)
-	fig_filespec = None
-	#fig_filespec = r"C:\Temp\seismodb_%s.png" % attribute
-	map.plot(fig_filespec=fig_filespec)
+	if fig_filespec:
+		dpi = 300
+	else:
+		dpi = 90
+	map.plot(fig_filespec=fig_filespec, dpi=dpi)
 
 #def plot_macro_web(psf, region, proj, event_ID, min_replies=3, min_fiability=20.0, plot_info="Intensity", cpt="KVN_intensity_USGS", legend=True, group_by_main_village=False, agg_function="", min_intensity=1, symbol_style=None, symbol_size=0.25, symbol_size_fixed=True, verbose=True, errf=None):
 
@@ -271,19 +299,31 @@ if __name__ == "__main__":
 	projection = "tmerc"
 	graticule_interval = (0.5, 1)
 	id_earth = 6625
-	min_replies = 1
-	query_info = "cii"
+	min_replies = 3
+	#query_info = "cii"
+	query_info = "num_replies"
 	min_fiability = 20
 	group_by_main_village = False
-	color_gradient = "continuous"
+	color_gradient = "discontinuous"
+	#cmap = "rob"
+	cmap = "jet"
 	#symbol_style = lbm.PointStyle(shape='D', size=5)
 	symbol_style = None
-	radii = [10, 25, 50]
+	#radii = [10, 25, 50]
+	radii = []
 	plot_pie = False
-	title = "Kinrooi 25/05/2018"
+	#title = "Kinrooi 25/05/2018"
+	title = ""
+
+	out_folder = r"D:\Earthquake Reports\20180525\plots"
+	fig_filename = "Kinrooi_id_com_num_replies.PNG"
+	fig_filespec = os.path.join(out_folder, fig_filename)
+	#fig_filespec = None
+
 	plot_macroseismic_map(id_earth, region=region, projection=projection,
 					graticule_interval=graticule_interval, min_replies=min_replies,
 					query_info=query_info, min_fiability=min_fiability, filter_floors=(-100,900),
-					color_gradient=color_gradient, symbol_style=symbol_style,
+					cmap=cmap, color_gradient=color_gradient, symbol_style=symbol_style,
 					group_by_main_village=group_by_main_village, radii=radii,
-					plot_pie=plot_pie, title=title, recalc=True)
+					plot_pie=plot_pie, title=title, fig_filespec=fig_filespec,
+					recalc=True)
