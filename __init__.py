@@ -35,7 +35,7 @@ import macrorecord
 reload(macrorecord)
 
 from macrorecord import (MacroseismicRecord, MacroseismicEnquiryEnsemble,
-						MacroseismicDataPoint)
+						MacroseismicDataPoint, get_roman_intensity)
 
 ## Depends on time_functions, msc
 import eqrecord

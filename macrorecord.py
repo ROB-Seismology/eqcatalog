@@ -10,7 +10,35 @@ import numpy as np
 
 
 __all__ = ["MacroseismicRecord", "MacroseismicEnquiryEnsemble",
-			"MacroseismicDataPoint"]
+			"MacroseismicDataPoint", "get_roman_intensity"]
+
+
+ROMAN_INTENSITY_DICT = {0: '', 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI',
+						7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X', 11: 'XI', 12: 'XII'}
+
+def get_roman_intensity(intensities, include_fraction=True):
+	scalar = False
+	if np.isscalar(intensities):
+		intensities = [intensities]
+		scalar = True
+	decimals = np.remainder(intensities, 1)
+	intensities = np.floor_divide(intensities, 1)
+	roman_intensities = []
+	for i in range(len(intensities)):
+		intensity, dec = intensities[i], decimals[i]
+		roman_intensity = ROMAN_INTENSITY_DICT[intensity]
+		if include_fraction:
+			if 0.125 <= dec < 0.375:
+				roman_intensity += ' 1/4'
+			elif 0.375 <= dec < 0.625:
+				roman_intensity += ' 1/2'
+			elif 0.625 <= dec:
+				roman_intensity += ' 3/4'
+		roman_intensities.append(roman_intensity.decode('Latin-1'))
+	if scalar:
+		return roman_intensities[0]
+	else:
+		return roman_intensities
 
 
 def strip_accents(unicode_string):
@@ -188,12 +216,12 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			list
 		"""
-		if not self.recs[0].has_key(prop):
+		if not len(self.recs) or not self.recs[0].has_key(prop):
 			return []
 		else:
 			first_non_None_value = next((rec[prop] for rec in self.recs
 										if rec[prop] is not None), None)
-			if len(self.recs) and isinstance(first_non_None_value, (str, unicode)):
+			if isinstance(first_non_None_value, (str, unicode)):
 				none_val = u""
 			else:
 				none_val = np.nan
@@ -439,6 +467,7 @@ class MacroseismicEnquiryEnsemble():
 										print(msg)
 							elif verbose:
 								## Unmatched ZIP, probably wrong
+								# TODO: we could still try to match commune name?
 								msg = "Commune %s-%s: %s could not be matched"
 								msg %= (country, ZIP, city)
 								print(msg)
@@ -688,7 +717,7 @@ class MacroseismicEnquiryEnsemble():
 	def fix_felt_is_none(self):
 		"""
 		Fix enquiries where 'felt' has not been filled out, based on
-		reply to 'asleep', 'mo(ion' and 'stand' questions.
+		reply to 'asleep', 'motion' and 'stand' questions.
 		"""
 		ensemble = self.subselect_by_property('felt', ['', np.nan])
 		## Slept through it --> not felt
@@ -1060,19 +1089,19 @@ class MacroseismicEnquiryEnsemble():
 			bins = self.bins.get(prop, None)
 		if bins is None:
 			if include_nan:
-				bins, counts = np.unique(ar.filled(), return_counts=True)
+				bins, counts = np.unique(np.ma.filled(ar), return_counts=True)
 				bins = bins.astype('float')
 				bins[-1] = np.nan
 			else:
-				bins, counts = np.unique(ar.compressed(), return_counts=True)
+				bins, counts = np.unique(np.ma.compressed(ar), return_counts=True)
 		else:
 			if not include_nan:
 				#bins.pop(bins.index(np.nan))
 				bins = np.delete(bins, np.argwhere(np.isnan(bins)))
 			counts = np.zeros(len(bins))
-			partial_counts = np.bincount(np.digitize(ar.compressed(), bins, right=True))
+			partial_counts = np.bincount(np.digitize(np.ma.compressed(ar), bins, right=True))
 			counts[:len(partial_counts)] = partial_counts
-			if include_nan:
+			if include_nan and np.ma.is_masked(ar):
 				counts[-1] = np.sum(ar.mask)
 		return bins, counts
 
@@ -1140,8 +1169,8 @@ class MacroseismicEnquiryEnsemble():
 							'asleep': 'sleep',
 							'other_felt': 'ofelt',
 							'damage': 'd_text'}.get(prop, prop)
-			labels = php_var_dict.get('$o_' + php_var_name)
-			title = php_var_dict.get('$t_' + php_var_name)
+			labels = php_var_dict.get('$o_' + php_var_name, [])
+			title = php_var_dict.get('$t_' + php_var_name, "")
 
 		## Move 'no answer' labels to end, to match with bincount
 		if prop in ["motion", "reaction", "response", "stand", "furniture",
@@ -1186,8 +1215,8 @@ class MacroseismicEnquiryEnsemble():
 
 		## Extract title and labels from PHP files for different languages
 		title, labels = self.get_prop_title_and_labels(prop, label_lang)
-		if len(labels) < len(bins):
-			labels.append('-')
+		if labels and len(labels) < len(bins):
+			labels.append('No answer')
 		if not labels:
 			try:
 				labels = ["%.0f" % b for b in bins]
@@ -1250,3 +1279,14 @@ class MacroseismicEnquiryEnsemble():
 			pylab.savefig(fig_filespec)
 		else:
 			pylab.show()
+
+	def report_num_replies_by_commune(self, comm_key):
+		comm_ensemble_dict = self.aggregate_by_commune(comm_key)
+		comm_rec_dict = self.get_communes_from_db(comm_key)
+		num_replies_communes = []
+		for comm_id, ensemble in comm_ensemble_dict.items():
+			comm_name = comm_rec_dict[comm_id]['name']
+			num_replies_communes.append((ensemble.num_replies, comm_name))
+		for (num_replies, comm_name) in sorted(num_replies_communes, reverse=True):
+			print("%4d - %s" % (num_replies, comm_name))
+
