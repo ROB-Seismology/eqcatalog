@@ -670,6 +670,7 @@ class MacroseismicEnquiryEnsemble():
 			dict, mapping (x_left, y_bottom) tuples to instances of
 			:class:`MacroseismicEnquiryEnsemble`
 		"""
+		grid_spacing *= 1000
 		import mapping.geotools.coordtrans as ct
 		lons = self.get_prop_values('longitude')
 		lats = self.get_prop_values('latitude')
