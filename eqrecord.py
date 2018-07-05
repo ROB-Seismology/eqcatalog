@@ -670,9 +670,9 @@ class LocalEarthquake:
 		hash = hi.encode(self.ID)
 		return hash
 
-	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=20.0, group_by_main_village=False, agg_function="", verbose=False):
+	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=20.0, group_by_main_village=False, filter_floors=False, agg_function="", verbose=False):
 		from seismodb import query_ROB_Web_MacroCatalog
-		return query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, agg_function=agg_function, verbose=verbose)
+		return query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, filter_floors=filter_floors, agg_function=agg_function, verbose=verbose)
 
 	def get_macroseismic_data_aggregated_official(self, Imax=True, min_val=1, group_by_main_village=False, agg_function="maximum", verbose=False):
 		from seismodb import query_ROB_Official_MacroCatalog
