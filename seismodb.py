@@ -602,7 +602,8 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 
 def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 					min_val=1, min_fiability=20.0, group_by_main_village=False,
-					agg_function="average", verbose=False, errf=None):
+					filter_floors=False, agg_function="average", verbose=False,
+					errf=None):
 	"""
 	Query ROB web macroseismic catalog (= online inquiries)
 
@@ -623,6 +624,10 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	:param group_by_main_village:
 		bool, whether or not to aggregate the results by main village
 		(default: False)
+	:param filter_floors:
+			(min_floor, max_floor) tuple, floors outside this range
+			(basement floors and upper floors) are filtered out
+			(default: False)
 	:param agg_function:
 		str, aggregation function to use, one of "minimum", "maximum" or
 		"average". If :param:`group_by_main_village` is False, aggregation
@@ -663,8 +668,11 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	column_clause.append('%s(web_analyse.%s) as "Intensity"' % (agg_function, query_info.upper()))
 
 	where_clause = 'web_analyse.id_earth = %d' % id_earth
-	where_clause += ' and web_analyse.m_fiability >= %.1f' % float(min_fiability)
-	where_clause += ' and web_analyse.deleted = false'
+	where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
+	where_clause += ' AND web_analyse.deleted = false'
+	if filter_floors:
+		where_clause += ' AND (web_input.floor IS NULL'
+		where_clause += ' OR web_input.floor BETWEEN %d AND %d)' % filter_floors
 
 	having_clause = 'num_replies >= %d' % min_replies
 	if query_info.lower() in ("cii", "cdi", "mi"):
