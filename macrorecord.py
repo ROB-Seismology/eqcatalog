@@ -253,6 +253,11 @@ class MacroseismicEnquiryEnsemble():
 		prop_values = self.get_prop_values(prop)
 		return sorted(set(prop_values))
 
+	def get_date_times(self):
+		# TODO: convert to datetime objects
+		date_times = self.get_prop_values('submit_time')
+		return date_times
+
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
 		Select part of ensemble matching given property values
@@ -694,6 +699,10 @@ class MacroseismicEnquiryEnsemble():
 			bin_rec_dict[key] = self.__class__(self.id_earth, bin_rec_dict[key])
 
 		return bin_rec_dict
+
+	def aggregate_by_distance(self, distance_interval):
+		# TODO
+		pass
 
 	def aggregate_by_zip(self):
 		# TODO: can be removed
@@ -1310,3 +1319,106 @@ class MacroseismicEnquiryEnsemble():
 		for (num_replies, comm_name) in sorted(num_replies_communes, reverse=True):
 			print("%4d - %s" % (num_replies, comm_name))
 
+	def find_duplicate_addresses(self, verbose=True):
+		"""
+		Find duplicate records based on their address (street name and ZIP).
+
+		:param verbose:
+			bool, whether or not to print some useful information
+
+		:return:
+			list of lists containing indexes of duplicate records
+		"""
+		all_streets = self.get_prop_values('street')
+		all_zips = self.get_prop_values('zip')
+		all_communes = self.get_prop_values('city')
+		unique_streets = []
+		unique_idxs = []
+		duplicate_idxs = {}
+		for s, street in enumerate(all_streets):
+			## Only consider non-empty strings containing numbers
+			#if street and not street.replace(' ', '').isalpha():
+			if street and any(char.isdigit() for char in street.replace(' ', '')):
+				## Combine with ZIP
+				zip_street = (all_zips[s], street)
+				if not zip_street in unique_streets:
+					unique_streets.append(zip_street)
+					unique_idxs.append(s)
+				else:
+					## Duplicate
+					unique_idx = unique_streets.index(zip_street)
+					unique_idx = unique_idxs[unique_idx]
+					if unique_idx in duplicate_idxs:
+						duplicate_idxs[unique_idx].append(s)
+					else:
+						duplicate_idxs[unique_idx] = [s]
+		duplicate_idxs = [[key] + values for key, values in duplicate_idxs.items()]
+		duplicate_idxs = sorted(duplicate_idxs)
+
+		if verbose:
+			print("Duplicate streets:")
+			for idxs in duplicate_idxs:
+				ensemble = self.__getitem__(idxs)
+				for rec in ensemble.recs:
+					street = rec['street']
+					if street:
+						street = street.encode('ascii', 'replace')
+					zip = rec['zip']
+					cii = rec['CII']
+					fiability = rec['fiability']
+					name = rec['name']
+					print("  %s [CII=%s, fiab=%d] %s - %s" % (zip, cii, fiability, name, street))
+				print("")
+
+		return duplicate_idxs
+
+	def get_duplicate_records(self, verbose=True):
+		"""
+		Get duplicate records based on their address (street name and ZIP).
+
+		:param verbose:
+			bool, whether or not to print some useful information
+
+		:return:
+			list of instances of :class:`MacroseismicEnquiryEnsemble`
+			for each set of duplicate records
+		"""
+		duplicate_idxs = self.find_duplicate_addresses(verbose=verbose)
+		ensemble_list = []
+		for idxs in duplicate_idxs:
+			ensemble = self.__getitem__(idxs)
+			ensemble_list.append(ensemble)
+		return ensemble_list
+
+	def remove_duplicate_records(self, verbose=True):
+		"""
+		Remove duplicate records based on street name and ZIP code.
+		For duplicate records, the one with the highest fiability and
+		most recent submit time is kept.
+
+		Note that records are not removed from current instance,
+		but a new instance without the duplicate records is returned!
+
+		:param verbose:
+			bool, whether or not to print some useful information
+
+		:return:
+			instance of :class:`MacroseismicEnquiryEnsemble`
+		"""
+		duplicate_idxs = self.find_duplicate_addresses(verbose=verbose)
+		web_ids_to_remove = []
+		for idxs in duplicate_idxs:
+			ensemble = self.__getitem__(idxs)
+			## Keep the one with highest fiability and most recent submit time
+			# TODO: should we also consider CII (lowest = most reliable?)
+			submit_times = ensemble.get_prop_values('submit_time')
+			ft = zip( ensemble.fiability, submit_times)
+			## numpy argsort doesn't work for tuples, this works similar
+			#order = np.argsort(fiability_times)
+			order = sorted(range(len(ft)), key=ft.__getitem__)
+			subensemble = ensemble[order[:-1]]
+			web_ids_to_remove.extend(subensemble.get_prop_values('id_web'))
+
+		if verbose:
+			print("Removing %d duplicates" % len(web_ids_to_remove))
+		return self.subselect_by_property('id_web', web_ids_to_remove, negate=True)
