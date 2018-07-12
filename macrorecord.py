@@ -210,6 +210,8 @@ class MacroseismicEnquiryEnsemble():
 		self.bins['response'] = np.array([0, 1, 2, 3, 4, np.nan])
 		self.bins['walls'] = np.array([0, 1, 2, 3, np.nan])
 		self.bins['floor'] = np.array([-10.5, -0.5, 0.5, 1.5, 2.5, 3.5, 4.5, 10.5, 100])
+		self.bins['sway'] = np.array([0, 1, 2, np.nan])
+		self.bins['creak'] = np.array([0, 1, 2, np.nan])
 
 		self.bins['fiability'] = np.arange(0, 101, 10)
 		self.bins['CII'] = np.arange(1, 13) - 0.5
