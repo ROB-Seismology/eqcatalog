@@ -258,9 +258,21 @@ class MacroseismicEnquiryEnsemble():
 		return sorted(set(prop_values))
 
 	def get_date_times(self):
-		# TODO: convert to datetime objects
+		format = "%Y-%m-%d %H:%M:%S"
 		date_times = self.get_prop_values('submit_time')
+		date_times = [datetime.datetime.strptime(dt, format) for dt in date_times]
+		date_times = np.array(date_times)
 		return date_times
+
+	def get_elapsed_times(self):
+		eq = self.get_eq()
+		return self.get_date_times() - eq.datetime
+
+	def get_eq(self):
+		from .seismodb import query_ROB_LocalEQCatalogByID
+		if isinstance(self.id_earth, (int, long)):
+			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
+			return eq
 
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
@@ -1513,4 +1525,5 @@ class MacroseismicEnquiryEnsemble():
 
 	def plot_cumulative_responses_vs_time(self):
 		# TODO
-		pass
+		pylab.plot(np.sort(self.get_date_times()), np.arange(self.num_replies)+1)
+		pylab.gcf().autofmt_xdate()
