@@ -230,6 +230,8 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			list
 		"""
+		if prop == "damage":
+			prop = "d_text"
 		if not len(self.recs) or not self.recs[0].has_key(prop):
 			return []
 		else:
@@ -1104,6 +1106,10 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		if isinstance(prop, (list, np.ndarray)):
 			ar = prop
+		elif prop == "damage":
+			bins = np.arange(self.damage.shape[1])
+			counts = np.sum(self.damage, axis=0)
+			return (bins, counts)
 		else:
 			try:
 				ar = getattr(self, prop)
@@ -1321,6 +1327,86 @@ class MacroseismicEnquiryEnsemble():
 		for (num_replies, comm_name) in sorted(num_replies_communes, reverse=True):
 			print("%4d - %s" % (num_replies, comm_name))
 
+	def report_bincount(self, prop, bins=None, include_nan=True, include_labels=False):
+		"""
+		Print table with bincounts for given property
+
+		:param prop:
+		:param bins:
+		:param include_nan:
+			see :meth:`bincount`
+		"""
+		from prettytable import PrettyTable
+		bins, numbers = self.bincount(prop, bins=bins, include_nan=include_nan)
+		column_names = ['Value', 'Num records']
+		if include_labels:
+			title, labels = self.get_prop_title_and_labels(prop, lang="EN")
+			if labels and len(labels) < len(bins):
+				labels.append('No answer')
+			column_names.append('Label')
+
+		table = PrettyTable(column_names)
+		for i in range(len(bins)):
+			bin, num = bins[i], numbers[i]
+			if num > 0:
+				row = [bin, int(num)]
+				if include_labels:
+					row.append(labels[i])
+				table.add_row(row)
+		print(table)
+
+	def evaluate_cws_calculation(self, include_other_felt=True, filter_floors=(0, 4)):
+		"""
+		Print values of properties used for CWS calculation, and the
+		derived indexes.
+
+		:param include_other_felt:
+		:param filter_floors:
+			see :meth:`calc_cws`
+		"""
+		print("felt:")
+		print("  Values: %s" % self.felt)
+		print("  Felt index (without other_felt) [x5]: %s" % (5 * self.calc_felt_index(include_other_felt=False)))
+
+		print("other_felt:")
+		print("  Values: %s" % self.other_felt)
+		print("  Felt index (including other_felt) [x5]: %s" % (5 * self.calc_felt_index(include_other_felt=True)))
+
+		print("motion:")
+		print("  Values: %s" % self.motion)
+		print("  Motion index [x1]: %s" % self.motion.filled(0))
+
+		print("reaction:")
+		print("  Values: %s" % self.reaction)
+		print("  Reaction index [x1]: %s" % self.reaction.filled(0))
+
+		print("stand:")
+		print("  Values: %s" % self.stand)
+		print("  Stand index [x2]: %s" % (2 * self.calc_stand_index().filled(0)))
+
+		print("shelf:")
+		print("  Values: %s" % self.shelf)
+		print("  Shelf index [x5]: %s" % (5 * self.calc_shelf_index().filled(0)))
+
+		print("picture:")
+		print("  Values: %s" % self.picture)
+		print("  Picture index [x2]: %s" % (2 * self.calc_picture_index().filled(0)))
+
+		print("furniture:")
+		print("  Values: %s" % self.furniture)
+		print("  Furniture index [x3]: %s" % (3 * self.furniture.filled(0)))
+
+		print("damage:")
+		print("  Values: %s" % self.get_prop_values('d_text'))
+		print("  Damage index [x5]: %s" % (5 * self.calc_damage_index()))
+
+		print("CWS:")
+		print("  Database: %s" % self.CWS)
+		print("  Recomputed: %s" % self.calc_cws(aggregate=False,
+			filter_floors=filter_floors, include_other_felt=include_other_felt))
+		print("  Aggregated: %s" % self.calc_cws(filter_floors=filter_floors,
+										include_other_felt=include_other_felt))
+
 	def find_duplicate_addresses(self, verbose=True):
 		"""
 		Find duplicate records based on their address (street name and ZIP).
@@ -1424,3 +1510,7 @@ class MacroseismicEnquiryEnsemble():
 		if verbose:
 			print("Removing %d duplicates" % len(web_ids_to_remove))
 		return self.subselect_by_property('id_web', web_ids_to_remove, negate=True)
+
+	def plot_cumulative_responses_vs_time(self):
+		# TODO
+		pass

@@ -79,6 +79,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 		ensemble.fix_felt_is_none()
 		ensemble.fix_commune_ids()
 		ensemble.set_main_commune_ids()
+		ensemble = ensemble.remove_duplicate_records()
 
 		if aggregate_by in ('id_com', 'id_main'):
 			comm_key = aggregate_by
