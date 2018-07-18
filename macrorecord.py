@@ -55,7 +55,7 @@ def get_roman_intensity(intensities, include_fraction=True):
 
 def strip_accents(unicode_string):
 	"""
-	Remove accents (diacritics) from unicode string
+	Remove accents (diacritics) from (unicode) string
 
 	:param unicode_string:
 		unicode or str, input string
@@ -716,9 +716,37 @@ class MacroseismicEnquiryEnsemble():
 
 		return bin_rec_dict
 
-	def aggregate_by_distance(self, distance_interval):
-		# TODO
-		pass
+	def aggregate_by_distance(self, lon, lat, distance_interval):
+		"""
+		Aggregate enquiriess in different distance bins
+
+		:param lon:
+			float, longitude of point to compute distance to
+		:param lat:
+			float, latitude of point to compute distance to
+		:param distance_interval:
+			float, distance interval for binning (in km)
+
+		:return:
+			dict, mapping distance bins to instances of
+			:class:`MacroseismicEnquiryEnsemble`
+		"""
+		distances = self.calc_distances(lon, lat)
+		binned_distances = np.floor(distances / distance_interval) * distance_interval
+		bin_rec_dict = {}
+		for r, rec in enumerate(self.recs):
+			bin = binned_distances[r]
+			if np.isnan(bin):
+				bin = None
+			if not bin in bin_rec_dict:
+				bin_rec_dict[bin] = [rec]
+			else:
+				bin_rec_dict[bin].append(rec)
+
+		for key in bin_rec_dict.keys():
+			bin_rec_dict[key] = self.__class__(self.id_earth, bin_rec_dict[key])
+
+		return bin_rec_dict
 
 	def aggregate_by_zip(self):
 		# TODO: can be removed
@@ -756,6 +784,9 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		Fix enquiries where 'felt' has not been filled out, based on
 		reply to 'asleep', 'motion' and 'stand' questions.
+
+		:return:
+			None, 'felt' values of :prop:`recs` are modified in place
 		"""
 		ensemble = self.subselect_by_property('felt', ['', np.nan])
 		## Slept through it --> not felt
@@ -768,24 +799,6 @@ class MacroseismicEnquiryEnsemble():
 				(ensemble.stand.filled(-1) > 1)].set_prop_values('felt', '1')
 		self._gen_arrays()
 
-	def fix_none_replies(self):
-		"""
-		Fix properties for which there is a "No answer" option:
-		NOT NECESSARY !
-
-		building? ('No building' = no answer?)
-		motion ('', '_') --> OK
-		reaction ('', '_')
-		response ('', '_')
-		stand ('', '_')
-		furniture ('_')
-		heavy_appliance ('_')
-		walls ('_')
-		sway ('', '_')
-
-		"""
-		pass
-
 	def calc_felt_index(self, include_other_felt=True):
 		"""
 		Compute felt indexes for individual questionnaires
@@ -793,18 +806,56 @@ class MacroseismicEnquiryEnsemble():
 
 		:param include_other_felt:
 			bool, whether or not to include the replies to the question
-			Did others nearby feel the earthquake ?
+			"Did others nearby feel the earthquake ?"
+			The 'other_felt' classes correspond to fractional values of
+			[0.72, 0.36, 0.72, 1, 1]
+
+			Note: A small modification is applied for cases where 'felt'
+			is zero or undefined. In that case, the fractional values are:
+			[0., 0., 0.36, 0.72, 1]
+
 			(default: True)
 
 		:return:
 			float array, felt indexes [range 0 - 1]
 		"""
 		other_felt_classes = np.array([0.72, 0.36, 0.72, 1, 1])
+		other_felt_classes_if_felt_is_zero = np.ma.array([0., 0., 0.36, 0.72, 1])
+		other_felt_classes_if_felt_is_zero.mask = np.isnan(other_felt_classes_if_felt_is_zero)
+
 		felt_index = self.felt
 		if include_other_felt:
 			## Note: do not use *= here, it doesn't work
-			felt_index = felt_index * other_felt_classes[self.other_felt]
+			#felt_index = felt_index * other_felt_classes[self.other_felt]
+
+			## More complex, taking into account other_felt if felt is zero or undefined
+			felt_index = np.ma.zeros(len(self.felt))
+			felt_index[self.felt == 1] = other_felt_classes[self.other_felt][self.felt == 1]
+			felt_index[self.felt == 0] = other_felt_classes_if_felt_is_zero[self.other_felt][self.felt == 0]
+			other_felt_classes_if_felt_is_zero.mask = [1, 0, 0, 0, 0]
+			felt_index[self.felt.mask] = other_felt_classes_if_felt_is_zero[self.other_felt][self.felt.mask]
+
 		return felt_index
+
+	def calc_motion_index(self):
+		"""
+		Compute motion indexes for individual questionnaires
+		following Wald et al. (1999)
+
+		:return:
+			float array, motion indexes [range 0 - 1]
+		"""
+		return self.motion.astype('float')
+
+	def calc_reaction_index(self):
+		"""
+		Compute reaction indexes for individual questionnaires
+		following Wald et al. (1999)
+
+		:return:
+			float array, reaction indexes [range 0 - 1]
+		"""
+		return self.reaction.astype('float')
 
 	def calc_shelf_index(self):
 		"""
@@ -812,7 +863,7 @@ class MacroseismicEnquiryEnsemble():
 		following Wald et al. (1999)
 
 		:return:
-			float array, shelf indexes [range 0 - 1]
+			float array, shelf indexes [range 0 - 3]
 		"""
 		return np.maximum(0., (self.shelf - 2))
 
@@ -835,6 +886,24 @@ class MacroseismicEnquiryEnsemble():
 			float array, stand indexes [range 0 - 1]
 		"""
 		return np.minimum(1., self.stand)
+
+	def calc_furniture_index(self, include_heavy_appliance=False):
+		"""
+		Compute furniture indexes for individual questionnaires
+		following Wald et al. (1999)
+
+		:param include_heavy_appliance:
+			bool, whether or not to take heavy_appliance into account
+			as well (not standard, but occurs with ROB forms)
+			(default: False)
+
+		:return:
+			float array, furniture indexes [range 0 - 1]
+		"""
+		if include_heavy_appliance:
+			return ((self.furniture) | (self.heavy_appliance > 1)).astype('float')
+		else:
+			return self.furniture
 
 	def calc_damage_index(self):
 		"""
@@ -876,7 +945,8 @@ class MacroseismicEnquiryEnsemble():
 		idxs = np.argwhere(condition)
 		return self.__getitem__(idxs)
 
-	def calc_cws(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True):
+	def calc_cws(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True,
+				include_heavy_appliance=False):
 		"""
 		Compute Community Weighted Sum (CWS) following Wald et al. (1999)
 
@@ -890,6 +960,8 @@ class MacroseismicEnquiryEnsemble():
 			(default: (0, 4))
 		:param include_other_felt:
 			see :meth:`calc_felt_index`
+		:param include_heavy_appliance:
+			see :meth:`calc_furniture_index`
 
 		:return:
 			float or float array, CWS
@@ -909,10 +981,10 @@ class MacroseismicEnquiryEnsemble():
 			felt_index = ensemble.calc_felt_index(include_other_felt).mean()
 			if np.ma.is_masked(felt_index) and felt_index.mask:
 				felt_index = 0.
-			motion_index = ensemble.motion.mean(dtype='float')
+			motion_index = ensemble.calc_motion_index().mean()
 			if np.ma.is_masked(motion_index) and motion_index.mask:
 				motion_index = 0.
-			reaction_index = ensemble.reaction.mean(dtype='float')
+			reaction_index = ensemble.calc_reaction_index().mean()
 			if np.ma.is_masked(reaction_index) and reaction_index.mask:
 				reaction_index = 0.
 			stand_index = ensemble.calc_stand_index().mean()
@@ -924,7 +996,7 @@ class MacroseismicEnquiryEnsemble():
 			picture_index = ensemble.calc_picture_index().mean()
 			if np.ma.is_masked(picture_index) and picture_index.mask:
 				picture_index = 0.
-			furniture_index = ensemble.furniture.mean(dtype='float')
+			furniture_index = ensemble.calc_furniture_index(include_heavy_appliance).mean()
 			if np.ma.is_masked(furniture_index) and furniture_index.mask:
 				furniture_index = 0.
 			damage_index = ensemble.calc_damage_index().mean()
@@ -938,14 +1010,14 @@ class MacroseismicEnquiryEnsemble():
 					+ 3 * furniture_index
 					+ 5 * damage_index)
 		else:
-			## Masked (NaN) values are replaced with zeros (except felt)
-			felt_indexes = ensemble.calc_felt_index(include_other_felt)
-			motion_indexes = ensemble.motion.filled(0)
-			reaction_indexes = ensemble.reaction.filled(0)
+			## Masked (NaN) values are replaced with zeros (including felt)
+			felt_indexes = ensemble.calc_felt_index(include_other_felt).filled(0)
+			motion_indexes = ensemble.calc_motion_index().filled(0)
+			reaction_indexes = ensemble.calc_reaction_index().filled(0)
 			stand_indexes = ensemble.calc_stand_index().filled(0)
 			shelf_indexes = ensemble.calc_shelf_index().filled(0)
 			picture_indexes = ensemble.calc_picture_index().filled(0)
-			furniture_indexes = ensemble.furniture.filled(0)
+			furniture_indexes = ensemble.calc_furniture_index(include_heavy_appliance).filled(0)
 			damage_indexes = ensemble.calc_damage_index()
 			cws = (5 * felt_indexes
 					+ motion_indexes
@@ -956,10 +1028,11 @@ class MacroseismicEnquiryEnsemble():
 					+ 3 * furniture_indexes
 					+ 5 * damage_indexes)
 			## NaN felt values have CWS zero
-			cws = cws.filled(0)
+			#cws = cws.filled(0)
 		return cws
 
-	def calc_cdi(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True):
+	def calc_cdi(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True,
+				include_heavy_appliance=False):
 		"""
 		Compute original Community Decimal Intensity sensu Dengler &
 		Dewey (1998)
@@ -967,16 +1040,19 @@ class MacroseismicEnquiryEnsemble():
 		:param aggregate:
 		:param filter_floors:
 		:param include_other_felt:
+		:param include_heavy_appliance:
 			see :meth:`calc_cws`
 
 		:return:
 			float or float array, CDI
 		"""
 		cws = self.calc_cws(aggregate=aggregate, filter_floors=filter_floors,
-							include_other_felt=include_other_felt)
+							include_other_felt=include_other_felt,
+							include_heavy_appliance=include_heavy_appliance)
 		return 3.3 + 0.13 * cws
 
-	def calc_cii(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True):
+	def calc_cii(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True,
+				include_heavy_appliance=False):
 		"""
 		Compute Community Internet Intensity following Wald et al. (1999),
 		later renamed into Community Decimal Intensity (CDI)
@@ -984,13 +1060,15 @@ class MacroseismicEnquiryEnsemble():
 		:param aggregate:
 		:param filter_floors:
 		:param include_other_felt:
+		:param include_heavy_appliance:
 			see :meth:`calc_cws`
 
 		:return:
 			float or float array, CII
 		"""
 		cws = self.calc_cws(aggregate=aggregate, filter_floors=filter_floors,
-							include_other_felt=include_other_felt)
+							include_other_felt=include_other_felt,
+							include_heavy_appliance=include_heavy_appliance)
 		cii = 3.40 * np.log(cws) - 4.38
 
 		## Needed to recompute felt index
@@ -1026,7 +1104,7 @@ class MacroseismicEnquiryEnsemble():
 		return cii
 
 	def calc_mean_cii(self, filter_floors=(0, 4), include_other_felt=True,
-						remove_outliers=(2.5, 97.5)):
+					include_heavy_appliance=False, remove_outliers=(2.5, 97.5)):
 		"""
 		Compute mean CII value from CII values of individual enquiries,
 		ignoring outliers. This is an alternative to the aggregated
@@ -1034,6 +1112,7 @@ class MacroseismicEnquiryEnsemble():
 
 		:param filter_floors:
 		:param include_other_felt:
+		:param include_heavy_appliance:
 			see :meth:`calc_cii`
 		:param remove_outliers:
 			(min_pct, max_pct) tuple, percentile range to use
@@ -1043,22 +1122,83 @@ class MacroseismicEnquiryEnsemble():
 			float, mean CII
 		"""
 		cii = self.calc_cii(aggregate=False, filter_floors=filter_floors,
-					include_other_felt=include_other_felt)
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance)
 		min_pct, max_pct = remove_outliers
 		pct0 = np.percentile(cii, min_pct)
 		pct1 = np.percentile(cii, max_pct)
 		cii = cii[(cii >= pct0) & (cii <= pct1)]
 		return cii.mean()
 
-	def plot_analysis_comparison(self, prop='CWS', include_other_felt=True):
+	def calc_fiability(self, include_other_felt=True, include_heavy_appliance=False,
+						aggregate=False, filter_floors=False):
+		"""
+		Compute reliability of individual enquiries following ROB web
+		procedure
+
+		:param include_other_felt:
+		:param include_heavy_appliance:
+			see :meth:`calc_cws`
+		:param aggregate:
+		:param filter_floors:
+			dummy arguments to have same call signature as :meth:`calc_cws`
+			will be ignored
+
+		:return:
+			float array, fiabilities
+		"""
+		emails = self.get_prop_values('email')
+		felt_indexes = self.calc_felt_index(include_other_felt)
+		motion_indexes = self.calc_motion_index().filled(0)
+		reaction_indexes = self.calc_reaction_index().filled(0)
+		stand_indexes = self.calc_stand_index().filled(0)
+		shelf_indexes = self.calc_shelf_index().filled(0)
+		picture_indexes = self.calc_picture_index().filled(0)
+		furniture_indexes = self.calc_furniture_index(include_heavy_appliance).filled(0)
+		damage_indexes = self.calc_damage_index()
+
+		fiability = np.zeros(len(self))
+		for i in range(len(self)):
+			fiability[i] = 80
+
+			if emails[i]:
+				fiability[i] += 10
+
+			if felt_indexes[i] == 0:
+				if motion_indexes[i] > 0:
+					fiability[i] -= (10 * motion_indexes[i])
+				if reaction_indexes[i] > 0:
+					fiability[i] -= (10 * reaction_indexes[i])
+				if stand_indexes[i] > 0:
+					fiability[i] -= 50
+				if (shelf_indexes[i] > 1 or furniture_indexes[i] > 0
+					or damage_indexes[i] > 1.5):
+					fiability[i] -= (20 * damage_indexes[i])
+			else:
+				if (stand_indexes[i] == 1 and
+					(motion_indexes[i] < 3 or reaction_indexes[i] < 2)):
+					fiability[i] -= 30
+				elif (motion_indexes[i] < 3 and reaction_indexes[i] > 3):
+					fiability[i] -= 30
+
+			if (damage_indexes[i] > 2 and shelf_indexes[i] < 2
+				and picture_indexes[i] == 0):
+				fiability[i] -= ((damage_indexes[i] - shelf_indexes[i]) * 20)
+
+		fiability = np.maximum(0, np.minimum(100, fiability))
+		return fiability
+
+	def plot_analysis_comparison(self, prop='CWS', include_other_felt=True,
+								include_heavy_appliance=False):
 		"""
 		Plot comparison between values in database and computation
 		in this module for analysis of individual enquiries.
 
 		:param prop:
-			str, property name, either 'CWS', 'CDI' or 'CII'
+			str, property name, either 'CWS', 'CDI', 'CII' or 'fiability'
 			(default: 'CWS')
 		:param include_other_felt:
+		:param include_heavy_appliance:
 			see :meth:`calc_cii`
 
 		:return:
@@ -1068,12 +1208,12 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		import pylab
 
-		db_result = getattr(self, prop.upper())
-		print db_result.min(), db_result.max()
+		db_result = getattr(self, prop.upper() if prop != 'fiability' else prop)
 		func_name = 'calc_%s' % prop.lower()
 		func = getattr(self, func_name)
 		recalc_result = func(aggregate=False, filter_floors=False,
-								include_other_felt=include_other_felt)
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance)
 		non_matching_ids = []
 		for i in range(len(self)):
 			db_val = db_result[i]
@@ -1116,7 +1256,7 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			(bins, counts) tuple
 		"""
-		if isinstance(prop, (list, np.ndarray)):
+		if isinstance(prop, (list, np.ndarray, np.ma.MaskedArray)):
 			ar = prop
 		elif prop == "damage":
 			bins = np.arange(self.damage.shape[1])
@@ -1127,13 +1267,17 @@ class MacroseismicEnquiryEnsemble():
 				ar = getattr(self, prop)
 			except AttributeError:
 				ar = np.ma.array(self.get_prop_values(prop))
-		if bins is None:
+		if bins is None and isinstance(prop, (str, unicode)):
 			bins = self.bins.get(prop, None)
 		if bins is None:
 			if include_nan:
+				if ar.dtype == 'bool':
+					ar = ar.astype('int')
+					ar.fill_value = 2
 				bins, counts = np.unique(np.ma.filled(ar), return_counts=True)
 				bins = bins.astype('float')
-				bins[-1] = np.nan
+				if len(np.ma.compressed(ar)) < len(ar):
+					bins[-1] = np.nan
 			else:
 				bins, counts = np.unique(np.ma.compressed(ar), return_counts=True)
 		else:
@@ -1256,7 +1400,9 @@ class MacroseismicEnquiryEnsemble():
 		#colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
 
 		## Extract title and labels from PHP files for different languages
-		title, labels = self.get_prop_title_and_labels(prop, label_lang)
+		title, labels = "", []
+		if isinstance(prop, (str, unicode)):
+			title, labels = self.get_prop_title_and_labels(prop, label_lang)
 		if labels and len(labels) < len(bins):
 			labels.append('No answer')
 		if not labels:
@@ -1264,7 +1410,7 @@ class MacroseismicEnquiryEnsemble():
 				labels = ["%.0f" % b for b in bins]
 			except TypeError:
 				labels = ["%s" % b for b in bins]
-		if not title:
+		if not title and isinstance(prop, (str, unicode)):
 			title = prop.title()
 		pylab.pie(counts, colors=colors, labels=labels, autopct='%1.1f%%',
 					startangle=start_angle)
@@ -1322,24 +1468,39 @@ class MacroseismicEnquiryEnsemble():
 		else:
 			pylab.show()
 
-	def report_num_replies_by_commune(self, comm_key='id_com'):
+	def report_by_commune(self, comm_key='id_com', sort_column=0, sort_order="asc"):
 		"""
-		Print a sorted list of communes and number of replies
+		Print a sorted table of commune names, number of replies,
+		mean CCI in database and aggregated CII
 
 		:param comm_key:
 			str, commune key, either 'id_com' or 'id_main'
 			(default: 'id_com')
+		:param sort_column:
+			int, column number to sort table with
+			(default: 0)
+		:param sort_order:
+			str, either "asc" (ascending) or "desc" (descending)
+			(default: "asc")
 		"""
+		from operator import itemgetter
+		from prettytable import PrettyTable
+
+		table = PrettyTable(["Commune", "Num replies", "Mean CII", "Aggregated CII"])
 		comm_ensemble_dict = self.aggregate_by_commune(comm_key)
 		comm_rec_dict = self.get_communes_from_db(comm_key)
-		num_replies_communes = []
 		for comm_id, ensemble in comm_ensemble_dict.items():
 			comm_name = comm_rec_dict[comm_id]['name']
-			num_replies_communes.append((ensemble.num_replies, comm_name))
-		for (num_replies, comm_name) in sorted(num_replies_communes, reverse=True):
-			print("%4d - %s" % (num_replies, comm_name))
+			mean_cii = np.mean(ensemble.CII)
+			agg_cii = ensemble.calc_cii(filter_floors=(0,4), include_other_felt=True)
+			table.add_row([comm_name, len(ensemble), "%.1f" % mean_cii, "%.1f" % agg_cii])
 
-	def report_bincount(self, prop, bins=None, include_nan=True, include_labels=False):
+		reverse_order = {"asc": False, "desc": True}[sort_order]
+		table._rows = sorted(table._rows, key=itemgetter(sort_column), reverse=reverse_order)
+		print(table)
+
+	def report_bincount(self, prop, bins=None, include_nan=True, include_labels=False,
+						include_empty=False):
 		"""
 		Print table with bincounts for given property
 
@@ -1347,6 +1508,12 @@ class MacroseismicEnquiryEnsemble():
 		:param bins:
 		:param include_nan:
 			see :meth:`bincount`
+		:param include_labels:
+			bool, whether or not to add a column with corresponding labels
+			(default: False)
+		:param include_empty:
+			bool, whether or not to print empty bins
+			(default: False)
 		"""
 		from prettytable import PrettyTable
 		bins, numbers = self.bincount(prop, bins=bins, include_nan=include_nan)
@@ -1360,19 +1527,21 @@ class MacroseismicEnquiryEnsemble():
 		table = PrettyTable(column_names)
 		for i in range(len(bins)):
 			bin, num = bins[i], numbers[i]
-			if num > 0:
+			if num > 0 or include_empty:
 				row = [bin, int(num)]
 				if include_labels:
 					row.append(labels[i])
 				table.add_row(row)
 		print(table)
 
-	def evaluate_cws_calculation(self, include_other_felt=True, filter_floors=(0, 4)):
+	def evaluate_cws_calculation(self, include_other_felt=True,
+							include_heavy_appliance=False, filter_floors=(0, 4)):
 		"""
 		Print values of properties used for CWS calculation, and the
 		derived indexes.
 
 		:param include_other_felt:
+		:param include_heavy_appliance:
 		:param filter_floors:
 			see :meth:`calc_cws`
 		"""
@@ -1382,15 +1551,15 @@ class MacroseismicEnquiryEnsemble():
 
 		print("other_felt:")
 		print("  Values: %s" % self.other_felt)
-		print("  Felt index (including other_felt) [x5]: %s" % (5 * self.calc_felt_index(include_other_felt=True)))
+		print("  Felt index (incl. other_felt) [x5]: %s" % (5 * self.calc_felt_index(include_other_felt=True)))
 
 		print("motion:")
 		print("  Values: %s" % self.motion)
-		print("  Motion index [x1]: %s" % self.motion.filled(0))
+		print("  Motion index [x1]: %s" % self.calc_motion_index().filled(0))
 
 		print("reaction:")
 		print("  Values: %s" % self.reaction)
-		print("  Reaction index [x1]: %s" % self.reaction.filled(0))
+		print("  Reaction index [x1]: %s" % self.calc_reaction_index().filled(0))
 
 		print("stand:")
 		print("  Values: %s" % self.stand)
@@ -1406,7 +1575,9 @@ class MacroseismicEnquiryEnsemble():
 
 		print("furniture:")
 		print("  Values: %s" % self.furniture)
-		print("  Furniture index [x3]: %s" % (3 * self.furniture.filled(0)))
+		print("  Furniture index [x3]: %s" % (3 * self.calc_furniture_index().filled(0)))
+		print("  Furniture index (incl. heavy_appliance) [x3]: %s" %
+			(3 * self.calc_furniture_index(include_heavy_appliance=True).filled(0)))
 
 		print("damage:")
 		print("  Values: %s" % self.get_prop_values('d_text'))
@@ -1415,9 +1586,11 @@ class MacroseismicEnquiryEnsemble():
 		print("CWS:")
 		print("  Database: %s" % self.CWS)
 		print("  Recomputed: %s" % self.calc_cws(aggregate=False,
-			filter_floors=filter_floors, include_other_felt=include_other_felt))
+			filter_floors=filter_floors, include_other_felt=include_other_felt,
+			include_heavy_appliance=include_heavy_appliance))
 		print("  Aggregated: %s" % self.calc_cws(filter_floors=filter_floors,
-										include_other_felt=include_other_felt))
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance))
 
 	def find_duplicate_addresses(self, verbose=True):
 		"""
@@ -1467,6 +1640,8 @@ class MacroseismicEnquiryEnsemble():
 					cii = rec['CII']
 					fiability = rec['fiability']
 					name = rec['name']
+					if name:
+						name = name.encode('ascii', errors='replace')
 					print("  %s [CII=%s, fiab=%d] %s - %s" % (zip, cii, fiability, name, street))
 				print("")
 
@@ -1512,7 +1687,7 @@ class MacroseismicEnquiryEnsemble():
 			## Keep the one with highest fiability and most recent submit time
 			# TODO: should we also consider CII (lowest = most reliable?)
 			submit_times = ensemble.get_prop_values('submit_time')
-			ft = zip( ensemble.fiability, submit_times)
+			ft = zip(ensemble.fiability, submit_times)
 			## numpy argsort doesn't work for tuples, this works similar
 			#order = np.argsort(fiability_times)
 			order = sorted(range(len(ft)), key=ft.__getitem__)
@@ -1524,6 +1699,15 @@ class MacroseismicEnquiryEnsemble():
 		return self.subselect_by_property('id_web', web_ids_to_remove, negate=True)
 
 	def plot_cumulative_responses_vs_time(self):
-		# TODO
+		import pylab
 		pylab.plot(np.sort(self.get_date_times()), np.arange(self.num_replies)+1)
 		pylab.gcf().autofmt_xdate()
+		pylab.xlabel("Time")
+		pylab.ylabel("Number of replies")
+		pylab.grid(True)
+		pylab.show()
+
+	def get_inconsistent_damage_records(self):
+		idxs = np.argwhere((self.damage[:, 0] == True)
+						& (np.sum(self.damage[:,1:], axis=1) > 0))
+		return self.__getitem__(idxs)
