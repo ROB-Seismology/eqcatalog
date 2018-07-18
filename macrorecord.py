@@ -403,6 +403,8 @@ class MacroseismicEnquiryEnsemble():
 		from difflib import SequenceMatcher as SM
 
 		if comm_key in ("id_com", "id_main"):
+			if comm_key == "id_main" and not hasattr(self, "id_main"):
+				self.set_main_commune_ids()
 			unique_ids = sorted(set(self.get_prop_values(comm_key)))
 			table_clause = ['communes']
 			column_clause = ['*']
@@ -1486,14 +1488,14 @@ class MacroseismicEnquiryEnsemble():
 		from operator import itemgetter
 		from prettytable import PrettyTable
 
-		table = PrettyTable(["Commune", "Num replies", "Mean CII", "Aggregated CII"])
+		table = PrettyTable(["Commune", "ID", "Num replies", "Mean CII", "Aggregated CII"])
 		comm_ensemble_dict = self.aggregate_by_commune(comm_key)
 		comm_rec_dict = self.get_communes_from_db(comm_key)
 		for comm_id, ensemble in comm_ensemble_dict.items():
 			comm_name = comm_rec_dict[comm_id]['name']
 			mean_cii = np.mean(ensemble.CII)
 			agg_cii = ensemble.calc_cii(filter_floors=(0,4), include_other_felt=True)
-			table.add_row([comm_name, len(ensemble), "%.1f" % mean_cii, "%.1f" % agg_cii])
+			table.add_row([comm_name, comm_id, len(ensemble), "%.1f" % mean_cii, "%.1f" % agg_cii])
 
 		reverse_order = {"asc": False, "desc": True}[sort_order]
 		table._rows = sorted(table._rows, key=itemgetter(sort_column), reverse=reverse_order)
