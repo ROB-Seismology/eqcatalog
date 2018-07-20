@@ -121,6 +121,19 @@ class MacroseismicInfo():
 		self.lat = lat
 		self.db_ids = db_ids
 
+	def get_eq(self):
+		"""
+		Fetch earthquake from ROB database
+
+		:return:
+			instance of :class:`eqcatalog.LocalEarthquake`
+		"""
+		from seismodb import query_ROB_LocalEQCatalogByID
+
+		if isinstance(self.id_earth, (int, long)):
+			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
+			return eq
+
 	def get_enquiries(self, min_fiability=20, verbose=False):
 		"""
 		Fetch macroseismic enquiry records from the database, based on
@@ -273,6 +286,19 @@ class MacroseismicEnquiryEnsemble():
 		else:
 			recs = [rec.copy() for rec in self.recs]
 			return self.__class__(self.id_earth, recs)
+
+	def get_eq(self):
+		"""
+		Fetch earthquake from ROB database
+
+		:return:
+			instance of :class:`eqcatalog.LocalEarthquake`
+		"""
+		from seismodb import query_ROB_LocalEQCatalogByID
+
+		if isinstance(self.id_earth, (int, long)):
+			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
+			return eq
 
 	def get_prop_values(self, prop):
 		"""
