@@ -34,7 +34,7 @@ from source_models import (read_source_model, rob_source_models_dict)
 import macrorecord
 reload(macrorecord)
 
-from macrorecord import (MacroseismicRecord, MacroseismicEnquiryEnsemble,
+from macrorecord import (MacroseismicInfo, MacroseismicEnquiryEnsemble,
 						MacroseismicDataPoint, get_roman_intensity)
 
 ## Depends on time_functions, msc

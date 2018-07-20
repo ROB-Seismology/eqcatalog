@@ -9,7 +9,7 @@ import datetime
 import numpy as np
 
 
-__all__ = ["MacroseismicRecord", "MacroseismicEnquiryEnsemble",
+__all__ = ["MacroseismicInfo", "MacroseismicEnquiryEnsemble",
 			"MacroseismicDataPoint", "get_roman_intensity"]
 
 
@@ -74,31 +74,67 @@ class MacroseismicDataPoint:
 	pass
 
 
-class MacroseismicRecord():
+class MacroseismicInfo():
 	"""
-	Container class to hold information of records retrieved from the macrocatalog database table.
-	Currently has the following properties:
-		id_earth
-		id_com
-		I
-		lon
-		lat
-		num_replies
+	Container class to hold information of (aggregated) records retrieved
+	from the official or internet macroseismic enquiry database, and
+	used for plotting maps.
+
+	:param id_earth:
+		int, ID of earthquake in ROB catalog
+		or 'all'
+	:param id_com:
+		int, ID of commune in ROB database
+	:param I:
+		int or float, macroseismic intensity
+	:param agg_type:
+		str, type of aggregation, one of:
+		- 'id_com' or 'commune'
+		- 'id_main' or 'main commune'
+		- 'grid_X' (where X is grid spacing in km)
+		- None or ''
+	:param enq_type:
+		str, type of enquirey, one of:
+		- 'internet' or 'online'
+		- 'official'
+	:param num_replies:
+		int, number of replies in aggregate
+		(default: 1)
+	:param lon:
+		float, longitude or (if :param:`agg_type` = 'grid_X') easting
+		(default: 0)
+	:param lat:
+		float, latitude or (if :param:`agg_type` = 'grid_X') northing
+		(default: 0)
+	:param db_ids:
+		list of ints, IDs of database records represented in aggregate
 	"""
-	def __init__(self, id_earth, id_com, I, num_replies=1, lon=0, lat=0, web_ids=[]):
+	def __init__(self, id_earth, id_com, I, agg_type, enq_type, num_replies=1,
+				lon=0, lat=0, db_ids=[]):
 		self.id_earth = id_earth
 		self.id_com = id_com
 		self.I = I
+		self.agg_type = agg_type
+		self.enq_type = enq_type
 		self.num_replies = num_replies
 		self.lon = lon
 		self.lat = lat
-		self.web_ids = web_ids
+		self.db_ids = db_ids
 
 	def get_enquiries(self, min_fiability=20, verbose=False):
+		"""
+		Fetch macroseismic enquiry records from the database, based on
+		either db_ids or, if this is empty, id_earth
+
+		:param min_fiability:
+			int, minimum fiability (ignored if db_ids is not empty)
+		:param verbose:
+			bool, whether or not to print useful information
+		"""
 		from seismodb import query_ROB_Web_enquiries
 
-		if self.web_ids:
-			ensemble = query_ROB_Web_enquiries(web_ids=self.web_ids, verbose=verbose)
+		if self.db_ids:
+			ensemble = query_ROB_Web_enquiries(web_ids=self.db_ids, verbose=verbose)
 		else:
 			ensemble = query_ROB_Web_enquiries(self.id_earth, id_com=self.id_com,
 								min_fiability=min_fiability, verbose=verbose)
@@ -219,6 +255,24 @@ class MacroseismicEnquiryEnsemble():
 		self.bins['duration'] = np.arange(0, 61, 5)
 
 		self.bins['num_replies'] = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
+
+	def get_copy(self, deepcopy=False):
+		"""
+		Return a copy of the ensemble. Note that :prop:`recs` will be
+		shared with the original ensemble.
+
+		:param deepcopy:
+			bool, if True :prop:`recs` will be copied as well, if False
+			they will be shared with the original ensemble
+			(default: False)
+		:return:
+			instance of :class:`MacroseismicEnquiryEnsemble`
+		"""
+		if not deepcopy:
+			return self.__getitem__(slice(None, None, None))
+		else:
+			recs = [rec.copy() for rec in self.recs]
+			return self.__class__(self.id_earth, recs)
 
 	def get_prop_values(self, prop):
 		"""
@@ -781,6 +835,24 @@ class MacroseismicEnquiryEnsemble():
 			ensemble = self.subselect_by_property('id_main', [id_main])
 			main_id_ensemble_dict[int(id_main)] = ensemble
 		return main_id_ensemble_dict
+
+	def fix_all(self):
+		"""
+		Fix various issues:
+		- repair records that have 'felt' unspecified
+		- match unmatched commune IDs
+		- set main commune IDs
+		- remove duplicate records
+
+		:return:
+			instance of :class:`MacroseismicEnquiryEnsemble`
+		"""
+		ensemble = self.get_copy()
+		ensemble.fix_felt_is_none()
+		ensemble.fix_commune_ids()
+		ensemble.set_main_commune_ids()
+		ensemble = ensemble.remove_duplicate_records()
+		return ensemble
 
 	def fix_felt_is_none(self):
 		"""
