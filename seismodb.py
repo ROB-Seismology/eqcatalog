@@ -26,7 +26,7 @@ from db.simpledb import (build_sql_query, query_mysql_db_generic)
 
 
 
-__all__ = ["LocalEarthquake", "MacroseismicRecord", "FocMecRecord",
+__all__ = ["LocalEarthquake", "MacroseismicInfo", "FocMecRecord",
 			"query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID",
 			"query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog",
 			"query_ROB_Web_MacroCatalog", "get_last_earthID", "query_ROB_Web_enquiries"]
@@ -475,9 +475,9 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		File object, where to print errors
 
 	:return:
-		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
+		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
 	"""
-	from macrorecord import MacroseismicRecord
+	from macrorecord import MacroseismicInfo
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
@@ -497,7 +497,8 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		column_clause = [
 			'macro_detail.id_com',
 			'communes.longitude',
-			'communes.latitude']
+			'communes.latitude',
+			'GROUP_CONCAT(id_macro_of SEPARATOR ",") AS id_db']
 
 		if group_by_main_village:
 			agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "MAX")
@@ -525,6 +526,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 
 	## Fetch records
 	macro_info = {}
+	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					where_clause=where_clause, having_clause=having_clause,
 					order_clause=order_clause, group_clause=group_clause,
@@ -532,7 +534,10 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
-		macro_info[id_com] = MacroseismicRecord(id_earth, id_com, I, num_replies=1, lon=lon, lat=lat)
+		db_ids = map(int, rec['id_db'].split(','))
+		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
+											'official', num_replies=1,
+											lon=lon, lat=lat, db_ids=db_ids)
 
 	return macro_info
 
@@ -639,9 +644,9 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		File object, where to print errors
 
 	:return:
-		dict mapping commune IDs to instances of :class:`MacroseismicRecord`
+		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
 	"""
-	from macrorecord import MacroseismicRecord
+	from macrorecord import MacroseismicInfo
 
 	## Construct SQL query
 	table_clause = ['web_analyse']
@@ -685,6 +690,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 
 	## Fetch records
 	macro_info = {}
+	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					join_clause=join_clause, where_clause=where_clause,
 					having_clause=having_clause, order_clause=order_clause,
@@ -694,9 +700,9 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		lon, lat = rec['lon'], rec['lat']
 		num_replies = rec['num_replies']
 		web_ids = map(int, rec['id_web'].split(','))
-		macro_info[id_com] = MacroseismicRecord(id_earth, id_com, I,
-									num_replies=num_replies, lon=lon, lat=lat,
-									web_ids=web_ids)
+		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
+										'internet', num_replies=num_replies,
+										lon=lon, lat=lat, db_ids=web_ids)
 
 	return macro_info
 
