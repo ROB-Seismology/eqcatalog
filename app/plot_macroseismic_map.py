@@ -15,7 +15,11 @@ import mapping.layeredbasemap as lbm
 GIS_FOLDER = r"D:\seismo-gis\collections\Bel_administrative_ROB\TAB"
 
 
-def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tmerc",
+# TODO: See if it is possible to define a more generic function that plots
+# macroseismic information (official or internet enquiries)
+
+
+def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="merc",
 				graticule_interval=(1, 1), min_replies=3, query_info="cii", min_val=1,
 				min_fiability=20.0, filter_floors=(0, 4), aggregate_by="commune",
 				agg_function="average", int_conversion="round", symbol_style=None,
@@ -46,6 +50,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 		aggregate_by = 'id_main'
 	elif not aggregate_by:
 		min_replies = 1
+		symbol_style = symbol_style or lbm.PointStyle(shape='D', size=5)
 
 	[eq] = eqcatalog.seismodb.query_ROB_LocalEQCatalogByID(id_earth)
 
@@ -71,7 +76,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 
 	else:
 		# TODO: agg_function?
-		from eqcatalog.macrorecord import MacroseismicRecord
+		from eqcatalog.macrorecord import MacroseismicInfo
 
 		ensemble = eqcatalog.seismodb.query_ROB_Web_enquiries(id_earth,
 						min_fiability=min_fiability, verbose=verbose)
@@ -138,7 +143,8 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 			else:
 				print("Don't know how to recompute %s" % query_info)
 				exit()
-			rec = MacroseismicRecord(id_earth, id_com, I, num_replies, lon, lat, web_ids)
+			rec = MacroseismicInfo(id_earth, id_com, I, aggregate_by, 'internet',
+									num_replies, lon, lat, web_ids)
 			macro_recs.append(rec)
 
 	if unassigned:
@@ -166,6 +172,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 			gis_filename = "Bel_communes_avant_fusion.TAB"
 	if gis_filename:
 		gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
+		#gis_filespec = "http://seishaz.oma.be:8080/geoserver/rob/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=rob:bel_villages_polygons&outputFormat=application%2Fjson"
 
 	cmap_name = cmap
 	if cmap_name.lower() in ("usgs", "rob"):
@@ -222,6 +229,7 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 			commune_data = None
 	else:
 		key = "ID_ROB"
+		#key = 'village_number'
 		joined_attributes = {}
 		joined_attributes[query_info] = {'key': key,
 			'values': {rec.id_com: getattr(rec, query_info) for rec in macro_recs}}
@@ -234,7 +242,10 @@ def plot_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="tme
 			print("Max %s: %s" % (query_info, Imax))
 
 		commune_data = lbm.GisData(gis_filespec, joined_attributes=joined_attributes)
-		#_, _, polygon_data = commune_data.get_data()
+		_, _, polygon_data = commune_data.get_data()
+		#print(len(polygon_data))
+		#print(polygon_data[0].value)
+		#exit()
 		#print [val for val in polygon_data.values['cii'] if val != None]
 
 
@@ -393,17 +404,20 @@ if __name__ == "__main__":
 	graticule_interval = (0.5, 1)
 	#id_earth = 509
 	id_earth = 6625
-	min_replies = 1
-	filter_floors = (-100, 900)
+	min_replies = 3
+	#filter_floors = (-100, 900)
+	filter_floors = (0, 4)
 	query_info = "cii"
 	#query_info = "num_replies"
 	min_fiability = 20
-	aggregate_by = 'commune'
-	color_gradient = "continuous"
+	#aggregate_by = 'grid_5'
+	#aggregate_by = None
+	aggregate_by = 'main commune'
+	color_gradient = "discontinuous"
 	cmap = "rob"
 	#cmap = "jet"
-	symbol_style = lbm.PointStyle(shape='D', size=5)
-	#symbol_style = None
+	#symbol_style = lbm.PointStyle(shape='D', size=5)
+	symbol_style = None
 	#radii = [10, 25, 50]
 	radii = []
 	plot_pie = False
@@ -411,7 +425,7 @@ if __name__ == "__main__":
 	title = ""
 
 	out_folder = r"D:\Earthquake Reports\20180525\plots"
-	fig_filename = "Kinrooi_id_com_num_replies.PNG"
+	fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
 	#fig_filespec = os.path.join(out_folder, fig_filename)
 	fig_filespec = None
 
