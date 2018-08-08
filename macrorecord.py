@@ -1634,12 +1634,13 @@ class MacroseismicEnquiryEnsemble():
 				table.add_row(row)
 		print(table)
 
-	def evaluate_cws_calculation(self, include_other_felt=True,
+	def evaluate_cws_calculation(self, aggregate=False, include_other_felt=True,
 							include_heavy_appliance=False, filter_floors=(0, 4)):
 		"""
 		Print values of properties used for CWS calculation, and the
 		derived indexes.
 
+		:param aggregate:
 		:param include_other_felt:
 		:param include_heavy_appliance:
 		:param filter_floors:
@@ -1647,48 +1648,96 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		print("felt:")
 		print("  Values: %s" % self.felt)
-		print("  Felt index (without other_felt) [x5]: %s" % (5 * self.calc_felt_index(include_other_felt=False)))
+		felt_index = self.calc_felt_index(include_other_felt=False)
+		if aggregate:
+			felt_index = felt_index.mean()
+		print("  Felt index (without other_felt) [x5]: %s" % (5 * felt_index))
 
 		print("other_felt:")
 		print("  Values: %s" % self.other_felt)
-		print("  Felt index (incl. other_felt) [x5]: %s" % (5 * self.calc_felt_index(include_other_felt=True)))
+		felt_index = self.calc_felt_index(include_other_felt=True)
+		if aggregate:
+			felt_index = felt_index.mean()
+		print("  Felt index (incl. other_felt) [x5]: %s" % (5 * felt_index))
 
 		print("motion:")
 		print("  Values: %s" % self.motion)
-		print("  Motion index [x1]: %s" % self.calc_motion_index().filled(0))
+		motion_index = self.calc_motion_index()
+		if aggregate:
+			motion_index = motion_index.mean()
+		else:
+			motion_index = motion_index.filled(0)
+		print("  Motion index [x1]: %s" % motion_index)
 
 		print("reaction:")
 		print("  Values: %s" % self.reaction)
-		print("  Reaction index [x1]: %s" % self.calc_reaction_index().filled(0))
+		reaction_index = self.calc_reaction_index()
+		if aggregate:
+			reaction_index = reaction_index.mean()
+		else:
+			reaction_index = reaction_index.filled(0)
+		print("  Reaction index [x1]: %s" % reaction_index)
 
 		print("stand:")
 		print("  Values: %s" % self.stand)
-		print("  Stand index [x2]: %s" % (2 * self.calc_stand_index().filled(0)))
+		stand_index = self.calc_stand_index()
+		if aggregate:
+			stand_index = stand_index.mean()
+		else:
+			stand_index = stand_index.filled(0)
+		print("  Stand index [x2]: %s" % (2 * stand_index))
 
 		print("shelf:")
 		print("  Values: %s" % self.shelf)
-		print("  Shelf index [x5]: %s" % (5 * self.calc_shelf_index().filled(0)))
+		shelf_index = self.calc_shelf_index()
+		if aggregate:
+			shelf_index = shelf_index.mean()
+		else:
+			shelf_index = shelf_index.filled(0)
+		print("  Shelf index [x5]: %s" % (5 * shelf_index))
 
 		print("picture:")
 		print("  Values: %s" % self.picture)
-		print("  Picture index [x2]: %s" % (2 * self.calc_picture_index().filled(0)))
+		picture_index = self.calc_picture_index()
+		if aggregate:
+			picture_index = picture_index.mean()
+		else:
+			picture_index = picture_index.filled(0)
+		print("  Picture index [x2]: %s" % (2 * picture_index))
 
 		print("furniture:")
 		print("  Values: %s" % self.furniture)
-		print("  Furniture index [x3]: %s" % (3 * self.calc_furniture_index().filled(0)))
+		furniture_index = self.calc_furniture_index()
+		if aggregate:
+			furniture_index = furniture_index.mean()
+		else:
+			furniture_index = furniture_index.filled(0)
+		print("  Furniture index [x3]: %s" % (3 * furniture_index))
+		furniture_index = self.calc_furniture_index(include_heavy_appliance=True)
+		if aggregate:
+			furniture_index = furniture_index.mean()
+		else:
+			furniture_index = furniture_index.filled(0)
 		print("  Furniture index (incl. heavy_appliance) [x3]: %s" %
-			(3 * self.calc_furniture_index(include_heavy_appliance=True).filled(0)))
+			(3 * furniture_index))
 
 		print("damage:")
 		print("  Values: %s" % self.get_prop_values('d_text'))
-		print("  Damage index [x5]: %s" % (5 * self.calc_damage_index()))
+		damage_index = self.calc_damage_index()
+		if aggregate:
+			damage_index = damage_index.mean()
+		print("  Damage index [x5]: %s" % (5 * damage_index))
 
 		print("CWS:")
-		print("  Database: %s" % self.CWS)
-		print("  Recomputed: %s" % self.calc_cws(aggregate=False,
+		cws = self.CWS
+		if aggregate:
+			cws = np.mean(cws)
+		print("  Database: %s" % cws)
+		print("  Recomputed: %s" % self.calc_cws(aggregate=aggregate,
 			filter_floors=filter_floors, include_other_felt=include_other_felt,
 			include_heavy_appliance=include_heavy_appliance))
-		print("  Aggregated: %s" % self.calc_cws(filter_floors=filter_floors,
+		if not aggregate:
+			print("  Aggregated: %s" % self.calc_cws(filter_floors=filter_floors,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance))
 
