@@ -493,12 +493,11 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 
 	else:
 		## Construct SQL query
-		table_clause = ['macro_detail', 'communes']
+		table_clause = ['macro_detail']
 		column_clause = [
 			'macro_detail.id_com',
 			'communes.longitude',
-			'communes.latitude',
-			'GROUP_CONCAT(id_macro_of SEPARATOR ",") AS id_db']
+			'communes.latitude']
 
 		if group_by_main_village:
 			agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "MAX")
@@ -507,16 +506,20 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 			else:
 				column_clause.append('%s(macro_detail.intensity_min) as "Intensity"' % agg_function)
 			group_clause = 'communes.id_main'
+			column_clause.append('GROUP_CONCAT(id_macro_detail SEPARATOR ",") AS id_db')
 		else:
 			if Imax:
 				column_clause.append('macro_detail.intensity_max as "Intensity"')
 			else:
 				column_clause.append('macro_detail.intensity_min as "Intensity"')
 			group_clause = ""
+			column_clause.append('id_macro_detail as id_db')
 
 		where_clause = 'macro_detail.id_earth = %d' % id_earth
 		where_clause += ' and macro_detail.fiability != 0'
-		where_clause += ' and macro_detail.id_com = communes.id'
+		#where_clause += ' and macro_detail.id_com = communes.id'
+
+		join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id')]
 
 		having_clause = 'Intensity >= %d' % min_val
 		order_clause = ''
@@ -528,13 +531,16 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 	macro_info = {}
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
-					where_clause=where_clause, having_clause=having_clause,
-					order_clause=order_clause, group_clause=group_clause,
-					verbose=verbose, errf=errf):
+					join_clause=join_clause, where_clause=where_clause,
+					having_clause=having_clause, order_clause=order_clause,
+					group_clause=group_clause, verbose=verbose, errf=errf):
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
-		db_ids = map(int, rec['id_db'].split(','))
+		if isinstance(rec['id_db'], (int, long)):
+			db_ids = [rec['id_db']]
+		else:
+			db_ids = map(int, rec['id_db'].split(','))
 		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
 											'official', num_replies=1,
 											lon=lon, lat=lat, db_ids=db_ids)
