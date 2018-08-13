@@ -866,6 +866,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		Fix various issues:
 		- repair records that have 'felt' unspecified
+		- set 'motion', 'reaction' and 'stand' to 0 for not-felt records
 		- match unmatched commune IDs
 		- set main commune IDs
 		- remove duplicate records
@@ -875,6 +876,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		ensemble = self.get_copy()
 		ensemble.fix_felt_is_none()
+		ensemble.fix_not_felt()
 		ensemble.fix_commune_ids()
 		ensemble.set_main_commune_ids()
 		ensemble = ensemble.remove_duplicate_records()
@@ -898,6 +900,20 @@ class MacroseismicEnquiryEnsemble():
 				(ensemble.motion.filled(-1) > 0) &
 				(ensemble.stand.filled(-1) > 1)].set_prop_values('felt', '1')
 		self._gen_arrays()
+
+	def fix_not_felt(self):
+		"""
+		For 'not felt' enquiries, set motion, reaction and stand to 0
+		to avoid bias in the aggregated computation
+
+		:return:
+			None, 'motion', 'reaction' and 'stand' arrays of :prop:`recs`
+			are modified in place
+		"""
+		not_felt_idxs = np.argwhere(self.felt == 0)
+		self.motion[not_felt_idxs] = 0
+		self.reaction[not_felt_idxs] = 0
+		self.stand[not_felt_idxs] = 0
 
 	def calc_felt_index(self, include_other_felt=True):
 		"""
