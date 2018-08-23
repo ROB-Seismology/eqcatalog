@@ -913,6 +913,28 @@ def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
 				where_clause=where_clause, verbose=verbose)
 
 
+def get_station_coordinates(station_codes):
+	"""
+	Quick and dirty extraction of station coordinates from database
+
+	:param station_codes:
+		list of strings, station codes (note that these are place codes,
+		not instrument codes)
+
+	:return:
+		(lons, lats) tuple
+	"""
+	table_clause = "station_place"
+	where_clause = 'code in (%s)'
+	where_clause %= ','.join(['"%s"' % code for code in station_codes])
+	recs = query_seismodb_table(table_clause, where_clause=where_clause)
+	## Note that order may not be preserved in query result
+	recs = {rec['code']: rec for rec in recs}
+	lons = [recs[code]['longitude'] for code in station_codes]
+	lats = [recs[code]['latitude'] for code in station_codes]
+	return (lons, lats)
+
+
 def get_last_earthID():
 	"""
 	Return ID of most recently added earthquake in database
