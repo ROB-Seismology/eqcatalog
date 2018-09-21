@@ -1,3 +1,5 @@
+# -*- coding: iso-Latin-1 -*-
+
 """
 Compute MFD specifically for Belgium,
 taking into account increasingly larger area around Belgium in function
@@ -14,6 +16,8 @@ import hazard.rshalib as rshalib
 
 
 GIS_ROOT = r"D:\seismo-gis\collections"
+
+OUT_FOLDER = r"E:\Home\_kris\Meetings\2018 - Opendeurdagen"
 
 
 def get_declustering_distance(mag, dc_window_name):
@@ -132,16 +136,58 @@ gis_file = os.path.join(GIS_ROOT, "Bel_administrative_ROB", "TAB", gis_filename)
 
 ## Read catalog
 raw_catalog = eqcatalog.read_catalogSQL(region, start_date, end_date)
+
+## Plot catalog map
+"""
+label = "KSB Catalogus / Catalgue ORB"
+fig_filename = "ROB_catalog_full.PNG"
+fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
+#fig_filespec = None
+
+raw_catalog.plot_map(label=label, Mtype=Mtype, Mrelation=Mrelation,
+					region=(1, 8, 49, 52), dlon=2, title="", legend_location=3,
+					fig_filespec=fig_filespec, dpi=300, edge_color='b')
+exit()
+"""
+
+## Plot mag vs time
+"""
+lang = 'nlfr'
+label = "KSB Catalogus / Catalgue ORB"
+fig_filename = "KSB_catalog_mag_vs_time.png"
+fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
+#fig_filespec = None
+raw_catalog.plot_magnitude_time(edge_color='b', Mtype=Mtype, Mrelation=Mrelation,
+								completeness=completeness, Mrange=(0,7), lang=lang,
+								label=label, legend_location=3,
+								minor_tick_interval=10, fig_filespec=fig_filespec,
+								dpi=300)
+exit()
+"""
+
 # TODO: find out why Verviers disappears after declustering...!
 #dc_catalog = raw_catalog.subselect_declustering(method=dc_method, window=dc_window,
 #							fa_ratio=dc_fa_ratio, Mtype=Mtype, Mrelation=Mrelation)
 cc_catalog = raw_catalog.subselect_completeness(completeness=completeness,
 								Mtype=Mtype, Mrelation=Mrelation, verbose=True)
-cc_catalog.name = "ROB Catalog 1350-2014 (declustered)"
+cc_catalog.name = "ROB Catalog 1350-2014 (completeness)"
 #cc_catalog = cc_catalog.sort()
 print("Catalog: n=%d, Mmax=%.1f" % (len(raw_catalog), raw_catalog.get_Mmax(Mtype=Mtype,
 										Mrelation=Mrelation)))
 cc_catalog.print_list()
+
+## Plot catalog map
+"""
+label = "KSB Catalogus / Catalgue ORB"
+fig_filename = "ROB_catalog_cc.PNG"
+fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
+#fig_filespec = None
+
+cc_catalog.plot_map(label=label, Mtype=Mtype, Mrelation=Mrelation,
+					region=(1, 8, 49, 52), dlon=2, title="", legend_location=3,
+					fig_filespec=fig_filespec, dpi=300, edge_color='r')
+exit()
+"""
 
 ## Construct MFD
 num_bins = int(round((Mmax - Mmin_mfd) / mfd_bin_width)) + 1
@@ -151,6 +197,52 @@ elapsed_years = np.zeros_like(mag_bins)
 
 dist_window = "GardnerKnopoff1974"
 #dist_window = "Uhrhammer1986"
+
+
+## Plot buffers for different magnitudes
+"""
+country_data = lbm.GisData(gis_file)
+country_style = lbm.LineStyle()
+buffer_style = lbm.LineStyle(line_width=3, line_color='grey')
+label_style = lbm.TextStyle(horizontal_alignment='right',
+					vertical_alignment='bottom', multi_alignment='left',
+					background_color='w', border_color='k', border_pad=0.5)
+thematic_size = lbm.ThematicStyleGradient([3,5,7], [2,4,8], value_key="magnitude")
+catalog_style = lbm.PointStyle(shape='o', size=thematic_size, line_color='r')
+projection = "merc"
+region = (1.5, 7.5, 49, 52)
+
+import pylab
+import matplotlib.gridspec as gridspec
+fig = pylab.figure()
+gs = gridspec.GridSpec(2,2)
+gs.update(wspace=0.1, hspace=0.1)
+
+for m, mag in enumerate(range(3, 7)):
+	row, col = divmod(m, 2)
+	ax = pylab.subplot(gs[row, col])
+	layers = []
+	layers.append(lbm.MapLayer(country_data, country_style))
+	buffer_distance = get_declustering_distance(mag, dist_window)
+	buffer_pg = create_buffer_polygon(gis_file, buffer_distance, show_plot=False)
+	buffer_data = lbm.PolygonData.from_ogr(buffer_pg)
+	layers.append(lbm.MapLayer(buffer_data, buffer_style))
+	subcatalog = cc_catalog.subselect(Mmin=mag, Mtype=Mtype, Mrelation=Mrelation)
+	subcatalog = subcatalog.subselect_polygon(buffer_pg)
+	values = {}
+	values['magnitude'] = subcatalog.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
+	catalog_data = lbm.MultiPointData(subcatalog.get_longitudes(), subcatalog.get_latitudes(), values=values)
+	layers.append(lbm.MapLayer(catalog_data, catalog_style))
+	map = lbm.LayeredBasemap(layers, "", projection, region=region, ax=ax)
+	map.draw_text_box((0.275, 0.1), "$M\geq%.1f$" % mag, label_style, zorder=10000)
+	map.plot(fig_filespec="hold")
+
+fig_filename = "Bel_mag_buffers.png"
+fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
+pylab.savefig(fig_filespec, dpi=300)
+exit()
+"""
+
 for m, mag in enumerate(mag_bins):
 	subcatalog = cc_catalog.subselect(Mmin=mag, Mmax=mag+mfd_bin_width-1E-5,
 									Mtype=Mtype, Mrelation=Mrelation)
@@ -188,12 +280,21 @@ fitted_mfd = observed_mfd.to_truncated_GR_mfd(completeness, end_date, method=fit
 fitted_mfd.print_report()
 
 mfd_list = [observed_mfd, fitted_mfd]
-labels = ["Observed", "%s fit (a=%.3f, b=%.3f)" % (fit_method, fitted_mfd.a_val,
-															fitted_mfd.b_val)]
-title = "MFD Belgium (dist. window: %s)" % dist_window
-fig_filespec = r"C:\Temp\MFD_Bel_%s_%s.PNG" % (dist_window, fit_method)
+cumul_or_inc = ["cumul", "cumul"]
+#labels = ["Observed", "%s fit (a=%.3f, b=%.3f)" % (fit_method, fitted_mfd.a_val,
+#															fitted_mfd.b_val)]
+lang = 'nl'
+labels = ["KSB Catalogus / Catalogue ORB", "Gutenberg-Richter"]
+
+#title = "MFD Belgium (dist. window: %s)" % dist_window
+title = ""
+#fig_filename = "MFD_Bel_%s_%s.PNG" % (dist_window, fit_method)
+fig_filename = "Bel_MFD.PNG"
+fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
 #fig_filespec = None
-rshalib.mfd.plot_MFD(mfd_list, labels=labels, title=title, fig_filespec=fig_filespec)
+rshalib.mfd.plot_MFD(mfd_list, labels=labels, completeness=completeness,
+					cumul_or_inc=cumul_or_inc, y_log_labels=False,
+					title=title, lang=lang, fig_filespec=fig_filespec, dpi=300)
 
 
 ## Compute Poisson and time-dependent probabilities
@@ -212,7 +313,7 @@ col_names = ["Magnitude", "Return period", "Elapsed time", "P (Poisson)", "P (ti
 tab_inc = PrettyTable(col_names)
 tab_cumul = PrettyTable(col_names)
 
-scenario_mags = [4.6, 5.3, 6.0]
+scenario_mags = [3.0, 4.6, 5.3, 6.0]
 for scen_mag in scenario_mags:
 	[idx] = np.argwhere(np.isclose(mag_bins, scen_mag))
 	## Using incremental rates
