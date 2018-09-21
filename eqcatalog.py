@@ -5546,9 +5546,12 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 
 	## plot x and y labels
 	if not plot_date:
-		xlabel = {"en": "Time (years)", "nl": "Tijd (jaar)"}[lang]
+		xlabel = {"en": "Time (years)",
+				"nl": "Tijd (jaar)",
+				"fr": u"Temps (années)",
+				"nlfr": u"Tijd (jaar) / Temps (années)"}[lang]
 	else:
-		xlabel = {"en": "Date", "nl": "Datum"}[lang]
+		xlabel = {"en": "Date", "nl": "Datum", "fr": "Date", "nlfr": "Datum / Date"}[lang]
 	ax.set_xlabel(xlabel, fontsize="x-large")
 	ax.set_ylabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
 
@@ -5568,12 +5571,16 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 	## plot completeness
 	# TODO: implement completeness dates rather than years
 	if completeness:
+		clabel = {"en": "Completeness magnitude",
+				"nl": "Compleetheidsmagnitude",
+				"fr": u"Magnitude de complétude",
+				"nlfr": u"Compleetheid / Complétude"}[lang]
 		x, y = completeness.min_years, completeness.min_mags
 		x = np.append(x, max([catalog.end_date for catalog in catalogs]).year+1)
 		if plot_date:
 			x = [datetime.datetime(year, 1, 1) for year in x]
 		xmin, xmax, ymin, ymax = ax.axis()
-		ax.hlines(y, xmin=x[:-1], xmax=x[1:], colors=completeness_color)
+		ax.hlines(y, xmin=x[:-1], xmax=x[1:], colors=completeness_color, label=clabel)
 		ax.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors=completeness_color, lw=2)
 		ax.axis((xmin, xmax, ymin, ymax))
 
