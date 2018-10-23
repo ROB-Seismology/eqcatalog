@@ -40,10 +40,15 @@ def writeHY4(filespec, catalog):
 
 
 if __name__ == "__main__":
+	import os
 	import datetime
 	import seismodb
-	#filespec = r"C:\Program Files\SeisVolE\ROB.HY4"
-	filespec = r"D:\GIS-data\KSB-ORB\ROB.HY4"
+
+	out_folder = r"D:\GIS-data\KSB-ORB"
+	#out_folder = r"E:\Home\_kris\Meetings\2018 - Opendeurdagen"
+	#out_folder = r"C:\Program Files (x86)\SeismicEruption\OpenDoorDays"
+
+	filespec = os.path.join(out_folder, "ROB.HY4")
 
 	region = (0,8,49,52)
 	start_date = datetime.date(1985, 1, 1)
