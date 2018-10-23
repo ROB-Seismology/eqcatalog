@@ -182,7 +182,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 		print("Note: %d enquiries are not assigned to a commune" % unassigned.num_replies)
 
 	plot_info = 'num_replies' if query_info == 'num_replies' else 'intensity'
-	plot_macroseismic_map(macro_recs, region=region, projection=projection,
+	plot_macroseismic_map(macro_recs, id_earth, region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion=int_conversion, symbol_style=symbol_style,
 				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
@@ -191,7 +191,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 				verbose=verbose)
 
 
-def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="merc",
+def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75), projection="merc",
 				graticule_interval=(1, 1), plot_info="intensity",
 				int_conversion="round", symbol_style=None,
 				cmap="rob", color_gradient="discontinuous", event_style="default",
@@ -311,8 +311,8 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 		intensities = np.array([rec.I for rec in macro_recs])
 		if color_gradient == "discontinuous":
 			intensities = getattr(np, int_conversion)(intensities).astype('int')
-		## Store possibly rounded intensities in new attribute, keeping
-		## original I attribute unmodified
+		## Store possibly rounded intensities in new 'intensity' attribute,
+		## keeping original 'I' attribute unmodified
 		for r, rec in enumerate(macro_recs):
 			setattr(rec, plot_info, intensities[r])
 		idxs = np.argsort(intensities)
@@ -321,6 +321,7 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 												macro_recs[idx].num_replies))
 
 	layers = []
+
 
 	## Commune/grid layer
 	if aggregate_by == 'grid':
@@ -338,7 +339,7 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 			all_lons.append(lons)
 			all_lats.append(lats)
 		values = {}
-		values[plot_info] = [getattr(rec, query_info) for rec in macro_recs]
+		values[plot_info] = [getattr(rec, plot_info) for rec in macro_recs]
 		if plot_info != 'num_replies':
 			values['num_replies'] = [rec.num_replies for rec in macro_recs]
 		commune_data = lbm.MultiPolygonData(all_lons, all_lats, values=values)
@@ -348,7 +349,7 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 		lats = [rec.lat for rec in macro_recs]
 		values = {}
 		values[plot_info] = [getattr(rec, plot_info) for rec in macro_recs]
-		if query_info != 'num_replies':
+		if plot_info != 'num_replies':
 			values['num_replies'] = [rec.num_replies for rec in macro_recs]
 		if len(lons):
 			commune_data = lbm.MultiPointData(lons, lats, values=values)
@@ -360,7 +361,7 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 		joined_attributes = {}
 		joined_attributes[plot_info] = {'key': key,
 			'values': {rec.id_com: getattr(rec, plot_info) for rec in macro_recs}}
-		if query_info != 'num_replies':
+		if plot_info != 'num_replies':
 			joined_attributes['num_replies'] = {'key': key,
 				'values': {rec.id_com: rec.num_replies for rec in macro_recs}}
 		#print(joined_attributes)
@@ -387,11 +388,12 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 		cb_title = "Number of replies"
 
 	if color_gradient == "discontinuous":
-		if query_info in ('cii', 'cdi'):
+		#if query_info in ('cii', 'cdi'):
+		if plot_info == 'intensity':
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
 										labels=["%d" % val for val in classes],
 										style_under='w')
-		elif query_info == 'num_replies':
+		elif plot_info == 'num_replies':
 			tfc = lbm.ThematicStyleRanges(classes, cmap, value_key=plot_info,
 										labels=["%d" % val for val in classes],
 										style_under='w', style_bad='w')
@@ -416,8 +418,9 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 			#tfh = lbm.ThematicStyleRanges(num_replies, ['', '.....', '....', '...', '..', ''],
 			#								value_key="num_replies")
 			if color_gradient == "discontinuous":
-				ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
-											value_key="num_replies")
+				#ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
+				#							value_key="num_replies")
+				ta = 1.
 		polygon_style = lbm.PolygonStyle(fill_color=tfc, line_width=0.1,
 					fill_hatch=tfh, alpha=ta, thematic_legend_style=thematic_legend_style)
 		#commune_style = lbm.CompositeStyle(polygon_style=polygon_style)
@@ -426,7 +429,7 @@ def plot_macroseismic_map(macro_recs, region=(2, 7, 49.25, 51.75), projection="m
 	else:
 		## Plot points
 		## Symbol size in function of number of replies
-		if query_info != 'num_replies':
+		if plot_info != 'num_replies':
 			num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
 			num_replies = num_replies[num_replies >= min_replies]
 			symbol_size = symbol_style.size
@@ -541,7 +544,7 @@ if __name__ == "__main__":
 	#aggregate_by = 'grid_5'
 	#aggregate_by = None
 	aggregate_by = 'main commune'
-	color_gradient = "discontinuous"
+	color_gradient = "continuous"
 	cmap = "rob"
 	#cmap = "jet"
 	#symbol_style = lbm.PointStyle(shape='D', size=5)
