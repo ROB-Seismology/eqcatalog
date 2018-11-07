@@ -348,12 +348,6 @@ class MacroseismicEnquiryEnsemble():
 		eq = self.get_eq()
 		return self.get_date_times() - eq.datetime
 
-	def get_eq(self):
-		from .seismodb import query_ROB_LocalEQCatalogByID
-		if isinstance(self.id_earth, (int, long)):
-			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
-			return eq
-
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
 		Select part of ensemble matching given property values
