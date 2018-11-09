@@ -1,3 +1,12 @@
+"""
+Provides interface to Harvard CMT catalog:
+- download from the internet
+- store in spatialite database
+- partial interface with eqcatalog
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import os
 import datetime
 import urllib2
@@ -248,6 +257,12 @@ class HarvardCMTRecord:
 		pass
 
 	def to_local_eq(self):
+		"""
+		Convert to earthquake record understood by eqrecord
+
+		:return:
+			instance of :class:`eqcatalog.LocalEarthquake`
+		"""
 		from eqcatalog import LocalEarthquake
 
 		ID = self.ID
@@ -262,6 +277,13 @@ class HarvardCMTRecord:
 
 
 class HarvardCMTCatalog:
+	"""
+	Class representing Harvard CMT Catalog
+
+	:param db_filespec:
+		str, full path to Sqlite/Spatialite database
+		or ':memory:'
+	"""
 	def __init__(self, db_filespec):
 		self.db_filespec = db_filespec
 		self.db = simpledb.SQLiteDB(db_filespec)
@@ -306,11 +328,12 @@ class HarvardCMTCatalog:
 
 	def import_ndk(self, ndk_filespecs, start_date=datetime.date(1900, 1, 1), clear_db=False):
 		if clear_db and self.table_name in self.db.list_tables():
+			self.db.discard_geometry_column(self.table_name)
 			self.db.drop_table(self.table_name)
 		if not self.table_name in self.db.list_tables():
 			self.db.create_table(self.table_name, HarvardCMTColDef)
 		for ndk_filespec in ndk_filespecs:
-			print ndk_filespec
+			print(ndk_filespec)
 			recs = self.parse_ndk_file(ndk_filespec)
 			if recs:
 				self.db.add_records(self.table_name, [rec.to_dict() for rec in recs if rec.hypo_date >= start_date])
@@ -382,9 +405,10 @@ class HarvardCMTCatalog:
 
 		## Create SpatiaLite geometries
 		if self.db.has_spatialite:
-			self.db.init_spatialite()
-			self.db.add_geometry_column('harvard_cmt', 'geom')
-			self.db.create_points_from_columns('harvard_cmt', 'hypo_lon', 'hypo_lat')
+			if not 'spatial_ref_sys' in self.db.list_tables():
+				self.db.init_spatialite()
+			self.db.add_geometry_column(self.table_name, 'geom')
+			self.db.create_points_from_columns(self.table_name, 'hypo_lon', 'hypo_lat')
 
 	def get_records(self):
 		for rec in self.db.query(self.table_name):
@@ -402,12 +426,19 @@ class HarvardCMTCatalog:
 		return EQCatalog(eq_list, name="Harvard CMT", start_date=datetime.date(1976, 1, 1))
 
 
-
-if __name__ == "__main__":
+def update_harvard_cmt_catalog():
+	"""
+	Update local database containing Harvard CMT catalog
+	"""
 	db_filespec = os.path.join(ROOT_FOLDER, "SQLite", "HarvardCMT.sqlite")
 	harvard_cmt = HarvardCMTCatalog(db_filespec)
 	harvard_cmt.read_from_web(clear_db=True)
 
+
+
+if __name__ == "__main__":
+	## Update catalog
+	update_harvard_cmt_catalog()
 	exit()
 
 	ndk_records = """
@@ -425,24 +456,24 @@ if __name__ == "__main__":
 	23 -1.310 0.212  2.320 0.166 -1.010 0.241  0.013 0.535 -2.570 0.668  1.780 0.151
 	V10   3.376 16 149   0.611 43  44  -3.987 43 254   3.681 282 48  -23  28 73 -136
 	"""
-	print ndk_records.splitlines()[1:6]
+	print(ndk_records.splitlines()[1:6])
 	rec = HarvardCMTRecord.from_ndk_record(ndk_records)
-	print rec.ID
-	print dir(rec)
-	print rec.__dict__
+	print(rec.ID)
+	print(dir(rec))
+	print(rec.__dict__)
 
 	"""
-	db_filespec = r"C:\Users\kris\Documents\Python\notebooks\Vienna\HarvardCMT.sqlite"
+	db_filespec = "C:\\Users\\kris\\Documents\\Python\\notebooks\\Vienna\\HarvardCMT.sqlite"
 	cmt_catalog = HarvardCMTCatalog(db_filespec)
-	print len(cmt_catalog)
+	print(len(cmt_catalog))
 	exit()
 	#cmt_catalog.read_from_web(clear_db=True)
 	#recs = list(cmt_catalog.get_records())
-	#print recs[0].hypo_date_time.isoformat()
+	#print(recs[0].hypo_date_time.isoformat())
 
 	eq_catalog = cmt_catalog.to_eq_catalog()
 	iets = eq_catalog.get_inter_event_times()
-	print iets.mean(), iets.std()
+	print(iets.mean(), iets.std())
 	import pylab
 	pylab.hist(iets, bins=np.linspace(0,3,50))
 	pylab.show()
@@ -456,14 +487,14 @@ if __name__ == "__main__":
 	"""
 
 	cmt_catalog = HarvardCMTCatalog(':memory:')
-	ndk_filespec = r"C:\Users\kris\Downloads\jan76_dec13.ndk"
+	ndk_filespec = "C:\\Users\\kris\\Downloads\\jan76_dec13.ndk"
 	ndk_url = "http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog/jan76_dec13.ndk"
 	cmt_records = cmt_catalog.parse_ndk_file(ndk_filespec)
-	print len(cmt_records)
+	print(len(cmt_records))
 	rec = cmt_records[-1]
-	print rec.Mrr, rec.Mtt, rec.Mpp
-	print rec.hypo_lon, rec.centroid_lon
+	print(rec.Mrr, rec.Mtt, rec.Mpp)
+	print(rec.hypo_lon, rec.centroid_lon)
 
 	db = cmt_catalog.import_ndk([ndk_filespec])
 	rec = cmt_catalog.get_records().next()
-	print rec.location
+	print(rec.location)
