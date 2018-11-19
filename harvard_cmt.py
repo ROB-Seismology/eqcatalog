@@ -16,7 +16,7 @@ import numpy as np
 import db.simpledb as simpledb
 
 
-ROOT_FOLDER = r"D:\seismo-gis\collections\Harvard_CMT"
+ROOT_FOLDER = "D:\\seismo-gis\\collections\\Harvard_CMT"
 
 
 HarvardCMTColDef = [
