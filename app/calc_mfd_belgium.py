@@ -57,12 +57,12 @@ def create_buffer_polygon(gis_file, buffer_distance, show_plot=False):
 	"""
 	import pylab
 	import mapping.geotools.coordtrans as ct
-	from mapping.geotools.readGIS import read_GIS_file
+	from mapping.geotools.read_gis import read_gis_file
 
 	## Read country polygon
 	#gis_data = lbm.GisData(gis_file)
 	#_, _, polygon_data = gis_data.get_data()
-	recs = read_GIS_file(gis_file, out_srs=ct.lambert1972, verbose=False)
+	recs = read_gis_file(gis_file, out_srs=ct.lambert1972, verbose=False)
 	geom = recs[0]['obj']
 	polygon_data = lbm.MultiPolygonData.from_ogr(geom)
 

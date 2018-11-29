@@ -469,7 +469,7 @@ def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True, ver
 		ordered dict {String sourceID: dict {String column_name: value}}
 		Note: special key 'obj' contains instance of :class:`osgeo.ogr.Geometry`}
 	"""
-	from mapping.geotools.readGIS import read_GIS_file
+	from mapping.geotools.read_gis import read_gis_file
 
 	## Read zone model from MapInfo file
 	#source_model_table = ZoneModelTables[source_model_name.lower()]
@@ -482,7 +482,7 @@ def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True, ver
 		if not ID_colname:
 			ID_colname = rob_source_models_dict[source_model_name]["column_map"]["id"]
 
-	zone_records = read_GIS_file(gis_filespec, verbose=verbose, encoding=None)
+	zone_records = read_gis_file(gis_filespec, verbose=verbose, encoding=None)
 	if ID_colname:
 		zone_ids = [rec[ID_colname] for rec in zone_records]
 	else:

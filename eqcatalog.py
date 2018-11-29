@@ -4138,9 +4138,9 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	from mapping.geotools.readGIS import read_GIS_file
+	from mapping.geotools.read_gis import read_gis_file
 
-	data = read_GIS_file(gis_filespec, verbose=verbose)
+	data = read_gis_file(gis_filespec, verbose=verbose)
 	eq_list = []
 	skipped = 0
 	for i, rec in enumerate(data):
