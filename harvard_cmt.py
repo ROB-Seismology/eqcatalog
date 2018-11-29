@@ -19,6 +19,49 @@ import db.simpledb as simpledb
 ROOT_FOLDER = "D:\\seismo-gis\\collections\\Harvard_CMT"
 
 
+def moment_to_mag(moment, unit='dyn.cm'):
+	"""
+	Convert seismic moment to moment magnitude
+
+	:param moment:
+		array-like, seismic moment (in dyn.cm)
+	:param unit:
+		str, moment unit, either 'dyn.cm' or 'N.m'
+		(default: 'dyn.cm')
+
+	:return:
+		array-like, moment magnitude
+	"""
+	base_term = (2./3) * np.log10(moment)
+	if unit == 'dyn.cm':
+		return base_term - 10.73
+	elif unit == 'N.m':
+		return base_term - 6.06
+	else:
+		raise Exception("Moment unit %s not supported!" % unit)
+
+
+def mag_to_moment(mag, unit='N.m'):
+	"""
+	Convert moment magnitude to seismic moment
+
+	:param mag:
+		array-like, moment magnitude
+	:param unit:
+		str, moment unit, either 'dyn.cm' or 'N.m'
+		(default: 'dyn.cm')
+
+	:return:
+		array-like, seismic moment (in dyn.cm)
+	"""
+	if unit == 'dyn.cm':
+		return 10**(1.5*mag + 16.095)
+	elif unit == 'N.m':
+		return 10**(1.5*mag + 9.09)
+	else:
+		raise Exception("Moment unit %s not supported!" % unit)
+
+
 HarvardCMTColDef = [
 	dict(name='ID', type='STRING', notnull=1, pk=1),
 	dict(name='ref_catalog', type='STRING'),
@@ -196,7 +239,23 @@ class HarvardCMTRecord:
 
 	@property
 	def MW(self):
-		return (2./3) * np.log10(self.moment * 10**self.exp) - 10.7
+		return moment_to_mag(self.get_moment())
+
+	def get_moment(self, unit='dyn.cm'):
+		"""
+		Get seismic moment, combining 'moment' and 'exp' values in DB
+
+		:param unit:
+			str, moment unit, either 'dyn.cm' or 'N.m'
+			(default: 'dyn.cm')
+
+		:return:
+			float, seismic moment
+		"""
+		moment = self.moment * 10**self.exp
+		if unit == 'N.m':
+			moment *= 1E-7
+		return moment
 
 	@classmethod
 	def from_ndk_record(cls, ndk_record):
@@ -326,17 +385,27 @@ class HarvardCMTCatalog:
 		ndk.close()
 		return cmt_records
 
-	def import_ndk(self, ndk_filespecs, start_date=datetime.date(1900, 1, 1), clear_db=False):
-		if clear_db and self.table_name in self.db.list_tables():
+	def clear_db(self):
+		if self.table_name in self.db.list_tables():
 			self.db.discard_geometry_column(self.table_name)
 			self.db.drop_table(self.table_name)
 		if not self.table_name in self.db.list_tables():
 			self.db.create_table(self.table_name, HarvardCMTColDef)
+
+	def import_records(self, cmt_records, clear_db=False):
+		if clear_db:
+			self.clear_db()
+		self.db.add_records(self.table_name, [rec.to_dict() for rec in cmt_records])
+
+	def import_ndk(self, ndk_filespecs, start_date=datetime.date(1900, 1, 1), clear_db=False):
+		if clear_db:
+			self.clear_db()
 		for ndk_filespec in ndk_filespecs:
 			print(ndk_filespec)
 			recs = self.parse_ndk_file(ndk_filespec)
+			recs = [rec for rec in recs if rec.hypo_date >= start_date]
 			if recs:
-				self.db.add_records(self.table_name, [rec.to_dict() for rec in recs if rec.hypo_date >= start_date])
+				self.import_records(recs, clear_db=False)
 			else:
 				break
 
@@ -410,8 +479,45 @@ class HarvardCMTCatalog:
 			self.db.add_geometry_column(self.table_name, 'geom')
 			self.db.create_points_from_columns(self.table_name, 'hypo_lon', 'hypo_lat')
 
-	def get_records(self):
-		for rec in self.db.query(self.table_name):
+	def get_records(self, region=None, start_date=None, end_date=None,
+					Mmin=None, Mmax=None, min_depth=None, max_depth=None,
+					verbose=False):
+		table_clause = self.table_name
+
+		where_clauses = []
+		if region:
+			clause = "(hypo_lon BETWEEN %f AND %f) AND (hypo_lat BETWEEN %f AND %f)"
+			clause %= region
+			where_clauses.append(clause)
+		if start_date:
+			if isinstance(start_date, int):
+				## year
+				start_date = datetime.date(start_date, 1, 1)
+			clause = "julianday(hypo_date_time) >= julianday('%s')" % start_date
+			where_clauses.append(clause)
+		if end_date:
+			if isinstance(end_date, int):
+				end_date = datetime.date(end_date, 12, 31)
+			clause = "julianday(hypo_date_time) <= julianday('%s')" % end_date
+			where_clauses.append(clause)
+		if min_depth:
+			clause = "hypo_depth >= %f" % min_depth
+			where_clauses.append(clause)
+		if max_depth:
+			clause = "hypo_depth <= %f" % max_depth
+			where_clauses.append(clause)
+		if Mmin:
+			min_moment = mag_to_moment(Mmin)
+			clause = "(moment * POWER(10, exp)) >= %E" % min_moment
+			where_clauses.append(clause)
+		if Mmax:
+			max_moment = mag_to_moment(Mmax)
+			clause = "(moment * POWER(10, exp)) <= %E" % max_moment
+			where_clauses.append(clause)
+
+		where_clause = " AND ".join(where_clauses)
+
+		for rec in self.db.query(table_clause, where_clause=where_clause, verbose=verbose):
 			rec = rec.to_dict()
 			if rec.has_key('geom'):
 				del rec['geom']
