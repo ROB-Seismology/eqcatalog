@@ -41,7 +41,7 @@ def moment_to_mag(moment, unit='dyn.cm'):
 		raise Exception("Moment unit %s not supported!" % unit)
 
 
-def mag_to_moment(mag, unit='N.m'):
+def mag_to_moment(mag, unit='dyn.cm'):
 	"""
 	Convert moment magnitude to seismic moment
 
