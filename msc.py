@@ -1,6 +1,10 @@
 """
 Magnitude Scale Conversion (MSC) module
+
+Author: Bart Vleminckx
 """
+
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 
 import numpy as np
@@ -222,7 +226,7 @@ class Camelbeeck1985(MSCE_ML_MW):
 	"""
 	Conversion MS -> log seismic moment
 	Published in:
-	Camelbeek, T. (1985). Recent seismicity in Hainaut - Scaling laws from the
+	Camelbeeck, T. (1985). Recent seismicity in Hainaut - Scaling laws from the
 	seismological stations in Belgium and Luxemburg. P. Melchior (ed.), Seismic
 	Activity in Western Europe, 109-126. D. Reidel Publishing Company.
 
@@ -457,4 +461,3 @@ def seismic_moment_to_moment_magnitude_dyncm(M0):
 	"""
 	"""
 	return (2./3.)*np.log10(M0)-10.73
-
