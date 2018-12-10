@@ -1,7 +1,14 @@
+"""
+Functionality related to catalog completeness (time/magnitude)
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import numpy as np
 
 import mx.DateTime as mxDateTime
-from time_functions import timespan
+from .time_functions import timespan
 
 
 
@@ -31,17 +38,19 @@ class Completeness:
 		if len(self.min_dates) > 1 and self.min_dates[0] > self.min_dates[1]:
 			self.min_dates = self.min_dates[::-1]
 			self.min_mags = self.min_mags[::-1]
-			if not np.all(np.diff(self.min_dates) > 0):
-				raise Exception("Completeness dates not in chronological order")
-			if not np.all(np.diff(self.min_mags) < 0):
-				raise Exception("Completeness magnitudes not monotonically decreasing with time!")
+		if not np.all(np.diff(self.min_dates) > 0):
+			raise Exception("Completeness dates not in chronological order")
+		if not np.all(np.diff(self.min_mags) < 0):
+			raise Exception("Completeness magnitudes not monotonically "
+							"decreasing with time!")
 
 
 	def __len__(self):
 		return len(self.min_dates)
 
 	def __str__(self):
-		s = "\n".join(["%s, %.2f" % (date, mag) for (date, mag) in zip(self.min_dates, self.min_mags)])
+		s = "\n".join(["%s, %.2f" % (date, mag) for (date, mag)
+						in zip(self.min_dates, self.min_mags)])
 		return s
 
 	@property
@@ -60,8 +69,10 @@ class Completeness:
 	def min_years(self):
 		#return np.array([date.year for date in self.min_dates])
 		years = np.array([date.year for date in self.min_dates], 'f')
-		year_num_days = np.array([(mxDateTime.Date(year, 12, 31) - mxDateTime.Date(year, 1, 1)).days + 1 for year in years], 'f')
-		time_deltas = self.min_dates - np.array([mxDateTime.Date(year, 1, 1) for year in years])
+		year_num_days = np.array([(mxDateTime.Date(year, 12, 31)
+				- mxDateTime.Date(year, 1, 1)).days + 1 for year in years], 'f')
+		time_deltas = (self.min_dates
+					- np.array([mxDateTime.Date(year, 1, 1) for year in years]))
 		num_days = np.array([td.days for td in time_deltas], 'f')
 		return years + num_days / year_num_days
 
@@ -163,8 +174,10 @@ class Completeness:
 		if isinstance(end_date, int):
 			end_date = mxDateTime.Date(end_date, 12, 31)
 		completeness_dates = [self.get_initial_completeness_date(M) for M in magnitudes]
-		completeness_timespans = [timespan(start_date, end_date) for start_date in completeness_dates]
-		#completeness_timespans = [((end_date - start_date).days + 1) / 365.25 for start_date in completeness_dates]
+		completeness_timespans = [timespan(start_date, end_date)
+								for start_date in completeness_dates]
+		#completeness_timespans = [((end_date - start_date).days + 1) / 365.25
+		# 						for start_date in completeness_dates]
 		completeness_timespans = np.array(completeness_timespans)
 		## Replace negative timespans with zeros
 		completeness_timespans[np.where(completeness_timespans < 0)] = 0
@@ -241,12 +254,19 @@ class Completeness:
 
 
 ## NOTE: I think threshold magnitudes should be a multiple of dM (or dM/2)!
-Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.7, 3.3, 1.8], "MS")
 #Completeness_Leynaud = Completeness([1350, 1911, 1985], [4.75, 3.25, 1.75], "MS")
-Completeness_Rosset = Completeness([1350, 1926, 1960, 1985], [5.0, 4.0, 3.0, 1.8], "MS")
-## Following relation is for MW based on conversion from ML using Ahorner (1983)
-Completeness_MW_201303a = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.9, 4.5, 4.0, 3.0, 2.2], "MW")
-## Following relation is for MW based on conversion from ML using Reamer and Hinzen (2004)
-Completeness_MW_201303b = Completeness([1350, 1750, 1860, 1905, 1960, 1985], [5.2, 4.9, 4.5, 3.9, 2.9, 2.0], "MW")
+Completeness_Leynaud = Completeness([1350, 1911, 1985],
+									[4.7, 3.3, 1.8], "MS")
 
+Completeness_Rosset = Completeness([1350, 1926, 1960, 1985],
+									[5.0, 4.0, 3.0, 1.8], "MS")
+
+## Following relation is for MW based on conversion from ML using Ahorner (1983)
+Completeness_MW_201303a = Completeness([1350, 1750, 1860, 1905, 1960, 1985],
+										[5.2, 4.9, 4.5, 4.0, 3.0, 2.2], "MW")
+## Following relation is for MW based on conversion from ML using Reamer and Hinzen (2004)
+Completeness_MW_201303b = Completeness([1350, 1750, 1860, 1905, 1960, 1985],
+										[5.2, 4.9, 4.5, 3.9, 2.9, 2.0], "MW")
+
+# TODO: rename to DEFAULT_ROB_COMPLETENESS
 default_completeness = Completeness_MW_201303a
