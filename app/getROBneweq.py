@@ -1,7 +1,16 @@
 #! /usr/bin/env python
 
+"""
+Check if a new earthquake has been entered in the database,
+and send email or SMS to users.
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import os, sys, platform
 import datetime
+
 
 ## Add python path to allow running from cron on linux machine
 if platform.uname()[0] == "Linux":
@@ -77,7 +86,7 @@ else:
 
 ## Obtain most recent id_earth from database
 last_earthID = seismodb.get_last_earthID()
-#print last_earthID
+#print(last_earthID)
 
 if last_earthID != prev_last_earthID:
 	try:
