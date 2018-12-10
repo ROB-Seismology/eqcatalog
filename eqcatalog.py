@@ -1,10 +1,7 @@
 # -*- coding: iso-Latin-1 -*-
 
 """
-MagFreq
-Python module to calculate Frequency/Magnitude relations from the ROB catalog.
-The catalog is read either from the online database, or from a running instance of MapInfo.
-If read from MapInfo, it is also possible to split catalog according to a source zone model.
+Module for processing earthquake catalogs.
 ====================================================
 Author: Kris Vanneste, Royal Observatory of Belgium.
 Date: May 2008.
@@ -21,6 +18,16 @@ Required modules:
 """
 
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+try:
+	## Python 2
+	basestring
+except:
+	## Python 3
+	basestring = str
+
+
 ## Import standard python modules
 import csv
 import os
@@ -33,10 +40,10 @@ from collections import OrderedDict
 
 
 ## Import third-party modules
-## Kludge because matplotlib is broken on seissrv3.
 import numpy as np
 import matplotlib
 if platform.uname()[1] == "seissrv3":
+	## Kludge because matplotlib is broken on seissrv3.
 	matplotlib.use('AGG')
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
@@ -46,19 +53,21 @@ from matplotlib.ticker import MultipleLocator, MaxNLocator
 import mx.DateTime as mxDateTime
 
 
+# TODO: Move ROB-specific code to separate submodule
+
 ## Directories with MapInfo tables for named catalogs
 if platform.uname()[0] == "Windows":
-	GIS_root = r"D:\GIS-data"
+	GIS_ROOT = "D:\\GIS-data"
 else:
-	GIS_root = os.path.join(os.environ.get("HOME", ""), "gis-data")
+	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
 
 
 ## Import ROB modules
-from eqrecord import LocalEarthquake
-from source_models import read_source_model
-from completeness import *
-from time_functions import timespan
+from .eqrecord import LocalEarthquake
+from .source_models import read_source_model
+from .completeness import *
+from .time_functions import timespan
 import mapping.geotools.geodetic as geodetic
 
 
@@ -90,10 +99,12 @@ class EQCatalog:
 		self.end_date = end_date
 		if not end_date:
 			self.end_date = Tmax
-		if isinstance(self.start_date, (datetime.datetime, datetime.date, mxDateTime.DateTimeType)):
+		if isinstance(self.start_date, (datetime.datetime, datetime.date,
+					mxDateTime.DateTimeType)):
 			year, month, day = self.start_date.timetuple()[:3]
 			self.start_date = mxDateTime.Date(year, month, day)
-		if isinstance(self.end_date, (datetime.datetime, datetime.date, mxDateTime.DateTimeType)):
+		if isinstance(self.end_date, (datetime.datetime, datetime.date,
+					mxDateTime.DateTimeType)):
 			year, month, day = self.end_date.timetuple()[:3]
 			self.end_date = mxDateTime.Date(year, month, day)
 		self.region = region
@@ -116,12 +127,15 @@ class EQCatalog:
 		if isinstance(item, (int, np.int32, np.int64)):
 			return self.eq_list.__getitem__(item)
 		elif isinstance(item, slice):
-			return EQCatalog(self.eq_list.__getitem__(item), start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name + " %s" % item)
+			return EQCatalog(self.eq_list.__getitem__(item), start_date=self.start_date,
+							end_date=self.end_date, region=self.region,
+							name=self.name + " %s" % item)
 		elif isinstance(item, (list, np.ndarray)):
 			eq_list = []
 			for index in item:
 				eq_list.append(self.eq_list[index])
-			return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name + " %s" % item)
+			return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date,
+							region=self.region, name=self.name + " %s" % item)
 
 	@property
 	def lons(self):
@@ -149,7 +163,8 @@ class EQCatalog:
 			if len(mags):
 				if mags.min() == 0:
 					mags = mags[mags > 0]
-				print("%s: n=%d, min=%.1f, max=%.1f" % (Mtype, count, mags.min(), mags.max()))
+				print("%s: n=%d, min=%.1f, max=%.1f"
+					% (Mtype, count, mags.min(), mags.max()))
 		lons = self.get_longitudes()
 		lons = lons[np.isfinite(lons)]
 		print("Longitude bounds: %.4f - %.4f" % (lons.min(), lons.max()))
@@ -171,7 +186,8 @@ class EQCatalog:
 		else:
 			has_prettytable = True
 
-		col_names = ["ID", "Date", "Time", "Name", "Lon", "Lat", "Depth", "ML", "MS", "MW"]
+		col_names = ["ID", "Date", "Time", "Name", "Lon", "Lat", "Depth",
+					"ML", "MS", "MW"]
 		if has_prettytable:
 			tab = PrettyTable(col_names)
 		else:
@@ -188,9 +204,9 @@ class EQCatalog:
 		if has_prettytable:
 			print(tab)
 		else:
-			print '\t'.join(col_names)
+			print('\t'.join(col_names))
 			for row in tab:
-				print '\t'.join(row)
+				print('\t'.join(row))
 
 	def get_record(self, ID):
 		"""
@@ -240,7 +256,8 @@ class EQCatalog:
 			dct['time'] = dt.time()
 			del dct['datetime']
 		if 'eq_list' in dct:
-			dct['eq_list'] = [LocalEarthquake.from_dict(d["__LocalEarthquake__"]) for d in dct['eq_list']]
+			dct['eq_list'] = [LocalEarthquake.from_dict(d["__LocalEarthquake__"])
+							for d in dct['eq_list']]
 		return EQCatalog(**dct)
 
 	def dump_json(self):
@@ -306,7 +323,8 @@ class EQCatalog:
 			list of timedelta objects
 		"""
 		if not start_datetime:
-			year, month, day = self.start_date.year, self.start_date.month, self.start_date.day
+			year, month, day = (self.start_date.year, self.start_date.month,
+								self.start_date.day)
 			start_datetime = mxDateTime.Date(year, month, day)
 		return [eq.datetime - start_datetime for eq in self]
 
@@ -317,7 +335,7 @@ class EQCatalog:
 		:return:
 			float array, inter-event times
 		"""
-		from time_functions import time_delta_to_days
+		from .time_functions import time_delta_to_days
 
 		sorted_catalog = self.sort()
 		date_times = sorted_catalog.get_datetimes()
@@ -348,7 +366,8 @@ class EQCatalog:
 		Return array with fractional years for all earthquakes in catalog
 		"""
 		years = np.array([eq.get_fractional_year() for eq in self])
-		#years = [eq.datetime.year + (eq.datetime.month - 1.0) /12 + ((eq.datetime.day - 1.0) / 31) / 12 for eq in self]
+		#years = [eq.datetime.year + (eq.datetime.month - 1.0) /12
+		# 		+ ((eq.datetime.day - 1.0) / 31) / 12 for eq in self]
 		return years
 
 	def get_magnitudes(self, Mtype="MW", Mrelation="default"):
@@ -414,13 +433,13 @@ class EQCatalog:
 		for eq in self:
 			eq_Mtypes = eq.get_Mtypes()
 			for Mtype in eq_Mtypes:
-				if Mtype_counts.has_key(Mtype):
+				if Mtype in Mtype_counts:
 					Mtype_counts[Mtype] += 1
 				else:
 					Mtype_counts[Mtype] = 1
 			if len(eq_Mtypes) > 1:
 				comb_Mtype = '+'.join(sorted(eq_Mtypes))
-				if Mtype_counts.has_key(comb_Mtype):
+				if comb_Mtype in Mtype_counts:
 					Mtype_counts[comb_Mtype] += 1
 				else:
 					Mtype_counts[comb_Mtype] = 1
@@ -474,7 +493,7 @@ class EQCatalog:
 		"""
 		import mapping.geotools.coordtrans as coordtrans
 		lons, lats = self.get_longitudes(), self.get_latitudes()
-		coord_list = zip(lons, lats)
+		coord_list = list(zip(lons, lats))
 		if proj == "lambert1972":
 			return coordtrans.lonlat_to_lambert1972(coord_list)
 		elif proj == "utm31N":
@@ -634,7 +653,8 @@ class EQCatalog:
 			if completeness.Mtype != "MW":
 				raise Exception("Completeness magnitude must be moment magnitude!")
 			M0rate = 0.
-			for subcatalog in self.split_completeness(completeness=completeness, Mtype="MW", Mrelation=Mrelation):
+			for subcatalog in self.split_completeness(completeness=completeness,
+											Mtype="MW", Mrelation=Mrelation):
 				M0rate += subcatalog.get_M0_total(Mrelation=Mrelation) / subcatalog.timespan()
 		return M0rate
 
@@ -656,7 +676,10 @@ class EQCatalog:
 		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date,
 						region=self.region, name=self.name)
 
-	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, attr_val=(), Mtype="MW", Mrelation="default", include_right_edges=True, catalog_name=""):
+	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None,
+					Mmax=None, min_depth=None, max_depth=None, attr_val=(),
+					Mtype="MW", Mrelation="default", include_right_edges=True,
+					catalog_name=""):
 		"""
 		Make a subselection from the catalog.
 
@@ -768,9 +791,12 @@ class EQCatalog:
 		if not catalog_name:
 			catalog_name = self.name + " (subselect)"
 
-		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region, name=catalog_name)
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
+						region=region, name=catalog_name)
 
-	def subselect_declustering(self, method="Cluster", window="GardnerKnopoff1974", fa_ratio=0.5, Mtype="MW", Mrelation="default", return_triggered_catalog=False, catalog_name=""):
+	def subselect_declustering(self, method="Cluster", window="GardnerKnopoff1974",
+								fa_ratio=0.5, Mtype="MW", Mrelation="default",
+								return_triggered_catalog=False, catalog_name=""):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		declustering method and params.
@@ -802,7 +828,7 @@ class EQCatalog:
 			if return_triggered_catalog = False also an triggered catalog is
 			returned as instance of :class:`EQCatalog`
 		"""
-		from declustering import (WindowMethod, ClusterMethod,
+		from .declustering import (WindowMethod, ClusterMethod,
 			GardnerKnopoff1974Window, Gruenthal2009Window, Uhrhammer1986Window)
 
 		methods = {
@@ -848,7 +874,8 @@ class EQCatalog:
 		# TODO: implement get_dependent_events, get_foreshocks, get_aftershocks
 		# methods in LocalEarthquake class
 
-	def subselect_completeness(self, completeness=default_completeness, Mtype="MW", Mrelation="default", catalog_name="", verbose=True):
+	def subselect_completeness(self, completeness=default_completeness, Mtype="MW",
+							Mrelation="default", catalog_name="", verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		completeness criterion.
@@ -873,7 +900,8 @@ class EQCatalog:
 		if completeness:
 			start_date = min(completeness.min_dates)
 			if completeness.Mtype != Mtype:
-				raise Exception("Magnitude type of completeness not compatible with specified Mtype!")
+				raise Exception("Magnitude type of completeness "
+								"not compatible with specified Mtype!")
 		else:
 			start_date = self.start_date
 		end_date = self.end_date
@@ -889,13 +917,16 @@ class EQCatalog:
 			eq_list = self.eq_list
 
 		if verbose:
-			print "Number of events constrained by completeness criteria: %d out of %d" % (len(eq_list), len(self.eq_list))
+			print("Number of events constrained by completeness criteria: %d out of %d"
+					% (len(eq_list), len(self.eq_list)))
 
 		if not catalog_name:
 			catalog_name = self.name + " (completeness-constrained)"
-		return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=self.region, name=catalog_name)
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
+						region=self.region, name=catalog_name)
 
-	def split_completeness(self, completeness=default_completeness, Mtype="MW", Mrelation="default"):
+	def split_completeness(self, completeness=default_completeness, Mtype="MW",
+							Mrelation="default"):
 		"""
 		Split catlog in subcatalogs according to completeness periods and magnitudes
 
@@ -916,11 +947,13 @@ class EQCatalog:
 		max_mags = list(min_mags[1:]) + [None]
 		start_dates = completeness.min_dates[::-1]
 		for Mmin, Mmax, start_date in zip(min_mags, max_mags, start_dates):
-			catalog = self.subselect(Mmin=Mmin, Mmax=Mmax, start_date=start_date, end_date=self.end_date)
+			catalog = self.subselect(Mmin=Mmin, Mmax=Mmax, start_date=start_date,
+									end_date=self.end_date)
 			completeness_catalogs.append(catalog)
 		return completeness_catalogs
 
-	def bin_year(self, start_year, end_year, dYear, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default"):
+	def bin_year(self, start_year, end_year, dYear, Mmin=None, Mmax=None,
+				Mtype="MW", Mrelation="default"):
 		"""
 		Bin earthquakes into year intervals
 
@@ -948,12 +981,14 @@ class EQCatalog:
 		"""
 		bins_Years = np.arange(start_year, end_year+dYear, dYear)
 		## Select years according to magnitude criteria
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year,
+						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		Years = subcatalog.get_years()
 		bins_N, bins_Years = np.histogram(Years, bins_Years)
 		return (bins_N, bins_Years[:-1])
 
-	def bin_year_by_M0(self, start_year, end_year, dYear, Mmin=None, Mmax=None, Mrelation="default"):
+	def bin_year_by_M0(self, start_year, end_year, dYear, Mmin=None, Mmax=None,
+						Mrelation="default"):
 		"""
 		Bin earthquakes moments into year intervals
 
@@ -980,7 +1015,8 @@ class EQCatalog:
 		bins_Years = np.arange(start_year, end_year+dYear, dYear)
 		bins_M0 = np.zeros(len(bins_Years))
 		## Select years according to magnitude criteria
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year,
+						Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation)
 
 		for eq in subcatalog:
 			try:
@@ -993,7 +1029,8 @@ class EQCatalog:
 		return bins_M0, bins_Years
 
 
-	def bin_day(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default"):
+	def bin_day(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mtype="MW",
+				Mrelation="default"):
 		"""
 		Bin earthquakes into day intervals
 
@@ -1022,12 +1059,15 @@ class EQCatalog:
 		"""
 		bins_Days = np.arange(0, (end_date - start_date).days + dday, dday)
 		## Select years according to magnitude criteria
-		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		Days = [(eq.date - start_date).days + (eq.date - start_date).seconds / 86400.0 for eq in subcatalog]
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
+						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		Days = [(eq.date - start_date).days + (eq.date - start_date).seconds / 86400.0
+				for eq in subcatalog]
 		bins_N, bins_Days = np.histogram(Days, bins_Days)
 		return (bins_N, bins_Days[:-1])
 
-	def bin_day_by_M0(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mrelation="default"):
+	def bin_day_by_M0(self, start_date, end_date, dday, Mmin=None, Mmax=None,
+					Mrelation="default"):
 		"""
 		Bin earthquake moments into day intervals.
 
@@ -1055,7 +1095,8 @@ class EQCatalog:
 		bins_Days = np.arange(0, (end_date - start_date).days + dday, dday)
 		bins_M0 = np.zeros(len(bins_Days))
 		## Select years according to magnitude criteria
-		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
+						Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation)
 
 		for eq in subcatalog:
 			try:
@@ -1067,7 +1108,8 @@ class EQCatalog:
 				bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_Days
 
-	def bin_hour(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default", start_year=None, end_year=None):
+	def bin_hour(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default",
+				start_year=None, end_year=None):
 		"""
 		Bin earthquakes into hour intervals
 
@@ -1091,7 +1133,8 @@ class EQCatalog:
 			bins_N: array containing number of earthquakes for each bin
 			bins_Hours: array containing lower limit of each hour interval
 		"""
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year,
+						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		hours = np.array([eq.get_fractional_hour() for eq in subcatalog])
 		bins_Hr = np.arange(25)
 		bins_N, junk = np.histogram(hours, bins_Hr)
@@ -1139,16 +1182,20 @@ class EQCatalog:
 			bins_N: array containing number of earthquakes for each bin
 			bins_depth: array containing lower depth value of each interval
 		"""
-		subcatalog = self.subselect(start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
+						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		if depth_error:
-			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0) and 0 < eq.errz < depth_error]
+			depths = [eq.depth for eq in subcatalog
+					if not eq.depth in (None, 0) and 0 < eq.errz < depth_error]
 		else:
 			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, _ = np.histogram(depths, bins_depth)
 		return bins_N, bins_depth[:-1]
 
-	def bin_depth_by_M0(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mrelation="default", start_year=None, end_year=None):
+	def bin_depth_by_M0(self, min_depth=0, max_depth=30, bin_width=2,
+					depth_error=None, Mmin=None, Mmax=None, Mrelation="default",
+					start_year=None, end_year=None):
 		"""
 		Bin earthquake moments into depth bins
 
@@ -1180,7 +1227,9 @@ class EQCatalog:
 		"""
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_M0 = np.zeros(len(bins_depth))
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year, Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation, min_depth=min_depth, max_depth=max_depth)
+		subcatalog = self.subselect(start_date=start_year, end_date=end_year,
+						Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation,
+						min_depth=min_depth, max_depth=max_depth)
 		if depth_error:
 			min_depth_error = 0
 		else:
@@ -1198,9 +1247,11 @@ class EQCatalog:
 					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_depth
 
-	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default", completeness=None, verbose=True):
+	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default",
+				completeness=None, verbose=True):
 		"""
-		Bin all earthquake magnitudes in catalog according to specified magnitude interval.
+		Bin all earthquake magnitudes in catalog according to specified
+		magnitude interval.
 
 		:param Mmin:
 			Float, minimum magnitude to bin
@@ -1215,14 +1266,15 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: None)
+			instance of :class:`Completeness` containing initial years of
+			completeness and corresponding minimum magnitudes (default: None)
 		:param verbose:
 			Bool, whether or not to print additional information
 
-		#:param large_eq_correction: (M, corr_factor) tuple, with M the lower magnitude for which to apply corr_factor
-		#	This is to correct the frequency of large earthquakes having a return period which is longer
-		#	than the catalog length
+		#:param large_eq_correction: (M, corr_factor) tuple, with M the
+		#	lower magnitude for which to apply corr_factor
+		#	This is to correct the frequency of large earthquakes having a
+		# 	return period which is longer than the catalog length
 
 		:return:
 			Tuple (bins_N, bins_Mag)
@@ -1244,7 +1296,8 @@ class EQCatalog:
 
 		## Select magnitudes according to completeness criteria
 		if completeness:
-			cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
+			cc_catalog = self.subselect_completeness(completeness, Mtype,
+												Mrelation, verbose=verbose)
 			Mags = cc_catalog.get_magnitudes(Mtype, Mrelation)
 		else:
 			Mags = self.get_magnitudes(Mtype, Mrelation)
@@ -1256,16 +1309,18 @@ class EQCatalog:
 
 		return bins_N, bins_Mag
 
-	def get_initial_completeness_dates(self, magnitudes, completeness=default_completeness):
+	def get_initial_completeness_dates(self, magnitudes,
+									completeness=default_completeness):
 		"""
 		Compute initial date of completeness for list of magnitudes
 
 		:param magnitudes:
 			list or numpy array, magnitudes
 		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` containing initial years of
+			completeness and corresponding minimum magnitudes.
+			If None, use start year of catalog.
+			(default: Completeness_MW_201303a)
 
 		:return:
 			numpy array, completeness dates
@@ -1274,7 +1329,8 @@ class EQCatalog:
 		if completeness:
 			completeness_dates = []
 			for M in magnitudes:
-				start_date = max(self.start_date, completeness.get_initial_completeness_date(M))
+				start_date = max(self.start_date,
+								completeness.get_initial_completeness_date(M))
 				#start_date = completeness.get_initial_completeness_date(M)
 				completeness_dates.append(start_date)
 		else:
@@ -1300,7 +1356,8 @@ class EQCatalog:
 		min_date = self.start_date.year
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
-	def get_completeness_timespans(self, magnitudes, completeness=default_completeness):
+	def get_completeness_timespans(self, magnitudes,
+								completeness=default_completeness):
 		"""
 		Compute completeness timespans for list of magnitudes
 
@@ -1320,7 +1377,9 @@ class EQCatalog:
 			completeness = Completeness([min_date], [min_mag], Mtype="MW")
 		return completeness.get_completeness_timespans(magnitudes, self.end_date)
 
-	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default", completeness=default_completeness, trim=False, verbose=True):
+	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW",
+						Mrelation="default", completeness=default_completeness,
+						trim=False, verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1350,7 +1409,8 @@ class EQCatalog:
 			bins_N_incremental: incremental annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype,
+				Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 
 		bins_N_incremental = bins_N / bins_timespans
@@ -1363,7 +1423,8 @@ class EQCatalog:
 
 		return bins_N_incremental, bins_Mag
 
-	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default", completeness=default_completeness, trim=False, verbose=True):
+	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default",
+					completeness=default_completeness, trim=False, verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1392,12 +1453,16 @@ class EQCatalog:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
 		from hazard.rshalib.mfd import EvenlyDiscretizedMFD
-		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype, Mrelation, completeness, trim, verbose=verbose)
+		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax,
+					dM, Mtype, Mrelation, completeness, trim, verbose=verbose)
 		## Mmin may have changed depending on completeness
 		Mmin = bins_Mag[0]
-		return EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental), Mtype=Mtype)
+		return EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental),
+									Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation="default", completeness=default_completeness, trim=False, verbose=True):
+	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW",
+						Mrelation="default", completeness=default_completeness,
+						trim=False, verbose=True):
 		"""
 		Compute cumulative magnitude-frequency distribution.
 
@@ -1427,13 +1492,17 @@ class EQCatalog:
 			bins_N_cumulative: cumulative annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
+		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax,
+				dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
 		## Reverse arrays for calculating cumulative number of events
 		bins_N_incremental = bins_N_incremental[::-1]
 		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation="default", completeness=default_completeness, verbose=True):
+	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
+					b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
+					Mrelation="default", completeness=default_completeness,
+					verbose=True):
 		"""
 		Compute Mmax distribution following Bayesian approach.
 
@@ -1499,8 +1568,12 @@ class EQCatalog:
 			if not b_val:
 				## Note: using lowest magnitude of completeness to compute Weichert
 				## is more robust than using min_mag
-				a_val, b_val, stda, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
-			mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag, Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+				a_val, b_val, stda, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag,
+						Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation,
+						completeness=completeness, b_val=b_val, verbose=verbose)
+			mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag,
+						Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation,
+						completeness=completeness, verbose=verbose)
 		else:
 			from hazard.rshalib.mfd import EvenlyDiscretizedMFD
 			Mmax_obs = 0.
@@ -1509,10 +1582,17 @@ class EQCatalog:
 			## Fake MFD
 			mfd = EvenlyDiscretizedMFD(Mmin_n, dM, [1.0])
 
-		prior, likelihood, posterior, params = mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM, truncation=truncation, completeness=completeness, end_date=self.end_date, verbose=verbose)
+		prior, likelihood, posterior, params = mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model,
+				Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM,
+				truncation=truncation, completeness=completeness,
+				end_date=self.end_date, verbose=verbose)
 		return (prior, likelihood, posterior, params)
 
-	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5, b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW', Mrelation="default", completeness=default_completeness, num_discretizations=0, title=None, fig_filespec=None, verbose=True):
+	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
+						b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
+						Mrelation="default", completeness=default_completeness,
+						num_discretizations=0, title=None, fig_filespec=None,
+						verbose=True):
 		"""
 		Compute Mmax distribution following Bayesian approach.
 
@@ -2461,7 +2541,7 @@ class EQCatalog:
 			- stda: standard deviation on a value
 			- stdb: standard deviation on b value
 		"""
-		from calcGR import calcGR_LSQ
+		from .calcGR import calcGR_LSQ
 		if weighted:
 			bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
 			weights = bins_N
@@ -2548,7 +2628,7 @@ class EQCatalog:
 		are taken into account. It is therefore important to specify Mmax as
 		the evaluated Mmax for the specific region or source.
 		"""
-		from calcGR import calcGR_Weichert
+		from .calcGR import calcGR_Weichert
 		## Note: don't use get_incremental_MagFreq here, as completeness
 		## is taken into account in the Weichert algorithm !
 		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
@@ -2566,7 +2646,7 @@ class EQCatalog:
 			BETA = b_val * np.log(10)
 		BETL = 0
 		while(np.abs(BETA-BETL)) >= 0.0001:
-			#print BETA
+			#print(BETA)
 
 			SNM = 0.0
 			NKOUNT = 0.0
@@ -2585,7 +2665,7 @@ class EQCatalog:
 				SUMTEX += TJEXP
 				STM2X += bins_Mag[k] * TMEXP
 
-			#print SNM, NKOUNT, STMEX, SUMTEX, STM2X, SUMEXP
+			#print(SNM, NKOUNT, STMEX, SUMTEX, STM2X, SUMEXP)
 
 			try:
 				DLDB = STMEX / SUMTEX
@@ -2612,7 +2692,7 @@ class EQCatalog:
 		STDFN0 = FN0 / np.sqrt(NKOUNT)
 		## Applying error propogation for base-10 logarithm
 		STDA = STDFN0 / (2.303 * FN0)
-		#print STDA
+		#print(STDA)
 		## Note: the following formula in Philippe Rosset's program is equivalent
 		#A = np.log10(FNGTMO) + B * (bins_Mag[0] - dM/2.0)
 		## This is also equivalent to:
@@ -2636,7 +2716,8 @@ class EQCatalog:
 		#	LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
 		#	STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
 		#if verbose:
-		#	print "Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)" % (A, STDA, B, STDB, BETA, STDBETA)
+		#	print("Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)"
+		# 		% (A, STDA, B, STDB, BETA, STDBETA))
 		#if Mc != None:
 		#	return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
 		#else:
@@ -2844,7 +2925,8 @@ class EQCatalog:
 				date = eq.date.date
 			time = eq.time.isoformat()
 			if eq.name != None:
-				eq_name = eq.name.encode('ascii', 'ignore')
+				if isinstance(eq_name, bytes):
+					eq_name = eq.name.encode('ascii', 'ignore')
 			else:
 				eq_name = ""
 			if Mtype:
@@ -3080,7 +3162,7 @@ class EQCatalog:
 		:param filespec:
 			String, full path to output file
 		"""
-		from HY4 import HYPDAT
+		from .HY4 import HYPDAT
 
 		ofd = open(filespec, "wb")
 		for eq in self:
@@ -3183,7 +3265,7 @@ class EQCatalog:
 		db = simpledb.SQLiteDB(sqlite_filespec)
 		for rec in db.query(table_name):
 			dic = rec.to_dict()
-			if dic.has_key('geom'):
+			if 'geom' in dic:
 				del dic['geom']
 			eq = LocalEarthquake.from_dict(dic)
 			eq_list.append(eq)
@@ -3246,12 +3328,11 @@ class EQCatalog:
 
 		if isinstance(poly_obj, ogr.Geometry):
 			## Construct WGS84 projection system corresponding to earthquake coordinates
-			wgs84 = osr.SpatialReference()
-			wgs84.SetWellKnownGeogCS("WGS84")
+			from mapping.geotools.coordtrans import WGS84
 
 			## Point object that will be used to test if earthquake is inside zone
 			point = ogr.Geometry(ogr.wkbPoint)
-			point.AssignSpatialReference(wgs84)
+			point.AssignSpatialReference(WGS84)
 
 			if poly_obj.GetGeometryName() in ("POLYGON", "LINESTRING"):
 				## Objects other than polygons or closed polylines will be skipped
@@ -3284,8 +3365,9 @@ class EQCatalog:
 			if isinstance(poly_obj, oqhazlib.geo.Polygon):
 				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(), depths=None)
 				intersects = poly_obj.intersects(mesh)
-				idxs = np.argwhere(intersects == True)
-				idxs = [idx[0] for idx in idxs]
+				#idxs = np.argwhere(intersects == True)
+				#idxs = [idx[0] for idx in idxs]
+				idxs = np.where(intersects == True)[0]
 				zone_catalog = self.__getitem__(idxs)
 				lons = zone_catalog.get_longitudes()
 				lats = zone_catalog.get_latitudes()
@@ -3326,7 +3408,7 @@ class EQCatalog:
 		"""
 		zone_catalogs = OrderedDict()
 
-		if isinstance(source_model_name, (str, unicode)):
+		if isinstance(source_model_name, basestring):
 			## Read zone model from GIS file
 			model_data = read_source_model(source_model_name, ID_colname=ID_colname, fix_mi_lambert=fix_mi_lambert, verbose=verbose)
 
@@ -3888,7 +3970,7 @@ class EQCatalog:
 			Bool, whether or not to print additional information
 		"""
 		from scipy.misc import factorial
-		from time_functions import time_delta_to_days
+		from .time_functions import time_delta_to_days
 
 		def poisson(n, t, tau):
 			## Probability of n events in period t
@@ -4104,8 +4186,12 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	import seismodb
-	return seismodb.query_ROB_LocalEQCatalog(region=region, start_date=start_date, end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth, max_depth=max_depth, id_earth=id_earth, sort_key=sort_key, sort_order=sort_order, event_type=event_type, convert_NULL=convert_NULL, verbose=verbose, errf=errf)
+	from .seismodb import query_ROB_LocalEQCatalog
+	return query_ROB_LocalEQCatalog(region=region, start_date=start_date,
+					end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth,
+					max_depth=max_depth, id_earth=id_earth, sort_key=sort_key,
+					sort_order=sort_order, event_type=event_type,
+					convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
 def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
@@ -4144,29 +4230,29 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 	eq_list = []
 	skipped = 0
 	for i, rec in enumerate(data):
-		if column_map.has_key('ID'):
+		if 'ID' in column_map:
 			ID = rec[column_map['ID']]
 		else:
 			ID = i
 		if ID_prefix:
 			ID = ID_prefix + str(ID)
 
-		if column_map.has_key('date'):
+		if 'date' in column_map:
 			date = rec[column_map['date']]
 			if date:
 				year, month, day = [int(s) for s in date.split('/')]
 			else:
 				year, month, day = 0, 0, 0
 		else:
-			if column_map.has_key('year'):
+			if 'year' in column_map:
 				year = rec[column_map['year']]
-			if column_map.has_key('month'):
+			if 'month' in column_map:
 				month = rec[column_map['month']]
 				if month == 0 and fix_zero_days_and_months:
 					month = 1
 			else:
 				month = 1
-			if column_map.has_key('day'):
+			if 'day' in column_map:
 				day = rec[column_map['day']]
 				if day == 0 and fix_zero_days_and_months:
 					day = 1
@@ -4175,22 +4261,22 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 		try:
 			date = datetime.date(year, month, day)
 		except:
-			print year, month, day
+			print(year, month, day)
 			date = None
 
-		if column_map.has_key('time'):
+		if 'time' in column_map:
 			time = rec[column_map['time']]
 			hour, minute, second = [int(s) for s in time.split(':')]
 		else:
-			if column_map.has_key('hour'):
+			if 'hour' in column_map:
 				hour = rec[column_map['hour']]
 			else:
 				hour = 0
-			if column_map.has_key('minute'):
+			if 'minute' in column_map:
 				minute = rec[column_map['minute']]
 			else:
 				minute = 0
-			if column_map.has_key('second'):
+			if 'second' in column_map:
 				second = rec[column_map['second']]
 			else:
 				second = 0
@@ -4199,84 +4285,84 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 		try:
 			time = datetime.time(hour, minute, second)
 		except:
-			print hour, minute, second
+			print(hour, minute, second)
 			time = None
 
-		if column_map.has_key('lon'):
+		if 'lon' in column_map:
 			lon = rec[column_map['lon']]
 		else:
 			lon = rec["obj"].GetX()
 
-		if column_map.has_key('lat'):
+		if 'lat' in column_map:
 			lat = rec[column_map['lat']]
 		else:
 			lat = rec["obj"].GetY()
 
-		if column_map.has_key('depth'):
+		if 'depth' in column_map:
 			depth = rec[column_map['depth']]
 		else:
 			depth = 0
 
 		mag = {}
-		if column_map.has_key('ML'):
+		if 'ML' in column_map:
 			ML = rec[column_map['ML']]
 			if convert_zero_magnitudes:
 				ML = ML or np.nan
 			mag['ML'] = ML
 
-		if column_map.has_key('MS'):
+		if 'MS' in column_map:
 			MS = rec[column_map['MS']]
 			if convert_zero_magnitudes:
 				MS = MS or np.nan
 			mag['MS'] = MS
 
-		if column_map.has_key('MW'):
+		if 'MW' in column_map:
 			MW = rec[column_map['MW']]
 			if convert_zero_magnitudes:
 				MW = MW or np.nan
 			mag['MW'] = MW
 
-		if column_map.has_key('name'):
+		if 'name' in column_map:
 			name = rec[column_map['name']]
 		else:
 			name = ""
 
-		if column_map.has_key('intensity_max'):
+		if 'intensity_max' in column_map:
 			intensity_max = rec[column_map['intensity_max']]
 		else:
 			intensity_max = None
 
-		if column_map.has_key('macro_radius'):
+		if 'macro_radius' in column_map:
 			macro_radius = rec[column_map['macro_radius']]
 		else:
 			macro_radius = None
 
-		if column_map.has_key('errh'):
+		if 'errh' in column_map:
 			errh = rec[column_map['errh']]
 		else:
 			errh = 0.
 
-		if column_map.has_key('errz'):
+		if 'errz' in column_map:
 			errz = rec[column_map['errz']]
 		else:
 			errz = 0.
 
-		if column_map.has_key('errt'):
+		if 'errt' in column_map:
 			errt = rec[column_map['errt']]
 		else:
 			errt = 0.
 
-		if column_map.has_key('errM'):
+		if 'errM' in column_map:
 			errM = rec[column_map['errM']]
 		else:
 			errM = 0.
 
-		if column_map.has_key('zone'):
+		if 'zone' in column_map:
 			zone = rec[column_map['zone']]
 		else:
 			zone = ""
 
-		#print ID, date, time, lon, lat, depth, ML, MS, MW
+		#print(ID, date, time, lon, lat, depth, ML, MS, MW)
 		try:
 			eq = LocalEarthquake(ID, date, time, lon, lat, depth, mag, name=name,
 							intensity_max=intensity_max, macro_radius=macro_radius,
@@ -4313,23 +4399,23 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 		instance of :class:`EQCatalog`
 	"""
 	if catalog_name.upper() == "SHEEC":
-		gis_filespec = os.path.join(GIS_root, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
+		gis_filespec = os.path.join(GIS_ROOT, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
 		column_map = {'lon': 'Lon', 'lat': 'Lat', 'year': 'Year', 'month': 'Mo', 'day': 'Da', 'hour': 'Ho', 'minute': 'Mi', 'second': 'Se', 'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
 		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "CENEC":
-		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "CENEC", "CENEC 2008.TAB")
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "CENEC", "CENEC 2008.TAB")
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'Date', 'hour': 'hour', 'minute': 'minute', 'MW': 'Mw', 'depth': 'depth'}
 		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "ISC-GEM":
-		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "ISC-GEM", "isc-gem-cat.TAB")
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "ISC-GEM", "isc-gem-cat.TAB")
 		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
 		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "CEUS-SCR":
-		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
 		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
 		convert_zero_magnitudes = True
 	elif catalog_name.upper() == "BGS":
-		gis_filespec = os.path.join(GIS_root, "Seismology", "Earthquake Catalogs", "BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
 		column_map = {'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR', 'hour': 'HR', 'minute': 'MN', 'second': 'SECS', 'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'ID': 'ID', 'name': 'LOCALITY', 'intensity_max': 'INT'}
 		convert_zero_magnitudes = True
 	else:
@@ -4389,7 +4475,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	:returns:
 		instance of :class:`EQCatalog`
 	"""
-	from time_functions import parse_isoformat_datetime
+	from .time_functions import parse_isoformat_datetime
 
 	date_order = date_order.upper()
 	earthquakes = []
@@ -4451,7 +4537,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				try:
 					date = mxDateTime.Date(year, month, day)
 				except:
-					print line
+					print(line)
 				if "time" in column_map:
 					time = line[column_map["time"]]
 					time_elements = time.split(time_sep)
@@ -4713,7 +4799,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	:return:
 		instance of :class:`LayeredBasemap`
 	"""
-	from source_models import rob_source_models_dict
+	from .source_models import rob_source_models_dict
 	import mapping.layeredbasemap as lbm
 
 	layers = []
@@ -4759,7 +4845,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 		try:
 			gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
 		except:
-			if isinstance(source_model, (str, unicode)):
+			if isinstance(source_model, basestring):
 				gis_filespec = source_model
 				source_model_name = os.path.splitext(os.path.split(source_model)[1])[0]
 			else:
@@ -4795,7 +4881,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 			polygon_data = lbm.MultiPolygonData(polygon_lons, polygon_lats, labels=polygon_labels)
 			data = lbm.CompositeData(points=point_data, lines=line_data, polygons=polygon_data)
 		if isinstance(sm_style, dict):
-			if sm_style.has_key("fill_color") and not sm_style["fill_color"] in ("None", None):
+			if "fill_color" in sm_style and not sm_style.get("fill_color") in ("None", None):
 				polygon_style = lbm.PolygonStyle.from_dict(sm_style)
 				line_style = None
 			else:
@@ -5122,7 +5208,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 
 				if centroid and sm_label_size:
 					x, y = map(centroid.GetX(), centroid.GetY())
-					if isinstance(sm_label_colname, (str, unicode)):
+					if isinstance(sm_label_colname, basestring):
 						zone_label = zone_data.get("sm_label_colname", "")
 					else:
 						zone_label = " / ".join([str(zone_data[colname]) for colname in sm_label_colname])
@@ -5151,8 +5237,8 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 				symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
 				symbol_sizes = symbol_sizes ** 2
 				if symbol_sizes.min() <= 0:
-					print "Warning: negative or zero symbol size encountered"
-				#print symbol_sizes.min(), symbol_sizes.max()
+					print("Warning: negative or zero symbol size encountered")
+				#print(symbol_sizes.min(), symbol_sizes.max())
 
 			## Earthquake epicenters
 			if len(catalog.eq_list) > 0:
@@ -5753,7 +5839,7 @@ def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_
 	else:
 		zone_names = []
 
-	tab_filespec = os.path.join(GIS_root, "KSB-ORB", os.path.splitext(tabname)[0] + ".TAB")
+	tab_filespec = os.path.join(GIS_ROOT, "KSB-ORB", os.path.splitext(tabname)[0] + ".TAB")
 	tab = app.OpenTable(tab_filespec)
 	tabname = tab.GetName()
 
@@ -5783,7 +5869,7 @@ def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_
 		## argument, and can be specified by the caller
 		name = "%s %s - %s" % (zone_name, start_date.isoformat(), end_date.isoformat())
 		if verbose:
-			print query
+			print(query)
 		app.Do(query)
 		catalog_table = app.GetTable("CatalogQuery")
 		catalog = []
@@ -5902,13 +5988,14 @@ def format_zones_CRISIS(zone_model, Mc=3.5, smooth=False, fixed_depth=None):
 			else:
 				alpha, beta, lambda0 = alphabetalambda(rec.aMLEfixadj, rec.bMLEfix, Mc)
 
-			print "%s" % rec.Name
-			print "1,0,1,1"
-			print " %d" % len(coords)
+			print("%s" % rec.Name)
+			print("1,0,1,1")
+			print(" %d" % len(coords))
 			for pt in coords:
-				print "%f,%f,%.1f" % (pt.x, pt.y, depth)
-			print "%.3f,%.3f,0,%.1f,0,%.1f,%.1f" % (lambda0, beta, rec.MS_max_evaluated, rec.MS_max_observed, Mc)
-			print " 0"
+				print("%f,%f,%.1f" % (pt.x, pt.y, depth))
+			print("%.3f,%.3f,0,%.1f,0,%.1f,%.1f"
+				% (lambda0, beta, rec.MS_max_evaluated, rec.MS_max_observed, Mc))
+			print(" 0")
 
 	if smooth:
 		zonetab.Revert()
@@ -5935,7 +6022,7 @@ def distribute_avalues(zones, catalog, M=0):
 
 	for zone, weight in zip(zones, weights):
 		zone.a_new = np.log10(10**zone.a + weight*N_diff)
-		print "%s - a: %.3f  ->  %.3f" % (zone.name, zone.a, zone.a_new)
+		print("%s - a: %.3f  ->  %.3f" % (zone.name, zone.a, zone.a_new))
 
 	N_zones = 0
 	for zone in zones:
@@ -6042,7 +6129,7 @@ if __name__ == "__main__":
 
 	## Analyse completeness with Stepp method
 	#completeness = catalog.analyse_completeness_Stepp(ttol=0.1)
-	#print completeness
+	#print(completeness)
 
 	## Here we analyse hourly means for a section of the catalog
 	"""
@@ -6058,7 +6145,7 @@ if __name__ == "__main__":
 		means_night.append(mean_night)
 		means_day.append(mean_day)
 		means.append(mean)
-		print Mmin, "%.1f" % mean_night, "%.1f" % (mean_night*24,)
+		print(Mmin, "%.1f" % mean_night, "%.1f" % (mean_night*24,))
 
 	a, b = 2.731, 0.840
 	num_years = end_date.year - start_year + 1
@@ -6098,7 +6185,7 @@ if __name__ == "__main__":
 	#M0_historical = historical_catalog.get_M0rate(Mrelation="geller")
 	#M0_instrumental = instrumental_catalog.get_M0rate(Mrelation="hinzen")
 	#M0_total = M0_historical + M0_instrumental
-	#print "Total seismic moment: %.2E (historical) + %.2E (instrumental) = %.2E N.m" % (M0_historical, M0_instrumental, M0_total)
+	#print("Total seismic moment: %.2E (historical) + %.2E (instrumental) = %.2E N.m" % (M0_historical, M0_instrumental, M0_total))
 	#catalog.plot_CumulatedM0(ddate=10, ddate_spec="years", Mrelation=None)
 
 	## Read full catalog from database, calculate a and b values, and store these for later use
@@ -6116,8 +6203,8 @@ if __name__ == "__main__":
 	zone_names = []
 	catalogs = read_catalogMI(region=region, start_date=start_date, end_date=end_date, zone_model=zone_model, zone_names=zone_names, verbose=True)
 	for catalog in catalogs.values():
-		print catalog.name
-		print "  Mmax: %.1f" % catalog.Mminmax()[1]
+		print(catalog.name)
+		print("  Mmax: %.1f" % catalog.Mminmax()[1])
 		if len(catalog) > 0:
 			## Plot Mag/Freq for each zone and save figure to file
 			dirname = os.path.join(r"C:\PSHA\MagFreq", zone_model)
@@ -6145,8 +6232,8 @@ if __name__ == "__main__":
 	zones = []
 	catalogs = read_catalogMI(region=region, start_date=start_date, end_date=end_date, zone_model=zone_model, zone_names=zone_names, verbose=True)
 	for catalog in catalogs.values():
-		print catalog.name
-		print "  Mmax: %.1f" % catalog.Mminmax()[1]
+		print(catalog.name)
+		print("  Mmax: %.1f" % catalog.Mminmax()[1])
 		if len(catalog) > 0:
 
 			## Just print a and b values for each zone
@@ -6168,14 +6255,14 @@ if __name__ == "__main__":
 	distribute_avalues(zones, cat, Mc)
 
 	for zone in zones:
-		print zone.name
+		print(zone.name)
 		if "Single Large Zone" in zone.name:
 			for a in split_avalues(zone.a_new, [0.793, 0.207]):
 				alpha, beta, lambda0 = alphabetalambda(a, zone.b, Mc)
-				print "%.3f  %.3f" % (lambda0, beta)
+				print("%.3f  %.3f" % (lambda0, beta))
 		else:
 			alpha, beta, lambda0 = alphabetalambda(zone.a_new, zone.b, Mc)
-			print "%.3f  %.3f" % (lambda0, beta)
+			print("%.3f  %.3f" % (lambda0, beta))
 	"""
 
 
@@ -6189,8 +6276,7 @@ if __name__ == "__main__":
 	## Calculate alpha, beta, lambda for different Mc
 	"""
 	for a in [2.4, 1.5, 1.7, 2.0, 2.3, 1.7, 1.4, 1.4, 1.5]:
-		print "%.3f  %.3f" % tuple(alphabetalambda(a, 0.87, 2.0)[1:])
+		print("%.3f  %.3f" % tuple(alphabetalambda(a, 0.87, 2.0)[1:]))
 
-	print alphabetalambda(1.4, 0.87, 3.0)
+	print(alphabetalambda(1.4, 0.87, 3.0))
 	"""
-
