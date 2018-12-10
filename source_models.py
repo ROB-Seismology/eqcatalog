@@ -1,16 +1,24 @@
+"""
+ROB source model definitions
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import os
 import platform
 from collections import OrderedDict
 
 
-## Directories with MapInfo tables for source models
-if platform.uname()[0] == "Windows":
-	GIS_root = r"D:\GIS-data"
-else:
-	GIS_root = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
-ROB_directory = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models")
-SHARE_directory = os.path.join(GIS_root, "SHARE")
+## Directories with GIS tables for source models
+if platform.uname()[0] == "Windows":
+	GIS_ROOT = "D:\\GIS-data"
+else:
+	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
+
+ROB_directory = os.path.join(GIS_ROOT, "KSB-ORB", "Source Zone Models")
+SHARE_directory = os.path.join(GIS_ROOT, "SHARE")
 SHARE_CSS_directory = os.path.join(SHARE_directory, "Task 3.2", "DATA")
 
 
@@ -447,7 +455,8 @@ SHARE_AS_Belgium = SourceModelDefinition(name, gis_filespec, column_map)
 rob_source_models_dict[name] = SHARE_AS_Belgium
 
 
-def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True, verbose=True):
+def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True,
+					verbose=True):
 	"""
 	Read source-zone model stored in a GIS (MapInfo) table.
 
@@ -473,7 +482,8 @@ def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True, ver
 
 	## Read zone model from MapInfo file
 	#source_model_table = ZoneModelTables[source_model_name.lower()]
-	#gis_filespec = os.path.join(GIS_root, "KSB-ORB", "Source Zone Models", source_model_table + ".TAB")
+	#gis_filespec = os.path.join(GIS_ROOT, "KSB-ORB", "Source Zone Models",
+	# 							source_model_table + ".TAB")
 	try:
 		gis_filespec = rob_source_models_dict[source_model_name]["gis_filespec"]
 	except:
@@ -495,4 +505,3 @@ def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True, ver
 		zone_data[id] = rec
 
 	return zone_data
-
