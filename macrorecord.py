@@ -1,6 +1,20 @@
 # -*- coding: iso-Latin-1 -*-
+
 """
+Processing of macroseismic and DYFI data
 """
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+try:
+	## Python 2
+	basestring
+	PY2 = True
+except:
+	## Python 3
+	PY2 = False
+	basestring = str
+
 
 ## Import standard python modules
 import datetime
@@ -46,27 +60,29 @@ def get_roman_intensity(intensities, include_fraction=True):
 				roman_intensity += ' 1/2'
 			elif 0.625 <= dec:
 				roman_intensity += ' 3/4'
-		roman_intensities.append(roman_intensity.decode('Latin-1'))
+		if PY2:
+			roman_intensity = roman_intensity.decode('ascii')
+		roman_intensities.append(roman_intensity)
 	if scalar:
 		return roman_intensities[0]
 	else:
 		return roman_intensities
 
 
-def strip_accents(unicode_string):
+def strip_accents(txt):
 	"""
 	Remove accents (diacritics) from (unicode) string
 
-	:param unicode_string:
+	:param txt:
 		unicode or str, input string
 
 	:return:
 		unicode, output string
 	"""
 	import unicodedata
-	if not isinstance(unicode_string, unicode):
-		unicode_string = unicode_string.decode("latin1")
-	nkfd_form = unicodedata.normalize('NFKD', unicode_string)
+	if isinstance(txt, bytes):
+		txt = txt.decode("latin1")
+	nkfd_form = unicodedata.normalize('NFKD', txt)
 	return "".join([c for c in nkfd_form if not unicodedata.combining(c)])
 
 
@@ -128,7 +144,7 @@ class MacroseismicInfo():
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
 		"""
-		from seismodb import query_ROB_LocalEQCatalogByID
+		from .seismodb import query_ROB_LocalEQCatalogByID
 
 		if isinstance(self.id_earth, (int, long)):
 			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
@@ -144,7 +160,7 @@ class MacroseismicInfo():
 		:param verbose:
 			bool, whether or not to print useful information
 		"""
-		from seismodb import query_ROB_Web_enquiries
+		from .seismodb import query_ROB_Web_enquiries
 
 		if self.db_ids:
 			ensemble = query_ROB_Web_enquiries(web_ids=self.db_ids, verbose=verbose)
@@ -193,7 +209,7 @@ class MacroseismicEnquiryEnsemble():
 			recs = []
 			if len(spec):
 				idxs = np.arange(len(self))
-				idxs = idxs[np.array(spec)]
+				idxs = idxs[np.asarray(spec)]
 				for idx in idxs:
 					recs.append(self.recs[idx])
 			return MacroseismicEnquiryEnsemble(self.id_earth, recs)
@@ -294,7 +310,7 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
 		"""
-		from seismodb import query_ROB_LocalEQCatalogByID
+		from .seismodb import query_ROB_LocalEQCatalogByID
 
 		if isinstance(self.id_earth, (int, long)):
 			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
@@ -312,12 +328,12 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		if prop == "damage":
 			prop = "d_text"
-		if not len(self.recs) or not self.recs[0].has_key(prop):
+		if not len(self.recs) or not prop in self.recs[0]:
 			return []
 		else:
 			first_non_None_value = next((rec[prop] for rec in self.recs
 										if rec[prop] is not None), None)
-			if isinstance(first_non_None_value, (str, unicode)):
+			if isinstance(first_non_None_value, basestring):
 				none_val = u""
 			else:
 				none_val = np.nan
@@ -363,7 +379,7 @@ class MacroseismicEnquiryEnsemble():
 			instance of :class:`MacroseismicEnquiryEnsemble`
 		"""
 		values = self.get_prop_values(prop)
-		if isinstance(values[0], (str, unicode)):
+		if isinstance(values[0], basestring):
 			prop_values = map(str, prop_values)
 		if not negate:
 			idxs = [i for i in range(len(values)) if values[i] in prop_values]
@@ -399,7 +415,7 @@ class MacroseismicEnquiryEnsemble():
 			float, radius (in km)
 		"""
 		all_distances = self.calc_distances(lon, lat)
-		idxs = np.argwhere(all_distances <= radius)
+		idxs = np.where(all_distances <= radius)[0]
 		return self.__getitem__(idxs)
 
 	def calc_distances(self, lon, lat):
@@ -446,7 +462,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		zips = self.get_prop_values('zip')
 		countries = self.get_prop_values('country')
-		zip_country_tuples = zip(zips, countries)
+		zip_country_tuples = list(zip(zips, countries))
 		return zip_country_tuples
 
 	def get_unique_zip_country_tuples(self):
@@ -473,7 +489,7 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			dict, mapping comm_key values to database records (dicts)
 		"""
-		from seismodb import query_seismodb_table
+		from .seismodb import query_seismodb_table
 		from difflib import SequenceMatcher as SM
 
 		if comm_key in ("id_com", "id_main"):
@@ -514,7 +530,8 @@ class MacroseismicEnquiryEnsemble():
 				ensemble = self.subselect_by_property('country', [country])
 				zips = ensemble.get_prop_values('zip')
 				unique_zips = sorted(set(zips))
-				cities = [strip_accents(city).title() for city in ensemble.get_prop_values('city')]
+				cities = [strip_accents(city).title()
+						for city in ensemble.get_prop_values('city')]
 				unique_zip_cities = set(zip(zips, cities))
 				#join_clause = [('RIGHT JOIN', 'communes', '%s.id = communes.id_main' % table_clause)]
 
@@ -532,9 +549,13 @@ class MacroseismicEnquiryEnsemble():
 							column_clause=column_clause, where_clause=where_clause,
 							verbose=verbose)
 						if country == "NL":
-							comm_recs = {(country, rec['zip'][:-3], strip_accents(rec[com_col]).title()): rec for rec in comm_recs}
+							comm_recs = {(country, rec['zip'][:-3],
+									strip_accents(rec[com_col]).title()): rec
+									for rec in comm_recs}
 						else:
-							comm_recs = {(country, rec['zip'], strip_accents(rec[com_col]).title()): rec for rec in comm_recs}
+							comm_recs = {(country, rec['zip'],
+									strip_accents(rec[com_col]).title()): rec
+									for rec in comm_recs}
 						country_comm_rec_dict.update(comm_recs)
 
 					for (ZIP, city) in sorted(unique_zip_cities):
@@ -592,7 +613,8 @@ class MacroseismicEnquiryEnsemble():
 						else:
 							## There may be more than one record with the same ZIP...
 							## The lowest id_com should correspond to id_main
-							# TODO: try matching name first (city/commune, city, we will also need lang...)
+							# TODO: try matching name first (city/commune, city,
+							# we will also need lang...)
 							if rec['id_com'] < comm_rec_dict[key]['id_com']:
 								comm_rec_dict[key] = rec
 					"""
@@ -703,7 +725,7 @@ class MacroseismicEnquiryEnsemble():
 			None, 'longitude' and 'latitude' values of :prop:`recs`
 			are created or modified in place
 		"""
-		from seismodb import query_seismodb_table
+		from .seismodb import query_seismodb_table
 
 		table_clause = ['web_location']
 		column_clause = ['*']
@@ -774,7 +796,7 @@ class MacroseismicEnquiryEnsemble():
 		mask = np.isnan(lons)
 		lons = np.ma.array(lons, mask=mask)
 		lats = np.ma.array(lats, mask=mask)
-		X, Y = ct.transform_array_coordinates(ct.wgs84, ct.lambert1972, lons, lats)
+		X, Y = ct.transform_array_coordinates(ct.WGS84, ct.LAMBERT1972, lons, lats)
 
 		bin_rec_dict = {}
 		for r, rec in enumerate(self.recs):
@@ -904,7 +926,7 @@ class MacroseismicEnquiryEnsemble():
 			None, 'motion', 'reaction' and 'stand' arrays of :prop:`recs`
 			are modified in place
 		"""
-		not_felt_idxs = np.argwhere(self.felt == 0)
+		not_felt_idxs = np.where(self.felt == 0)
 		self.motion[not_felt_idxs] = 0
 		self.reaction[not_felt_idxs] = 0
 		self.stand[not_felt_idxs] = 0
@@ -941,9 +963,11 @@ class MacroseismicEnquiryEnsemble():
 			## More complex, taking into account other_felt if felt is zero or undefined
 			felt_index = np.ma.zeros(len(self.felt))
 			felt_index[self.felt == 1] = other_felt_classes[self.other_felt][self.felt == 1]
-			felt_index[self.felt == 0] = other_felt_classes_if_felt_is_zero[self.other_felt][self.felt == 0]
+			felt_index[self.felt == 0] = (
+				other_felt_classes_if_felt_is_zero[self.other_felt][self.felt == 0])
 			other_felt_classes_if_felt_is_zero.mask = [1, 0, 0, 0, 0]
-			felt_index[self.felt.mask] = other_felt_classes_if_felt_is_zero[self.other_felt][self.felt.mask]
+			felt_index[self.felt.mask] = (
+				other_felt_classes_if_felt_is_zero[self.other_felt][self.felt.mask])
 
 		return felt_index
 
@@ -1052,7 +1076,7 @@ class MacroseismicEnquiryEnsemble():
 		if keep_nan_values:
 			condition.mask = False
 			condition = (condition | self.floor.mask)
-		idxs = np.argwhere(condition)
+		idxs = np.where(condition)[0]
 		return self.__getitem__(idxs)
 
 	def calc_cws(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True,
@@ -1377,7 +1401,7 @@ class MacroseismicEnquiryEnsemble():
 				ar = getattr(self, prop)
 			except AttributeError:
 				ar = np.ma.array(self.get_prop_values(prop))
-		if bins is None and isinstance(prop, (str, unicode)):
+		if bins is None and isinstance(prop, basestring):
 			bins = self.bins.get(prop, None)
 		if bins is None:
 			if include_nan:
@@ -1393,9 +1417,10 @@ class MacroseismicEnquiryEnsemble():
 		else:
 			if not include_nan:
 				#bins.pop(bins.index(np.nan))
-				bins = np.delete(bins, np.argwhere(np.isnan(bins)))
+				bins = np.delete(bins, np.where(np.isnan(bins)))
 			counts = np.zeros(len(bins))
-			partial_counts = np.bincount(np.digitize(np.ma.compressed(ar), bins, right=True))
+			partial_counts = np.bincount(np.digitize(np.ma.compressed(ar), bins,
+										right=True))
 			counts[:len(partial_counts)] = partial_counts
 			if include_nan and np.ma.is_masked(ar):
 				counts[-1] = np.sum(ar.mask)
@@ -1445,7 +1470,7 @@ class MacroseismicEnquiryEnsemble():
 			(title, labels) tuple
 		"""
 		import os
-		from parse_php_vars import parse_php_vars
+		from .parse_php_vars import parse_php_vars
 
 		base_path = os.path.split(__file__)[0]
 		php_file = os.path.join(base_path, 'webenq', 'const_inq%s.php' % lang.upper())
@@ -1511,7 +1536,7 @@ class MacroseismicEnquiryEnsemble():
 
 		## Extract title and labels from PHP files for different languages
 		title, labels = "", []
-		if isinstance(prop, (str, unicode)):
+		if isinstance(prop, basestring):
 			title, labels = self.get_prop_title_and_labels(prop, label_lang)
 		if labels and len(labels) < len(bins):
 			labels.append('No answer')
@@ -1520,7 +1545,7 @@ class MacroseismicEnquiryEnsemble():
 				labels = ["%.0f" % b for b in bins]
 			except TypeError:
 				labels = ["%s" % b for b in bins]
-		if not title and isinstance(prop, (str, unicode)):
+		if not title and isinstance(prop, basestring):
 			title = prop.title()
 		pylab.pie(counts, colors=colors, labels=labels, autopct='%1.1f%%',
 					startangle=start_angle)
@@ -1603,7 +1628,8 @@ class MacroseismicEnquiryEnsemble():
 			comm_name = comm_rec_dict[comm_id]['name']
 			mean_cii = np.mean(ensemble.CII)
 			agg_cii = ensemble.calc_cii(filter_floors=(0,4), include_other_felt=True)
-			table.add_row([comm_name, comm_id, len(ensemble), "%.1f" % mean_cii, "%.1f" % agg_cii])
+			table.add_row([comm_name, comm_id, len(ensemble), "%.1f" % mean_cii,
+							"%.1f" % agg_cii])
 
 		reverse_order = {"asc": False, "desc": True}[sort_order]
 		table._rows = sorted(table._rows, key=itemgetter(sort_column), reverse=reverse_order)
@@ -1801,7 +1827,8 @@ class MacroseismicEnquiryEnsemble():
 					name = rec['name']
 					if name:
 						name = name.encode('ascii', errors='replace')
-					print("  %s [CII=%s, fiab=%d] %s - %s" % (zip, cii, fiability, name, street))
+					print("  %s [CII=%s, fiab=%d] %s - %s" % (zip, cii, fiability,
+						name, street))
 				print("")
 
 		return duplicate_idxs
@@ -1846,7 +1873,7 @@ class MacroseismicEnquiryEnsemble():
 			## Keep the one with highest fiability and most recent submit time
 			# TODO: should we also consider CII (lowest = most reliable?)
 			submit_times = ensemble.get_prop_values('submit_time')
-			ft = zip(ensemble.fiability, submit_times)
+			ft = list(zip(ensemble.fiability, submit_times))
 			## numpy argsort doesn't work for tuples, this works similar
 			#order = np.argsort(fiability_times)
 			order = sorted(range(len(ft)), key=ft.__getitem__)
@@ -1867,6 +1894,6 @@ class MacroseismicEnquiryEnsemble():
 		pylab.show()
 
 	def get_inconsistent_damage_records(self):
-		idxs = np.argwhere((self.damage[:, 0] == True)
-						& (np.sum(self.damage[:,1:], axis=1) > 0))
+		idxs = np.where((self.damage[:, 0] == True)
+						& (np.sum(self.damage[:,1:], axis=1) > 0))[0]
 		return self.__getitem__(idxs)
