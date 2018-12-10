@@ -1,6 +1,13 @@
+"""
+Export ROB catalog to HY4 format of Seismic Eruption (used for Open Door Days)
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import os
 import datetime
 from eqcatalog.seismodb import query_ROB_LocalEQCatalog
+
 
 out_folder = "D:\\GIS-data\\KSB-ORB"
 #out_folder = r"E:\Home\_kris\Meetings\2018 - Opendeurdagen"
