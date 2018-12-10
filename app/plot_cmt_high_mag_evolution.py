@@ -4,6 +4,9 @@
 Check if N(M>7) has increased in equatorial regions
 """
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import numpy as np
 import pylab
 import eqcatalog.harvard_cmt as cmt
