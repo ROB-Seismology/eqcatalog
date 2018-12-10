@@ -1,10 +1,16 @@
 # -*- coding: iso-Latin-1 -*-
 
-import numpy as np
-from completeness import default_completeness
-from eqcatalog import EQCatalog, read_source_model
+"""
+Functionality (e.g., MFD balancing) for composite earthquake catalogs
+consisting of a number of subcatalogs
+"""
 
-#import hazard.rshalib.mfd.mfd as mfd
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
+import numpy as np
+from .completeness import default_completeness
+from .eqcatalog import EQCatalog, read_source_model
 
 
 
@@ -42,7 +48,9 @@ class CompositeEQCatalog:
 	"""
 	# TODO: modify to make it work with master and zone MFD's without catalogs
 	# TODO: modify to make sure parameters for _get_zone_Mmaxes are consistent
-	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None, completeness=default_completeness, min_mag=4.0, mfd_bin_width=0.1, master_MFD=None, zone_MFDs=[]):
+	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None,
+				completeness=default_completeness, min_mag=4.0, mfd_bin_width=0.1,
+				master_MFD=None, zone_MFDs=[]):
 		self.zone_catalogs = zone_catalogs
 		self.source_model_name = source_model_name
 		self.Mtype = Mtype
@@ -107,7 +115,10 @@ class CompositeEQCatalog:
 			else:
 				b_val = None
 			if use_posterior:
-				prior, likelihood, posterior, params = catalog.get_Bayesian_Mmax_pdf(prior_model=prior_model, Mmin_n=4.5, b_val=b_val, dM=self.mfd_bin_width, Mtype=self.Mtype, Mrelation=self.Mrelation, completeness=self.completeness, verbose=False)
+				prior, likelihood, posterior, params = catalog.get_Bayesian_Mmax_pdf(
+						prior_model=prior_model, Mmin_n=4.5, b_val=b_val,
+						dM=self.mfd_bin_width, Mtype=self.Mtype, Mrelation=self.Mrelation,
+						completeness=self.completeness, verbose=False)
 				max_mag = posterior.get_percentiles([50])[0]
 			max_mag = np.ceil(max_mag / self.mfd_bin_width) * self.mfd_bin_width
 			max_mags[zone_id] = max_mag
@@ -157,7 +168,9 @@ class CompositeEQCatalog:
 		mfd_bin_width = self.mfd_bin_width
 		Mtype, Mrelation, completeness = self.Mtype, self.Mrelation, self.completeness
 		min_mag = completeness.min_mag
-		MFD = catalog.get_estimated_MFD(min_mag, Mmax, mfd_bin_width, method=method, b_val=b_val, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+		MFD = catalog.get_estimated_MFD(min_mag, Mmax, mfd_bin_width, method=method,
+								b_val=b_val, Mtype=Mtype, Mrelation=Mrelation,
+								completeness=completeness, verbose=False)
 		MFD.min_mag = self.min_mag
 		return MFD
 
@@ -196,13 +209,16 @@ class CompositeEQCatalog:
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
 			zone_area = zone_areas[zone_id]
-			zone_MFD = mfd.TruncatedGRMFD.construct_FentonEtAl2006MFD(self.min_mag, zone_Mmax, self.mfd_bin_width, zone_area)
+			zone_MFD = mfd.TruncatedGRMFD.construct_FentonEtAl2006MFD(self.min_mag,
+										zone_Mmax, self.mfd_bin_width, zone_area)
 			if b_val != None:
 				b = b_val
 				stda, stdb = 0, 0
 				lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
-				a_val = mfd.a_from_lambda(lamda, M, b) + mfd.get_a_separation(b, self.mfd_bin_width)
-				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stda, stdb)
+				a_val = (mfd.a_from_lambda(lamda, M, b)
+						+ mfd.get_a_separation(b, self.mfd_bin_width))
+				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax,
+									self.mfd_bin_width, a_val, b, stda, stdb)
 			zone_MFDs[zone_id] = zone_MFD
 		return zone_MFDs
 
@@ -224,13 +240,16 @@ class CompositeEQCatalog:
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
 			zone_area = zone_areas[zone_id]
-			zone_MFD = mfd.TruncatedGRMFD.construct_Johnston1994MFD(self.min_mag, zone_Mmax, self.mfd_bin_width, zone_area)
+			zone_MFD = mfd.TruncatedGRMFD.construct_Johnston1994MFD(self.min_mag,
+										zone_Mmax, self.mfd_bin_width, zone_area)
 			if b_val != None:
 				b = b_val
 				stda, stdb = 0, 0
 				lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
-				a_val = mfd.a_from_lambda(lamda, M, b) + mfd.get_a_separation(b, self.mfd_bin_width)
-				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b, stda, stdb)
+				a_val = (mfd.a_from_lambda(lamda, M, b)
+						+ mfd.get_a_separation(b, self.mfd_bin_width))
+				zone_MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax,
+									self.mfd_bin_width, a_val, b, stda, stdb)
 			zone_MFDs[zone_id] = zone_MFD
 		return zone_MFDs
 
@@ -262,7 +281,8 @@ class CompositeEQCatalog:
 		for zone_id, zone_catalog in self.zone_catalogs.items():
 			zone_Mmax = zone_Mmaxes[zone_id]
 			try:
-				zone_MFD = self._compute_MFD(zone_catalog, zone_Mmax, method=method, b_val=b_val)
+				zone_MFD = self._compute_MFD(zone_catalog, zone_Mmax, method=method,
+											b_val=b_val)
 				zone_MFD.Weichert = True
 			except ValueError:
 				## Note: it is critical that this doesn't fail for any one zone,
@@ -272,7 +292,8 @@ class CompositeEQCatalog:
 			else:
 				## If computed MFD is below min SCR MFD, select the latter
 				mags, rates = zone_MFD.get_center_magnitudes(), zone_MFD.occurrence_rates
-				mags_scr, rates_scr = zone_min_SCR_MFDs[zone_id].get_center_magnitudes(), zone_min_SCR_MFDs[zone_id].occurrence_rates
+				mags_scr, rates_scr = (zone_min_SCR_MFDs[zone_id].get_center_magnitudes(),
+									zone_min_SCR_MFDs[zone_id].occurrence_rates)
 				M = 5.5
 				if rates_scr[mags_scr > M][0] > rates[mags > M][0]:
 					zone_MFD = zone_min_SCR_MFDs[zone_id]
@@ -284,15 +305,21 @@ class CompositeEQCatalog:
 				b_val1 = zone_MFD.b_val + zone_MFD.b_sigma * num_sigma
 				b_val2 = zone_MFD.b_val - zone_MFD.b_sigma * num_sigma
 				if zone_MFD.Weichert:
-					MFD_sigma1 = self._compute_MFD(zone_catalog, zone_Mmax, method=method, b_val=b_val1)
-					MFD_sigma2 = self._compute_MFD(zone_catalog, zone_Mmax, method=method, b_val=b_val2)
+					MFD_sigma1 = self._compute_MFD(zone_catalog, zone_Mmax,
+												method=method, b_val=b_val1)
+					MFD_sigma2 = self._compute_MFD(zone_catalog, zone_Mmax,
+												method=method, b_val=b_val2)
 				else:
 					## If median MFD could not be computed
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
-					a_val1 = mfd.a_from_lambda(lamda, M, b_val1) + mfd.get_a_separation(b_val1, self.mfd_bin_width)
-					MFD_sigma1 = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val1, b_val1)
-					a_val2 = mfd.a_from_lambda(lamda, M, b_val2) + mfd.get_a_separation(b_val2, self.mfd_bin_width)
-					MFD_sigma2 = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val2, b_val2)
+					a_val1 = (mfd.a_from_lambda(lamda, M, b_val1) +
+							mfd.get_a_separation(b_val1, self.mfd_bin_width))
+					MFD_sigma1 = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax,
+											self.mfd_bin_width, a_val1, b_val1)
+					a_val2 = (mfd.a_from_lambda(lamda, M, b_val2) +
+							mfd.get_a_separation(b_val2, self.mfd_bin_width))
+					MFD_sigma2 = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax,
+											self.mfd_bin_width, a_val2, b_val2)
 				zone_MFDs[zone_id].append(MFD_sigma1)
 				zone_MFDs[zone_id].append(MFD_sigma2)
 
@@ -317,12 +344,15 @@ class CompositeEQCatalog:
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		overall_Mmax = max(zone_Mmaxes.values())
 		master_catalog = self.master_catalog
-		master_MFD = self._compute_MFD(master_catalog, overall_Mmax, method=method, b_val=None)
+		master_MFD = self._compute_MFD(master_catalog, overall_Mmax,
+										method=method, b_val=None)
 		if num_sigma > 0:
 			b_val1 = master_MFD.b_val + num_sigma * master_MFD.b_sigma
-			master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax, method=method, b_val=b_val1)
+			master_MFD1 = self._compute_MFD(master_catalog, overall_Mmax,
+											method=method, b_val=b_val1)
 			b_val2 = master_MFD.b_val - num_sigma * master_MFD.b_sigma
-			master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax, method=method, b_val=b_val2)
+			master_MFD2 = self._compute_MFD(master_catalog, overall_Mmax,
+											method=method, b_val=b_val2)
 			return [master_MFD, master_MFD1, master_MFD2]
 		else:
 			return master_MFD
@@ -351,7 +381,8 @@ class CompositeEQCatalog:
 		import hazard.rshalib.mfd.mfd as mfd
 
 		if num_sigma > 0:
-			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(method=method, num_sigma=num_sigma)
+			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(method=method,
+															num_sigma=num_sigma)
 		else:
 			master_MFD = self._compute_master_MFD(method=method)
 		zone_MFDs = self._compute_zone_MFDs(method=method, b_val=master_MFD.b_val)
@@ -365,7 +396,8 @@ class CompositeEQCatalog:
 		else:
 			return summed_MFD
 
-	def balance_MFD_by_moment_rate(self, num_samples, mr_num_sigma=1, max_test_mag=None, b_num_sigma=2, use_master=False):
+	def balance_MFD_by_moment_rate(self, num_samples, mr_num_sigma=1,
+						max_test_mag=None, b_num_sigma=2, use_master=False):
 		"""
 		Balance MFD's of zone catalogs by moment rate.
 		First, calculate moment rate range corresponding to b_val +/-
@@ -408,23 +440,30 @@ class CompositeEQCatalog:
 				max_test_mag = min(zone_Mmaxes.values()) - self.mfd_bin_width
 			else:
 				max_test_mag = max(zone_Mmaxes.values()) - self.mfd_bin_width
-		max_test_mag_index = int(round((max_test_mag - self.min_mag) / self.mfd_bin_width)) + 1
-		print("Maximum magnitude to test: %.1f (i=%d)" % (max_test_mag, max_test_mag_index))
+		max_test_mag_index = (int(round((max_test_mag - self.min_mag)
+								/ self.mfd_bin_width)) + 1)
+		print("Maximum magnitude to test: %.1f (i=%d)"
+			% (max_test_mag, max_test_mag_index))
 
 		## Determine moment rate range of master catalog
 		if use_master:
-			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=mr_num_sigma)
+			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(
+														num_sigma=mr_num_sigma)
 			#master_MFD1.max_mag = max_test_mag
 			master_MFD2.max_mag = max_test_mag
 		else:
-			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(num_sigma=mr_num_sigma)
+			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(
+														num_sigma=mr_num_sigma)
 			min_mag = master_MFD1.min_mag
-			#master_MFD1 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width, master_MFD1.occurrence_rates[:max_test_mag_index])
-			master_MFD2 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width, master_MFD2.occurrence_rates[:max_test_mag_index])
+			#master_MFD1 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width,
+			# 				master_MFD1.occurrence_rates[:max_test_mag_index])
+			master_MFD2 = mfd.EvenlyDiscretizedMFD(min_mag, self.mfd_bin_width,
+							master_MFD2.occurrence_rates[:max_test_mag_index])
 		master_moment_rate_range = np.zeros(2, 'd')
 		master_moment_rate_range[0] = master_MFD1._get_total_moment_rate()
 		master_moment_rate_range[1] = master_MFD2._get_total_moment_rate()
-		print("Moment rate range: %E - %E N.m" % (master_moment_rate_range[0], master_moment_rate_range[1]))
+		print("Moment rate range: %E - %E N.m"
+			% (master_moment_rate_range[0], master_moment_rate_range[1]))
 
 		## Determine unconstrained MFD for each zone catalog
 		if not self.zone_MFDs:
@@ -438,7 +477,8 @@ class CompositeEQCatalog:
 		num_iterations = 0
 		while num_passed < num_samples:
 			if num_iterations % 10 == 0:
-				print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
+				print("%05d  (passed: %05d; rejected: %05d; failed: %05d)"
+					% (num_iterations, num_passed, num_rejected, num_failed))
 			failed = False
 			temp_MFD_container = dict.fromkeys(zone_catalogs.keys())
 
@@ -464,15 +504,19 @@ class CompositeEQCatalog:
 				else:
 					## Do not recompute if mean MFD is min SCR MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
-					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
-					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
+					a_val = (mfd.a_from_lambda(lamda, M, b_val)
+							+ mfd.get_a_separation(b_val, self.mfd_bin_width))
+					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax,
+											self.mfd_bin_width, a_val, b_val)
 					temp_MFD_container[zone_id] = MFD
 
 			## Check if summed moment rate lies within master moment rate range
 			if not failed:
 				zone_mfds = temp_MFD_container.values()
-				summed_moment_rate = np.sum(mfd._get_total_moment_rate() for mfd in zone_mfds)
-				if master_moment_rate_range[0] <= summed_moment_rate <= master_moment_rate_range[1]:
+				summed_moment_rate = np.sum([mfd._get_total_moment_rate()
+											for mfd in zone_mfds])
+				if (master_moment_rate_range[0] <= summed_moment_rate
+					<= master_moment_rate_range[1]):
 					for zone_id in zone_catalogs.keys():
 						if num_passed == 0:
 							MFD_container[zone_id] = [temp_MFD_container[zone_id]]
@@ -483,11 +527,13 @@ class CompositeEQCatalog:
 					num_rejected += 1
 
 			num_iterations += 1
-		print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
+		print("%05d  (passed: %05d; rejected: %05d; failed: %05d)"
+			% (num_iterations, num_passed, num_rejected, num_failed))
 
 		return MFD_container
 
-	def balance_MFD_by_frequency(self, num_samples, num_sigma=2, max_test_mag=None, use_master=False, random_seed=None):
+	def balance_MFD_by_frequency(self, num_samples, num_sigma=2, max_test_mag=None,
+								use_master=False, random_seed=None):
 		"""
 		Balance MFD's of zone catalogs by frequency.
 		First, calculate frequency range corresponding to b_val +/-
@@ -531,18 +577,22 @@ class CompositeEQCatalog:
 				max_test_mag = min(zone_Mmaxes.values()) - self.mfd_bin_width
 			else:
 				max_test_mag = max(zone_Mmaxes.values()) - self.mfd_bin_width
-		max_test_mag_index = int(round((max_test_mag - self.min_mag) / self.mfd_bin_width)) + 1
-		print("Maximum magnitude to test: %.1f (i=%d)" % (max_test_mag, max_test_mag_index))
+		max_test_mag_index = int(round((max_test_mag - self.min_mag)
+								 / self.mfd_bin_width)) + 1
+		print("Maximum magnitude to test: %.1f (i=%d)"
+			% (max_test_mag, max_test_mag_index))
 
 		## Determine frequency range of master catalog
 		if use_master:
-			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(num_sigma=num_sigma)
+			master_MFD, master_MFD1, master_MFD2 = self._compute_master_MFD(
+															num_sigma=num_sigma)
 		else:
-			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(num_sigma=num_sigma)
+			master_MFD, master_MFD1, master_MFD2 = self._compute_summed_MFD(
+															num_sigma=num_sigma)
 		master_frequency_range = np.zeros((2, len(master_MFD)), 'd')
 		master_frequency_range[0] = master_MFD1.get_cumulative_rates()
 		master_frequency_range[1] = master_MFD2.get_cumulative_rates()
-		#print master_frequency_range
+		#print(master_frequency_range)
 
 		## Determine unconstrained MFD for each zone catalog
 		if not self.zone_MFDs:
@@ -557,7 +607,8 @@ class CompositeEQCatalog:
 		num_iterations = 0
 		while num_passed < num_samples:
 			if num_iterations % 10 == 0:
-				print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
+				print("%05d  (passed: %05d; rejected: %05d; failed: %05d)"
+					% (num_iterations, num_passed, num_rejected, num_failed))
 			failed = False
 			temp_MFD_container = dict.fromkeys(zone_catalogs.keys())
 
@@ -583,8 +634,10 @@ class CompositeEQCatalog:
 				else:
 					## Do not recompute if mean MFD is min SCR MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
-					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
-					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
+					a_val = (mfd.a_from_lambda(lamda, M, b_val)
+							+ mfd.get_a_separation(b_val, self.mfd_bin_width))
+					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax,
+											self.mfd_bin_width, a_val, b_val)
 					temp_MFD_container[zone_id] = MFD
 
 			## Check if summed frequencies lie within master frequency range
@@ -594,8 +647,11 @@ class CompositeEQCatalog:
 				for MFD in zone_mfds:
 					summed_frequency_range[:len(MFD)] += MFD.get_cumulative_rates()
 				if ((master_frequency_range[0] <= summed_frequency_range).all()
-					and (summed_frequency_range[:max_test_mag_index] <= master_frequency_range[1, :max_test_mag_index]).all()):
-					#print master_frequency_range[0, max_test_mag_index], summed_frequency_range[max_test_mag_index], master_frequency_range[1, max_test_mag_index]
+					and (summed_frequency_range[:max_test_mag_index]
+						<= master_frequency_range[1, :max_test_mag_index]).all()):
+					#print(master_frequency_range[0, max_test_mag_index],
+					# 		summed_frequency_range[max_test_mag_index],
+					# 		master_frequency_range[1, max_test_mag_index])
 					for zone_id in zone_catalogs.keys():
 						if num_passed == 0:
 							MFD_container[zone_id] = [temp_MFD_container[zone_id]]
@@ -606,7 +662,8 @@ class CompositeEQCatalog:
 					num_rejected += 1
 
 			num_iterations += 1
-		print("%05d  (passed: %05d; rejected: %05d; failed: %05d)" % (num_iterations, num_passed, num_rejected, num_failed))
+		print("%05d  (passed: %05d; rejected: %05d; failed: %05d)"
+			% (num_iterations, num_passed, num_rejected, num_failed))
 
 		return MFD_container
 
@@ -715,8 +772,10 @@ class CompositeEQCatalog:
 				else:
 					## Do not recompute if mean MFD is min SCR MFD
 					lamda, M = zone_MFD.occurrence_rates[0], self.min_mag
-					a_val = mfd.a_from_lambda(lamda, M, b_val) + mfd.get_a_separation(b_val, self.mfd_bin_width)
-					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax, self.mfd_bin_width, a_val, b_val)
+					a_val = (mfd.a_from_lambda(lamda, M, b_val)
+							 + mfd.get_a_separation(b_val, self.mfd_bin_width))
+					MFD = mfd.TruncatedGRMFD(self.min_mag, zone_Mmax,
+											self.mfd_bin_width, a_val, b_val)
 					temp_MFD_container[zone_id] = MFD
 
 			if not failed:
@@ -728,5 +787,3 @@ class CompositeEQCatalog:
 				num_passed += 1
 
 		return MFD_container
-
-
