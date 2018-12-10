@@ -1,6 +1,14 @@
 # -*- coding: iso-Latin-1 -*-
 """
+Classes corresponding to records in database
 """
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
+## Make relative imports work in Python 3
+import importlib
+
 
 ## Import standard python modules
 import datetime
@@ -14,8 +22,7 @@ import mx.DateTime as mxDateTime
 
 ## Import ROB modules
 import mapping.geotools.geodetic as geodetic
-import msc
-from time_functions import fractional_year
+msc = importlib.import_module('.msc', __name__.split('.')[0])
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord"]
@@ -100,11 +107,14 @@ class LocalEarthquake:
 		self.ID = ID
 		if isinstance(date, datetime.date) and isinstance(time, datetime.time):
 			self.datetime = datetime.datetime.combine(date, time)
-		elif isinstance(date, mxDateTime.DateTimeType) and isinstance(time, mxDateTime.DateTimeDeltaType):
+		elif (isinstance(date, mxDateTime.DateTimeType)
+				and isinstance(time, mxDateTime.DateTimeDeltaType)):
 			self.datetime = date + time
-		elif isinstance(date, datetime.datetime) or isinstance(date, mxDateTime.DateTimeType):
+		elif (isinstance(date, datetime.datetime)
+				or isinstance(date, mxDateTime.DateTimeType)):
 			self.datetime = date
-		elif isinstance(time, datetime.datetime) or isinstance(time, mxDateTime.DateTimeType):
+		elif (isinstance(time, datetime.datetime)
+				or isinstance(time, mxDateTime.DateTimeType)):
 			self.datetime = time
 		elif isinstance(date, datetime.date):
 			time = datetime.time(0, 0, 0)
@@ -279,7 +289,7 @@ class LocalEarthquake:
 		:return:
 			instance of :class:`HYPDAT`
 		"""
-		from HY4 import HYPDAT
+		from .HY4 import HYPDAT
 
 		latitude = int(round(self.lat * 3600 / 0.001))
 		longitude = int(round(self.lon * 3600 / 0.001))
@@ -290,7 +300,8 @@ class LocalEarthquake:
 		M = self.get_M(Mtype, Mrelation)
 		magnitude = int(round(M * 10))
 
-		return HYPDAT(latitude, longitude, year, month, day, minutes, tseconds, depth, magnitude, 0, 0, 0)
+		return HYPDAT(latitude, longitude, year, month, day, minutes, tseconds,
+						depth, magnitude, 0, 0, 0)
 
 	## date-time-related methods
 
@@ -334,6 +345,7 @@ class LocalEarthquake:
 		:return:
 			Float, fractional year
 		"""
+		from .time_functions import fractional_year
 		return fractional_year(self.datetime)
 
 	def get_fractional_hour(self):
@@ -343,7 +355,8 @@ class LocalEarthquake:
 		:return:
 			Float, fractional hour
 		"""
-		return self.datetime.hour + self.datetime.minute/60.0 + self.datetime.second/3600.0
+		return (self.datetime.hour + self.datetime.minute/60.0
+				+ self.datetime.second/3600.0)
 
 	## Magnitude-related methods
 
@@ -377,7 +390,7 @@ class LocalEarthquake:
 		:return:
 			bool
 		"""
-		if self.mag.has_key(Mtype) and not np.isnan(self.mag[Mtype]):
+		if Mtype in self.mag and not np.isnan(self.mag[Mtype]):
 			return True
 		else:
 			return False
@@ -487,7 +500,7 @@ class LocalEarthquake:
 
 		"""
 		if not self.has_mag('MS'):
-			if self.has_mag('ML') and Mrelation.has_key("ML"):
+			if self.has_mag('ML') and 'ML' in Mrelation:
 				msce = getattr(msc, Mrelation["ML"])()
 				return msce.get_mean(self.ML)
 			# TODO: add relation for MW
@@ -538,10 +551,10 @@ class LocalEarthquake:
 
 		"""
 		if not self.has_mag('MW'):
-			if self.has_mag('MS') and Mrelation.has_key("MS"):
+			if self.has_mag('MS') and 'MS' in Mrelation:
 				msce = getattr(msc, Mrelation["MS"])()
 				MW = msce.get_mean(self.MS)
-			elif self.has_mag('ML') and Mrelation.has_key("ML"):
+			elif self.has_mag('ML') and 'ML' in Mrelation:
 				msce = getattr(msc, Mrelation["ML"])()
 				MW = msce.get_mean(self.ML)
 			else:
@@ -670,22 +683,31 @@ class LocalEarthquake:
 		hash = hi.encode(self.ID)
 		return hash
 
-	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii", min_val=1, min_fiability=20.0, group_by_main_village=False, filter_floors=False, agg_function="", verbose=False):
-		from seismodb import query_ROB_Web_MacroCatalog
-		return query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies, query_info=query_info, min_val=min_val, min_fiability=min_fiability, group_by_main_village=group_by_main_village, filter_floors=filter_floors, agg_function=agg_function, verbose=verbose)
+	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii",
+					min_val=1, min_fiability=20.0, group_by_main_village=False,
+					filter_floors=False, agg_function="", verbose=False):
+		from .seismodb import query_ROB_Web_MacroCatalog
+		return query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies,
+					query_info=query_info, min_val=min_val, min_fiability=min_fiability,
+					group_by_main_village=group_by_main_village, filter_floors=filter_floors,
+					agg_function=agg_function, verbose=verbose)
 
-	def get_macroseismic_data_aggregated_official(self, Imax=True, min_val=1, group_by_main_village=False, agg_function="maximum", verbose=False):
-		from seismodb import query_ROB_Official_MacroCatalog
-		return query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val, group_by_main_village=group_by_main_village, agg_function=agg_function, verbose=verbose)
+	def get_macroseismic_data_aggregated_official(self, Imax=True, min_val=1,
+			group_by_main_village=False, agg_function="maximum", verbose=False):
+		from .seismodb import query_ROB_Official_MacroCatalog
+		return query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val,
+			group_by_main_village=group_by_main_village, agg_function=agg_function,
+			verbose=verbose)
 
 	def get_macroseismic_enquiries(self, min_fiability=20, verbose=False):
-		from macrorecord import MacroseismicEnquiryEnsemble
-		from seismodb import query_ROB_Web_enquiries
-		ensemble = query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability, verbose=verbose)
+		from .macrorecord import MacroseismicEnquiryEnsemble
+		from .seismodb import query_ROB_Web_enquiries
+		ensemble = query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability,
+											verbose=verbose)
 		return ensemble
 
 	def get_focal_mechanism(self, verbose=False):
-		from seismodb import query_ROB_FocalMechanisms
+		from .seismodb import query_ROB_FocalMechanisms
 		try:
 			return query_ROB_FocalMechanisms(id_earth=self.ID, verbose=verbose)[0]
 		except IndexError:
@@ -696,10 +718,14 @@ class LocalEarthquake:
 #class FocMecRecord(LocalEarthquake, MT.FaultGeometry):
 class FocMecRecord(LocalEarthquake):
 	"""
-	Container class to hold information of records retrieved from the focal_mechanisms database table.
+	Container class to hold information of records retrieved from the
+	focal_mechanisms database table.
 	"""
-	def __init__(self, ID, date, time, lon, lat, depth, mag, ML, MS, MW, strike, dip, rake, name="", intensity_max=None, macro_radius=None):
-		LocalEarthquake.__init__(self, ID, date, time, lon, lat, depth, mag, ML, MS, MW, name=name, intensity_max=intensity_max, macro_radius=macro_radius)
+	def __init__(self, ID, date, time, lon, lat, depth, mag, ML, MS, MW,
+				strike, dip, rake, name="", intensity_max=None, macro_radius=None):
+		LocalEarthquake.__init__(self, ID, date, time, lon, lat, depth, mag,
+								ML, MS, MW, name=name, intensity_max=intensity_max,
+								macro_radius=macro_radius)
 		#MT.FaultGeometry.__init__(self, strike, dip, rake)
 		self.Mw = self.get_MW()
 		self.strike = strike
@@ -707,14 +733,13 @@ class FocMecRecord(LocalEarthquake):
 		self.rake = rake
 
 	def get_focmec(self):
-		import eqgeology.FocMec.MomentTensor as MT
-		return MT.FaultGeometry(self.strike, self.dip, self.rake, Mw=self.get_MW())
+		from eqgeology.faultlib.tensorlib import FocalMechanism
+		return FocalMechanism(self.strike, self.dip, self.rake, MW=self.get_MW())
 
 	def get_mtensor(self):
-		import eqgeology.FocMec.MomentTensor as MT
-		mt = MT.MomentTensor()
-		mt.fromsdr(self.strike, self.dip, self.rake, Mw=self.get_MW())
+		from eqgeology.faultlib.tensorlib import MomentTensor
+		mt = MomentTensor()
+		mt.from_sdr(self.strike, self.dip, self.rake, MW=self.get_MW())
 		return mt
 
 	#property(focmec, get_focmec)
-
