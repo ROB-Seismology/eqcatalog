@@ -2,6 +2,9 @@
 Useful time functions
 """
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import datetime
 import mx.DateTime as mxDateTime
 
@@ -24,14 +27,17 @@ def timespan(start_date, end_date):
 	num_intervening_years = end_date.year - start_date.year
 	if num_intervening_years == 0:
 		year = end_date.year
-		timespan = (end_date - start_date).days * 1. / (mxDateTime.Date(year+1,1,1) - mxDateTime.Date(year,1,1)).days
+		timespan = ((end_date - start_date).days *
+			1. / (mxDateTime.Date(year+1,1,1) - mxDateTime.Date(year,1,1)).days)
 	else:
 		end_of_last_year = mxDateTime.Date(end_date.year-1,12,31)
 		end_of_this_year = mxDateTime.Date(end_date.year,12,31)
-		timespan = (end_date - end_of_last_year).days * 1./ (end_of_this_year - end_of_last_year).days
+		timespan = ((end_date - end_of_last_year).days *
+					1./ (end_of_this_year - end_of_last_year).days)
 		start_of_this_year = mxDateTime.Date(start_date.year,1,1)
 		start_of_next_year = mxDateTime.Date(start_date.year+1,1,1)
-		timespan += (start_of_next_year - start_date).days * 1. / (start_of_next_year - start_of_this_year).days
+		timespan += ((start_of_next_year - start_date).days *
+					1. / (start_of_next_year - start_of_this_year).days)
 		timespan += (num_intervening_years - 1)
 	return timespan
 
