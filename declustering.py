@@ -1,6 +1,13 @@
 """
-Module containing declustering methods.
+Module containing different declustering methods.
+
+Author: Bart Vleminckx
 """
+
+# TODO: rewrite decluster functions in a way that they also work to obtain
+# all dependent events of a single mainshock
+
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 
 import abc
@@ -65,7 +72,8 @@ class WindowMethod(DeclusteringMethod):
 				t_window = datetime.timedelta(days=t_window)
 				## create time window index
 				in_t_window = np.logical_and(
-					datetimes >= (datetimes[i] - datetime.timedelta(seconds=fa_ratio*t_window.total_seconds())),
+					datetimes >= (datetimes[i] - datetime.timedelta(
+								seconds=fa_ratio*t_window.total_seconds())),
 					datetimes <= (datetimes[i] + t_window),
 				)
 				## create distance window index
@@ -114,7 +122,8 @@ class ClusterMethod(DeclusteringMethod):
 			smaller_magnitude = magnitudes <= magnitude
 			## create time window index
 			in_t_window = np.logical_and(
-				datetimes >= (datetimes[i] - datetime.timedelta(seconds=fa_ratio*t_window.total_seconds())),
+				datetimes >= (datetimes[i] - datetime.timedelta(
+								seconds=fa_ratio*t_window.total_seconds())),
 				datetimes <= (datetimes[i] + t_window),
 			)
 			## create distance window index
@@ -204,4 +213,3 @@ def get_all_windows():
 	windows = inspect.getmembers(sys.modules[__name__], is_window)
 	windows = OrderedDict(windows)
 	return windows
-
