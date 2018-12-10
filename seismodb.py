@@ -15,6 +15,9 @@ Required modules:
 """
 
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 ## Import standard python modules
 import datetime
 
@@ -26,10 +29,15 @@ from db.simpledb import (build_sql_query, query_mysql_db_generic)
 
 
 
-__all__ = ["LocalEarthquake", "MacroseismicInfo", "FocMecRecord",
+__all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID",
 			"query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog",
-			"query_ROB_Web_MacroCatalog", "get_last_earthID", "query_ROB_Web_enquiries"]
+			"query_ROB_Web_MacroCatalog", "query_ROB_Web_enquiries",
+			"query_ROB_Stations", "get_station_coordinates",
+			"get_last_earthID", "zip2ID"]
+
+
+AGG_FUNC_DICT = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}
 
 
 def query_seismodb_table_generic(query, verbose=False, errf=None):
@@ -152,8 +160,8 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	from eqrecord import LocalEarthquake
-	from eqcatalog import EQCatalog
+	from .eqrecord import LocalEarthquake
+	from .eqcatalog import EQCatalog
 
 	## Convert input arguments, if necessary
 	if isinstance(id_earth, (int, long)):
@@ -211,7 +219,8 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 			end_date = datetime.datetime.now()
 		if not start_date:
 			start_date = datetime.datetime(100, 1, 1)
-		where_clause += ' and date Between "%s" and "%s"' % (start_date.isoformat(), end_date.isoformat())
+		where_clause += (' and date Between "%s" and "%s"'
+						% (start_date.isoformat(), end_date.isoformat()))
 	if min_depth:
 		where_clause += ' and depth >= %f' % min_depth
 	if max_depth:
@@ -294,7 +303,9 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 
 			mb = np.nan
 
-		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, mb, name, intensity_max, macro_radius, errh, errz, errt, errM, event_type=etype)
+		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {},
+							ML, MS, MW, mb, name, intensity_max, macro_radius,
+							errh, errz, errt, errM, event_type=etype)
 		eq_list.append(eq)
 
 	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
@@ -341,7 +352,7 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 	:return:
 		list with instances of :class:`FocMecRecord`
 	"""
-	from eqrecord import FocMecRecord
+	from .eqrecord import FocMecRecord
 
 	if type(id_earth) in (type(1), type(1L)):
 		id_earth = [id_earth]
@@ -371,7 +382,8 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 	where_clause += ' and earthquakes.type = "ke"'
 	where_clause += ' and earthquakes.is_true = 1'
 	if id_earth:
-		where_clause += ' and earthquakes.id_earth in (%s)' % ",".join([str(item) for item in id_earth])
+		where_clause += (' and earthquakes.id_earth in (%s)'
+						% ",".join([str(item) for item in id_earth]))
 	if region:
 		w, e, s, n = region
 		where_clause += ' and earthquakes.longitude Between %f and %f' % (w, e)
@@ -381,7 +393,8 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 			end_date = datetime.datetime.now()
 		if not start_date:
 			start_date = datetime.datetime(100, 1, 1)
-		where_clause += ' and earthquakes.date Between "%s" and "%s"' % (start_date.isoformat(), end_date.isoformat())
+		where_clause += (' and earthquakes.date Between "%s" and "%s"'
+						% (start_date.isoformat(), end_date.isoformat()))
 
 	having_clause = ""
 	if Mmax or Mmin != None:
@@ -442,7 +455,8 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 		if macro_radius == None:
 			macro_radius = 0
 
-		eq = FocMecRecord(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW, strike, dip, rake, name, intensity_max, macro_radius)
+		eq = FocMecRecord(id_earth, date, time, lon, lat, depth, {}, ML, MS, MW,
+						strike, dip, rake, name, intensity_max, macro_radius)
 		focmec_list.append(eq)
 
 	return focmec_list
@@ -477,12 +491,13 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 	:return:
 		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
 	"""
-	from macrorecord import MacroseismicInfo
+	from .macrorecord import MacroseismicInfo
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
 		import eqmapperdb_secrets
-		db = MySQLdb.connect(host=eqmapperdb_secrets.host, user=eqmapperdb_secrets.user, passwd=eqmapperdb_secrets.passwd, db=eqmapperdb_secrets.database)
+		db = MySQLdb.connect(host=eqmapperdb_secrets.host, user=eqmapperdb_secrets.user,
+				passwd=eqmapperdb_secrets.passwd, db=eqmapperdb_secrets.database)
 		c = db.cursor()
 		query = 'SELECT id_com_main,'
 		if Imax:
@@ -500,11 +515,13 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 			'communes.latitude']
 
 		if group_by_main_village:
-			agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "MAX")
+			agg_function = AGG_FUNC_DICT.get(agg_function.lower(), "MAX")
 			if Imax:
-				column_clause.append('%s(macro_detail.intensity_max) as "Intensity"' % agg_function)
+				column_clause.append('%s(macro_detail.intensity_max) as "Intensity"'
+									% agg_function)
 			else:
-				column_clause.append('%s(macro_detail.intensity_min) as "Intensity"' % agg_function)
+				column_clause.append('%s(macro_detail.intensity_min) as "Intensity"'
+									% agg_function)
 			group_clause = 'communes.id_main'
 			column_clause.append('GROUP_CONCAT(id_macro_detail SEPARATOR ",") AS id_db')
 		else:
@@ -572,7 +589,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		query += ' HAVING Intensity >= %d' % min_val
 		query += ' Order By Intensity asc'
 	else:
-		agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}[agg_function.lower()]
+		agg_function = AGG_FUNC_DICT[agg_function.lower()]
 		query = 'SELECT communes.id_main,'
 		if Imax:
 			query += ' %s(macro_detail.intensity_max) as "Intensity"' % agg_function
@@ -589,7 +606,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		query += ' Order By Intensity asc'
 
 	if verbose:
-		print query
+		print(query)
 	c.execute(query)
 
 	macro_info = {}
@@ -652,15 +669,18 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	:return:
 		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
 	"""
-	from macrorecord import MacroseismicInfo
+	from .macrorecord import MacroseismicInfo
 
 	## Construct SQL query
 	table_clause = ['web_analyse']
 
 	## Hack to include enquiries where ZIP code is given but not matched in web_analyse
 	join_clause = [('JOIN', 'web_input', 'web_analyse.id_web = web_input.id_web'),
-				('LEFT JOIN', 'communes comm1', 'web_analyse.id_com != 0  AND web_analyse.id_com = comm1.id'),
-				('LEFT JOIN', 'communes comm2', 'web_analyse.id_com = 0 AND web_input.zip = comm2.code_p AND web_input.country = comm2.country AND comm2.id = comm2.id_main')]
+				('LEFT JOIN', 'communes comm1',
+					'web_analyse.id_com != 0 AND web_analyse.id_com = comm1.id'),
+				('LEFT JOIN', 'communes comm2',
+					'web_analyse.id_com = 0 AND web_input.zip = comm2.code_p '
+					'AND web_input.country = comm2.country AND comm2.id = comm2.id_main')]
 
 	if group_by_main_village:
 		column_clause = ['COALESCE(comm1.id_main, comm2.id_main) AS id_comm']
@@ -675,8 +695,9 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 
 	group_clause = "id_comm"
 
-	agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}.get(agg_function.lower(), "AVG")
-	column_clause.append('%s(web_analyse.%s) as "Intensity"' % (agg_function, query_info.upper()))
+	agg_function = AGG_FUNC_DICT.get(agg_function.lower(), "AVG")
+	column_clause.append('%s(web_analyse.%s) as "Intensity"'
+						% (agg_function, query_info.upper()))
 
 	where_clause = 'web_analyse.id_earth = %d' % id_earth
 	where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
@@ -744,7 +765,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		elif sort_key.lower() == "id_com":
 			query += ' Order By web_analyse.id_com %s' % sort_order
 	else:
-		#agg_function = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}[agg_function.lower()]
+		#agg_function = AGG_FUNC_DICT[agg_function.lower()]
 		query = 'SELECT communes.id_main, COUNT(*) as "Num_Replies"'
 		if query_info == "manual_intensity":
 			query += ', AVG(web_analyse.MI) as "Intensity"'
@@ -772,7 +793,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		errf.write("%s\n" % query)
 		errf.flush()
 	elif verbose:
-		print query
+		print(query)
 
 	c.execute(query)
 	if lonlat:
@@ -799,8 +820,8 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	"""
 
 
-def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None, min_fiability=20,
-							web_ids=[], verbose=False, errf=None):
+def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None,
+						min_fiability=20, web_ids=[], verbose=False, errf=None):
 	"""
 	Query internet enquiries.
 
@@ -829,7 +850,7 @@ def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None, min_fiabi
 	:return:
 		instance of :class:`MacroseismicEnquiryEnsemble`
 	"""
-	from macrorecord import MacroseismicEnquiryEnsemble
+	from .macrorecord import MacroseismicEnquiryEnsemble
 
 	table_clause = ['web_input']
 
@@ -876,7 +897,8 @@ def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
 	:return:
 		generator object, yielding a dictionary for each record
 	"""
-	table_clause = ["station", "station_place", "station_sismometer", "station_sismometer_type"]
+	table_clause = ["station", "station_place", "station_sismometer",
+					"station_sismometer_type"]
 
 	where_clause = "station.id_place=station_place.id_place"
 	where_clause += " AND station.id_sismometer=station_sismometer.id_sismometer"
@@ -885,7 +907,8 @@ def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
 		where_clause += " AND network='%s'" % network
 	if activity_date_time:
 		where_clause += " AND station.begin <= '%s'" % activity_date_time.isoformat()
-		where_clause += " AND (station.end >= '%s' OR station.end IS NULL)" % activity_date_time.isoformat()
+		where_clause += (" AND (station.end >= '%s' OR station.end IS NULL)"
+						% activity_date_time.isoformat())
 
 	column_clause = ["id_station",
 					"station_place.code",
@@ -942,7 +965,8 @@ def get_last_earthID():
 	:return:
 		int, earthquake ID
 	"""
-	query = 'SELECT id_earth FROM earthquakes WHERE type="ke" and is_true = 1 ORDER BY id_earth DESC LIMIT 0 , 1'
+	query = ('SELECT id_earth FROM earthquakes WHERE type="ke" AND is_true = 1 '
+			'ORDER BY id_earth DESC LIMIT 0 , 1')
 	id_earth = query_seismodb_table_generic(query)[0]['id_earth']
 	return id_earth
 
@@ -965,4 +989,4 @@ if __name__ == "__main__":
 	end_date = datetime.date(2007, 12, 31)
 	catalogue_length = (end_date.year - start_date.year) * 1.0
 	catalogue = query_ROB_LocalEQCatalog(start_date=start_date, end_date=end_date)
-	print "%d events" % len(catalogue)
+	print("%d events" % len(catalogue))
