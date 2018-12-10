@@ -1,5 +1,8 @@
 #! /usr/bin/python
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import sys, os
 
 pythondir = "/var/www/EQMapper/python"
@@ -16,8 +19,8 @@ import eqcatalog.seismodb as seismodb
 #Response.ContentType = "text/xml"
 #Response.CharSet = "iso-8859-1"
 
-#print "Content-Type: text/xml"
-#print
+#print("Content-Type: text/xml")
+#print()
 
 #qs = os.environ["QUERY_STRING"]
 
