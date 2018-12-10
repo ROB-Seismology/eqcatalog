@@ -1,3 +1,10 @@
+"""
+Implementation of different methods to compute Gutenberg-Richter MFDs
+"""
+
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import numpy as np
 from scipy import stats
 
@@ -5,10 +12,11 @@ from scipy import stats
 
 def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verbose=False):
 	"""
-	Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
-	for variable observation periods for different magnitude increments.
-	Adapted from calB.m and calBfixe.m Matlab modules written by Philippe Rosset (ROB, 2004),
-	which is based on the method by Weichert, 1980 (BSSA, 70, Nr 4, 1337-1346).
+	Calculate a and b values of Gutenberg-Richter relation using maximum likelihood
+	estimation for variable observation periods for different magnitude increments.
+	Adapted from calB.m and calBfixe.m Matlab modules written by Philippe Rosset
+	(ROB, 2004), which is based on the method by Weichert, 1980
+	(BSSA, 70, Nr 4, 1337-1346).
 
 	:param magnitudes:
 		numpy float array, left edges of magnitude bins up to Mmax
@@ -50,7 +58,7 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 		BETA = b_val * np.log(10)
 	BETL = 0
 	while(np.abs(BETA-BETL)) >= 0.0001:
-		#print BETA
+		#print(BETA)
 
 		SNM = 0.0
 		NKOUNT = 0.0
@@ -121,7 +129,8 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 
 def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=False):
 	"""
-	Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
+	Calculate a and b values of Gutenberg-Richter relation using a linear regression
+	(least-squares).
 
 	:param magnitudes:
 		numpy float array, left edges of magnitude bins up to Mmax
@@ -187,7 +196,6 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=F
 		r = np.nan
 
 	if verbose:
-		print "Linear regression: a=%.3f, b=%.3f (r**2=%.2f)" % (a_val, b_val, r**2)
+		print("Linear regression: a=%.3f, b=%.3f (r**2=%.2f)" % (a_val, b_val, r**2))
 
 	return (a_val, b_val, a_sigma, b_sigma)
-
