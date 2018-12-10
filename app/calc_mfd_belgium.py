@@ -6,6 +6,9 @@ taking into account increasingly larger area around Belgium in function
 of magnitude
 """
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import os
 import datetime
 from collections import OrderedDict
@@ -15,9 +18,9 @@ import eqcatalog
 import hazard.rshalib as rshalib
 
 
-GIS_ROOT = r"D:\seismo-gis\collections"
+GIS_ROOT = "D:\\seismo-gis\\collections"
 
-OUT_FOLDER = r"E:\Home\_kris\Meetings\2018 - Opendeurdagen"
+OUT_FOLDER = "E:\\Home\\_kris\\Meetings\\2018 - Opendeurdagen"
 
 
 def get_declustering_distance(mag, dc_window_name):
@@ -62,7 +65,7 @@ def create_buffer_polygon(gis_file, buffer_distance, show_plot=False):
 	## Read country polygon
 	#gis_data = lbm.GisData(gis_file)
 	#_, _, polygon_data = gis_data.get_data()
-	recs = read_gis_file(gis_file, out_srs=ct.lambert1972, verbose=False)
+	recs = read_gis_file(gis_file, out_srs=ct.LAMBERT1972, verbose=False)
 	geom = recs[0]['obj']
 	polygon_data = lbm.MultiPolygonData.from_ogr(geom)
 
@@ -85,7 +88,7 @@ def create_buffer_polygon(gis_file, buffer_distance, show_plot=False):
 		pylab.show()
 
 	## Reproject buffer polygon to lon, lat
-	lons, lats = ct.transform_array_coordinates(ct.lambert1972, ct.wgs84,
+	lons, lats = ct.transform_array_coordinates(ct.LAMBERT1972, ct.WGS84,
 												buffer_pg.lons, buffer_pg.lats)
 	buffer_pg.lons = lons
 	buffer_pg.lats = lats
@@ -99,7 +102,7 @@ def create_buffer_polygon(gis_file, buffer_distance, show_plot=False):
 
 ## Print magnitudes / distances
 #for mag in range(3, 7):
-#	print mag, get_declustering_distance(mag, "GardnerKnopoff1974")
+#	print(mag, get_declustering_distance(mag, "GardnerKnopoff1974"))
 
 
 
@@ -239,7 +242,8 @@ for m, mag in enumerate(range(3, 7)):
 
 fig_filename = "Bel_mag_buffers.png"
 fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
-pylab.savefig(fig_filespec, dpi=300)
+#pylab.savefig(fig_filespec, dpi=300)
+pylab.show()
 exit()
 """
 
@@ -290,8 +294,8 @@ labels = ["KSB Catalogus / Catalogue ORB", "Gutenberg-Richter"]
 title = ""
 #fig_filename = "MFD_Bel_%s_%s.PNG" % (dist_window, fit_method)
 fig_filename = "Bel_MFD.PNG"
-fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
-#fig_filespec = None
+#fig_filespec = os.path.join(OUT_FOLDER, fig_filename)
+fig_filespec = None
 rshalib.mfd.plot_MFD(mfd_list, labels=labels, completeness=completeness,
 					cumul_or_inc=cumul_or_inc, y_log_labels=False,
 					title=title, lang=lang, fig_filespec=fig_filespec, dpi=300)
@@ -315,7 +319,7 @@ tab_cumul = PrettyTable(col_names)
 
 scenario_mags = [3.0, 4.6, 5.3, 6.0]
 for scen_mag in scenario_mags:
-	[idx] = np.argwhere(np.isclose(mag_bins, scen_mag))
+	[idx] = np.where(np.isclose(mag_bins, scen_mag))[0]
 	## Using incremental rates
 	Tinc = 1. / np.sum(fitted_mfd.occurrence_rates[idx:idx+4])
 	T1inc = 1. / np.sum(sigma_mfd1.occurrence_rates[idx:idx+4])
