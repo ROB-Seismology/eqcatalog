@@ -7,6 +7,14 @@ Provides interface to Harvard CMT catalog:
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+try:
+	## Python 2
+	basestring
+except:
+	## Python 3
+	basestring = str
+
+
 import os
 import datetime
 import urllib2
@@ -263,13 +271,14 @@ class HarvardCMTRecord:
 		:param ndk_record:
 			str or list of strings corresponding to record lines
 		"""
-		if isinstance(ndk_record, (str, unicode)):
+		if isinstance(ndk_record, basestring):
 			ndk_record = ndk_record.strip().splitlines()
 		for i, line in enumerate(ndk_record):
 			line = line.strip('\t')
 			if i == 0:
 				ref_catalog = line[:4].strip()
-				hypo_date, hypo_time, hypo_lat, hypo_lon, hypo_depth, ref_mb, ref_MS = line[4:56].split()
+				(hypo_date, hypo_time, hypo_lat, hypo_lon, hypo_depth, ref_mb,
+					ref_MS) = line[4:56].split()
 				year, month, day = map(int, hypo_date.split('/'))
 				date = datetime.date(year, month, day)
 				hour, minute, second = hypo_time.split(':')
@@ -288,11 +297,15 @@ class HarvardCMTRecord:
 				mrf_type, mrf_duration = line[69:].split()
 			elif i == 2:
 				centroid_time = line[14:19].strip()
-				centroid_time_sigma, centroid_lat, centroid_lat_sigma, centroid_lon, centroid_lon_sigma, centroid_depth, centroid_depth_sigma, centroid_depth_type = line[19:63].split()
+				(centroid_time_sigma, centroid_lat, centroid_lat_sigma, centroid_lon,
+					centroid_lon_sigma, centroid_depth, centroid_depth_sigma,
+					centroid_depth_type) = line[19:63].split()
 			elif i == 3:
-				exp, Mrr, Mrr_sigma, Mtt, Mtt_sigma, Mpp, Mpp_sigma, Mrt, Mrt_sigma, Mrp, Mrp_sigma, Mtp, Mtp_sigma = line.split()
+				(exp, Mrr, Mrr_sigma, Mtt, Mtt_sigma, Mpp, Mpp_sigma, Mrt,
+					Mrt_sigma, Mrp, Mrp_sigma, Mtp, Mtp_sigma) = line.split()
 			elif i == 4:
-				eva1, pl1, az1, eva2, pl2, az2, eva3, pl3, az3, moment, strike1, dip1, rake1, strike2, dip2, rake2 = line[3:].split()
+				(eva1, pl1, az1, eva2, pl2, az2, eva3, pl3, az3, moment,
+					strike1, dip1, rake1, strike2, dip2, rake2) = line[3:].split()
 
 		return cls(ID, ref_catalog, hypo_date_time, hypo_lon, hypo_lat, hypo_depth,
 				ref_mb, ref_MS, location, source_type, mrf_type, mrf_duration,
@@ -322,7 +335,7 @@ class HarvardCMTRecord:
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
 		"""
-		from eqcatalog import LocalEarthquake
+		from .eqcatalog import LocalEarthquake
 
 		ID = self.ID
 		date = self.hypo_date
@@ -397,7 +410,8 @@ class HarvardCMTCatalog:
 			self.clear_db()
 		self.db.add_records(self.table_name, [rec.to_dict() for rec in cmt_records])
 
-	def import_ndk(self, ndk_filespecs, start_date=datetime.date(1900, 1, 1), clear_db=False):
+	def import_ndk(self, ndk_filespecs, start_date=datetime.date(1900, 1, 1),
+					clear_db=False):
 		if clear_db:
 			self.clear_db()
 		for ndk_filespec in ndk_filespecs:
@@ -434,7 +448,8 @@ class HarvardCMTCatalog:
 			current_month += (12 - 4)
 
 		ndk_urls = ["jan76_dec13.ndk"]
-		months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+		months = ["jan", "feb", "mar", "apr", "may", "jun",
+					"jul", "aug", "sep", "oct", "nov", "dec"]
 		for year in range(2014, current_year+1):
 			if year == current_year:
 				end_month = current_month
@@ -519,12 +534,12 @@ class HarvardCMTCatalog:
 
 		for rec in self.db.query(table_clause, where_clause=where_clause, verbose=verbose):
 			rec = rec.to_dict()
-			if rec.has_key('geom'):
+			if 'geom' in rec:
 				del rec['geom']
 			yield HarvardCMTRecord.from_sql_record(rec)
 
 	def to_eq_catalog(self):
-		from eqcatalog import EQCatalog
+		from .eqcatalog import EQCatalog
 
 		eq_list = []
 		for rec in self.get_records():
