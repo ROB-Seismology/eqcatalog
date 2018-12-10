@@ -4,6 +4,9 @@
 Plot macroseismic maps
 """
 
+from __future__ import absolute_import, division, print_function, unicode_literals
+
+
 import os
 import numpy as np
 import matplotlib
@@ -12,7 +15,7 @@ import eqcatalog
 import mapping.layeredbasemap as lbm
 
 
-GIS_FOLDER = r"D:\seismo-gis\collections\Bel_administrative_ROB\TAB"
+GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
 
 
 # TODO: add plot_official_macroseismic_map function
@@ -335,7 +338,7 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75), pro
 		for i in range(len(macro_recs)):
 			X = [X_left[i], X_right[i], X_right[i], X_left[i], X_left[i]]
 			Y = [Y_bottom[i], Y_bottom[i], Y_top[i], Y_top[i], Y_bottom[i]]
-			lons, lats = ct.transform_array_coordinates(ct.lambert1972, ct.wgs84, X, Y)
+			lons, lats = ct.transform_array_coordinates(ct.LAMBERT1972, ct.WGS84, X, Y)
 			all_lons.append(lons)
 			all_lats.append(lats)
 		values = {}
@@ -556,7 +559,7 @@ if __name__ == "__main__":
 	#title = "Kinrooi 25/05/2018"
 	title = ""
 
-	out_folder = r"D:\Earthquake Reports\20180525\plots"
+	out_folder = "D:\\Earthquake Reports\\20180525\\plots"
 	fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
 	#fig_filespec = os.path.join(out_folder, fig_filename)
 	fig_filespec = None
