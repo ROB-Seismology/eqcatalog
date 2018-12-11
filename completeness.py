@@ -204,7 +204,7 @@ class Completeness:
 		for i, min_mag in enumerate(self.min_mags):
 			are_mags_complete[i] = (magnitudes >= min_mag)
 		completeness_timespans = np.zeros_like(magnitudes)
-		for m, M in enumerate(magnitudes):
+		for m in range(len(magnitudes)):
 			ts = 0
 			is_mag_complete = are_mags_complete[:,m]
 			try:
@@ -268,5 +268,4 @@ Completeness_MW_201303a = Completeness([1350, 1750, 1860, 1905, 1960, 1985],
 Completeness_MW_201303b = Completeness([1350, 1750, 1860, 1905, 1960, 1985],
 										[5.2, 4.9, 4.5, 3.9, 2.9, 2.0], "MW")
 
-# TODO: rename to DEFAULT_ROB_COMPLETENESS
-default_completeness = Completeness_MW_201303a
+DEFAULT_COMPLETENESS = Completeness_MW_201303a
