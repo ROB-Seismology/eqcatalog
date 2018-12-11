@@ -235,7 +235,6 @@ class Camelbeeck1985(MSCE_ML_MW):
 	Standard deviation not given
 	"""
 	def get_mean(self, ML):
-		input_type = type(ML)
 		log_Mo_dyncm = 18.22 + 0.99 * ML
 		MW = seismic_moment_to_moment_magnitude_dyncm(10**log_Mo_dyncm)
 		return MW
