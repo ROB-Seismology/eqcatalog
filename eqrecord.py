@@ -20,6 +20,9 @@ from collections import OrderedDict
 import numpy as np
 import mx.DateTime as mxDateTime
 
+## Disable no-member errors for mxDateTime
+# pylint: disable=no-member
+
 ## Import ROB modules
 import mapping.geotools.geodetic as geodetic
 msc = importlib.import_module('.msc', __name__.split('.')[0])
@@ -498,18 +501,6 @@ class LocalEarthquake:
 
 		return self.get_or_convert_mag('MS', Mrelation)
 
-		"""
-		if not self.has_mag('MS'):
-			if self.has_mag('ML') and 'ML' in Mrelation:
-				msce = getattr(msc, Mrelation["ML"])()
-				return msce.get_mean(self.ML)
-			# TODO: add relation for MW
-			else:
-				return 0.
-		else:
-			return self.MS
-		"""
-
 	def get_MW(self, Mrelation="default"):
 		"""
 		Return MW.
@@ -548,21 +539,6 @@ class LocalEarthquake:
 			Mrelation = default_Mrelations['MW']
 
 		return self.get_or_convert_mag('MW', Mrelation)
-
-		"""
-		if not self.has_mag('MW'):
-			if self.has_mag('MS') and 'MS' in Mrelation:
-				msce = getattr(msc, Mrelation["MS"])()
-				MW = msce.get_mean(self.MS)
-			elif self.has_mag('ML') and 'ML' in Mrelation:
-				msce = getattr(msc, Mrelation["ML"])()
-				MW = msce.get_mean(self.ML)
-			else:
-				MW = 0.
-		else:
-			MW = self.MW
-		return MW
-		"""
 
 	def get_M(self, Mtype, Mrelation="default"):
 		"""
@@ -700,7 +676,6 @@ class LocalEarthquake:
 			verbose=verbose)
 
 	def get_macroseismic_enquiries(self, min_fiability=20, verbose=False):
-		from .macrorecord import MacroseismicEnquiryEnsemble
 		from .seismodb import query_ROB_Web_enquiries
 		ensemble = query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability,
 											verbose=verbose)
