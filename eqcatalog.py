@@ -52,6 +52,9 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
 import mx.DateTime as mxDateTime
 
+## Disable no-member errors for mxDateTime
+# pylint: disable=no-member
+
 
 # TODO: Move ROB-specific code to separate submodule
 
@@ -66,7 +69,7 @@ else:
 ## Import ROB modules
 from .eqrecord import LocalEarthquake
 from .source_models import read_source_model
-from .completeness import *
+from .completeness import Completeness, DEFAULT_COMPLETENESS
 from .time_functions import timespan
 import mapping.geotools.geodetic as geodetic
 
@@ -288,6 +291,8 @@ class EQCatalog:
 		:param Mtype:
 			Str, magnitude type, either 'ML', 'MS' or 'MW' (default: 'ML')
 		"""
+		from .HY4 import HYPDAT, struct
+
 		eq_list = []
 		fd = open(filespec, "rb")
 		ID = 1
@@ -874,14 +879,14 @@ class EQCatalog:
 		# TODO: implement get_dependent_events, get_foreshocks, get_aftershocks
 		# methods in LocalEarthquake class
 
-	def subselect_completeness(self, completeness=default_completeness, Mtype="MW",
+	def subselect_completeness(self, completeness=DEFAULT_COMPLETENESS, Mtype="MW",
 							Mrelation="default", catalog_name="", verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		completeness criterion.
 
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation":
@@ -925,13 +930,13 @@ class EQCatalog:
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=self.region, name=catalog_name)
 
-	def split_completeness(self, completeness=default_completeness, Mtype="MW",
+	def split_completeness(self, completeness=DEFAULT_COMPLETENESS, Mtype="MW",
 							Mrelation="default"):
 		"""
 		Split catlog in subcatalogs according to completeness periods and magnitudes
 
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation":
@@ -1137,7 +1142,7 @@ class EQCatalog:
 						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		hours = np.array([eq.get_fractional_hour() for eq in subcatalog])
 		bins_Hr = np.arange(25)
-		bins_N, junk = np.histogram(hours, bins_Hr)
+		bins_N, _ = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
 	def bin_depth(self,
@@ -1301,7 +1306,6 @@ class EQCatalog:
 			Mags = cc_catalog.get_magnitudes(Mtype, Mrelation)
 		else:
 			Mags = self.get_magnitudes(Mtype, Mrelation)
-		num_events = len(Mags)
 
 		## Compute number of earthquakes per magnitude bin
 		bins_N, bins_Mag = np.histogram(Mags, bins_Mag)
@@ -1310,7 +1314,7 @@ class EQCatalog:
 		return bins_N, bins_Mag
 
 	def get_initial_completeness_dates(self, magnitudes,
-									completeness=default_completeness):
+									completeness=DEFAULT_COMPLETENESS):
 		"""
 		Compute initial date of completeness for list of magnitudes
 
@@ -1320,7 +1324,7 @@ class EQCatalog:
 			instance of :class:`Completeness` containing initial years of
 			completeness and corresponding minimum magnitudes.
 			If None, use start year of catalog.
-			(default: Completeness_MW_201303a)
+			(default: DEFAULT_COMPLETENESS)
 
 		:return:
 			numpy array, completeness dates
@@ -1357,7 +1361,7 @@ class EQCatalog:
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
 	def get_completeness_timespans(self, magnitudes,
-								completeness=default_completeness):
+								completeness=DEFAULT_COMPLETENESS):
 		"""
 		Compute completeness timespans for list of magnitudes
 
@@ -1366,7 +1370,7 @@ class EQCatalog:
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: Completeness_MW_201303a)
+			catalog (default: DEFAULT_COMPLETENESS)
 
 		:return:
 			numpy float array, completeness timespans (fractional years)
@@ -1378,7 +1382,7 @@ class EQCatalog:
 		return completeness.get_completeness_timespans(magnitudes, self.end_date)
 
 	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW",
-						Mrelation="default", completeness=default_completeness,
+						Mrelation="default", completeness=DEFAULT_COMPLETENESS,
 						trim=False, verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
@@ -1397,7 +1401,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -1424,7 +1428,7 @@ class EQCatalog:
 		return bins_N_incremental, bins_Mag
 
 	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default",
-					completeness=default_completeness, trim=False, verbose=True):
+					completeness=DEFAULT_COMPLETENESS, trim=False, verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1442,7 +1446,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -1461,7 +1465,7 @@ class EQCatalog:
 									Mtype=Mtype)
 
 	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW",
-						Mrelation="default", completeness=default_completeness,
+						Mrelation="default", completeness=DEFAULT_COMPLETENESS,
 						trim=False, verbose=True):
 		"""
 		Compute cumulative magnitude-frequency distribution.
@@ -1480,7 +1484,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -1501,7 +1505,7 @@ class EQCatalog:
 
 	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
 					b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
-					Mrelation="default", completeness=default_completeness,
+					Mrelation="default", completeness=DEFAULT_COMPLETENESS,
 					verbose=True):
 		"""
 		Compute Mmax distribution following Bayesian approach.
@@ -1538,7 +1542,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
 		:param verbose:
 			Bool, whether or not to print additional information (default: True)
 
@@ -1590,7 +1594,7 @@ class EQCatalog:
 
 	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
 						b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
-						Mrelation="default", completeness=default_completeness,
+						Mrelation="default", completeness=DEFAULT_COMPLETENESS,
 						num_discretizations=0, title=None, fig_filespec=None,
 						verbose=True):
 		"""
@@ -1628,7 +1632,7 @@ class EQCatalog:
 			select the default relation for the given Mtype)
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: Completeness_MW_201303a)
+			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
 		:param num_discretizations:
 			int, number of portions to discretize the posterior in
 			(default: 0)
@@ -1766,7 +1770,7 @@ class EQCatalog:
 		pylab.plot(bins_Years, bins_N_cumul, "bo", label="Cumulated number of events")
 
 		## Optionally, plot regression for a particular range
-		xmin, xmax, ymin, ymax = pylab.axis()
+		ymin, ymax = pylab.ylim()
 		if completeness_year != None:
 			year_index = np.where(bins_Years == completeness_year)[0][0]
 			if not regression_range:
@@ -1840,7 +1844,7 @@ class EQCatalog:
 			bins_M0, bins_Dates = self.bin_day_by_M0(start_date, end_date, bin_width, Mrelation=Mrelation)
 			#bins_Dates = np.arange((end_date - start_date).days + 1)
 			subcatalog = self.subselect(start_date=start_date, end_date=end_date)
-			Dates = [(eq.datetime - start_dt).days + (eq.datetime - start_dt).seconds / 86400.0 for eq in subcatalog]
+			Dates = [(eq.datetime - start_date).days + (eq.datetime - start_date).seconds / 86400.0 for eq in subcatalog]
 		bins_M0_cumul = np.add.accumulate(bins_M0)
 		unbinned_M0 = subcatalog.get_M0(Mrelation=Mrelation)
 		M0_cumul = np.add.accumulate(unbinned_M0)
@@ -1867,7 +1871,7 @@ class EQCatalog:
 		pylab.xlabel("Time (%s)" % bin_width_spec, fontsize="x-large")
 		pylab.ylabel("Seismic Moment (N.m)", fontsize="x-large")
 		pylab.title(self.name)
-		xmin, xmax, ymin, ymax = pylab.axis()
+		ymin, ymax = pylab.ylim()
 		if M0max:
 			ymax = M0max
 		pylab.axis((bins_Dates[0], bins_Dates[-1], ymin, ymax))
@@ -1946,7 +1950,7 @@ class EQCatalog:
 				else:
 					label = "%.1f <= M < %.1f" % (mag_limits[Nmag-i-2], mag_limits[Nmag-i-1])
 				pylab.ylabel(label)
-			xmin, xmax, ymin, ymax = pylab.axis()
+			ymin, ymax = pylab.ylim()
 			pylab.axis((bins_Dates[0], bins_Dates[-1], ymin, ymax))
 
 		pylab.xlabel("Time (%s)" % ddate_spec)
@@ -2003,7 +2007,7 @@ class EQCatalog:
 
 		if fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
-			default_dpi = pylab.rcParams['figure.dpi']
+			#default_dpi = pylab.rcParams['figure.dpi']
 			if fig_width:
 				fig_width /= 2.54
 				dpi = dpi * (fig_width / default_figsize[0])
@@ -2145,7 +2149,7 @@ class EQCatalog:
 		:return:
 			Tuple (mean, daily mean, nightly mean)
 		"""
-		bins_N, bins_Hr = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
+		bins_N, _ = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		mean = np.mean(bins_N)
 		mean_day = np.mean(bins_N[day[0]:day[1]])
 		mean_night = np.mean(np.concatenate([bins_N[:day[0]], bins_N[day[1]:]]))
@@ -2172,7 +2176,7 @@ class EQCatalog:
 		"""
 		bins_N, bins_Hr = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		pylab.bar(bins_Hr, bins_N)
-		xmin, xmax, ymin, ymax = pylab.axis()
+		ymin, ymax = pylab.ylim()
 		pylab.axis((0, 24, ymin, ymax))
 		pylab.xlabel("Hour of day", fontsize='x-large')
 		pylab.ylabel("Number of events", fontsize='x-large')
@@ -2306,7 +2310,7 @@ class EQCatalog:
 			ax.barh(bins_depth, bins_n, height=bin_width, left=left, color=color, label=label)
 			left += bins_n
 
-		xmin, xmax, ymin, ymax = ax.axis()
+		xmin, xmax = ax.xlim()
 		ax.axis((xmin, xmax, min_depth, max_depth))
 		ax.set_ylabel("Depth (km)", fontsize='x-large')
 		xlabel = "Number of events"
@@ -2330,7 +2334,7 @@ class EQCatalog:
 			return
 		elif fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
-			default_dpi = pylab.rcParams['figure.dpi']
+			#default_dpi = pylab.rcParams['figure.dpi']
 			if fig_width:
 				fig_width /= 2.54
 				dpi = dpi * (fig_width / default_figsize[0])
@@ -2386,7 +2390,7 @@ class EQCatalog:
 		except:
 			## This happens when all bins_M0 values are zero
 			pass
-		xmin, xmax, ymin, ymax = pylab.axis()
+		xmin, xmax = pylab.xlim()
 		pylab.axis((xmin, xmax, min_depth, max_depth))
 		pylab.ylabel("Depth (km)", fontsize='x-large')
 		pylab.xlabel("Summed seismic moment (N.m)", fontsize='x-large')
@@ -2408,7 +2412,7 @@ class EQCatalog:
 
 		if fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
-			default_dpi = pylab.rcParams['figure.dpi']
+			#default_dpi = pylab.rcParams['figure.dpi']
 			if fig_width:
 				fig_width /= 2.54
 				dpi = dpi * (fig_width / default_figsize[0])
@@ -2503,7 +2507,7 @@ class EQCatalog:
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], edge_widths=[edge_width], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, sm_label_colname=sm_label_colname, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, weighted=False, verbose=False):
+	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, weighted=False, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
 
@@ -2523,7 +2527,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (default: None)
 			This parameter is currently ignored.
@@ -2541,9 +2545,11 @@ class EQCatalog:
 			- stda: standard deviation on a value
 			- stdb: standard deviation on b value
 		"""
+		from hazard.rshalib.mfd import get_a_separation
 		from .calcGR import calcGR_LSQ
+
 		if weighted:
-			bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+			bins_N, _ = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
 			weights = bins_N
 		else:
 			weights = None
@@ -2555,10 +2561,10 @@ class EQCatalog:
 
 		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, weights=weights, verbose=verbose)
 		if not cumul:
-			a += mfd.get_a_separation(b, dM)
+			a += get_a_separation(b, dM)
 		return a, b, stda, stdb
 
-	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, verbose=False):
+	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, verbose=False):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using original
 		maximum likelihood estimation by Aki (1965)
@@ -2576,7 +2582,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (ignored)
 		:param verbose:
@@ -2590,7 +2596,7 @@ class EQCatalog:
 		"""
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
 
-	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, verbose=True):
+	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, verbose=True):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
 		for variable observation periods for different magnitude increments.
@@ -2610,7 +2616,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (default: None)
 		:param verbose:
@@ -2728,7 +2734,7 @@ class EQCatalog:
 
 	#TODO: averaged Weichert method (Felzer, 2007)
 
-	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, verbose=True):
+	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, verbose=True):
 		"""
 		Compute a and b values of Gutenberg Richter relation, and return
 		as TruncatedGRMFD object.
@@ -2749,7 +2755,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation
 			Currently only supported by Weichert method (default: None)
@@ -2776,7 +2782,7 @@ class EQCatalog:
 		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose, **kwargs)
 		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
 
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation="default", completeness=default_completeness, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
+	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
 		"""
 		Compute GR MFD from observed MFD, and plot result
 
@@ -2796,7 +2802,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 		:param b_val:
 			Float, fixed b value to constrain Weichert estimation (default: None)
 		:param num_sigma:
@@ -2925,7 +2931,7 @@ class EQCatalog:
 				date = eq.date.date
 			time = eq.time.isoformat()
 			if eq.name != None:
-				if isinstance(eq_name, bytes):
+				if isinstance(eq.name, bytes):
 					eq_name = eq.name.encode('ascii', 'ignore')
 			else:
 				eq_name = ""
@@ -3162,8 +3168,6 @@ class EQCatalog:
 		:param filespec:
 			String, full path to output file
 		"""
-		from .HY4 import HYPDAT
-
 		ofd = open(filespec, "wb")
 		for eq in self:
 			hyp = eq.to_HY4()
@@ -3197,7 +3201,7 @@ class EQCatalog:
 			table_name = os.path.splitext(os.path.split(sqlite_filespec)[1])[0]
 
 		if len(self):
-			db = simpledb.SQLiteDB(sqlite_file)
+			db = simpledb.SQLiteDB(sqlite_filespec)
 			if table_name in db.list_tables():
 				db.drop_table(table_name)
 			eq = self.eq_list[-1]
@@ -3324,7 +3328,7 @@ class EQCatalog:
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		import osr, ogr
+		from osgeo import ogr
 
 		if isinstance(poly_obj, ogr.Geometry):
 			## Construct WGS84 projection system corresponding to earthquake coordinates
@@ -3643,7 +3647,7 @@ class EQCatalog:
 				plt.plot(bins_Years, m*bins_Years+c, color='k', linestyle='--', linewidth=5)
 		minorLocator = MultipleLocator(dYear)
 		plt.gca().xaxis.set_minor_locator(minorLocator)
-		xmin, xmax, ymin, ymax = plt.axis()
+		ymin, ymax = plt.ylim()
 		if year1:
 			plt.vlines(year1, ymin, ymax, colors='r', linestyles='-', linewidth=5)
 		if year2:
@@ -3658,7 +3662,7 @@ class EQCatalog:
 		plt.grid()
 		if fig_filespec:
 			default_figsize = pylab.rcParams['figure.figsize']
-			default_dpi = pylab.rcParams['figure.dpi']
+			#default_dpi = pylab.rcParams['figure.dpi']
 			if fig_width:
 				fig_width /= 2.54
 				dpi = dpi * (fig_width / default_figsize[0])
@@ -3788,7 +3792,7 @@ class EQCatalog:
 		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
 		return Mmax, Mmax_sigma
 
-	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation="default", completeness=default_completeness):
+	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS):
 		"""
 		Analyse magnitude-frequency.
 		This method is a wrapper for meth:`recurrence_analysis` in the
@@ -3811,7 +3815,7 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` (default: Completeness_MW_201303a)
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
 
 		:return:
 			Tuple (a, b, stdb)
@@ -3914,7 +3918,7 @@ class EQCatalog:
 		return catalogue
 
 
-	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation="default", completeness=default_completeness):
+	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation="default", completeness=DEFAULT_COMPLETENESS):
 		"""
 		"""
 		from hmtk.seismicity.smoothing.smoothed_seismicity import SmoothedSeismicity
@@ -3925,8 +3929,9 @@ class EQCatalog:
 		config = {'Length_limit': 50., 'BandWidth': 25., 'increment': True}
 		completeness_table = completeness.to_hmtk_table()
 		data = smoothed_seismicity.run_analysis(catalogue=catalogue, config=config, completeness_table=completeness_table, smoothing_kernel=None, end_year=None)
+		return data
 
-	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation="default", completeness=default_completeness, title=None, fig_filespec=None, verbose=True):
+	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation="default", completeness=DEFAULT_COMPLETENESS, title=None, fig_filespec=None, verbose=True):
 		"""
 		Plot catalog distribution versus Poisson distribution
 		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
@@ -3959,7 +3964,7 @@ class EQCatalog:
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: Completeness_MW_201303a)
+			catalog (default: DEFAULT_COMPLETENESS)
 		:param title:
 			String, plot title. (None = default title, "" = no title)
 			(default: None)
@@ -4017,7 +4022,7 @@ class EQCatalog:
 		pylab.xlabel("Number of events per interval", fontsize="x-large")
 		pylab.ylabel("Number of intervals", fontsize="x-large")
 		pylab.legend()
-		xmin, xmax, ymin, ymax = pylab.axis()
+		ymin, ymax = pylab.ylim()
 		pylab.axis((-0.5, nmax, ymin, ymax))
 
 		ax = pylab.gca()
@@ -4799,7 +4804,6 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 	:return:
 		instance of :class:`LayeredBasemap`
 	"""
-	from .source_models import rob_source_models_dict
 	import mapping.layeredbasemap as lbm
 
 	layers = []
@@ -4842,6 +4846,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 
 	## Source model
 	if source_model:
+		from .source_models import rob_source_models_dict
 		try:
 			gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
 		except:
@@ -5176,6 +5181,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 
 	## Source model
 	if source_model:
+		from .source_models import rob_source_models_dict
 		try:
 			rob_source_models_dict[source_model_name]["gis_filespec"]
 		except:
@@ -5283,7 +5289,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 	#plt.tight_layout()
 	if fig_filespec:
 		default_figsize = pylab.rcParams['figure.figsize']
-		default_dpi = pylab.rcParams['figure.dpi']
+		#default_dpi = pylab.rcParams['figure.dpi']
 		if fig_width:
 			fig_width /= 2.54
 			dpi = dpi * (fig_width / default_figsize[0])
@@ -5611,7 +5617,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 			maj_loc = maj_loc(**maj_loc_kwargs)
 			ax.xaxis.set_major_locator(maj_loc)
 			if tick_form:
-				maj_fmt = DateFormatter(tick_form)
+				maj_fmt = mdates.DateFormatter(tick_form)
 			else:
 				maj_fmt = mdates.AutoDateFormatter(maj_loc)
 			ax.xaxis.set_major_formatter(maj_fmt)
@@ -5683,7 +5689,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 	elif fig_filespec:
 		plt.tight_layout()
 		default_figsize = plt.rcParams['figure.figsize']
-		default_dpi = plt.rcParams['figure.dpi']
+		#default_dpi = plt.rcParams['figure.dpi']
 		if fig_width:
 			fig_width /= 2.54
 			dpi = dpi * (fig_width / default_figsize[0])
@@ -5775,7 +5781,7 @@ def plot_depth_statistics(
 		return
 	elif fig_filespec:
 		default_figsize = pylab.rcParams['figure.figsize']
-		default_dpi = pylab.rcParams['figure.dpi']
+		#default_dpi = pylab.rcParams['figure.dpi']
 		if fig_width:
 			fig_width /= 2.54
 			dpi = dpi * (fig_width / default_figsize[0])
@@ -5908,6 +5914,9 @@ def read_zonesMI(tabname):
 		dictionary of shapely polygons
 	"""
 	import mapping.MIPython as MI
+	# TODO: this import doesn't always work!
+	from thirdparty.recipes.dummyclass import DummyClass
+
 	app = MI.Application(maximize=False)
 	coordsys = app.GetCurrentCoordsys()
 	app.SetCoordsys(MI.Coordsys(1,0))
@@ -5952,7 +5961,9 @@ def read_zonesTXT(filespec, fixed_depth=None):
 ### The following functions are obsolete or have moved to other modules
 
 def format_zones_CRISIS(zone_model, Mc=3.5, smooth=False, fixed_depth=None):
+	from hazard.rshalib.mfd import alphabetalambda
 	import mapping.MIPython as MI
+
 	app = MI.Application(maximize=False)
 	coordsys = app.GetCurrentCoordsys()
 	app.SetCoordsys(MI.Coordsys(1,0))
@@ -6088,8 +6099,8 @@ if __name__ == "__main__":
 	Mmin = 0.0
 	Mmax = 7.0
 	dM = 0.2
-	completeness = Completeness_Rosset
-	Mtype = "MS"
+	completeness = DEFAULT_COMPLETENESS
+	Mtype = "MW"
 	Mrange = (1.5, 7.0)
 	Freq_range = (1E-4, 10**1.25)
 	Mc = 3.5
