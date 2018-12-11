@@ -126,7 +126,6 @@ gis_filespec = os.path.join(ROB_directory, 'TwoZone_v2.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
-	'area': 'Area',
 	'tectonic_region_type':'SHARE_TRT',
 	'a_val': 'aMLE',
 	'b_val': 'bMLE',
