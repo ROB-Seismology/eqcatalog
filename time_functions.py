@@ -104,6 +104,8 @@ def parse_isoformat_datetime(isodatetime):
 		return datetime.datetime.strptime(isodatetime, '%Y-%m-%dT%H:%M:%S')
 	except ValueError:
 		pass
+
+	import re
 	pat = r'(.*?[+-]\d{2}):(\d{2})'
 	temp = re.sub(pat, r'\1\2', isodatetime)
 	return datetime.datetime.strptime(temp, '%Y-%m-%dT%H:%M:%S.%f%z')
