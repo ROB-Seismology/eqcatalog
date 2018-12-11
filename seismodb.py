@@ -495,16 +495,23 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
-		import eqmapperdb_secrets
-		db = MySQLdb.connect(host=eqmapperdb_secrets.host, user=eqmapperdb_secrets.user,
-				passwd=eqmapperdb_secrets.passwd, db=eqmapperdb_secrets.database)
-		c = db.cursor()
-		query = 'SELECT id_com_main,'
+		from eqmapperdb_secrets import (host as _host, user as _user,
+									passwd as _passwd, database as _database)
+
+		query = 'SELECT id_com_main as "id_com",'
+		query += ' Longitude as "longitude", Latitude as "latitude",'
+		query += ' id as "id_db",'
 		if Imax:
 			query += ' Imax'
 		else:
 			query += ' Imin'
+		query += ' as "Intensity"'
 		query += ' from Macro18280223 Where country = "BE"'
+
+		if errf !=None:
+			errf.write("Querying Macro18280223 table on eqmapperdb:\n")
+
+		macro_recs = query_mysql_db_generic(_database, _host, _user, _passwd, query)
 
 	else:
 		## Construct SQL query
@@ -541,16 +548,18 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		having_clause = 'Intensity >= %d' % min_val
 		order_clause = ''
 
-	if errf !=None:
-		errf.write("Querying KSB-ORB official macroseismic catalog:\n")
+		if errf !=None:
+			errf.write("Querying KSB-ORB official macroseismic catalog:\n")
+
+		macro_recs = query_seismodb_table(table_clause, column_clause=column_clause,
+					join_clause=join_clause, where_clause=where_clause,
+					having_clause=having_clause, order_clause=order_clause,
+					group_clause=group_clause, verbose=verbose, errf=errf)
 
 	## Fetch records
 	macro_info = {}
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
-	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
-					join_clause=join_clause, where_clause=where_clause,
-					having_clause=having_clause, order_clause=order_clause,
-					group_clause=group_clause, verbose=verbose, errf=errf):
+	for rec in macro_recs:
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
@@ -563,69 +572,6 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 											lon=lon, lat=lat, db_ids=db_ids)
 
 	return macro_info
-
-	"""
-	from seismodb_secrets import host, user, passwd, database
-	port = 3306
-	lonlat = True
-
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port)
-	c = db.cursor()
-	if group_by_main_village == False:
-		query = 'SELECT macro_detail.id_com,'
-		if Imax:
-			query += ' macro_detail.intensity_max as "Intensity"'
-		else:
-			query += ' macro_detail.intensity_min as "Intensity"'
-		if lonlat:
-			query += ' , communes.longitude, communes.latitude'
-		query += ' from macro_detail'
-		if lonlat:
-			query += ', communes'
-		query +=' Where macro_detail.id_earth = %d' % id_earth
-		query += ' and macro_detail.fiability != 0'
-		if lonlat:
-			query += ' and macro_detail.id_com = communes.id'
-		query += ' HAVING Intensity >= %d' % min_val
-		query += ' Order By Intensity asc'
-	else:
-		agg_function = AGG_FUNC_DICT[agg_function.lower()]
-		query = 'SELECT communes.id_main,'
-		if Imax:
-			query += ' %s(macro_detail.intensity_max) as "Intensity"' % agg_function
-		else:
-			query += ' %s(macro_detail.intensity_min) as "Intensity"' % agg_function
-		if lonlat:
-			query += ' , communes.longitude, communes.latitude'
-		query += ' from macro_detail, communes'
-		query += ' Where macro_detail.id_earth = %d' % id_earth
-		query += ' and macro_detail.fiability != 0'
-		query += ' and macro_detail.id_com = communes.id'
-		query += ' GROUP BY communes.id_main'
-		query += ' HAVING Intensity >= %d' % min_val
-		query += ' Order By Intensity asc'
-
-	if verbose:
-		print(query)
-	c.execute(query)
-
-	macro_info = {}
-	if lonlat:
-		for rec in c.fetchall():
-			id_com, I, lon, lat = rec
-			try:
-				macro_info[id_com] = (float(lon), float(lat), I)
-			except TypeError:
-				if errf != None:
-					errf.write("Record without geographic coordinates!")
-					errf.flush()
-	else:
-		for rec in c.fetchall():
-			id_com, I = rec
-			macro_info[id_com] = I
-
-	return macro_info
-	"""
 
 
 def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
@@ -710,6 +656,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	if query_info.lower() in ("cii", "cdi", "mi"):
 		having_clause += ' and Intensity >= %d' % min_val
 
+	## Not really useful, as we return a dict...
 	order_clause = 'num_replies DESC'
 
 	if errf !=None:
@@ -732,92 +679,6 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 										lon=lon, lat=lat, db_ids=web_ids)
 
 	return macro_info
-
-	"""
-	macro_info = []
-
-	db = MySQLdb.connect(host=host, user=user, passwd=passwd, db=database, port=port)
-	c = db.cursor()
-	if group_by_main_village == False:
-		query = 'SELECT web_analyse.id_com, COUNT(*) as "Num_Replies"'
-		if query_info == "manual_intensity":
-			query += ', AVG(web_analyse.MI) as "Intensity"'
-		else:
-			query += ', AVG(web_analyse.CII) as "Intensity"'
-		if lonlat:
-			query += ' , communes.longitude, communes.latitude'
-		query += ' from web_analyse'
-		if lonlat:
-			query += ', communes'
-		query += ' Where web_analyse.id_earth = %d' % id_earth
-		query += ' and web_analyse.m_fiability > %.1f' % float(min_fiability)
-		query += ' and web_analyse.deleted = false'
-		if lonlat:
-			query += ' and web_analyse.id_com = communes.id'
-		query += ' GROUP BY web_analyse.id_com'
-		query += ' HAVING Num_Replies >= %d' % min_replies
-		if query_info.lower() in ("cii", "manual_intensity"):
-			query += ' and Intensity >= %d' % min_val
-		if sort_key.lower() in ("intensity", "cii", "manual_intensity"):
-			query += ' Order By Intensity %s, Num_Replies desc' % sort_order
-		elif sort_key.lower() == "num_replies":
-			query += ' Order By Num_Replies %s, Intensity asc' % sort_order
-		elif sort_key.lower() == "id_com":
-			query += ' Order By web_analyse.id_com %s' % sort_order
-	else:
-		#agg_function = AGG_FUNC_DICT[agg_function.lower()]
-		query = 'SELECT communes.id_main, COUNT(*) as "Num_Replies"'
-		if query_info == "manual_intensity":
-			query += ', AVG(web_analyse.MI) as "Intensity"'
-		else:
-			query += ', AVG(web_analyse.CII) as "Intensity"'
-		if lonlat:
-			query += ' , communes.longitude, communes.latitude'
-		query += ' from web_analyse, communes'
-		query += ' Where web_analyse.id_earth = %d' % id_earth
-		query += ' and web_analyse.m_fiability >= %.1f' % float(min_fiability)
-		query += ' and web_analyse.deleted = false'
-		query += ' and web_analyse.id_com = communes.id'
-		query += ' GROUP BY communes.id_main'
-		query += ' HAVING Num_Replies >= %d' % min_replies
-		if query_info.lower() in ("cii", "manual_intensity"):
-			query += ' and Intensity >= %d' % min_val
-		if sort_key.lower() in ("intensity", "cii", "manual_intensity"):
-			query += ' Order By Intensity %s, Num_Replies desc' % sort_order
-		elif sort_key.lower() == "num_replies":
-			query += ' Order By Num_Replies %s, Intensity asc' % sort_order
-		elif sort_key.lower() == "id_com":
-			query += ' Order By web_analyse.id_com %s' % sort_order
-
-	if errf !=None:
-		errf.write("%s\n" % query)
-		errf.flush()
-	elif verbose:
-		print(query)
-
-	c.execute(query)
-	if lonlat:
-		for rec in c.fetchall():
-			id_com, num_replies, I, lon, lat = rec
-			try:
-				lon, lat = float(lon), float(lat)
-			except TypeError:
-				lon, lat = 0.0, 0.0
-				if errf != None:
-					errf.write("Record without geographic coordinates!")
-					errf.flush()
-			I = int(round(I))
-
-			macro_info.append(MacroseismicRecord(id_com, I, num_replies, lon, lat))
-
-	else:
-		for rec in c.fetchall():
-			id_com, num_replies, I = rec
-
-			macro_info.append(MacroseismicRecord(id_com, I, num_replies))
-
-	return macro_info
-	"""
 
 
 def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None,
