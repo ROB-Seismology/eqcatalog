@@ -171,6 +171,9 @@ class MacroseismicInfo():
 		return ensemble
 
 
+## Disable no-member errors for MacroseismicEnquiryEnsemble
+# pylint: disable=no-member
+
 class MacroseismicEnquiryEnsemble():
 	"""
 	Class representing ensemble (or aggregate) of macroseismic enquiries
@@ -736,7 +739,7 @@ class MacroseismicEnquiryEnsemble():
 					column_clause=column_clause, where_clause=where_clause)
 		db_rec_dict = {rec['id_web']: rec for rec in db_recs}
 		for rec in self.recs:
-			db_rec = comm_recs.get(key)
+			db_rec = db_rec_dict.get('id_web')
 			if db_rec:
 				rec['longitude'] = db_rec['longitude']
 				rec['latitude'] = db_rec['latitude']
@@ -1789,7 +1792,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		all_streets = self.get_prop_values('street')
 		all_zips = self.get_prop_values('zip')
-		all_communes = self.get_prop_values('city')
+		#all_communes = self.get_prop_values('city')
 		unique_streets = []
 		unique_idxs = []
 		duplicate_idxs = {}
