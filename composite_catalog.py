@@ -9,7 +9,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import numpy as np
-from .completeness import default_completeness
+from .completeness import DEFAULT_COMPLETENESS
 from .eqcatalog import EQCatalog, read_source_model
 
 
@@ -49,7 +49,7 @@ class CompositeEQCatalog:
 	# TODO: modify to make it work with master and zone MFD's without catalogs
 	# TODO: modify to make sure parameters for _get_zone_Mmaxes are consistent
 	def __init__(self, zone_catalogs, source_model_name, Mtype="MW", Mrelation=None,
-				completeness=default_completeness, min_mag=4.0, mfd_bin_width=0.1,
+				completeness=DEFAULT_COMPLETENESS, min_mag=4.0, mfd_bin_width=0.1,
 				master_MFD=None, zone_MFDs=[]):
 		self.zone_catalogs = zone_catalogs
 		self.source_model_name = source_model_name
@@ -206,7 +206,7 @@ class CompositeEQCatalog:
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
-		for zone_id, zone_catalog in self.zone_catalogs.items():
+		for zone_id in self.zone_catalogs.keys():
 			zone_Mmax = zone_Mmaxes[zone_id]
 			zone_area = zone_areas[zone_id]
 			zone_MFD = mfd.TruncatedGRMFD.construct_FentonEtAl2006MFD(self.min_mag,
@@ -237,7 +237,7 @@ class CompositeEQCatalog:
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
 		zone_areas = self._get_zone_areas()
 		zone_MFDs = dict.fromkeys(self.zone_catalogs.keys())
-		for zone_id, zone_catalog in self.zone_catalogs.items():
+		for zone_id in self.zone_catalogs.keys():
 			zone_Mmax = zone_Mmaxes[zone_id]
 			zone_area = zone_areas[zone_id]
 			zone_MFD = mfd.TruncatedGRMFD.construct_Johnston1994MFD(self.min_mag,
@@ -430,11 +430,8 @@ class CompositeEQCatalog:
 		import scipy.stats
 		import hazard.rshalib.mfd.mfd as mfd
 
-		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
-
 		## Determine Mmax of each zone catalog, and overall Mmax
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
-		overall_Mmax = max(zone_Mmaxes.values())
 		if max_test_mag is None:
 			if use_master:
 				max_test_mag = min(zone_Mmaxes.values()) - self.mfd_bin_width
@@ -472,6 +469,7 @@ class CompositeEQCatalog:
 			zone_MFDs = self.zone_MFDs
 
 		## Monte Carlo sampling
+		zone_catalogs = self.zone_catalogs
 		MFD_container = dict.fromkeys(zone_catalogs.keys())
 		num_passed, num_rejected, num_failed = 0, 0, 0
 		num_iterations = 0
@@ -567,11 +565,8 @@ class CompositeEQCatalog:
 		import scipy.stats
 		import hazard.rshalib.mfd.mfd as mfd
 
-		master_catalog, zone_catalogs = self.master_catalog, self.zone_catalogs
-
 		## Determine Mmax of each zone catalog, and overall Mmax
 		zone_Mmaxes = self._get_zone_Mmaxes(prior_model_category="CEUS", use_posterior=True)
-		overall_Mmax = max(zone_Mmaxes.values())
 		if max_test_mag is None:
 			if use_master:
 				max_test_mag = min(zone_Mmaxes.values()) - self.mfd_bin_width
@@ -602,6 +597,7 @@ class CompositeEQCatalog:
 
 		## Monte Carlo sampling
 		np.random.seed(seed=random_seed)
+		zone_catalogs = self.zone_catalogs
 		MFD_container = dict.fromkeys(zone_catalogs.keys())
 		num_passed, num_rejected, num_failed = 0, 0, 0
 		num_iterations = 0
