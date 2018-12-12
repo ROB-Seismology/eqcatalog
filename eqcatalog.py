@@ -57,6 +57,7 @@ import mx.DateTime as mxDateTime
 
 
 # TODO: Move ROB-specific code to separate submodule
+# TODO: re-implement interface with (Hazard) Modelers' Toolkit
 
 ## Directories with MapInfo tables for named catalogs
 if platform.uname()[0] == "Windows":
