@@ -91,9 +91,10 @@ if not reloading:
 	eqcatalog = importlib.import_module('.eqcatalog', package=__name__)
 else:
 	reload(eqcatalog)
-from .eqcatalog import (EQCatalog, read_catalogSQL, read_catalogGIS,
-	concatenate_catalogs, read_named_catalog, read_catalogTXT, plot_catalogs_map,
-	get_catalogs_map, plot_catalogs_magnitude_time, plot_depth_statistics)
+from .eqcatalog import (EQCatalog, read_catalogSQL, read_catalog_sql,
+	read_catalog_gis, read_catalog_csv, read_named_catalog, plot_catalogs_map,
+	concatenate_catalogs, get_catalogs_map, plot_catalogs_magnitude_time,
+	plot_depth_statistics)
 
 ## composite_catalog (depends on completeness, eqcatalog)
 if not reloading:
