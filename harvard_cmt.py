@@ -237,6 +237,8 @@ class HarvardCMTRecord:
 		self.dip2 = cnv_coltype('dip2', dip2)
 		self.rake2 = cnv_coltype('rake2', rake2)
 
+	# TODO: get absolute centroid_date_time
+
 	@property
 	def hypo_date(self):
 		return self.hypo_date_time.date()
