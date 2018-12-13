@@ -29,7 +29,6 @@ except:
 
 
 ## Import standard python modules
-import csv
 import os
 import sys
 import platform
@@ -183,6 +182,7 @@ class EQCatalog:
 		"""
 		Print list of earthquakes in catalog
 		"""
+		# TODO: detect and skip columns that are empty or have only NaN values
 		try:
 			from prettytable import PrettyTable
 		except:
@@ -2934,6 +2934,8 @@ class EQCatalog:
 			if eq.name != None:
 				if isinstance(eq.name, bytes):
 					eq_name = eq.name.encode('ascii', 'ignore')
+				else:
+					eq_name = eq.name
 			else:
 				eq_name = ""
 			if Mtype:
@@ -4093,9 +4095,6 @@ class EQCatalog:
 		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name)
 
 
-EQCollection = EQCatalog
-
-
 def concatenate_catalogs(catalog_list, name=""):
 	"""
 	Concatenate different catalogs into one new catalog
@@ -4198,6 +4197,307 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 					max_depth=max_depth, id_earth=id_earth, sort_key=sort_key,
 					sort_order=sort_order, event_type=event_type,
 					convert_NULL=convert_NULL, verbose=verbose, errf=errf)
+
+
+def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
+					date_sep='-', time_sep=':', date_order='YMD',
+					ignore_errors=False, verbose=True):
+	"""
+	Read catalog from SQL database
+
+	:param sqldb:
+		instance of :class:`db.simpledb.SQLDB`
+	:param tab_name:
+		str, name of database table containing catalog
+		Will be ignored if :param:`query` is not empty (but is still
+		useful as it will be used as catalog name)
+	:param query:
+		str, generic query string
+		(default: '')
+	:param column_map:
+		dict, mapping property names of :class:`LocalEarthquake` to
+		database column names.
+		(default: {})
+	:param ID_prefix:
+		str, prefix to add to earthquake IDs
+		(default: '')
+	:param date_sep:
+		str, character separating date elements
+		(default: '-')
+	:param time_sep:
+		str, character separating time elements
+		(default: ':'
+	:param date_order:
+		str, order of year (Y), month (M), day (D) in date string
+		(default: 'YMD')
+	:param ignore_errors:
+		bool, whether or not records that cannot be parsed should be
+		silently ignored
+		(default: False, will raise exception)
+	:param verbose:
+		bool, whether or not to print information while reading file
+		(default: True)
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	if verbose:
+		print("Reading catalog from SQL database table %s" % tab_name)
+
+	if not query:
+		query = 'SELECT * FROM %s' % tab_name
+
+	eq_list = []
+	num_skipped = 0
+	for r, rec in enumerate(sql_db.query_generic(query)):
+		rec = rec.to_dict()
+		## If no ID is present, use record number
+		ID_key = column_map.get('ID', 'ID')
+		rec[ID_key] = ID_prefix + str(rec.get(ID_key, r))
+
+		try:
+			eq = LocalEarthquake.from_dict_rec(rec, column_map=column_map,
+				date_sep=date_sep, time_sep=time_sep, date_order=date_order)
+		except:
+			if not ignore_errors:
+				raise
+			else:
+				num_skipped += 1
+		else:
+			eq_list.append(eq)
+
+	catalog = EQCatalog(eq_list, name=tab_name)
+	if verbose and num_skipped:
+		print("  Skipped %d records" % num_skipped)
+	return(catalog)
+
+
+def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
+					date_sep='-', time_sep=':', date_order='YMD',
+					comment_char='#', ignore_chars=[], ignore_errors=False,
+					verbose=False, **fmtparams):
+	"""
+	Read earthquake catalog from CSV file with columns defining
+	earthquake properties: ID, datetime or (date or (year, month, day))
+	and (time or (hours, minutes, seconds)), lon, lat, depth, name,
+	zone, (Mtype and Mag) or (ML and/or MS and/or MW), intensity_max,
+	macro_radius, errh, errz, errt, errM.
+
+	Property names can be specified in a (single) header line.
+	If no header line is present, :param:`column_map` should map
+	standard earthquake property names to column numbers.
+	If header line is present, but property names do not correspond
+	to standard names, a column map should provide mapping between
+	standard property names and column names in header.
+
+	Most properties are optional.
+	For the date, at least the year must be given. If month or day
+	are not given or zero, they will be silently set to 1
+	Empty magnitudes are set to NaN,
+	all other empty properties are set to 0 or ''.
+
+	:param csv_filespec:
+		str, full path to CSV file containing earthquake records
+	:param column_map:
+		dict, mapping property names of :class:`LocalEarthquake` to
+		column names in header or to column numbers (zero-based) if no
+		header is present.
+		(default: {})
+	:param has_header:
+		bool, whether or not header line with column names is present.
+		If None, presence of a header will be auto-detected
+		(default: None)
+	:param ID_prefix:
+		str, prefix to add to earthquake IDs
+		(default: '')
+	:param date_sep:
+		str, character separating date elements
+		(default: '-')
+	:param time_sep:
+		str, character separating time elements
+		(default: ':'
+	:param date_order:
+		str, order of year (Y), month (M), day (D) in date string
+		(default: 'YMD')
+	:param comment_char:
+		char, character used to denote comments. All text following
+		this character will be ignored
+		(default: '#')
+	:param ignore_chars:
+		string containing characters or list containing strings that may
+		sometimes be present in a column and should be ignored
+		(e.g., '*')
+		(default: [])
+	:param ignore_errors:
+		bool, whether or not records that cannot be parsed should be
+		silently ignored
+		(default: False, will raise exception)
+	:param verbose:
+		bool, whether or not to print information while reading file
+		(default: True)
+	:param **fmtparams:
+		kwargs for csv reader (e.g. "delimiter", "quotechar",
+		"doublequote", "escapechar")
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	import csv
+
+	## python CSV module has no mechanism to skip comments
+	def decomment(csv_fp, comment_char):
+		for row in csv_fp:
+			raw = row.split(comment_char)[0].strip()
+			if raw:
+				yield raw
+
+	if verbose:
+		print("Reading CSV earthquake catalog from %s" % csv_filespec)
+
+	with open(csv_filespec, "r") as fp:
+		## Auto-detect header containing column names
+		if has_header is None:
+			sniffer = csv.Sniffer()
+			has_header = sniffer.has_header(fp.read(1024))
+			fp.seek(0)
+
+		if not has_header:
+			## If there is no header, column_map should map standard
+			## LocalEarthquake property names to integer column numbers
+			assert column_map and isinstance(column_map.values()[0], int)
+			cm2 = {val:key for key,val in column_map.items()}
+			fieldnames = [cm2.get(k) for k in range(min(cm2.keys()), max(cm2.keys())+1)]
+			column_map = {}
+		else:
+			fieldnames = None
+
+		eq_list = []
+		num_skipped = 0
+		reader = csv.DictReader(decomment(fp, comment_char),
+								fieldnames=fieldnames, **fmtparams)
+		for r, row in enumerate(reader):
+			## If column_map is still empty, infer it from keys of 1st row
+			if r == 0 and not column_map:
+				for col_name in row.keys():
+					if col_name in ('ID', 'ML', 'MS', 'MW', 'Mtype'):
+						column_map[col_name] = col_name
+					else:
+						if col_name is not None:
+							column_map[col_name.lower()] = col_name
+
+			## Remove ignore_chars from record values
+			for ic in ignore_chars:
+				for key, val in row.items():
+					row[key] = val.replace(ic, '')
+
+			## If no ID is present, use record number
+			ID_key = column_map.get('ID', 'ID')
+			row[ID_key] = ID_prefix + row.get(ID_key, r)
+
+			try:
+				eq = LocalEarthquake.from_dict_rec(row, column_map=column_map,
+					date_sep=date_sep, time_sep=time_sep, date_order=date_order)
+			except:
+				if not ignore_errors:
+					raise
+				else:
+					num_skipped += 1
+			else:
+				eq_list.append(eq)
+
+	name = os.path.split(csv_filespec)[-1]
+	catalog = EQCatalog(eq_list, name=name)
+	if verbose and num_skipped:
+		print("  Skipped %d records" % num_skipped)
+	return(catalog)
+
+
+def read_catalog_gis(gis_filespec, column_map={}, ID_prefix='',
+					date_sep='-', time_sep=':', date_order='YMD',
+					ignore_chars=[], ignore_errors=False, verbose=False):
+	"""
+	Read catalog from GIS file
+
+	:param gis_filespec:
+		str, full path to GIS file containing earthquake records
+	:param column_map:
+		dict, mapping property names of :class:`LocalEarthquake` to
+		GIS record attributes.
+		If 'lon' or 'lat' are not specified, they will be derived from
+		the geographic object.
+		(default: {})
+	:param ID_prefix:
+		str, prefix to add to earthquake IDs
+		(default: '')
+	:param date_sep:
+		str, character separating date elements
+		(default: '-')
+	:param time_sep:
+		str, character separating time elements
+		(default: ':'
+	:param date_order:
+		str, order of year (Y), month (M), day (D) in date string
+		(default: 'YMD')
+	:param ignore_chars:
+		string containing characters or list containing strings that may
+		sometimes be present in a column and should be ignored
+		(e.g., '*')
+		(default: [])
+	:param ignore_errors:
+		bool, whether or not records that cannot be parsed should be
+		silently ignored
+		(default: False, will raise exception)
+	:param verbose:
+		bool, whether or not to print information while reading file
+		(default: True)
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	from mapping.geotools.read_gis import read_gis_file
+
+	if verbose:
+		print("Reading GIS earthquake catalog from %s" % gis_filespec)
+
+	eq_list = []
+	num_skipped = 0
+	data = read_gis_file(gis_filespec, verbose=verbose)
+	for r, rec in enumerate(data):
+		## Remove ignore_chars from record values
+		for ic in ignore_chars:
+			for key, val in rec.items():
+				if isinstance(val, basestring):
+					row[key] = val.replace(ic, '')
+
+		## If no ID is present, use record number
+		ID_key = column_map.get('ID', 'ID')
+		rec[ID_key] = ID_prefix + str(rec.get(ID_key, r))
+
+		## Get lon/lat from object if not present in GIS attributes
+		lon_key = column_map.get('lon', 'lon')
+		if not lon_key in rec:
+			rec[lon_key] = rec["obj"].GetX()
+
+		lat_key = column_map.get('lat', 'lat')
+		if not lat_key in rec:
+			rec[lat_key] = rec["obj"].GetY()
+
+		try:
+			eq = LocalEarthquake.from_dict_rec(rec, column_map=column_map,
+				date_sep=date_sep, time_sep=time_sep, date_order=date_order)
+		except:
+			if not ignore_errors:
+				raise
+			else:
+				num_skipped += 1
+		else:
+			eq_list.append(eq)
+
+	name = os.path.split(gis_filespec)[-1]
+	catalog = EQCatalog(eq_list, name=name)
+	if verbose and num_skipped:
+		print("  Skipped %d records" % num_skipped)
+	return(catalog)
 
 
 def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
@@ -4393,45 +4693,83 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 	Read a known catalog (corresponding files should be in standard location)
 
 	:param catalog_name:
-		Str, name of catalog ("SHEEC", "CENEC", "ISC-GEM", "CEUS-SCR", "BGS"):
+		str, name of catalog ("HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
+		"CEUS-SCR", "BGS")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
 	:param verbose:
-		Boolean, whether or not to print information while reading
+		bool, whether or not to print information while reading
 		GIS table (default: True)
 
 	:return:
 		instance of :class:`EQCatalog`
 	"""
+	# TODO: add ROB (but only with default parameters)?
+	if catalog_name.upper() in ("HARVARD_CMT", "HARVARD CMT"):
+		import db.simpledb as simpledb
+		from .harvard_cmt import ROOT_FOLDER
+		sql_file = os.path.join(ROOT_FOLDER, "SQLite", "HarvardCMT.sqlite")
+		#harvard_cmt = HarvardCMTCatalog(sql_file)
+		#return harvard_cmt.to_eq_catalog()
+		sqldb = simpledb.SQLiteDB(sql_file)
+		table_name = 'harvard_cmt'
+		query = ('SELECT *, ((2./3) * (exp + LOG10(moment)) - 10.73) '
+				'as "MW" FROM harvard_cmt')
+		column_map =  {'ID': 'ID', 'datetime': 'hypo_date_time',
+					'lon': 'hypo_lon', 'lat': 'hypo_lat', 'depth': 'hypo_depth',
+					'MS': 'ref_MS', 'MW': 'MW', 'name': 'location'}
+		return read_catalog_sql(sqldb, table_name, query=query, column_map=column_map)
+
+	date_sep = '/'
 	if catalog_name.upper() == "SHEEC":
 		gis_filespec = os.path.join(GIS_ROOT, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
-		column_map = {'lon': 'Lon', 'lat': 'Lat', 'year': 'Year', 'month': 'Mo', 'day': 'Da', 'hour': 'Ho', 'minute': 'Mi', 'second': 'Se', 'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
-		convert_zero_magnitudes = True
+		column_map = {'lon': 'Lon', 'lat': 'Lat',
+					'year': 'Year', 'month': 'Mo', 'day': 'Da',
+					'hour': 'Ho', 'minute': 'Mi', 'second': 'Se',
+					'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
+		#convert_zero_magnitudes = True
 	elif catalog_name.upper() == "CENEC":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "CENEC", "CENEC 2008.TAB")
-		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'Date', 'hour': 'hour', 'minute': 'minute', 'MW': 'Mw', 'depth': 'depth'}
-		convert_zero_magnitudes = True
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+									"CENEC", "CENEC 2008.TAB")
+		column_map = {'lon': 'lon', 'lat': 'lat',
+					'year': 'year', 'month': 'month', 'day': 'day',
+					'hour': 'hour', 'minute': 'minute',
+					'MW': 'Mw', 'depth': 'depth', 'intensity_max': 'Imax'}
+		#convert_zero_magnitudes = True
 	elif catalog_name.upper() == "ISC-GEM":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "ISC-GEM", "isc-gem-cat.TAB")
-		column_map = {'lon': 'lon', 'lat': 'lat', 'date': 'date', 'time': 'time', 'MW': 'mw', 'depth': 'depth', 'ID': 'eventid', 'errz': 'unc', 'errM': 'unc_2'}
-		convert_zero_magnitudes = True
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+									"ISC-GEM", "isc-gem-cat.TAB")
+		column_map = {'ID': 'eventid', 'lon': 'lon', 'lat': 'lat',
+					'date': 'date', 'time': 'time',
+					'MW': 'mw', 'depth': 'depth',
+					'errz': 'unc', 'errM': 'unc_2'}
+		#convert_zero_magnitudes = True
 	elif catalog_name.upper() == "CEUS-SCR":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
-		column_map = {'lon': 'Longitude', 'lat': 'Latitude', 'year': 'Year', 'month': 'Month', 'day': 'Day', 'hour': 'Hour', 'minute': 'Minute', 'second': 'Second', 'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
-		convert_zero_magnitudes = True
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+									"CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
+		column_map = {'lon': 'Longitude', 'lat': 'Latitude',
+					'year': 'Year', 'month': 'Month', 'day': 'Day',
+					'hour': 'Hour', 'minute': 'Minute', 'second': 'Second',
+					'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
+		#convert_zero_magnitudes = True
 	elif catalog_name.upper() == "BGS":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs", "BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
-		column_map = {'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR', 'hour': 'HR', 'minute': 'MN', 'second': 'SECS', 'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'ID': 'ID', 'name': 'LOCALITY', 'intensity_max': 'INT'}
-		convert_zero_magnitudes = True
+		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+									"BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
+		column_map = {'ID': 'ID', 'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR',
+					'hour': 'HR', 'minute': 'MN', 'second': 'SECS',
+					'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'name': 'LOCALITY',
+					'intensity_max': 'INT'}
+		#convert_zero_magnitudes = True
 	else:
 		raise Exception("Catalog not recognized: %s" % catalog_name)
 
 	if not os.path.exists(gis_filespec):
 		raise Exception("Catalog file not found: %s" % gis_filespec)
 	ID_prefix = catalog_name + "-"
-	eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months,
-						convert_zero_magnitudes=convert_zero_magnitudes, ID_prefix=ID_prefix, verbose=verbose)
+	#eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months,
+	#					convert_zero_magnitudes=convert_zero_magnitudes, ID_prefix=ID_prefix, verbose=verbose)
+	eqc = read_catalog_gis(gis_filespec, column_map, date_sep=date_sep, ID_prefix=ID_prefix, verbose=verbose)
 	eqc.name = catalog_name
 	return eqc
 
@@ -4481,6 +4819,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 	:returns:
 		instance of :class:`EQCatalog`
 	"""
+	import csv
 	from .time_functions import parse_isoformat_datetime
 
 	date_order = date_order.upper()
