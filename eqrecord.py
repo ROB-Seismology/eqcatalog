@@ -5,6 +5,13 @@ Classes corresponding to records in database
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+try:
+	## Python 2
+	basestring
+except:
+	## Python 3
+	basestring = str
+
 
 ## Make relative imports work in Python 3
 import importlib
@@ -223,6 +230,183 @@ class LocalEarthquake:
 					dct['mag'][key] = dct[key]
 					del dct[key]
 		return cls(**dct)
+
+	@classmethod
+	def from_dict_rec(cls, rec, column_map={}, date_sep='-', time_sep=':',
+					date_order='YMD'):
+		"""
+		Construct instance of :class:`LocalEarthquake` from a dict-like
+		record mapping earthquake property names to values. If keys
+		do not correspond to standard names, a column map should provide
+		mapping between standard property names and keys in record.
+
+		:param rec:
+			dict-like, earthquake record
+		:param column_map:
+			dict, mapping property names of :class:`LocalEarthquake` to
+			column names in header or to column numbers (zero-based) if no
+			header is present.
+			(default: {})
+		:param date_sep:
+			str, character separating date elements
+			(default: '-')
+		:param time_sep:
+			str, character separating time elements
+			(default: ':'
+		:param date_order:
+			str, order of year (Y), month (M), day (D) in date string
+			(default: 'YMD')
+
+		:return:
+			instance of :class:`LocalEarthquake`
+		"""
+		from .time_functions import parse_isoformat_datetime
+
+		## If key is not in column_map, we assume it has the default name
+		ID_key = column_map.get('ID', 'ID')
+		ID = rec.get(ID_key)
+
+		datetime_key = column_map.get('datetime', 'datetime')
+		if datetime_key in rec:
+			dt = rec[datetime_key]
+			if isinstance(dt, basestring):
+				## Note: this returns datetime, not mxDateTime !
+				dt = parse_isoformat_datetime(dt)
+			date = dt.date()
+			time = dt.time()
+
+		else:
+			date_key = column_map.get('date', 'date')
+			date = rec.get(date_key)
+			## Year must always be present
+			## Silently convert month/day to 1 if it is zero
+			if date:
+				if isinstance(date, basestring):
+					date_elements = [int(s) for s in date.split(date_sep)]
+					year = date_elements[date_order.index('Y')]
+					try:
+						month = max(1, date_elements[date_order.index('M')])
+					except IndexError:
+						month = 1
+					try:
+						day = max(1, date_elements[date_order.index('D')])
+					except:
+						day = 1
+				elif isinstance(date, datetime.date):
+					year, month, day = date.year, date.month, datey.day
+			else:
+				year_key = column_map.get('year', 'year')
+				year = int(rec[year_key])
+				month_key = column_map.get('month', 'month')
+				month = max(1, int(rec.get(month_key, 1)))
+				day_key = column_map.get('day', 'day')
+				day = max(1, int(rec.get(day_key, 1)))
+			try:
+				date = mxDateTime.Date(year, month, day)
+			except:
+				print("Invalid date in rec %s: %s-%s-%s"
+					% (ID, year, month, day))
+				date = None
+
+			time_key = column_map.get('time', 'time')
+			time = rec.get(time_key)
+			if time:
+				if isinstance(time, basestring):
+					time_elements = time.split(time_sep)
+					try:
+						hour = int(time_elements[0])
+					except (IndexError, ValueError):
+						hour = 0
+					try:
+						minute = int(time_elements[1])
+					except (IndexError, ValueError):
+						minute = 0
+					try:
+						second = float(time_elements[2])
+					except (IndexError, ValueError):
+						second = 0.
+				elif isinstance(time, datetime.time):
+					hour, minute, second = time.hour, time.minute, time.second
+			else:
+				hour_key = column_map.get('hour', 'hour')
+				hour = int(rec.get(hour_key, 0))
+				minute_key = column_map.get('minute', 'minute')
+				minute = int(rec.get(minute_key, 0))
+				second_key = column_map.get('second', 'second')
+				second = float(rec.get(second_key, 0))
+				second = int(round(second))
+				second = min(second, 59)
+			try:
+				time = mxDateTime.Time(hour, minute, second)
+			except:
+				print("Invalid time in rec %s: %s:%s:%s"
+					% (ID, hour, minute, second))
+				time = None
+
+		lon_key = column_map.get('lon', 'lon')
+		lon = float(rec.get(lon_key, 0))
+
+		lat_key = column_map.get('lat', 'lat')
+		lat = float(rec.get(lat_key, 0))
+
+		depth_key = column_map.get('depth', 'depth')
+		depth = float(rec.get(depth_key, 0))
+
+		mag = {}
+
+		Mtype_key = column_map.get('Mtype', 'Mtype')
+		if Mtype_key in column_map:
+			Mtype = rec[Mtype]
+			Mag_key = column_map.get('Mag', 'Mag')
+			M = float(rec.get(Mag_key, np.nan))
+			mag[Mtype] = M
+		ML_key = column_map.get('ML', 'ML')
+		ML = float(rec.get(ML_key, np.nan))
+		mag['ML'] = ML
+		MS_key = column_map.get('MS', 'MS')
+		MS = float(rec.get(MS_key, np.nan))
+		mag['MS'] = MS
+		MW_key = column_map.get('MW', 'MW')
+		MW = float(rec.get(MW_key, np.nan))
+		mag['MW'] = MW
+
+		name_key = column_map.get('name', 'name')
+		name = rec.get(name_key, "")
+
+		intensity_max_key = column_map.get('intensity_max', 'intensity_max')
+		intensity_max = rec.get(intensity_max_key, 0)
+		if intensity_max:
+			if isinstance(intensity_max, basestring):
+				## Strip trailing + and - if present
+				if intensity_max[-1] in ('+', '-'):
+					intensity_max = intensity_max[:-1]
+				## Take average if Imax is specified as range
+				Imax_vals = map(float, intensity_max.split('-'))
+				intensity_max = np.mean(Imax_vals)
+		else:
+			intensity_max = 0.
+
+		macro_radius_key = column_map.get('macro_radius', 'macro_radius')
+		macro_radius = float(rec.get(macro_radius_key, 0))
+
+		errh_key = column_map.get('errh', 'errh')
+		errh = float(rec.get(errh_key, 0))
+
+		errz_key = column_map.get('errz', 'errz')
+		errz = float(rec.get(errz_key, 0))
+
+		errt_key = column_map.get('errt', 'errt')
+		errt = float(rec.get(errt_key, 0))
+
+		errM_key = column_map.get('errM', 'errM')
+		errM = float(rec.get(errM_key, 0))
+
+		zone_key = column_map.get('zone', 'zone')
+		zone = rec.get(zone_key, "")
+
+		return cls(ID, date, time, lon, lat, depth, mag, name=name,
+						intensity_max=intensity_max, macro_radius=macro_radius,
+						errh=errh, errz=errz, errt=errt, errM=errM, zone=zone)
 
 	def to_dict(self):
 		"""
