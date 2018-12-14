@@ -16,9 +16,6 @@ except:
 	basestring = str
 
 
-## Import standard python modules
-import datetime
-
 ## Third-party modules
 import numpy as np
 
@@ -357,15 +354,17 @@ class MacroseismicEnquiryEnsemble():
 		return sorted(set(prop_values))
 
 	def get_date_times(self):
+		import datetime
+
 		format = "%Y-%m-%d %H:%M:%S"
 		date_times = self.get_prop_values('submit_time')
 		date_times = [datetime.datetime.strptime(dt, format) for dt in date_times]
-		date_times = np.array(date_times)
+		date_times = np.array(date_times, dtype='datetime64[s]')
 		return date_times
 
 	def get_elapsed_times(self):
 		eq = self.get_eq()
-		return self.get_date_times() - eq.datetime
+		return self.get_date_times() - np.datetime64(eq.datetime)
 
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
@@ -1889,7 +1888,8 @@ class MacroseismicEnquiryEnsemble():
 
 	def plot_cumulative_responses_vs_time(self):
 		import pylab
-		pylab.plot(np.sort(self.get_date_times()), np.arange(self.num_replies)+1)
+		date_times = np.sort(self.get_date_times()).astype(object)
+		pylab.plot(date_times, np.arange(self.num_replies)+1)
 		pylab.gcf().autofmt_xdate()
 		pylab.xlabel("Time")
 		pylab.ylabel("Number of replies")
