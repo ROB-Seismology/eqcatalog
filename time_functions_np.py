@@ -16,7 +16,22 @@ SECS_PER_DAY = SECS_PER_HOUR * 24
 SECS_PER_WEEK = SECS_PER_DAY * 7
 
 EPOCH = np.datetime64(0, 's')
-ONE_SECOND = np.timedelta64(1, 's')
+#ONE_SECOND = np.timedelta64(1, 's')
+
+
+def is_np_datetime(dt):
+	"""
+	Check if argument is a numpy datetime64 object
+
+	:return:
+		bool
+	"""
+	if isinstance(dt, np.datetime64):
+		return True
+	elif isinstance(dt, np.ndarray) and np.issubdtype(dt.dtype, np.datetime64):
+		return True
+	else:
+		return False
 
 
 def as_np_datetime(dt, unit='s'):
@@ -35,12 +50,22 @@ def as_np_datetime(dt, unit='s'):
 	:return:
 		instance of :class:`np.datetime64` or array of type datetime64
 	"""
-	if isinstance(dt, (np.datetime64, np.ndarray)):
+	if is_np_datetime(dt):
 		return dt.astype('M8[%s]' % unit)
 	elif isinstance(dt, (datetime.datetime, datetime.date, str)):
 		return np.datetime64(dt, unit)
 	elif isinstance(dt, list):
 		return np.array(dt, dtype='M8[%s]' % unit)
+
+
+def utcnow(unit='s'):
+	"""
+	Return numpy datetime representing current UTC date and time
+
+	:return:
+		instance of :class:`np.datetime64`
+	"""
+	return np.datetime64('now', unit)
 
 
 def as_np_date(dt):
@@ -70,12 +95,14 @@ def to_py_datetime(dt64):
 		instance of :class:`numpy.datetime64` or array of instances
 
 	:return:
-		instance of :class:`datetime.datetime`
+		instance of :class:`datetime.datetime` or list of such instances
 	"""
 	#if isinstance(dt, datetime.datetime):
 	#	return dt
 	#elif isinstance(dt, (np.datetime64, np.ndarray)):
-	return dt64.astype(object)
+	assert is_np_datetime(dt64)
+	#return dt64.astype(object)
+	return dt64.tolist()
 
 
 def to_py_time(dt64):
@@ -89,21 +116,31 @@ def to_py_time(dt64):
 	:return:
 		instance of :class:`datetime.time`
 	"""
-	start_of_day = as_np_datetime(dt64, 'D')
-	secs = timespan(start_of_day, dt64, 'us') / 1E+6
-	## Note: np.divmod only from numpy 1.15 onwards...
-	hours = np.floor(secs / SECS_PER_HOUR).astype('int')
-	secs = np.mod(secs, SECS_PER_HOUR)
-	minutes = np.floor(secs / SECS_PER_MINUTE).astype('int')
-	secs = np.mod(secs, SECS_PER_MINUTE)
-	fracs, secs = np.modf(secs)
-	secs = secs.astype('int')
-	microsecs = (fracs * 1E+6).astype('int')
-	if np.isscalar(dt):
-		return datetime.time(hours, minutes, secs, microsecs)
+	assert is_np_datetime(dt64)
+
+	## Try to convert to datetime.datetime first
+	py_dt = to_py_datetime(dt64)
+	if isinstance(py_dt, datetime.datetime):
+		return py_dt.time()
+	elif isinstance(py_dt, list) and isinstance(py_dt[0], datetime.datetime):
+		return [item.time() for item in py_dt]
 	else:
-		return [datetime.time(h, m, s, us)
-				for (h, m, s, us) in zip(hours, minutes, secs, microsecs)]
+		## Conversion failed, extract time manually
+		start_of_day = as_np_datetime(dt64, 'D')
+		secs = timespan(start_of_day, dt64, 's')
+		## Note: np.divmod only from numpy 1.15 onwards...
+		hours = np.floor(secs / SECS_PER_HOUR).astype('int')
+		secs = np.mod(secs, SECS_PER_HOUR)
+		minutes = np.floor(secs / SECS_PER_MINUTE).astype('int')
+		secs = np.mod(secs, SECS_PER_MINUTE)
+		fracs, secs = np.modf(secs)
+		secs = secs.astype('int')
+		microsecs = (fracs * 1E+6).astype('int')
+		if np.isscalar(dt64):
+			return datetime.time(hours, minutes, secs, microsecs)
+		else:
+			return [datetime.time(h, m, s, us)
+					for (h, m, s, us) in zip(hours, minutes, secs, microsecs)]
 
 
 def to_py_date(dt64):
@@ -117,6 +154,8 @@ def to_py_date(dt64):
 	:return:
 		instance of :class:`datetime.date`
 	"""
+	assert is_np_datetime(dt64)
+
 	if np.isscalar(dt64):
 		return to_py_datetime(dt64).date()
 	else:
@@ -230,9 +269,9 @@ def timespan(start_dt, end_dt, unit='Y'):
 	"""
 	assert unit in ['Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us']
 	if unit == 'us':
-		resolution = 'ps'
+		resolution = 'ns'
 	elif unit == 'ms':
-		resolution == 'us'
+		resolution = 'us'
 	elif unit == 's':
 		resolution = 'ms'
 	else:
@@ -257,9 +296,9 @@ def fractional_time_delta(td64, unit):
 		float, time span in fractions of :param:`unit`
 	"""
 	if unit == 'us':
-		resolution = 'ps'
+		resolution = 'ns'
 	elif unit == 'ms':
-		resolution == 'us'
+		resolution = 'us'
 	elif unit == 's':
 		resolution = 'ms'
 	else:
@@ -270,9 +309,9 @@ def fractional_time_delta(td64, unit):
 				'D': SECS_PER_DAY,
 				'h': SECS_PER_HOUR,
 				'm': SECS_PER_MINUTE,
-				's': 1.,
-				'ms': 1.,
-				'us': 1.}[unit]
+				's': 1E+3,
+				'ms': 1E+3,
+				'us': 1E+3}[unit]
 	return (td64 / divisor)
 
 
@@ -300,8 +339,10 @@ def seconds_since_epoch(dt):
 		datetime spec understood by :func:`as_np_datetime`
 
 	:return:
-		int or int array, time in seconds
+		float or float array, time in seconds
 	"""
-	dt = as_np_datetime(dt, 's')
-	time_delta = (dt - EPOCH) / ONE_SECOND
-	return time_delta.astype('int64')
+	#dt = as_np_datetime(dt, 's')
+	#time_delta = (dt - EPOCH) / ONE_SECOND
+	#return time_delta.astype('int64')
+
+	return timespan(EPOCH, dt, 's')
