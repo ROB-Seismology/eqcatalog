@@ -4,6 +4,13 @@ Useful time functions based on numpy datetime64
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+try:
+	## Python 2
+	basestring
+except:
+	## Python 3
+	basestring = str
+
 
 import datetime
 import numpy as np
@@ -46,13 +53,17 @@ def as_np_datetime(dt, unit='s'):
 			or instances of :class:`datetime.date`
 		or instance of :class:`np.datetime64`
 		or array of type datetime64
+	:param unit:
+		str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+		(year|week|day|hour|minute|second|millisecond|microsecond)
+		(default: 's')
 
 	:return:
 		instance of :class:`np.datetime64` or array of type datetime64
 	"""
 	if is_np_datetime(dt):
 		return dt.astype('M8[%s]' % unit)
-	elif isinstance(dt, (datetime.datetime, datetime.date, str)):
+	elif isinstance(dt, (datetime.datetime, datetime.date, basestring)):
 		return np.datetime64(dt, unit)
 	elif isinstance(dt, list):
 		return np.array(dt, dtype='M8[%s]' % unit)
@@ -80,10 +91,6 @@ def as_np_date(dt):
 		date
 	"""
 	return as_np_datetime(dt, 'D')
-	#if np.isscalar(dt):
-	#	return np.datetime64(str(dt)[:10])
-	#else:
-	#	return np.array([str(el)[:10] for el in dt], dtype='M8[D]')
 
 
 def to_py_datetime(dt64):
@@ -99,7 +106,7 @@ def to_py_datetime(dt64):
 	"""
 	#if isinstance(dt, datetime.datetime):
 	#	return dt
-	#elif isinstance(dt, (np.datetime64, np.ndarray)):
+	#elif is_np_datetime(dt):
 	assert is_np_datetime(dt64)
 	#return dt64.astype(object)
 	return dt64.tolist()
@@ -263,6 +270,17 @@ def timespan(start_dt, end_dt, unit='Y'):
 		str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
 		(year|week|day|hour|minute|second|millisecond|microsecond)
 		(default: 'Y')
+		Note: to compute the (fractional) time span, :param:`start_dt` and
+		:param:`end_dt` are first converted to seconds if unit is Y, W, D, h or m,
+		or to the next higher resolution for the other units. Care should be taken
+		to make sure that the dates remain within the allowed range, which is:
+		- unit='s' : [2.9e11 BC, 2.9e11 AD]
+		- unit='ms': [ 2.9e8 BC, 2.9e8 AD]
+		- unit='us': [290301 BC, 294241 AD]
+		- unit='ns': [ 1678 AD, 2262 AD]
+		As a result, for most earthquake catalogs, :param:`unit` should not
+		be lower than 'ms', and for very long synthetic earthquake catalogs,
+		perhaps not lower than 's'!
 
 	:return:
 		float, time span in fractions of :param:`unit`
