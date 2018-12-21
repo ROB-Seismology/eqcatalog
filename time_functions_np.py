@@ -367,6 +367,15 @@ def seconds_since_epoch(dt):
 
 
 def py_time_to_seconds(py_time):
+	"""
+	Convert datetime.time to seconds
+
+	:param py_time:
+		instance of :class:`datetime.time`
+
+	:return:
+		float, number of seconds
+	"""
 	assert isinstance(py_time, datetime.time)
 	secs = py_time.hour * 3600 + py_time.minute * 60 + py_time.second
 	secs += (py_time.microsecond * 1E-6)
@@ -374,17 +383,46 @@ def py_time_to_seconds(py_time):
 
 
 def py_time_to_fractional_hours(py_time):
+	"""
+	Convert datetime.time to fractional hours
+
+	:param py_time:
+		instance of :class:`datetime.time`
+
+	:return:
+		float, fractional hours
+	"""
 	assert isinstance(py_time, datetime.time)
 	return py_time.hour + py_time.minute/60.0 + py_time.second/3600.0
 
 
 def py_time_to_np_timedelta(py_time):
+	"""
+	Convert datetime.time to numpy timedelta64
+
+	:param py_time:
+		instance of :class:`datetime.time`
+
+	:return:
+		instance of :class:`np.timedelta64`
+	"""
 	secs = py_time_to_seconds(py_time)
 	microsecs = int(round(secs * 1E+6))
 	return np.timedelta64(microsecs, 'us')
 
 
 def combine_np_date_and_time(dt64, py_time):
-	dt64 = as_np_datetime('D')
+	"""
+	Combine date from numpy datetime and time from datetime.time object
+
+	:param dt64:
+		instance of :class:`np.datetime64`
+	:param py_time:
+		instance of :class:`datetime.time`
+
+	:return:
+		instance of :class:`np.datetime64`
+	"""
+	dt64 = as_np_datetime(dt64, 'D')
 	td = py_time_to_np_timedelta(py_time)
 	return dt64 + td
