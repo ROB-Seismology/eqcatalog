@@ -364,3 +364,27 @@ def seconds_since_epoch(dt):
 	#return time_delta.astype('int64')
 
 	return timespan(EPOCH, dt, 's')
+
+
+def py_time_to_seconds(py_time):
+	assert isinstance(py_time, datetime.time)
+	secs = py_time.hour * 3600 + py_time.minute * 60 + py_time.second
+	secs += (py_time.microsecond * 1E-6)
+	return secs
+
+
+def py_time_to_fractional_hours(py_time):
+	assert isinstance(py_time, datetime.time)
+	return py_time.hour + py_time.minute/60.0 + py_time.second/3600.0
+
+
+def py_time_to_np_timedelta(py_time):
+	secs = py_time_to_seconds(py_time)
+	microsecs = int(round(secs * 1E+6))
+	return np.timedelta64(microsecs, 'us')
+
+
+def combine_np_date_and_time(dt64, py_time):
+	dt64 = as_np_datetime('D')
+	td = py_time_to_np_timedelta(py_time)
+	return dt64 + td
