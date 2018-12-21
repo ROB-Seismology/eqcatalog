@@ -10,10 +10,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 
-## Make relative imports work in Python 3
-import importlib
-
-
 ## Reloading mechanism
 try:
 	reloading
@@ -35,45 +31,45 @@ else:
 
 ## time_functions (no internal dependencies)
 if not reloading:
-	time_functions = importlib.import_module('.time_functions', package=__name__)
+	from . import time_functions
 else:
 	reload(time_functions)
 
 ## completeness (no internal dependencies)
 if not reloading:
-	completeness = importlib.import_module('.completeness', package=__name__)
+	from . import completeness
 else:
 	reload(completeness)
 from .completeness import *
 
 ## calcGR, depends on time_functions
 if not reloading:
-	calcGR = importlib.import_module('.calcGR', package=__name__)
+	from . import calcGR
 else:
 	reload(calcGR)
 
 ## msc (no internal dependencies)
 if not reloading:
-	msc = importlib.import_module('.msc', package=__name__)
+	from . import msc
 else:
 	reload(msc)
 
 ## declustering (no internal dependencies)
 if not reloading:
-	declustering = importlib.import_module('.declustering', package=__name__)
+	from . import declustering
 else:
 	reload(declustering)
 
 ## source_models (no internal dependencies)
 if not reloading:
-	source_models = importlib.import_module('.source_models', package=__name__)
+	from . import source_models
 else:
 	reload(source_models)
 from .source_models import (read_source_model, rob_source_models_dict)
 
 ## macrorecord (no internal dependencies)
 if not reloading:
-	macrorecord = importlib.import_module('.macrorecord', package=__name__)
+	from . import macrorecord
 else:
 	reload(macrorecord)
 from .macrorecord import (MacroseismicInfo, MacroseismicEnquiryEnsemble,
@@ -81,14 +77,14 @@ from .macrorecord import (MacroseismicInfo, MacroseismicEnquiryEnsemble,
 
 ## eqrecord (depends on time_functions, msc)
 if not reloading:
-	eqrecord = importlib.import_module('.eqrecord', package=__name__)
+	from . import eqrecord
 else:
 	reload(eqrecord)
 from .eqrecord import (LocalEarthquake, FocMecRecord)
 
 ## eqcatalog (depends on time_functions, completeness eqrecord, declustering, source_models)
 if not reloading:
-	eqcatalog = importlib.import_module('.eqcatalog', package=__name__)
+	from . import eqcatalog
 else:
 	reload(eqcatalog)
 from .eqcatalog import (EQCatalog, read_catalogSQL, read_catalog_sql,
@@ -98,13 +94,13 @@ from .eqcatalog import (EQCatalog, read_catalogSQL, read_catalog_sql,
 
 ## composite_catalog (depends on completeness, eqcatalog)
 if not reloading:
-	composite_catalog = importlib.import_module('.composite_catalog', package=__name__)
+	from . import composite_catalog
 else:
 	reload(composite_catalog)
 from .composite_catalog import CompositeEQCatalog
 
 ## seismodb (depends on eqrecord, macrorecord, eqcatalog)
 if not reloading:
-	seismodb = importlib.import_module('.seismodb', package=__name__)
+	from . import seismodb
 else:
 	reload(seismodb)
