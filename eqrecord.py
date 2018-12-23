@@ -13,10 +13,6 @@ except:
 	basestring = str
 
 
-## Make relative imports work in Python 3
-import importlib
-
-
 ## Import standard python modules
 import datetime
 import time
@@ -25,14 +21,13 @@ from collections import OrderedDict
 
 ## Third-party modules
 import numpy as np
-import mx.DateTime as mxDateTime
-
-## Disable no-member errors for mxDateTime
-# pylint: disable=no-member
 
 ## Import ROB modules
 import mapping.geotools.geodetic as geodetic
-msc = importlib.import_module('.msc', __name__.split('.')[0])
+
+## Import package submodules
+from . import msc
+from . import time_functions_np as tf
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord"]
@@ -55,11 +50,12 @@ class LocalEarthquake:
 	Provides methods to convert magnitudes, and compute distances.
 
 	:param ID:
-		Int, ID of earthquake in earthquakes table
+		str or int, ID of earthquake in earthquakes table
 	:param date:
-		datetime.date object, date when the earthquake happened
+		instance of :class:`np.datetime64` or :class:`datetime.date`
+		or ISO-8601 formatted string, date when the earthquake occurred
 	:param time:
-		datetime.time object, time when the earthquake happened
+		instance of :class:`datetime.time`, time when earthquake occurred
 	:param lon:
 		Float, longitude of epicenter in decimal degrees
 	:param lat:
@@ -115,22 +111,14 @@ class LocalEarthquake:
 			zone="",
 			event_type="ke"):
 		self.ID = ID
-		if isinstance(date, datetime.date) and isinstance(time, datetime.time):
-			self.datetime = datetime.datetime.combine(date, time)
-		elif (isinstance(date, mxDateTime.DateTimeType)
-				and isinstance(time, mxDateTime.DateTimeDeltaType)):
-			self.datetime = date + time
-		elif (isinstance(date, datetime.datetime)
-				or isinstance(date, mxDateTime.DateTimeType)):
-			self.datetime = date
-		elif (isinstance(time, datetime.datetime)
-				or isinstance(time, mxDateTime.DateTimeType)):
-			self.datetime = time
-		elif isinstance(date, datetime.date):
-			time = datetime.time(0, 0, 0)
-			self.datetime = datetime.datetime.combine(date, time)
-		else:
-			raise TypeError("date or time not of correct type")
+		try:
+			date = tf.as_np_date(date)
+		except:
+			raise TypeError("date not of correct type")
+		try:
+			self.datetime = tf.combine_np_date_and_py_time(date, time, unit='ms')
+		except:
+			raise TypeError("time not of correct type")
 
 		self.lon = lon
 		self.lat = lat
@@ -172,11 +160,11 @@ class LocalEarthquake:
 		try:
 			self.MS = float(MS)
 		except TypeError:
-			self.MS = float(MS)
+			self.MS = MS
 		try:
 			self.MW = float(MW)
 		except TypeError:
-			self.MW = float(MW)
+			self.MW = MW
 		"""
 		self.name = name
 		self.intensity_max = intensity_max
@@ -191,7 +179,7 @@ class LocalEarthquake:
 		self.event_type = event_type
 
 	@classmethod
-	def from_json(self, s):
+	def from_json(cls, s):
 		"""
 		Generate instance of :class:`LocalEarthquake` from a json string
 
@@ -203,7 +191,7 @@ class LocalEarthquake:
 			class_name = dct.keys()[0]
 			#if class_name == LocalEarthquake.__class__.__name__:
 			if class_name == "__LocalEarthquake__":
-				return self.from_dict(dct[class_name])
+				return cls.from_dict(dct[class_name])
 		#return LocalEarthquake.__init__(self, **json.loads(s))
 
 	@classmethod
@@ -214,15 +202,17 @@ class LocalEarthquake:
 		:param dct:
 			Dictionary
 		"""
-		if 'time' in dct:
-			dct['time'] = datetime.time(*dct['time'])
-		if 'date' in dct:
-			dct['date'] = datetime.date(*dct['date'])
 		if 'datetime' in dct:
-			dt = eval(dct['datetime'])
-			dct['date'] = dt.date()
-			dct['time'] = dt.time()
+			dt = tf.as_np_datetime(dct['datetime'])
+			dct['date'] = tf.as_np_date(dt)
+			dct['time'] = tf.to_py_time(dt)
 			del dct['datetime']
+		else:
+			if 'time' in dct:
+				dct['time'] = datetime.time(*dct['time'])
+			if 'date' in dct:
+				#dct['date'] = datetime.date(*dct['date'])
+				dct['date'] = tf.time_tuple_to_np_datetime(*dct['date'])
 		if not 'mag' in dct:
 			dct['mag'] = {}
 			for key in dct.keys():
@@ -252,7 +242,7 @@ class LocalEarthquake:
 			(default: '-')
 		:param time_sep:
 			str, character separating time elements
-			(default: ':'
+			(default: ':')
 		:param date_order:
 			str, order of year (Y), month (M), day (D) in date string
 			(default: 'YMD')
@@ -260,20 +250,15 @@ class LocalEarthquake:
 		:return:
 			instance of :class:`LocalEarthquake`
 		"""
-		from .time_functions import parse_isoformat_datetime
-
 		## If key is not in column_map, we assume it has the default name
 		ID_key = column_map.get('ID', 'ID')
 		ID = rec.get(ID_key)
 
 		datetime_key = column_map.get('datetime', 'datetime')
 		if datetime_key in rec:
-			dt = rec[datetime_key]
-			if isinstance(dt, basestring):
-				## Note: this returns datetime, not mxDateTime !
-				dt = parse_isoformat_datetime(dt)
-			date = dt.date()
-			time = dt.time()
+			dt = tf.as_np_datetime(rec[datetime_key])
+			date = tf.as_np_date(dt)
+			time = tf.to_py_time(dt)
 
 		else:
 			date_key = column_map.get('date', 'date')
@@ -282,27 +267,27 @@ class LocalEarthquake:
 			## Silently convert month/day to 1 if it is zero
 			if date:
 				if isinstance(date, basestring):
-					date_elements = [int(s) for s in date.split(date_sep)]
-					year = date_elements[date_order.index('Y')]
+					date_elements = date.split(date_sep)
+					year = int(date_elements[date_order.index('Y')])
 					try:
-						month = max(1, date_elements[date_order.index('M')])
+						month = max(1, int(date_elements[date_order.index('M')]))
 					except IndexError:
 						month = 1
 					try:
-						day = max(1, date_elements[date_order.index('D')])
+						day = max(1, int(date_elements[date_order.index('D')]))
 					except:
 						day = 1
 				elif isinstance(date, datetime.date):
-					year, month, day = date.year, date.month, datey.day
+					year, month, day = date.year, date.month, date.day
 			else:
 				year_key = column_map.get('year', 'year')
 				year = int(rec[year_key])
 				month_key = column_map.get('month', 'month')
-				month = max(1, int(rec.get(month_key, 1)))
+				month = max(1, int(rec.get(month_key, 1) or 1))
 				day_key = column_map.get('day', 'day')
-				day = max(1, int(rec.get(day_key, 1)))
+				day = max(1, int(rec.get(day_key, 1) or 1))
 			try:
-				date = mxDateTime.Date(year, month, day)
+				date = tf.time_tuple_to_np_datetime(year, month, day)
 			except:
 				print("Invalid date in rec %s: %s-%s-%s"
 					% (ID, year, month, day))
@@ -314,60 +299,62 @@ class LocalEarthquake:
 				if isinstance(time, basestring):
 					time_elements = time.split(time_sep)
 					try:
-						hour = int(time_elements[0])
+						hour = min(23, int(time_elements[0]))
 					except (IndexError, ValueError):
 						hour = 0
 					try:
-						minute = int(time_elements[1])
+						minute = min(59, int(time_elements[1]))
 					except (IndexError, ValueError):
 						minute = 0
 					try:
-						second = float(time_elements[2])
+						second = min(59, float(time_elements[2]))
 					except (IndexError, ValueError):
 						second = 0.
 				elif isinstance(time, datetime.time):
 					hour, minute, second = time.hour, time.minute, time.second
+					second += (time.microsecond * 1E-6)
 			else:
 				hour_key = column_map.get('hour', 'hour')
-				hour = int(rec.get(hour_key, 0))
+				hour = min(23, int(rec.get(hour_key, 0) or 0))
 				minute_key = column_map.get('minute', 'minute')
-				minute = int(rec.get(minute_key, 0))
+				minute = min(59, int(rec.get(minute_key, 0) or 0))
 				second_key = column_map.get('second', 'second')
-				second = float(rec.get(second_key, 0))
-				second = int(round(second))
-				second = min(second, 59)
+				second = float(rec.get(second_key, 0) or 0)
+			fraction, second = np.modf(second)
+			second = min(59, int(second))
+			microsecs = int(round(fraction * 1E+6))
 			try:
-				time = mxDateTime.Time(hour, minute, second)
+				time = datetime.time(hour, minute, second, microsecs)
 			except:
-				print("Invalid time in rec %s: %s:%s:%s"
-					% (ID, hour, minute, second))
-				time = None
+				print(ID, second)
+				raise
 
+		## Default value for lon, lat, depth is 0, but could also be nan
 		lon_key = column_map.get('lon', 'lon')
-		lon = float(rec.get(lon_key, 0))
+		lon = float(rec.get(lon_key, 0) or 0)
 
 		lat_key = column_map.get('lat', 'lat')
-		lat = float(rec.get(lat_key, 0))
+		lat = float(rec.get(lat_key, 0) or 0)
 
 		depth_key = column_map.get('depth', 'depth')
-		depth = float(rec.get(depth_key, 0))
+		depth = float(rec.get(depth_key, 0) or 0)
 
 		mag = {}
 
 		Mtype_key = column_map.get('Mtype', 'Mtype')
-		if Mtype_key in column_map:
-			Mtype = rec[Mtype]
+		if Mtype_key in rec:
+			Mtype = rec[Mtype_key]
 			Mag_key = column_map.get('Mag', 'Mag')
 			M = float(rec.get(Mag_key, np.nan))
 			mag[Mtype] = M
 		ML_key = column_map.get('ML', 'ML')
-		ML = float(rec.get(ML_key, np.nan))
+		ML = float(rec.get(ML_key, np.nan) or np.nan)
 		mag['ML'] = ML
 		MS_key = column_map.get('MS', 'MS')
-		MS = float(rec.get(MS_key, np.nan))
+		MS = float(rec.get(MS_key, np.nan) or np.nan)
 		mag['MS'] = MS
 		MW_key = column_map.get('MW', 'MW')
-		MW = float(rec.get(MW_key, np.nan))
+		MW = float(rec.get(MW_key, np.nan) or np.nan)
 		mag['MW'] = MW
 
 		name_key = column_map.get('name', 'name')
@@ -387,19 +374,19 @@ class LocalEarthquake:
 			intensity_max = 0.
 
 		macro_radius_key = column_map.get('macro_radius', 'macro_radius')
-		macro_radius = float(rec.get(macro_radius_key, 0))
+		macro_radius = float(rec.get(macro_radius_key, 0) or 0)
 
 		errh_key = column_map.get('errh', 'errh')
-		errh = float(rec.get(errh_key, 0))
+		errh = float(rec.get(errh_key, 0) or 0)
 
 		errz_key = column_map.get('errz', 'errz')
-		errz = float(rec.get(errz_key, 0))
+		errz = float(rec.get(errz_key, 0) or 0)
 
 		errt_key = column_map.get('errt', 'errt')
-		errt = float(rec.get(errt_key, 0))
+		errt = float(rec.get(errt_key, 0) or 0)
 
 		errM_key = column_map.get('errM', 'errM')
-		errM = float(rec.get(errM_key, 0))
+		errM = float(rec.get(errM_key, 0) or 0)
 
 		zone_key = column_map.get('zone', 'zone')
 		zone = rec.get(zone_key, "")
@@ -422,8 +409,10 @@ class LocalEarthquake:
 		Generate json string
 		"""
 		def json_handler(obj):
-			if isinstance(obj, datetime.datetime):
+			if isinstance(obj, (datetime.time, datetime.date)):
 				return repr(obj)
+			elif isinstance(obj, np.datetime64):
+				return str(obj)
 			else:
 				return obj.__dict__
 
@@ -461,7 +450,6 @@ class LocalEarthquake:
 
 		return LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW)
 
-
 	def to_HY4(self, Mtype='ML', Mrelation=None):
 		"""
 		Convert to HYPDAT structure used by SeismicEruption HY4 catalog format
@@ -480,7 +468,7 @@ class LocalEarthquake:
 
 		latitude = int(round(self.lat * 3600 / 0.001))
 		longitude = int(round(self.lon * 3600 / 0.001))
-		year, month, day, tm_hour, tm_min, tm_sec = self.datetime.timetuple()[:6]
+		year, month, day, tm_hour, tm_min, tm_sec = tf.to_time_tuple(self.datetime)
 		minutes = int(round(tm_hour * 60 + tm_min))
 		tseconds = int(round(tm_sec / 0.1))
 		depth = int(round(self.depth * 100000))
@@ -494,36 +482,15 @@ class LocalEarthquake:
 
 	@property
 	def date(self):
-		if isinstance(self.datetime, mxDateTime.DateTimeType):
-			year, month, day = self.datetime.timetuple()[:3]
-			try:
-				date = datetime.date(year, month, day)
-			except ValueError:
-				date = mxDateTime.Date(year, month, day)
-			return date
-		else:
-			return self.datetime.date()
+		return tf.as_np_date(self.datetime)
 
 	@property
 	def time(self):
-		if isinstance(self.datetime, mxDateTime.DateTimeType):
-			return self.datetime.pytime()
-		else:
-			return self.datetime.time()
+		return tf.to_py_time(self.datetime)
 
-	def set_mx_datetime(self):
-		"""
-		Convert datetime property to mxDateTime object
-		"""
-		if isinstance(self.datetime, datetime.datetime):
-			self.datetime = mxDateTime.DateTimeFrom(self.datetime)
-
-	def set_py_datetime(self):
-		"""
-		Convert datetime property to Python datetime object
-		"""
-		if isinstance(self.datetime, mxDateTime.DateTimeType):
-			self.datetime = self.datetime.pydatetime()
+	@property
+	def year(self):
+		return tf.to_year(self.datetime)
 
 	def get_fractional_year(self):
 		"""
@@ -532,8 +499,8 @@ class LocalEarthquake:
 		:return:
 			Float, fractional year
 		"""
-		from .time_functions import fractional_year
-		return fractional_year(self.datetime)
+		#from .time_functions import fractional_year
+		return tf.to_fractional_year(self.datetime)
 
 	def get_fractional_hour(self):
 		"""
@@ -542,8 +509,7 @@ class LocalEarthquake:
 		:return:
 			Float, fractional hour
 		"""
-		return (self.datetime.hour + self.datetime.minute/60.0
-				+ self.datetime.second/3600.0)
+		return tf.py_time_to_fractional_hours(self.time)
 
 	## Magnitude-related methods
 
@@ -607,7 +573,7 @@ class LocalEarthquake:
 	def get_or_convert_mag(self, Mtype, Mrelation={}):
 		"""
 		Return particular magnitude. If the magnitude type is not defined,
-		it will be converted.
+		it will be converted from another magnitude type.
 
 		:param Mtype:
 			str, magnitude type to return
@@ -761,12 +727,13 @@ class LocalEarthquake:
 		Compute epicentral distance to point in km using haversine formula
 
 		:param pt:
-			(lon, lat) tuple or other instance of :class:`LocalEarthquake`
+			(lon, lat) tuple or object having 'lon' and 'lat' attributes
+			Note that lon, lat may also be arrays
 
 		:return:
 			Float, epicentral distance in km
 		"""
-		if isinstance(pt, LocalEarthquake):
+		if hasattr(pt, 'lon') and hasattr(pt, 'lat'):
 			pt = (pt.lon, pt.lat)
 		return geodetic.spherical_distance(self.lon, self.lat, pt[0], pt[1]) / 1000.
 
@@ -777,6 +744,7 @@ class LocalEarthquake:
 
 		:param pt:
 			(lon, lat) tuple or other instance of :class:`LocalEarthquake`
+			Note that lon, lat may also be arrays
 
 		:return:
 			Float, hypocentral distance in km
@@ -791,6 +759,7 @@ class LocalEarthquake:
 
 		:param pt:
 			(lon, lat) tuple or other instance of :class:`LocalEarthquake`
+			Note that lon, lat may also be arrays
 
 		:return:
 			Float, azimuth in decimal degrees
@@ -805,6 +774,7 @@ class LocalEarthquake:
 
 		:param pt:
 			(lon, lat) tuple or other instance of :class:`LocalEarthquake`
+			Note that lon, lat may also be arrays
 
 		:return:
 			Float, azimuth in decimal degrees
@@ -819,14 +789,16 @@ class LocalEarthquake:
 		from epicenter.
 
 		:param distance:
-			Float, distance in km
+			Float or array, distance in km
 		:param azimuth:
-			Float, azimuth in decimal degrees
+			Float or array, azimuth in decimal degrees
+		Note that only one of :param:`distance` and :param:`azimuth` may be
+		an array
 
 		:return:
 			...
 		"""
-		return geodetic.spherical_point_at(self.lon, self.lat, distance, azimuth)
+		return geodetic.spherical_point_at(self.lon, self.lat, distance*1000, azimuth)
 
 	def get_rob_hash(self):
 		"""
