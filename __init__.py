@@ -31,7 +31,7 @@ else:
 
 ## time_functions (no internal dependencies)
 if not reloading:
-	from . import time_functions
+	from . import time_functions_np as time_functions
 else:
 	reload(time_functions)
 
