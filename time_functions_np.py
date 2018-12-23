@@ -69,6 +69,51 @@ def as_np_datetime(dt, unit='s'):
 		return np.array(dt, dtype='M8[%s]' % unit)
 
 
+def time_tuple_to_np_datetime(year, month=0, day=0, hour=0, minute=0, second=0,
+							microsecond=0):
+	"""
+	Construct numpy datetime from time tuple
+
+	:param year:
+		int, year
+	:param month:
+		int, month
+		(default: 0)
+	:param day:
+		int, day
+		(default: 0)
+	:param hour:
+		int, hour
+		(default: 0)
+	:param minute:
+		int, minute
+		(default: 0)
+	:param second:
+		int or float, second
+		(default: 0)
+	:param microsecond:
+		int, microsecond
+		(default: 0)
+
+	:return:
+		instance of :class:`np.datetime64`
+	"""
+	dt_string = '%d' % year
+	if month:
+		dt_string += '-%02d' % month
+		if day:
+			dt_string += "-%02d" % day
+			if hour:
+				dt_string += 'T%02d' % hour
+				if minute:
+					dt_string += ':%02d' % minute
+					if second:
+						if microsecond:
+							second += microsecond * 1E-6
+						dt_string += ':%09.6f' % second
+	return np.datetime64(dt_string)
+
+
 def utcnow(unit='s'):
 	"""
 	Return numpy datetime representing current UTC date and time
@@ -99,7 +144,7 @@ def to_py_datetime(dt64):
 	Note that this will fail for datetimes where year > 9999.
 
 	:param dt64:
-		instance of :class:`numpy.datetime64` or array of instances
+		instance of :class:`numpy.datetime64` or array of such instances
 
 	:return:
 		instance of :class:`datetime.datetime` or list of such instances
@@ -279,8 +324,8 @@ def timespan(start_dt, end_dt, unit='Y'):
 		- unit='us': [290301 BC, 294241 AD]
 		- unit='ns': [ 1678 AD, 2262 AD]
 		As a result, for most earthquake catalogs, :param:`unit` should not
-		be lower than 'ms', and for very long synthetic earthquake catalogs,
-		perhaps not lower than 's'!
+		be more precise than 'ms', and for very long synthetic earthquake catalogs,
+		perhaps not more precise than 's'!
 
 	:return:
 		float, time span in fractions of :param:`unit`
@@ -411,7 +456,7 @@ def py_time_to_np_timedelta(py_time):
 	return np.timedelta64(microsecs, 'us')
 
 
-def combine_np_date_and_time(dt64, py_time):
+def combine_np_date_and_py_time(dt64, py_time, unit='s'):
 	"""
 	Combine date from numpy datetime and time from datetime.time object
 
@@ -419,10 +464,14 @@ def combine_np_date_and_time(dt64, py_time):
 		instance of :class:`np.datetime64`
 	:param py_time:
 		instance of :class:`datetime.time`
+	:param unit:
+		str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+		(year|week|day|hour|minute|second|millisecond|microsecond)
+		(default: 's')
 
 	:return:
 		instance of :class:`np.datetime64`
 	"""
 	dt64 = as_np_datetime(dt64, 'D')
 	td = py_time_to_np_timedelta(py_time)
-	return dt64 + td
+	return as_np_datetime(dt64 + td, unit=unit)
