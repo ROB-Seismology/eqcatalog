@@ -69,11 +69,13 @@ class WindowMethod(DeclusteringMethod):
 				## get time and distance window
 				t_window, d_window = window.get(magnitudes[i])
 				## make datetime object from time window
-				t_window = datetime.timedelta(days=t_window)
+				#t_window = datetime.timedelta(days=t_window)
+				t_window = np.timedelta64(int(t_window * 86400), 's')
 				## create time window index
 				in_t_window = np.logical_and(
-					datetimes >= (datetimes[i] - datetime.timedelta(
-								seconds=fa_ratio*t_window.total_seconds())),
+					#datetimes >= (datetimes[i] - datetime.timedelta(
+					#			seconds=fa_ratio*t_window.total_seconds())),
+					datetimes >= (datetimes[i] - fa_ratio*t_window.astype('m8[s]')),
 					datetimes <= (datetimes[i] + t_window),
 				)
 				## create distance window index
@@ -117,13 +119,15 @@ class ClusterMethod(DeclusteringMethod):
 			## get time and distance window
 			t_window, d_window = window.get(magnitude)
 			## make datetime object from time window
-			t_window = datetime.timedelta(days=t_window)
+			#t_window = datetime.timedelta(days=t_window)
+			t_window = np.timedelta64(int(t_window * 86400), 's')
 			## create window index for equal or smaller earthquakes
 			smaller_magnitude = magnitudes <= magnitude
 			## create time window index
 			in_t_window = np.logical_and(
-				datetimes >= (datetimes[i] - datetime.timedelta(
-								seconds=fa_ratio*t_window.total_seconds())),
+				#datetimes >= (datetimes[i] - datetime.timedelta(
+				#				seconds=fa_ratio*t_window.total_seconds())),
+				datetimes >= (datetimes[i] - fa_ratio*t_window.astype('m8[s]')),
 				datetimes <= (datetimes[i] + t_window),
 			)
 			## create distance window index
