@@ -17,7 +17,6 @@ Required modules:
 		users.kris.Seismo.db.seismodb
 """
 
-
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 try:
@@ -49,10 +48,6 @@ import matplotlib.pyplot as plt
 import pylab
 from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
-import mx.DateTime as mxDateTime
-
-## Disable no-member errors for mxDateTime
-# pylint: disable=no-member
 
 
 # TODO: Move ROB-specific code to separate submodule
@@ -65,14 +60,15 @@ else:
 	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
 
-
 ## Import ROB modules
+import mapping.geotools.geodetic as geodetic
+
+
+## Import package submodules
 from .eqrecord import LocalEarthquake
 from .source_models import read_source_model
 from .completeness import Completeness, DEFAULT_COMPLETENESS
-from .time_functions import timespan
-import mapping.geotools.geodetic as geodetic
-
+from . import time_functions_np as tf
 
 
 class EQCatalog:
@@ -82,34 +78,32 @@ class EQCatalog:
 	:param eq_list:
 		List containing instances of :class:`LocalEarthquake`
 	:param start_date:
-		datetime, start of catalog (default: None = datetime of oldest
-		earthquake in catalog)
+		instance of :class:`np.datetime64` or :class:`datetime.datetime`,
+		start datetime of catalog
+		(default: None = datetime of oldest earthquake in catalog)
 	:param end_date:
-		datetime, end of catalog (default: None = datetime of youngest
-		earthquake in catalog)
+		instance of :class:`np.datetime64` or :class:`datetime.datetime`,
+		end datetme of catalog
+		(default: None = datetime of youngest earthquake in catalog)
 	:param region:
 		(lon0, lon1, lat0, lat1) tuple with geographic coordinates of
-		bounding box (default: None)
+		bounding box
+		(default: None)
 	:param name:
-		String, catalog name (default: "")
+		String, catalog name
+		(default: "")
 	"""
 	def __init__(self, eq_list, start_date=None, end_date=None, region=None, name=""):
 		self.eq_list = eq_list[:]
 		Tmin, Tmax = self.Tminmax()
-		self.start_date = start_date
 		if not start_date:
 			self.start_date = Tmin
-		self.end_date = end_date
+		else:
+			self.start_date = tf.as_np_datetime(start_date)
 		if not end_date:
 			self.end_date = Tmax
-		if isinstance(self.start_date, (datetime.datetime, datetime.date,
-					mxDateTime.DateTimeType)):
-			year, month, day = self.start_date.timetuple()[:3]
-			self.start_date = mxDateTime.Date(year, month, day)
-		if isinstance(self.end_date, (datetime.datetime, datetime.date,
-					mxDateTime.DateTimeType)):
-			year, month, day = self.end_date.timetuple()[:3]
-			self.end_date = mxDateTime.Date(year, month, day)
+		else:
+			self.end_date = tf.as_np_datetime(end_date)
 		self.region = region
 		self.name = name
 
@@ -125,7 +119,7 @@ class EQCatalog:
 	def __getitem__(self, item):
 		"""
 		Indexing --> instance of :class:`LocalEarthquake`
-		Slicing --> instance of :class:`EQCatalog`
+		Slicing / Index array --> instance of :class:`EQCatalog`
 		"""
 		if isinstance(item, (int, np.int32, np.int64)):
 			return self.eq_list.__getitem__(item)
@@ -217,12 +211,12 @@ class EQCatalog:
 		Fetch record with given ID
 
 		:param ID:
-			Int, ID of earthquake in ROB database
+			str or int, ID of earthquake in ROB database
 
 		:return:
 			instance of :class:`LocalEarthquake`
 		"""
-		events = [rec for rec in self if rec.ID == ID]
+		events = [rec for rec in self if str(rec.ID) == str(ID)]
 		if len(events) == 1:
 			return events[0]
 		else:
@@ -250,15 +244,6 @@ class EQCatalog:
 		:param dct:
 			Dictionary
 		"""
-		if 'time' in dct:
-			dct['time'] = datetime.time(*dct['time'])
-		if 'date' in dct:
-			dct['date'] = datetime.date(*dct['date'])
-		if 'datetime' in dct:
-			dt = eval(dct['datetime'])
-			dct['date'] = dt.date()
-			dct['time'] = dt.time()
-			del dct['datetime']
 		if 'eq_list' in dct:
 			dct['eq_list'] = [LocalEarthquake.from_dict(d["__LocalEarthquake__"])
 							for d in dct['eq_list']]
@@ -273,8 +258,10 @@ class EQCatalog:
 				key = '__%s__' % obj.__class__.__name__
 				dct = {key: obj.__dict__}
 				return dct
-			elif isinstance(obj, (datetime.date, datetime.datetime)):
+			elif isinstance(obj, (datetime.time, datetime.date)):
 				return repr(obj)
+			elif isinstance(obj, np.datetime64):
+				return str(obj)
 			else:
 				return obj.__dict__
 
@@ -312,7 +299,7 @@ class EQCatalog:
 		Return duration of catalog as timedelta object
 
 		:return:
-			instance of datetime.timedelta or mxDateTime.DateTimeDelta
+			instance of :class:`np.timedelta64`
 		"""
 		Tmin, Tmax = self.Tminmax()
 		return Tmax - Tmin
@@ -322,58 +309,64 @@ class EQCatalog:
 		Return time difference between a start time and each event.
 
 		:param start_datetime:
-			datetime object, start time (default: None, will take the
-			start time of the catalog)
+			instance of :class:`np.datetime64` or :class:`datetime.datetime`,
+			start time
+			(default: None, will take the start time of the catalog)
 
 		:return:
-			list of timedelta objects
+			list of instances of :class:`np.timedelta64`
 		"""
 		if not start_datetime:
-			year, month, day = (self.start_date.year, self.start_date.month,
-								self.start_date.day)
-			start_datetime = mxDateTime.Date(year, month, day)
-		return [eq.datetime - start_datetime for eq in self]
+			start_datetime = self.start_date
+		return self.get_datetimes() - start_datetime
 
-	def get_inter_event_times(self):
+	def get_inter_event_times(self, unit='D'):
 		"""
-		Return time interval in days between each subsequent event
+		Return time interval in fractions of specified unit between each
+		subsequent event
+
+		:param unit:
+			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+			(year|week|day|hour|minute|second|millisecond|microsecond)
+			(default: 'D')
 
 		:return:
 			float array, inter-event times
 		"""
-		from .time_functions import time_delta_to_days
-
-		sorted_catalog = self.sort()
+		sorted_catalog = self.get_sorted()
 		date_times = sorted_catalog.get_datetimes()
 		time_deltas = np.diff(date_times)
-		return np.array([time_delta_to_days(td) for td in time_deltas])
+		return tf.fractional_time_delta(time_deltas, unit=unit)
 
-	def timespan(self):
+	def timespan(self, unit='Y'):
 		"""
-		Return total time span of catalog as number of fractional years.
+		Return total time span of catalog as fraction of specified unit
+
+		:param unit:
+			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+			(year|week|day|hour|minute|second|millisecond|microsecond)
+			(default: 'Y')
 		"""
 		start_date, end_date = self.start_date, self.end_date
-		return timespan(start_date, end_date)
+		return tf.timespan(start_date, end_date, unit=unit)
 
 	def get_datetimes(self):
 		"""
 		Return list of datetimes for all earthquakes in catalog
 		"""
-		return [eq.datetime for eq in self]
+		return np.array([eq.datetime for eq in self])
 
 	def get_years(self):
 		"""
 		Return array of integer years for all earthquakes in catalog
 		"""
-		return np.array([date.year for date in self.get_datetimes()])
+		return tf.to_year(self.get_datetimes())
 
 	def get_fractional_years(self):
 		"""
 		Return array with fractional years for all earthquakes in catalog
 		"""
-		years = np.array([eq.get_fractional_year() for eq in self])
-		#years = [eq.datetime.year + (eq.datetime.month - 1.0) /12
-		# 		+ ((eq.datetime.day - 1.0) / 31) / 12 for eq in self]
+		years = tf.to_fractional_year(self.get_datetimes())
 		return years
 
 	def get_magnitudes(self, Mtype="MW", Mrelation="default"):
@@ -392,14 +385,6 @@ class EQCatalog:
 			1-D numpy float array, earthquake magnitudes
 		"""
 		Mags = [eq.get_or_convert_mag(Mtype, Mrelation) for eq in self]
-		"""
-		if Mtype.upper() == "ML":
-			Mags = [eq.get_ML(Mrelation=Mrelation) for eq in self]
-		elif Mtype.upper() == "MS":
-			Mags = [eq.get_MS(Mrelation=Mrelation) for eq in self]
-		elif Mtype.upper() == "MW":
-			Mags = [eq.get_MW(Mrelation=Mrelation) for eq in self]
-		"""
 		return np.array(Mags)
 
 	def get_magnitude_uncertainties(self, min_uncertainty=0.3):
@@ -500,9 +485,9 @@ class EQCatalog:
 		import mapping.geotools.coordtrans as coordtrans
 		lons, lats = self.get_longitudes(), self.get_latitudes()
 		coord_list = list(zip(lons, lats))
-		if proj == "lambert1972":
+		if proj.lower() == "lambert1972":
 			return coordtrans.lonlat_to_lambert1972(coord_list)
-		elif proj == "utm31N":
+		elif proj.lower() == "utm31n":
 			return coordtrans.utm_to_lonlat(coord_list, proj)
 
 	def Tminmax(self, Mmax=None, Mtype="MW", Mrelation="default"):
@@ -518,17 +503,13 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		"""
-		DateTimes = self.get_datetimes()
+		datetimes = self.get_datetimes()
 		if Mmax != None:
-			filtered_DateTimes = []
 			Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
-			for M, dt in zip(Mags, DateTimes):
-				if M < Mmax:
-					filtered_DateTimes.append(dt)
-			DateTimes = filtered_DateTimes
-		if DateTimes:
-			return (min(DateTimes), max(DateTimes))
-		else:
+			datetimes = datetimes[np.where(Mags < Mmax)]
+		try:
+			return (datetimes.min(), datetimes.max())
+		except ValueError:
 			return (None, None)
 
 	def Mminmax(self, Mtype="MW", Mrelation="default"):
@@ -637,9 +618,9 @@ class EQCatalog:
 		:return:
 			Float, total seismic moment in N.m
 		"""
-		return np.add.reduce(self.get_M0(Mrelation=Mrelation))
+		return np.sum(self.get_M0(Mrelation=Mrelation))
 
-	def get_M0rate(self, completeness=None, Mrelation="default"):
+	def get_M0rate(self, completeness=None, Mrelation="default", time_unit='Y'):
 		"""
 		Compute seismic moment rate.
 
@@ -649,38 +630,63 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MS" or "ML")
 			(default: None, will select the default relation for the given Mtype)
+		:param time_unit:
+			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+			(year|week|day|hour|minute|second|millisecond|microsecond)
+			timespan unit
+			(default: 'Y')
 
 		:return:
-			Float, seismic moment rate in N.m/yr
+			Float, seismic moment rate in N.m per unit of :param:`time_unit`
 		"""
 		if completeness is None:
-			M0rate = self.get_M0_total(Mrelation=Mrelation) / self.timespan()
+			M0rate = self.get_M0_total(Mrelation=Mrelation) / self.timespan(time_unit)
 		else:
 			if completeness.Mtype != "MW":
 				raise Exception("Completeness magnitude must be moment magnitude!")
 			M0rate = 0.
 			for subcatalog in self.split_completeness(completeness=completeness,
 											Mtype="MW", Mrelation=Mrelation):
-				M0rate += subcatalog.get_M0_total(Mrelation=Mrelation) / subcatalog.timespan()
+				M0rate += (subcatalog.get_M0_total(Mrelation=Mrelation)
+						 	/ subcatalog.timespan(time_unit))
 		return M0rate
 
-	def get_sorted(self, eq_attr, reverse=False):
+	def get_sorted(self, key="datetime", order="asc"):
 		"""
 		Get copy of catalog sorted by earthquake attribute.
 
-		:param eq_attr:
-			str, attribute of :class:`LocalEarthquake`
-		:param reverse:
-			bool, whether to sort ascending (False) or descending (True)
-			(default: False)
+		:param key:
+			str, property of :class:`LocalEarthquake` to use as sort key
+			(default: "datetime")
+		:param order:
+			str, sorting order: "asc" or "desc"
+			(default: "asc")
 
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		eq_list = sorted(self.eq_list, key=lambda eq:getattr(eq, eq_attr, None),
-						reverse=reverse)
+		reverse = {"asc": False, "desc": True}[order]
+		eq_list = sorted(self.eq_list, key=lambda eq:getattr(eq, key), reverse=reverse)
 		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date,
 						region=self.region, name=self.name)
+
+	def sort(self, key="datetime", order="asc"):
+		"""
+		Sort catalog in place
+
+		:param key:
+			str, property of :class:`LocalEarthquake` to use as sort key
+			(default: "datetime")
+		:param order:
+			str, sorting order: "asc" or "desc"
+			(default: "asc")
+
+		:return:
+			None, catalog is sorted in place
+		"""
+		reverse = {"asc": False, "desc": True}[order]
+		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key), reverse=reverse)
+		self.eq_list = eq_list
 
 	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None,
 					Mmax=None, min_depth=None, max_depth=None, attr_val=(),
@@ -697,7 +703,7 @@ class EQCatalog:
 			If integer, start_date is interpreted as start year
 			(default: None)
 		:param end_date:
-			Int date or datetime object specifying end of time window of interest
+			Int or date or datetime object specifying end of time window of interest
 			If integer, end_date is interpreted as end year
 			(default: None)
 		:param Mmin:
@@ -729,17 +735,13 @@ class EQCatalog:
 		"""
 		## Convert dates
 		if isinstance(start_date, int):
-			start_date = mxDateTime.Date(start_date, 1, 1)
-		elif isinstance(start_date, datetime.datetime):
-			start_date = start_date.date()
-		elif isinstance(start_date, mxDateTime.DateTimeType):
-			start_date = mxDateTime.Date(*start_date.timetuple()[:3])
+			start_date = tf.time_tuple_to_np_datetime(start_date, 1, 1)
+		else:
+			start_date = tf.as_np_datetime(start_date)
 		if isinstance(end_date, int):
-			end_date = mxDateTime.Date(end_date, 12, 31)
-		elif isinstance(end_date, datetime.datetime):
-			end_date = end_date.date()
-		elif isinstance(end_date, mxDateTime.DateTimeType):
-			end_date = mxDateTime.Date(*end_date.timetuple()[:3])
+			end_date = tf.time_tuple_to_np_datetime(end_date, 12, 31)
+		else:
+			end_date = tf.as_np_datetime(end_date)
 
 		## Check each constraint separately
 		eq_list = self.eq_list
@@ -789,10 +791,15 @@ class EQCatalog:
 				region = self.get_region()
 		if start_date is None:
 			start_date = self.start_date
+		else:
+			start_date = tf.as_np_datetime(start_date)
 		if end_date is None:
 			end_date = self.end_date
+		else:
+			end_date = tf.as_np_datetime(end_date)
 		if not include_right_edges:
-			end_date -= mxDateTime.DateTimeDelta(1)
+			unit = str(end_date.dtype).split('[')[1].split(']')[0]
+			end_date -= np.timedelta64(1, unit)
 
 		if not catalog_name:
 			catalog_name = self.name + " (subselect)"
@@ -848,12 +855,12 @@ class EQCatalog:
 			}
 
 		magnitudes = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
-		datetimes = np.array(self.get_datetimes())
+		datetimes = self.get_datetimes()
 		lons = self.get_longitudes()
 		lats = self.get_latitudes()
 
 		## Remove NaN magnitudes
-		idxs = -np.isnan(magnitudes)
+		idxs = ~np.isnan(magnitudes)
 		magnitudes = magnitudes[idxs]
 		datetimes = datetimes[idxs]
 		lons = lons[idxs]
@@ -1026,7 +1033,7 @@ class EQCatalog:
 
 		for eq in subcatalog:
 			try:
-				bin_id = np.where(bins_Years <= eq.datetime.year)[0][-1]
+				bin_id = np.where(bins_Years <= eq.year)[0][-1]
 			except IndexError:
 				## These are earthquakes that are younger
 				pass
@@ -1041,9 +1048,9 @@ class EQCatalog:
 		Bin earthquakes into day intervals
 
 		:param start_date:
-			instance of datetime.date, start date
+			instance of :class:`datetime.date` or :class:`np.datetime64`, start date
 		:param end_date:
-			instance of datetime.date, end date
+			instance of :class:`datetime.date` or :class:`np.datetime64`, end date
 		:param dday:
 			Int, bin interval in days
 		:param Mmin:
@@ -1063,12 +1070,11 @@ class EQCatalog:
 			bins_Days: array containing lower day of each interval
 				(relative to first day)
 		"""
-		bins_Days = np.arange(0, (end_date - start_date).days + dday, dday)
+		bins_Days = np.arange(0, int(tf.timespan(start_date, end_date, 'D')) + dday, dday)
 		## Select years according to magnitude criteria
 		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
 						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		Days = [(eq.date - start_date).days + (eq.date - start_date).seconds / 86400.0
-				for eq in subcatalog]
+		Days = tf.timespan(start_date, subcatalog.get_datetimes(), 'D')
 		bins_N, bins_Days = np.histogram(Days, bins_Days)
 		return (bins_N, bins_Days[:-1])
 
@@ -1078,9 +1084,9 @@ class EQCatalog:
 		Bin earthquake moments into day intervals.
 
 		:param start_date:
-			instance of datetime.date, start date
+			instance of :class:`datetime.date` or :class:`np.datetime64`, start date
 		:param end_date:
-			instance of datetime.date, end date
+			instance of :class:`datetime.date` or :class:`np.datetime64`, end date
 		:param dday:
 			Int, bin interval in days
 		:param Mmin:
@@ -1098,7 +1104,7 @@ class EQCatalog:
 			bins_Days: array containing lower day of each interval
 				(relative to first day)
 		"""
-		bins_Days = np.arange(0, (end_date - start_date).days + dday, dday)
+		bins_Days = np.arange(0, int(tf.timespan(start_date, end_date, 'D')) + dday, dday)
 		bins_M0 = np.zeros(len(bins_Days))
 		## Select years according to magnitude criteria
 		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
@@ -1106,7 +1112,7 @@ class EQCatalog:
 
 		for eq in subcatalog:
 			try:
-				bin_id = np.where(bins_Days <= (eq.date - start_date).days)[0][-1]
+				bin_id = np.where(bins_Days <= tf.timespan(start_date, eq.date, 'D'))[0][-1]
 			except IndexError:
 				## These are earthquakes that are younger
 				pass
@@ -1161,27 +1167,38 @@ class EQCatalog:
 		Bin earthquakes into depth bins
 
 		:param min_depth:
-			Int, minimum depth in km (default: 0)
+			Int, minimum depth in km
+			(default: 0)
 		:param max_depth:
-			Int, maximum depth in km (default: 30)
+			Int, maximum depth in km
+			(default: 30)
 		:param bin_width:
-			Int, bin width in km (default: 2)
+			Int, bin width in km
+			(default: 2)
 		:param depth_error:
-			Float, maximum depth uncertainty (default: None)
+			Float, maximum depth uncertainty
+			(default: None)
 		:param Mmin:
-			Float, minimum magnitude (inclusive) (default: None)
+			Float, minimum magnitude (inclusive)
+			(default: None)
 		:param Mmax:
-			Float, maximum magnitude (inclusive) (default: None)
+			Float, maximum magnitude (inclusive)
+			(default: None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
+			to magnitude type ("MW", "MS" or "ML")
+			(default: None, will select the default relation for the given Mtype)
 		:param start_date:
-			Int or datetime.date, lower year or date to bin (default: None)
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			lower year or date to bin
+			(default: None)
 		:param end_date:
-			Int or datetime.date, upper year or date to bin (default: None)
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			upper year or date to bin
+			(default: None)
 
 		:return:
 			tuple (bins_N, bins_depth)
@@ -1201,7 +1218,7 @@ class EQCatalog:
 
 	def bin_depth_by_M0(self, min_depth=0, max_depth=30, bin_width=2,
 					depth_error=None, Mmin=None, Mmax=None, Mrelation="default",
-					start_year=None, end_year=None):
+					start_date=None, end_date=None):
 		"""
 		Bin earthquake moments into depth bins
 
@@ -1221,10 +1238,14 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param start_year:
-			Int, lower year to bin (default: None)
-		:param end_year:
-			Int, upper year to bin (default: None)
+		:param start_date:
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			lower year or date to bin
+			(default: None)
+		:param end_date:
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			upper year or date to bin
+			(default: None)
 
 		:return:
 			tuple (bins_M0, bins_depth)
@@ -1233,7 +1254,7 @@ class EQCatalog:
 		"""
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_M0 = np.zeros(len(bins_depth))
-		subcatalog = self.subselect(start_date=start_year, end_date=end_year,
+		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
 						Mmin=Mmin, Mmax=Mmax, Mtype="MW", Mrelation=Mrelation,
 						min_depth=min_depth, max_depth=max_depth)
 		if depth_error:
@@ -1358,7 +1379,7 @@ class EQCatalog:
 		:return:
 			instance of :class:`Completeness`
 		"""
-		min_date = self.start_date.year
+		min_date = tf.to_year(self.start_date)
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
 	def get_completeness_timespans(self, magnitudes,
@@ -1757,7 +1778,7 @@ class EQCatalog:
 			String, language of plot labels (default: "en")
 		"""
 		from matplotlib.patches import FancyArrowPatch
-		catalog_start_year = self.start_date.year // dYear * dYear
+		catalog_start_year = tf.to_year(self.start_date) // dYear * dYear
 		if start_year <= catalog_start_year:
 			start_year = catalog_start_year
 		bins_N, bins_Years = self.bin_year(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
@@ -1786,7 +1807,7 @@ class EQCatalog:
 			pylab.plot(xfit, m*xfit+b, 'r--', lw=2, label="Regression")
 
 		pylab.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang], fontsize='x-large')
-		pylab.ylabel({"en": "Cumulative number of events since", "nl": "Gecumuleerd aantal aardbevingen sinds"}[lang] + " %d" % self.start_date.year, fontsize='x-large')
+		pylab.ylabel({"en": "Cumulative number of events since", "nl": "Gecumuleerd aantal aardbevingen sinds"}[lang] + " %d" % tf.to_year(self.start_date), fontsize='x-large')
 		pylab.title("%s (M %.1f - %.1f)" % (self.name, Mmin, Mmax), fontsize='xx-large')
 		majorLocator = MultipleLocator(major_ticks)
 		minorLocator = MultipleLocator(minor_ticks)
@@ -1808,10 +1829,12 @@ class EQCatalog:
 		Plot cumulated seismic moment versus time.
 
 		:param start_date:
-			datetime.date object or integer, start date or start year
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			start date or start year
 			(default: None)
 		:param end_date:
-			datetime.date object or integer, end date or end year
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			end date or end year
 			(default: None)
 		:param bin_width:
 			Int, bin width of histogram and binned curve (default: 10)
@@ -1837,15 +1860,15 @@ class EQCatalog:
 			end_date = self.end_date
 
 		if bin_width_spec.lower()[:4] == "year":
-			bins_M0, bins_Dates = self.bin_year_by_M0(start_date.year, end_date.year, bin_width, Mrelation=Mrelation)
+			bins_M0, bins_Dates = self.bin_year_by_M0(tf.to_year(start_date), tf.to_year(end_date), bin_width, Mrelation=Mrelation)
 			#bins_Dates = np.arange(start_date.year, end_date.year+bin_width, bin_width)
-			subcatalog = self.subselect(start_date=start_date.year, end_date=end_date.year)
-			Dates = [eq.datetime.year for eq in subcatalog]
+			subcatalog = self.subselect(start_date=tf.to_year(start_date), end_date=tf.to_year(end_date))
+			Dates = [eq.year for eq in subcatalog]
 		elif bin_width_spec.lower()[:3] == "day":
-			bins_M0, bins_Dates = self.bin_day_by_M0(start_date, end_date, bin_width, Mrelation=Mrelation)
+			bins_M0, bins_Dates = self.bin_day_by_M0(tf.as_np_date(start_date), tf.as_np_date(end_date), bin_width, Mrelation=Mrelation)
 			#bins_Dates = np.arange((end_date - start_date).days + 1)
 			subcatalog = self.subselect(start_date=start_date, end_date=end_date)
-			Dates = [(eq.datetime - start_date).days + (eq.datetime - start_date).seconds / 86400.0 for eq in subcatalog]
+			Dates = tf.timespan(start_date, self.get_datetimes(), 'D')
 		bins_M0_cumul = np.add.accumulate(bins_M0)
 		unbinned_M0 = subcatalog.get_M0(Mrelation=Mrelation)
 		M0_cumul = np.add.accumulate(unbinned_M0)
@@ -1917,9 +1940,10 @@ class EQCatalog:
 		start_date, end_date = subcatalog.start_date, subcatalog.end_date
 
 		if ddate_spec.lower()[:4] == "year":
-			bins_Dates = np.arange(start_date.year, end_date.year+ddate, ddate)
+			bins_Dates = np.arange(tf.to_year(start_date), tf.to_year(end_date)+ddate, ddate)
 		elif ddate_spec.lower()[:3] == "day":
-			bins_Dates = np.arange((end_date - start_date).days + 1)
+			#bins_Dates = np.arange((end_date - start_date).days + 1)
+			bins_Dates = np.arange(0, int(tf.timespan(start_date, end_date, 'D')) + 1)
 		bins_Num = []
 		mag_limits = np.array(mag_limits)
 		Nmag = len(mag_limits) + 1
@@ -1933,9 +1957,9 @@ class EQCatalog:
 			except IndexError:
 				im = -1
 			if ddate_spec.lower()[:4] == "year":
-				id = np.where(eq.datetime.year == bins_Dates)[0][0]
+				id = np.where(eq.year == bins_Dates)[0][0]
 			elif ddate_spec.lower()[:3] == "day":
-				id = (eq.date - start_date).days
+				id = int(tf.timespan(start_date, eq.date, 'D'))
 			bins_Num[im][id] += 1
 
 		fig = pylab.figure()
@@ -2002,7 +2026,7 @@ class EQCatalog:
 		pylab.grid(True)
 
 		if title is None:
-			title='Depth-Magnitude function {0}-{1}, {2} events'.format(subcatalog.start_date.year, subcatalog.end_date.year, len(magnitudes))
+			title='Depth-Magnitude function {0}-{1}, {2} events'.format(tf.to_year(subcatalog.start_date), tf.to_year(subcatalog.end_date), len(magnitudes))
 
 		pylab.title(title)
 
@@ -2187,9 +2211,9 @@ class EQCatalog:
 			label.set_size('large')
 
 		if not start_year:
-			start_year = self.start_date.year
+			start_year = tf.to_year(self.start_date)
 		if not end_year:
-			end_year = self.end_date.year
+			end_year = tf.to_year(self.end_date)
 		if Mmin is None:
 			Mmin = self.get_Mmin()
 		if Mmax is None:
@@ -2245,9 +2269,13 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param start_date:
-			Int or datetime.date, lower year or date to bin (default: None)
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			lower year or date to bin
+			(default: None)
 		:param end_date:
-			Int or datetime.date, upper year or date to bin (default: None)
+			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
+			upper year or date to bin
+			(default: None)
 		:param color:
 			String, matplotlib color specification for histogram bars
 			if :param:`dM` is set, this may also be a list of color specs
@@ -2401,9 +2429,9 @@ class EQCatalog:
 			label.set_size('large')
 		if title is None:
 			if not start_year:
-				start_year = self.start_date.year
+				start_year = tf.to_year(self.start_date)
 			if not end_year:
-				end_year = self.end_date.year
+				end_year = tf.to_year(self.end_date)
 			if Mmin is None:
 				Mmin = self.get_Mmin()
 			if Mmax is None:
@@ -2879,7 +2907,7 @@ class EQCatalog:
 			Mmax_obs = cc_catalog.get_Mmax(Mtype, Mrelation)
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
-		end_year = self.end_date.year
+		end_year = tf.to_year(self.end_date)
 		plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation="default"):
@@ -2898,7 +2926,9 @@ class EQCatalog:
 		f = open(filespec, "w")
 		for eq in self.eq_list:
 			M = eq.get_or_convert_mag(Mtype, Mrelation)
-			f.write("%f  %f  %d  %d  %d  %.1f %.2f %d %d\n" % (eq.lon, eq.lat, eq.datetime.year, eq.datetime.month, eq.datetime.day, M, eq.depth, eq.datetime.hour, eq.datetime.minute))
+			year, month, day, hour, minute, second = tf.to_time_tuple(eq.datetime)
+			f.write("%f  %f  %d  %d  %d  %.1f %.2f %d %d\n"
+					% (eq.lon, eq.lat, year, month, day, M, eq.depth, hour, minute))
 		f.close()
 
 	def export_csv(self, csv_filespec=None, Mtype=None, Mrelation="default"):
@@ -2926,10 +2956,7 @@ class EQCatalog:
 		else:
 			f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
 		for eq in self.eq_list:
-			try:
-				date = eq.date.isoformat()
-			except AttributeError:
-				date = eq.date.date
+			date = eq.date
 			time = eq.time.isoformat()
 			if eq.name != None:
 				if isinstance(eq.name, bytes):
@@ -2969,9 +2996,9 @@ class EQCatalog:
 		kmldoc = mykml.KML()
 		#year, month, day = self.start_date.year, self.start_date.month, self.start_date.day
 		#start_time = datetime.datetime(year, month, day)
-		start_time = datetime.datetime.now()
+		start_time = tf.utcnow()
 		kmldoc.addTimeStamp(start_time)
-		current_year = start_time.year
+		current_year = tf.to_year(start_time)
 		eq_years = self.get_years()
 		eq_centuries = sorted(set((eq_years // 100) * 100))
 
@@ -3018,7 +3045,7 @@ class EQCatalog:
 
 		for eq in self:
 			if eq.event_type == "ke":
-				if eq.datetime.year < instrumental_start_year:
+				if eq.year < instrumental_start_year:
 					Mtype = "MS"
 				else:
 					Mtype = "ML"
@@ -3032,8 +3059,8 @@ class EQCatalog:
 				#Mtype = "ML"
 
 			elif time_folders:
-				if eq.datetime.year < instrumental_start_year:
-					century = (eq.datetime.year // 100) * 100
+				if eq.year < instrumental_start_year:
+					century = (eq.year // 100) * 100
 					folder = century_folders[century]
 					visible = True
 					color = (0, 255, 0)
@@ -3041,19 +3068,19 @@ class EQCatalog:
 				else:
 					visible = True
 					#Mtype = "ML"
-					if start_time - eq.datetime <= datetime.timedelta(1, 0, 0):
+					if start_time - eq.datetime <= np.timedelta64(1, 'D'):
 						folder = folder_24h
 						color = (255, 0, 0)
-					elif start_time - eq.datetime <= datetime.timedelta(14, 0, 0):
+					elif start_time - eq.datetime <= np.timedelta64(14, 'D'):
 						folder = folder_2w
 						color = (255, 128, 0)
-					elif start_time - eq.datetime <= datetime.timedelta(365, 0, 0):
+					elif start_time - eq.datetime <= np.timedelta64(365, 'D'):
 						folder = folder_lastyear
 						color = (255, 255, 0)
 					else:
-						decade = (eq.datetime.year // 10) * 10
+						decade = (eq.year // 10) * 10
 						folder = decade_folders[decade]
-						if eq.datetime.year >= 2000:
+						if eq.year >= 2000:
 							color = (192, 0, 192)
 						else:
 							color = (0, 0, 255)
@@ -3078,7 +3105,7 @@ class EQCatalog:
 				elif eq.depth > 20.:
 					color = (255, 0, 0)
 
-			t = eq.datetime.time()
+			t = eq.time()
 			#url = '<a href="http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d">ROB web page</a>' % eq.ID
 			try:
 				hash = eq.get_rob_hash()
@@ -3089,10 +3116,7 @@ class EQCatalog:
 
 			values = OrderedDict()
 			values['ID'] = eq.ID
-			try:
-				values['Date'] = eq.date.isoformat()
-			except:
-				values['Date'] = eq.date.date
+			values['Date'] = str(eq.date)
 			values['Time'] = "%02d:%02d:%02d" % (t.hour, t.minute, int(round(t.second + t.microsecond/1e+6)))
 			values['Name'] = mykml.xmlstr(eq.name)
 			values['ML'] = eq.ML
@@ -3110,7 +3134,7 @@ class EQCatalog:
 			icon_href = "http://kh.google.com:80/flatfile?lf-0-icons/shield3_nh.png"
 			iconstyle = kmldoc.createIconStyle(href=icon_href, scale=0.75+(values[Mtype]-3.0)*0.15, rgb=color)
 			style = kmldoc.createStyle(styles=[labelstyle, iconstyle])
-			ts = kmldoc.createTimeSpan(begin=eq.datetime)
+			ts = kmldoc.createTimeSpan(begin=tf.to_py_datetime(eq.datetime))
 			kmldoc.addPointPlacemark(name, eq.lon, eq.lat, folder=folder, description=values, style=style, visible=visible, timestamp=ts)
 
 		if kml_filespec:
@@ -3439,30 +3463,25 @@ class EQCatalog:
 	def split_into_time_intervals(self, time_interval):
 		"""
 		:param time_interval:
-			int (years) or timedelta object (precision of days)
+			int (years) or instance of :class:`np.timedelta64`
+			(precision of days or better)
 
 		:return:
 			list with instances of :class:`EQCatalog`
 		"""
-		def add_time_delta(date_time, time_delta):
-			if isinstance(time_delta, int):
-				time_tuple = list(date_time.timetuple())
-				time_tuple[0] += time_delta
-				out_date_time = mxDateTime.DateTimeFrom(*time_tuple[:6])
-			else:
-				out_date_time = mxDateTime.DateTimeFrom(date_time)
-				out_date_time += time_delta
-			return out_date_time
-
 		subcatalogs = []
 		start_date = self.start_date
-		end_date = add_time_delta(self.start_date, time_interval)
-		max_end_date = self.end_date + mxDateTime.DateTimeDelta(1)
+		if isinstance(time_interval, int):
+			time_interval = np.timedelta64(time_interval, 'Y')
+		end_date = self.start_date + time_interval
+		unit = str(end_date.dtype).split('[')[1].split(']')[0]
+		max_end_date = self.end_date + np.timedelta64(1, unit)
 		while start_date <= self.end_date:
-			catalog = self.subselect(start_date=start_date, end_date=min(end_date, max_end_date), include_right_edges=False)
+			catalog = self.subselect(start_date=start_date, end_date=min(end_date, max_end_date),
+									include_right_edges=False)
 			subcatalogs.append(catalog)
 			start_date = end_date
-			end_date = add_time_delta(start_date, time_interval)
+			end_date = start_date + time_interval
 
 		return subcatalogs
 
@@ -3499,14 +3518,14 @@ class EQCatalog:
 		for i, eq in enumerate(self):
 			# TODO: write function to generate errM, errh based on date (use completeness dates?)
 			if not eq.errM:
-				if eq.datetime.year < 1910:
+				if eq.year < 1910:
 					errM = 0.5
-				elif 1910 <= eq.datetime.year < 1985:
+				elif 1910 <= eq.year < 1985:
 					if eq.MS > 0:
 						errM = 0.2
 					else:
 						errM = 0.3
-				elif eq.datetime.year >= 1985:
+				elif eq.year >= 1985:
 					eq.errM = 0.2
 			elif eq.errM >= 1.:
 				# A lot of earthquakes have errM = 9.9 ???
@@ -3515,17 +3534,17 @@ class EQCatalog:
 				errM = eq.errM
 
 			if not eq.errh:
-				if eq.datetime.year < 1650:
+				if eq.year < 1650:
 					errh = 25
-				elif 1650 <= eq.datetime.year < 1910:
+				elif 1650 <= eq.year < 1910:
 					errh = 15
-				elif 1910 <= eq.datetime.year < 1930:
+				elif 1910 <= eq.year < 1930:
 					errh = 10
-				elif 1930 <= eq.datetime.year < 1960:
+				elif 1930 <= eq.year < 1960:
 					errh = 5.
-				elif 1960 <= eq.datetime.year < 1985:
+				elif 1960 <= eq.year < 1985:
 					errh = 2.5
-				elif eq.datetime.year >= 1985:
+				elif eq.year >= 1985:
 					errh = 1.5
 			else:
 				errh = eq.errh
@@ -3731,15 +3750,16 @@ class EQCatalog:
 		for eq in self:
 			mag = eq.get_or_convert_mag(Mtype, Mrelation)
 			if not np.isnan(mag):
+				year, month, day, hour, minute, second = tf.to_time_tuple(eq.datetime)
 				data_int.append([
-					int(eq.datetime.year),
-					int(eq.datetime.month),
-					int(eq.datetime.day),
-					int(eq.datetime.hour),
-					int(eq.datetime.minute),
+					int(year),
+					int(month),
+					int(day),
+					int(hour),
+					int(minute),
 				])
 				data_flt.append([
-					float(eq.datetime.second),
+					float(second),
 					float(mag),
 					float(eq.lon),
 					float(eq.lat),
@@ -3902,19 +3922,20 @@ class EQCatalog:
 		keys_int = ['year', 'month', 'day', 'hour', 'minute']
 		data_int, data_flt = [], []
 		for eq in self:
+			year, month, day, hour, minute, second = tf.to_time_tuple(eq.datetime)
 			data_flt.append([
-				float(eq.datetime.second),
+				float(second),
 				float(eq.lon),
 				float(eq.lat),
 				float(eq.depth),
 				float(eq.get_or_convert_mag(Mtype=Mtype, Mrelation=Mrelation)),
 			])
 			data_int.append([
-				int(eq.datetime.year),
-				int(eq.datetime.month),
-				int(eq.datetime.day),
-				int(eq.datetime.hour),
-				int(eq.datetime.minute),
+				int(year),
+				int(month),
+				int(day),
+				int(hour),
+				int(minute),
 			])
 		catalogue.load_from_array(keys_flt, np.array(data_flt, dtype=np.float))
 		catalogue.load_from_array(keys_int, np.array(data_int, dtype=np.int))
@@ -4076,23 +4097,6 @@ class EQCatalog:
 		d_epi = self.get_epicentral_distances(lon, lat)
 		d_hypo = np.sqrt(d_epi**2 + (self.get_depths() - z)**2)
 		return d_hypo
-
-	def sort(self, key="datetime", order="asc"):
-		"""
-		Sort catalog
-
-		:param key:
-			str, property of :class:`EQRecord` to use as sort key
-		:param order:
-			str, sorting order: "asc" or "desc"
-			(default: "asc")
-
-		:return:
-			instance of :class:`EQCatalog`
-		"""
-		reverse = {"asc": False, "desc": True}[order]
-		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key), reverse=reverse)
-		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date, region=self.region, name=self.name)
 
 
 def concatenate_catalogs(catalog_list, name=""):
@@ -4366,7 +4370,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 			## LocalEarthquake property names to integer column numbers
 			assert column_map and isinstance(column_map.values()[0], int)
 			cm2 = {val:key for key,val in column_map.items()}
-			fieldnames = [cm2.get(k) for k in range(min(cm2.keys()), max(cm2.keys())+1)]
+			fieldnames = [cm2.get(k) for k in range(0, max(cm2.keys())+1)]
 			column_map = {}
 		else:
 			fieldnames = None
@@ -4385,14 +4389,23 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 						if col_name is not None:
 							column_map[col_name.lower()] = col_name
 
+			## Remove unmapped columns
+			if None in row:
+				del row[None]
+
 			## Remove ignore_chars from record values
 			for ic in ignore_chars:
 				for key, val in row.items():
 					row[key] = val.replace(ic, '')
 
+			## Strip leading/traling white space
+			for key, val in row.items():
+				if val:
+					row[key] = val.strip()
+
 			## If no ID is present, use record number
 			ID_key = column_map.get('ID', 'ID')
-			row[ID_key] = ID_prefix + row.get(ID_key, r)
+			row[ID_key] = ID_prefix + str(row.get(ID_key, r))
 
 			try:
 				eq = LocalEarthquake.from_dict_rec(row, column_map=column_map,
@@ -4467,7 +4480,7 @@ def read_catalog_gis(gis_filespec, column_map={}, ID_prefix='',
 		for ic in ignore_chars:
 			for key, val in rec.items():
 				if isinstance(val, basestring):
-					row[key] = val.replace(ic, '')
+					rec[key] = val.replace(ic, '')
 
 		## If no ID is present, use record number
 		ID_key = column_map.get('ID', 'ID')
@@ -4565,7 +4578,7 @@ def read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=False,
 			else:
 				day = 1
 		try:
-			date = datetime.date(year, month, day)
+			date = tf.time_tuple_to_np_datetime(year, month, day)
 		except:
 			print(year, month, day)
 			date = None
@@ -4820,7 +4833,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		instance of :class:`EQCatalog`
 	"""
 	import csv
-	from .time_functions import parse_isoformat_datetime
+	#from .time_functions import parse_isoformat_datetime
 
 	date_order = date_order.upper()
 	earthquakes = []
@@ -4840,7 +4853,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 				ID = ID_prefix + str(ID)
 
 			if "datetime" in column_map:
-				dt = parse_isoformat_datetime(line[column_map["datetime"]])
+				dt = np.datetime64(line[column_map["datetime"]])
 				date = dt.date()
 				time = dt.time()
 			else:
@@ -4880,7 +4893,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 					else:
 						day = 1
 				try:
-					date = mxDateTime.Date(year, month, day)
+					date = tf.time_tuple_to_np_datetime(year, month, day)
 				except:
 					print(line)
 				if "time" in column_map:
@@ -4920,7 +4933,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 							second = 0
 					else:
 						second = 0
-				time = mxDateTime.Time(hour, minute, second)
+				time = datetime.time(hour, minute, second)
 
 			if "lon" in column_map:
 				lon = float(line[column_map["lon"]])
@@ -5918,7 +5931,7 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 			label = catalog.name
 		y = catalog.get_magnitudes(Mtype, Mrelation)
 		if plot_date:
-			x = catalog.get_datetimes()
+			x = [tf.to_py_datetime(dt) for dt in catalog.get_datetimes()]
 		else:
 			x = catalog.get_fractional_years()
 		ax.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color, linewidth=edge_width)
@@ -6213,7 +6226,7 @@ def read_catalogMI(tabname="KSB-ORB_catalog", region=None, start_date=None, end_
 	for zone_name, query in zip(zone_names, queries):
 		## Important: we loop over zone_names instead of zones, because the former is a function
 		## argument, and can be specified by the caller
-		name = "%s %s - %s" % (zone_name, start_date.isoformat(), end_date.isoformat())
+		name = "%s %s - %s" % (zone_name, start_date, end_date)
 		if verbose:
 			print(query)
 		app.Do(query)
