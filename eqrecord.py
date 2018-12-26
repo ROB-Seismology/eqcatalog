@@ -464,7 +464,7 @@ class LocalEarthquake:
 		:return:
 			instance of :class:`HYPDAT`
 		"""
-		from .HY4 import HYPDAT
+		from .io.HY4 import HYPDAT
 
 		latitude = int(round(self.lat * 3600 / 0.001))
 		longitude = int(round(self.lon * 3600 / 0.001))

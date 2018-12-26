@@ -1472,7 +1472,7 @@ class MacroseismicEnquiryEnsemble():
 			(title, labels) tuple
 		"""
 		import os
-		from .parse_php_vars import parse_php_vars
+		from .io.parse_php_vars import parse_php_vars
 
 		base_path = os.path.split(__file__)[0]
 		php_file = os.path.join(base_path, 'rob', 'webenq', 'const_inq%s.php' % lang.upper())
