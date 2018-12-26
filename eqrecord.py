@@ -175,7 +175,7 @@ class LocalEarthquake:
 		# TODO: errM should be dict as well
 		self.errM = errM
 
-		self.zone = unicode(zone)
+		self.zone = u'' + zone
 		self.event_type = event_type
 
 	@classmethod
@@ -368,7 +368,7 @@ class LocalEarthquake:
 				if intensity_max[-1] in ('+', '-'):
 					intensity_max = intensity_max[:-1]
 				## Take average if Imax is specified as range
-				Imax_vals = map(float, intensity_max.split('-'))
+				Imax_vals = list(map(float, intensity_max.split('-')))
 				intensity_max = np.mean(Imax_vals)
 		else:
 			intensity_max = 0.
