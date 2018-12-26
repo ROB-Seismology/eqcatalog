@@ -30,10 +30,10 @@ from db.simpledb import (build_sql_query, query_mysql_db_generic)
 
 
 __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
-			"query_ROB_LocalEQCatalog", "query_ROB_LocalEQCatalogByID",
-			"query_ROB_FocalMechanisms", "query_ROB_Official_MacroCatalog",
-			"query_ROB_Web_MacroCatalog", "query_ROB_Web_enquiries",
-			"query_ROB_Stations", "get_station_coordinates",
+			"query_local_eq_catalog", "query_local_eq_catalog_by_id",
+			"query_focal_mechanisms", "query_official_macro_catalog",
+			"query_web_macro_catalog", "query_web_macro_enquiries",
+			"query_stations", "get_station_coordinates",
 			"get_last_earthID", "zip2ID"]
 
 
@@ -107,7 +107,7 @@ def query_seismodb_table(table_clause, column_clause="*", join_clause="",
 	return query_seismodb_table_generic(query, verbose=verbose, errf=errf)
 
 
-def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
+def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 						Mmin=None, Mmax=None, min_depth=None, max_depth=None,
 						id_earth=None, sort_key="date", sort_order="asc",
 						event_type="ke", convert_NULL=True, verbose=False, errf=None):
@@ -312,11 +312,11 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 	return EQCatalog(eq_list, start_date, end_date, region=region, name=name)
 
 
-def query_ROB_LocalEQCatalogByID(id_earth, verbose=False, errf=None):
-	return query_ROB_LocalEQCatalog(id_earth=id_earth, verbose=verbose, errf=errf)
+def query_local_eq_catalog_by_id(id_earth, verbose=False, errf=None):
+	return query_local_eq_catalog(id_earth=id_earth, verbose=verbose, errf=errf)
 
 
-def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
+def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 							Mmin=None, Mmax=None, id_earth=None, sort_key="Mag",
 							sort_order="asc", verbose=False, errf=None):
 	"""
@@ -462,7 +462,7 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 	return focmec_list
 
 
-def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
+def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
 					group_by_main_village=False, agg_function="maximum",
 					verbose=False, errf=None):
 	"""
@@ -574,7 +574,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 	return macro_info
 
 
-def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
+def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 					min_val=1, min_fiability=20.0, group_by_main_village=False,
 					filter_floors=False, agg_function="average", verbose=False,
 					errf=None):
@@ -681,7 +681,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	return macro_info
 
 
-def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None,
+def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 						min_fiability=20, web_ids=[], verbose=False, errf=None):
 	"""
 	Query internet enquiries.
@@ -742,7 +742,7 @@ def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None,
 	return MacroseismicEnquiryEnsemble(id_earth, recs)
 
 
-def query_ROB_Stations(network='UCC', activity_date_time=None, verbose=False):
+def query_stations(network='UCC', activity_date_time=None, verbose=False):
 	"""
 	Query the ROB station database
 
@@ -849,5 +849,5 @@ if __name__ == "__main__":
 	start_date = datetime.date(1983, 1,1)
 	end_date = datetime.date(2007, 12, 31)
 	catalogue_length = (end_date.year - start_date.year) * 1.0
-	catalogue = query_ROB_LocalEQCatalog(start_date=start_date, end_date=end_date)
+	catalogue = query_local_eq_catalog(start_date=start_date, end_date=end_date)
 	print("%d events" % len(catalogue))
