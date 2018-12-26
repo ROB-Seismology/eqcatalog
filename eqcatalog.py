@@ -32,7 +32,6 @@ import os
 import sys
 import platform
 import datetime
-import cPickle
 import json
 from collections import OrderedDict
 
@@ -191,7 +190,7 @@ class EQCatalog:
 		else:
 			tab = []
 		for eq in self.eq_list:
-			row = [eq.ID, eq.date, eq.time, eq.name,
+			row = [str(eq.ID), str(eq.date), str(eq.time), eq.name,
 					"%.4f" % eq.lon, "%.4f" % eq.lat, "%.1f" % eq.depth,
 					"%.1f" % eq.ML, "%.1f" % eq.MS, "%.1f" % eq.MW]
 			if has_prettytable:
@@ -3207,6 +3206,7 @@ class EQCatalog:
 		Required parameter:
 			filespec: full path specification of output file
 		"""
+		import cPickle
 		f = open(filespec, "w")
 		cPickle.dump(self, f)
 		f.close()
@@ -4253,7 +4253,7 @@ def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 
 	eq_list = []
 	num_skipped = 0
-	for r, rec in enumerate(sql_db.query_generic(query)):
+	for r, rec in enumerate(sql_db.query_generic(query, verbose=verbose)):
 		rec = rec.to_dict()
 		## If no ID is present, use record number
 		ID_key = column_map.get('ID', 'ID')
@@ -4732,7 +4732,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 		column_map =  {'ID': 'ID', 'datetime': 'hypo_date_time',
 					'lon': 'hypo_lon', 'lat': 'hypo_lat', 'depth': 'hypo_depth',
 					'MS': 'ref_MS', 'MW': 'MW', 'name': 'location'}
-		return read_catalog_sql(sqldb, table_name, query=query, column_map=column_map)
+		return read_catalog_sql(sqldb, table_name, query=query, column_map=column_map,
+								verbose=verbose)
 
 	date_sep = '/'
 	if catalog_name.upper() == "SHEEC":
