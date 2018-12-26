@@ -49,7 +49,6 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
 
 
-# TODO: Move ROB-specific code to separate submodule
 # TODO: re-implement interface with (Hazard) Modelers' Toolkit
 
 ## Directories with MapInfo tables for named catalogs
@@ -65,8 +64,8 @@ import mapping.geotools.geodetic as geodetic
 
 ## Import package submodules
 from .eqrecord import LocalEarthquake
-from .source_models import read_source_model
-from .completeness import Completeness, DEFAULT_COMPLETENESS
+from .completeness import Completeness
+from .rob.completeness import DEFAULT_COMPLETENESS
 from . import time_functions_np as tf
 
 
@@ -1382,7 +1381,7 @@ class EQCatalog:
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
 	def get_completeness_timespans(self, magnitudes,
-								completeness=DEFAULT_COMPLETENESS):
+								completeness=DEFAULT_COMPLETENESS, unit='Y'):
 		"""
 		Compute completeness timespans for list of magnitudes
 
@@ -1392,15 +1391,19 @@ class EQCatalog:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes. If None, use start year of
 			catalog (default: DEFAULT_COMPLETENESS)
+		:param unit:
+			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+			(year|week|day|hour|minute|second|millisecond|microsecond)
+			(default: 'Y')
 
 		:return:
-			numpy float array, completeness timespans (fractional years)
+			numpy float array, completeness timespans in fractions of :param:`unit`
 		"""
 		if not completeness:
 			min_date = self.start_date
 			min_mag = np.min(magnitudes)
 			completeness = Completeness([min_date], [min_mag], Mtype="MW")
-		return completeness.get_completeness_timespans(magnitudes, self.end_date)
+		return completeness.get_completeness_timespans(magnitudes, self.end_date, unit=unit)
 
 	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW",
 						Mrelation="default", completeness=DEFAULT_COMPLETENESS,
@@ -3437,6 +3440,8 @@ class EQCatalog:
 		:return:
 			ordered dict {String sourceID: EQCatalog}
 		"""
+		from .rob.source_models import read_source_model
+
 		zone_catalogs = OrderedDict()
 
 		if isinstance(source_model_name, basestring):
@@ -4195,7 +4200,7 @@ def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	from .seismodb import query_ROB_LocalEQCatalog
+	from .rob.seismodb import query_ROB_LocalEQCatalog
 	return query_ROB_LocalEQCatalog(region=region, start_date=start_date,
 					end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth,
 					max_depth=max_depth, id_earth=id_earth, sort_key=sort_key,
@@ -5200,7 +5205,7 @@ def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fi
 
 	## Source model
 	if source_model:
-		from .source_models import rob_source_models_dict
+		from .rob.source_models import rob_source_models_dict
 		try:
 			gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
 		except:
@@ -5535,7 +5540,7 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 
 	## Source model
 	if source_model:
-		from .source_models import rob_source_models_dict
+		from .rob.source_models import (rob_source_models_dict, read_source_model)
 		try:
 			rob_source_models_dict[source_model_name]["gis_filespec"]
 		except:
