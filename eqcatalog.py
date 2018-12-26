@@ -3235,7 +3235,7 @@ class EQCatalog:
 			if table_name in db.list_tables():
 				db.drop_table(table_name)
 			eq = self.eq_list[-1]
-			if isinstance(eq.ID, (int, long)):
+			if isinstance(eq.ID, int):
 				# Note: declare type as INT instead of INTEGER,
 				# otherwise rowid will be replaced with ID!
 				# See https://sqlite.org/lang_createtable.html#rowid
@@ -4149,63 +4149,6 @@ def concatenate_catalogs(catalog_list, name=""):
 		if n > region[3]:
 			region[3] = n
 	return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region, name=name)
-
-
-def read_catalogSQL(region=None, start_date=None, end_date=None, Mmin=None, Mmax=None, min_depth=None, max_depth=None, id_earth=None, sort_key="date", sort_order="asc", event_type="ke", convert_NULL=True, verbose=False, errf=None):
-	"""
-	Query ROB local earthquake catalog through the online database.
-
-	Notes:
-	Magnitude used for selection is based on MW first, then MS, then ML.
-	NULL values in the database are converted to 0.0 (this may change in the future)
-	Only real earthquakes are extracted (type = "ke" and is_true = 1).
-
-	:param region:
-		(w, e, s, n) tuple specifying rectangular region of interest in
-		geographic coordinates (default: None)
-	:param start_date:
-		Int or date or datetime object specifying start of time window of interest
-		If integer, start_date is interpreted as start year
-		(default: None)
-	:param end_date:
-		Int or date or datetime object specifying end of time window of interest
-		If integer, end_date is interpreted as end year
-		(default: None)
-	:param Mmin:
-		Float, minimum magnitude to extract (default: None)
-	:param Mmax:
-		Float, maximum magnitude to extract (default: None)
-	:param min_depth:
-		Float, minimum depth in km to extract (default: None)
-	:param max_depth:
-		Float, maximum depth in km to extract (default: None)
-	:param id_earth:
-		Int or List, ID(s) of event to extract (default: None)
-	:param sort_key":
-		String, property name to sort results with: "date" (= "time")
-		or "mag" (= "size") (default: "date")
-	:param sort_order:
-		String, sort order, either "asc" or "desc" (default: "asc")
-	:param event_type:
-		str, event type
-		(default: "ke" = known earthquakes)
-	:param convert_NULL:
-		Bool, whether or not to convert NULL values to zero values
-		(default: True)
-	:param verbose:
-		Bool, if True the query string will be echoed to standard output
-	:param errf:
-		File object, where to print errors
-
-	:return:
-		instance of :class:`EQCatalog`
-	"""
-	from .rob.seismodb import query_ROB_LocalEQCatalog
-	return query_ROB_LocalEQCatalog(region=region, start_date=start_date,
-					end_date=end_date, Mmin=Mmin, Mmax=Mmax, min_depth=min_depth,
-					max_depth=max_depth, id_earth=id_earth, sort_key=sort_key,
-					sort_order=sort_order, event_type=event_type,
-					convert_NULL=convert_NULL, verbose=verbose, errf=errf)
 
 
 def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
