@@ -21,10 +21,10 @@ if platform.uname()[0] == "Linux":
 		sys.path.insert(0, pythondir)
 	logfile = os.path.join(home_folder, "tmp", "ROBneweq.log")
 else:
-	logfile = r"C:\Temp\ROBneweq.log"
+	logfile = "C:\\Temp\\ROBneweq.log"
 
 from thirdparty.recipes.sendmail import sendmail
-import eqcatalog.seismodb as seismodb
+import eqcatalog.rob.seismodb as seismodb
 
 
 ## Users
@@ -90,7 +90,7 @@ last_earthID = seismodb.get_last_earthID()
 
 if last_earthID != prev_last_earthID:
 	try:
-		last_eq = seismodb.query_ROB_LocalEQCatalogByID(id_earth=last_earthID)[0]
+		last_eq = seismodb.query_local_eq_catalog_by_id(id_earth=last_earthID)[0]
 	except:
 		pass
 	else:

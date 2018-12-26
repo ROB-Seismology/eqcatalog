@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 import datetime
-from eqcatalog.seismodb import query_ROB_LocalEQCatalog
+from eqcatalog.rob import query_local_eq_catalog
 
 
 out_folder = "D:\\GIS-data\\KSB-ORB"
@@ -21,6 +21,6 @@ start_date = datetime.date(1985, 1, 1)
 end_date = datetime.datetime.now()
 min_mag = 0.0
 max_mag = 7.0
-catalog = query_ROB_LocalEQCatalog(region, start_date=start_date,
+catalog = query_local_eq_catalog(region, start_date=start_date,
                             end_date=end_date, Mmin=min_mag, Mmax=max_mag)
 catalog.export_HY4(filespec)

@@ -13,7 +13,7 @@ sys.path.insert(0, pythondir)
 import tempfile
 os.environ['MPLCONFIGDIR'] = tempfile.mkdtemp()
 
-import eqcatalog.seismodb as seismodb
+import eqcatalog.rob.seismodb as seismodb
 
 
 #Response.ContentType = "text/xml"
@@ -80,7 +80,7 @@ def rob_catalog_to_kml(
 	:return:
 		str, KML code (if :param:`kml_filespec` is not set)
 	"""
-	catalog = seismodb.query_ROB_LocalEQCatalog(region=region,
+	catalog = seismodb.query_rob_local_eq_catalog(region=region,
 							start_date=start_date, end_date=end_date,
 							Mmin=Mmin, Mmax=Mmax,
 							min_depth=min_depth, max_depth=max_depth,

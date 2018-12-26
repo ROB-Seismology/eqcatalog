@@ -117,7 +117,7 @@ Mtype = "MW"
 Mrelation = OrderedDict([("MS", "Utsu2002"), ("ML", "Ahorner1983")])
 
 ## Completeness
-completeness = eqcatalog.completeness.Completeness_MW_201303a
+completeness = eqcatalog.rob.Completeness_MW_201303a
 
 ## Mmax = mean of CEUS_COMP prior
 Mmax = 6.5
@@ -138,7 +138,7 @@ gis_file = os.path.join(GIS_ROOT, "Bel_administrative_ROB", "TAB", gis_filename)
 
 
 ## Read catalog
-raw_catalog = eqcatalog.read_catalogSQL(region, start_date, end_date)
+raw_catalog = eqcatalog.rob.query_local_eq_catalog(region, start_date, end_date)
 
 ## Plot catalog map
 """
@@ -174,7 +174,7 @@ exit()
 cc_catalog = raw_catalog.subselect_completeness(completeness=completeness,
 								Mtype=Mtype, Mrelation=Mrelation, verbose=True)
 cc_catalog.name = "ROB Catalog 1350-2014 (completeness)"
-#cc_catalog = cc_catalog.sort()
+#cc_catalog.sort()
 print("Catalog: n=%d, Mmax=%.1f" % (len(raw_catalog), raw_catalog.get_Mmax(Mtype=Mtype,
 										Mrelation=Mrelation)))
 cc_catalog.print_list()
@@ -257,7 +257,7 @@ for m, mag in enumerate(mag_bins):
 	#	show_plot = True
 	buffer_pg = create_buffer_polygon(gis_file, buffer_distance, show_plot=show_plot)
 	subcatalog = subcatalog.subselect_polygon(buffer_pg)
-	subcatalog = subcatalog.sort()
+	subcatalog.sort()
 	if 987 in [eq.ID for eq in subcatalog]:
 		print("  Roermond in catalog!")
 	inc_numbers[m] = len(subcatalog)
