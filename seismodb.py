@@ -164,7 +164,7 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 	from .eqcatalog import EQCatalog
 
 	## Convert input arguments, if necessary
-	if isinstance(id_earth, (int, long)):
+	if isinstance(id_earth, (int, str)):
 		id_earth = [id_earth]
 
 	if isinstance(start_date, int):
@@ -354,7 +354,7 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 	"""
 	from .eqrecord import FocMecRecord
 
-	if type(id_earth) in (type(1), type(1L)):
+	if isinstance(id_earth, (int, str)):
 		id_earth = [id_earth]
 
 	## Construct SQL query
@@ -566,7 +566,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 		if isinstance(rec['id_db'], (int, long)):
 			db_ids = [rec['id_db']]
 		else:
-			db_ids = map(int, rec['id_db'].split(','))
+			db_ids = list(map(int, rec['id_db'].split(',')))
 		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
 											'official', num_replies=1,
 											lon=lon, lat=lat, db_ids=db_ids)
@@ -673,7 +673,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 		I = rec['Intensity']
 		lon, lat = rec['lon'], rec['lat']
 		num_replies = rec['num_replies']
-		web_ids = map(int, rec['id_web'].split(','))
+		web_ids = list(map(int, rec['id_web'].split(',')))
 		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
 										'internet', num_replies=num_replies,
 										lon=lon, lat=lat, db_ids=web_ids)
