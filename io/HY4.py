@@ -58,7 +58,7 @@ def read_catalog_HY4(filespec, Mtype='ML'):
 	return EQCatalog(eq_list)
 
 
-def writeHY4(filespec, catalog):
+def write_catalog_HY4(filespec, catalog):
 	ofd = open(filespec, "wb")
 	for eq in catalog:
 		hyp = eq.to_HY4()
