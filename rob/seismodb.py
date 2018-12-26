@@ -160,8 +160,8 @@ def query_ROB_LocalEQCatalog(region=None, start_date=None, end_date=None,
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	from .eqrecord import LocalEarthquake
-	from .eqcatalog import EQCatalog
+	from ..eqrecord import LocalEarthquake
+	from ..eqcatalog import EQCatalog
 
 	## Convert input arguments, if necessary
 	if isinstance(id_earth, (int, str)):
@@ -352,7 +352,7 @@ def query_ROB_FocalMechanisms(region=None, start_date=None, end_date=None,
 	:return:
 		list with instances of :class:`FocMecRecord`
 	"""
-	from .eqrecord import FocMecRecord
+	from ..eqrecord import FocMecRecord
 
 	if isinstance(id_earth, (int, str)):
 		id_earth = [id_earth]
@@ -491,7 +491,7 @@ def query_ROB_Official_MacroCatalog(id_earth, Imax=True, min_val=1,
 	:return:
 		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
 	"""
-	from .macrorecord import MacroseismicInfo
+	from ..macrorecord import MacroseismicInfo
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
@@ -615,7 +615,7 @@ def query_ROB_Web_MacroCatalog(id_earth, min_replies=3, query_info="cii",
 	:return:
 		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
 	"""
-	from .macrorecord import MacroseismicInfo
+	from ..macrorecord import MacroseismicInfo
 
 	## Construct SQL query
 	table_clause = ['web_analyse']
@@ -711,7 +711,7 @@ def query_ROB_Web_enquiries(id_earth=None, id_com=None, zip_code=None,
 	:return:
 		instance of :class:`MacroseismicEnquiryEnsemble`
 	"""
-	from .macrorecord import MacroseismicEnquiryEnsemble
+	from ..macrorecord import MacroseismicEnquiryEnsemble
 
 	table_clause = ['web_input']
 

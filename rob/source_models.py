@@ -22,6 +22,9 @@ SHARE_directory = os.path.join(GIS_ROOT, "SHARE")
 SHARE_CSS_directory = os.path.join(SHARE_directory, "Task 3.2", "DATA")
 
 
+# TODO: move SourceModelDefinition to eqcatalog.source_models
+# TODO: add read function?
+
 class SourceModelDefinition:
 	def __init__(self, name, gis_filespec, column_map):
 		self.name = name

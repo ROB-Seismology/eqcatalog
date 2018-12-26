@@ -60,12 +60,20 @@ if not reloading:
 else:
 	reload(declustering)
 
+"""
 ## source_models (no internal dependencies)
 if not reloading:
 	from . import source_models
 else:
 	reload(source_models)
 from .source_models import (read_source_model, rob_source_models_dict)
+"""
+
+## rob (depends on completeness, indirectly on eqrecord, eqcatalog, macrorecord)
+if not reloading:
+	from . import rob
+else:
+	reload(rob)
 
 ## macrorecord (no internal dependencies)
 if not reloading:
@@ -99,8 +107,10 @@ else:
 	reload(composite_catalog)
 from .composite_catalog import CompositeEQCatalog
 
+"""
 ## seismodb (depends on eqrecord, macrorecord, eqcatalog)
 if not reloading:
 	from . import seismodb
 else:
 	reload(seismodb)
+"""

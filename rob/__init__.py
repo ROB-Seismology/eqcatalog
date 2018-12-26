@@ -24,24 +24,23 @@ else:
 
 ## Import submodules
 
-## completeness (no internal dependencies)
+## completeness (depends on ..completeness)
 if not reloading:
 	from . import completeness
 else:
 	reload(completeness)
 from .completeness import *
 
-"""
 ## source_models (no internal dependencies)
 if not reloading:
 	from . import source_models
 else:
 	reload(source_models)
-from .source_models import (read_source_model, rob_source_models_dict)
+from .source_models import (read_source_model,
+	rob_source_models_dict as source_models_dict)
 
-## seismodb (depends on eqrecord, macrorecord, eqcatalog)
+## seismodb (depends on ..eqrecord, ..macrorecord, ..eqcatalog)
 if not reloading:
 	from . import seismodb
 else:
 	reload(seismodb)
-"""
