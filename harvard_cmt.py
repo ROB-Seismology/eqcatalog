@@ -13,11 +13,14 @@ try:
 except:
 	## Python 3
 	basestring = str
+	from urllib.request import urlopen, HTTPError
+else:
+	# Fall back to Python 2's urllib2
+	from urllib2 import urlopen, HTTPError
 
 
 import os
 import datetime
-import urllib2
 
 import numpy as np
 
@@ -380,8 +383,8 @@ class HarvardCMTCatalog:
 		cmt_records = []
 		if ndk_filespec_or_url[:4] == "http":
 			try:
-				ndk = urllib2.urlopen(ndk_filespec_or_url)
-			except urllib2.HTTPError:
+				ndk = urlopen(ndk_filespec_or_url)
+			except HTTPError:
 				return []
 		else:
 			ndk = open(ndk_filespec_or_url)
@@ -430,8 +433,8 @@ class HarvardCMTCatalog:
 		filespec = os.path.join(ROOT_FOLDER, "NDK", filename)
 		if not os.path.exists(filespec) or overwrite:
 			try:
-				ndk = urllib2.urlopen(url)
-			except urllib2.HTTPError:
+				ndk = urlopen(url)
+			except HTTPError:
 				return None
 			else:
 				f = open(filespec, "w")
