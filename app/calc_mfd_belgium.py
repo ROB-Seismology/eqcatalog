@@ -264,7 +264,7 @@ for m, mag in enumerate(mag_bins):
 	if len(subcatalog):
 		et = end_date.year + 1 - subcatalog.get_fractional_years()[-1]
 		last_eq = subcatalog[-1]
-		print("%s - %s - ML=%.1f, MS=%.1f, MW=%.1f" % (last_eq.datetime.isoformat(),
+		print("%s - %s - ML=%.1f, MS=%.1f, MW=%.1f" % (last_eq.datetime,
 				last_eq.name, last_eq.ML, last_eq.MS, last_eq.MW))
 	else:
 		et = np.nan

@@ -95,7 +95,7 @@ if not reloading:
 	from . import eqcatalog
 else:
 	reload(eqcatalog)
-from .eqcatalog import (EQCatalog, read_catalogSQL, read_catalog_sql,
+from .eqcatalog import (EQCatalog, read_catalog_sql,
 	read_catalog_gis, read_catalog_csv, read_named_catalog, plot_catalogs_map,
 	concatenate_catalogs, get_catalogs_map, plot_catalogs_magnitude_time,
 	plot_depth_statistics)
