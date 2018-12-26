@@ -1475,7 +1475,7 @@ class MacroseismicEnquiryEnsemble():
 		from .parse_php_vars import parse_php_vars
 
 		base_path = os.path.split(__file__)[0]
-		php_file = os.path.join(base_path, 'webenq', 'const_inq%s.php' % lang.upper())
+		php_file = os.path.join(base_path, 'rob', webenq', 'const_inq%s.php' % lang.upper())
 		php_var_dict = parse_php_vars(php_file)
 		if prop == 'felt':
 			title = php_var_dict['$form23']
