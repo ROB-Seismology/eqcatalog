@@ -382,7 +382,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		values = self.get_prop_values(prop)
 		if isinstance(values[0], basestring):
-			prop_values = map(str, prop_values)
+			prop_values = list(map(str, prop_values))
 		if not negate:
 			idxs = [i for i in range(len(values)) if values[i] in prop_values]
 		else:
