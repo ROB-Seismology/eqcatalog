@@ -141,10 +141,10 @@ class MacroseismicInfo():
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
 		"""
-		from .seismodb import query_ROB_LocalEQCatalogByID
+		from .seismodb import query_local_eq_catalog_by_id
 
-		if isinstance(self.id_earth, (int, long)):
-			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
+		if isinstance(self.id_earth, (int, str)):
+			[eq] = query_local_eq_catalog_by_id(self.id_earth)
 			return eq
 
 	def get_enquiries(self, min_fiability=20, verbose=False):
@@ -157,12 +157,12 @@ class MacroseismicInfo():
 		:param verbose:
 			bool, whether or not to print useful information
 		"""
-		from .seismodb import query_ROB_Web_enquiries
+		from .seismodb import query_web_macro_enquiries
 
 		if self.db_ids:
-			ensemble = query_ROB_Web_enquiries(web_ids=self.db_ids, verbose=verbose)
+			ensemble = query_web_macro_enquiries(web_ids=self.db_ids, verbose=verbose)
 		else:
-			ensemble = query_ROB_Web_enquiries(self.id_earth, id_com=self.id_com,
+			ensemble = query_web_macro_enquiries(self.id_earth, id_com=self.id_com,
 								min_fiability=min_fiability, verbose=verbose)
 
 		return ensemble
@@ -310,10 +310,10 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
 		"""
-		from .seismodb import query_ROB_LocalEQCatalogByID
+		from .seismodb import query_local_eq_catalog_by_id
 
-		if isinstance(self.id_earth, (int, long)):
-			[eq] = query_ROB_LocalEQCatalogByID(self.id_earth)
+		if isinstance(self.id_earth, (int, str)):
+			[eq] = query_local_eq_catalog_by_id(self.id_earth)
 			return eq
 
 	def get_prop_values(self, prop):
