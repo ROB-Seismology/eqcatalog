@@ -6,16 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import os
-import platform
 from collections import OrderedDict
 
-
-
-## Directories with GIS tables for source models
-if platform.uname()[0] == "Windows":
-	GIS_ROOT = "D:\\GIS-data"
-else:
-	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
+from . import GIS_ROOT
 
 ROB_directory = os.path.join(GIS_ROOT, "KSB-ORB", "Source Zone Models")
 SHARE_directory = os.path.join(GIS_ROOT, "SHARE")
