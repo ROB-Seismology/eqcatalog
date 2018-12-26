@@ -818,7 +818,7 @@ class LocalEarthquake:
 	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii",
 					min_val=1, min_fiability=20.0, group_by_main_village=False,
 					filter_floors=False, agg_function="", verbose=False):
-		from .seismodb import query_ROB_Web_MacroCatalog
+		from .rob.seismodb import query_ROB_Web_MacroCatalog
 		return query_ROB_Web_MacroCatalog(self.ID, min_replies=min_replies,
 					query_info=query_info, min_val=min_val, min_fiability=min_fiability,
 					group_by_main_village=group_by_main_village, filter_floors=filter_floors,
@@ -826,19 +826,19 @@ class LocalEarthquake:
 
 	def get_macroseismic_data_aggregated_official(self, Imax=True, min_val=1,
 			group_by_main_village=False, agg_function="maximum", verbose=False):
-		from .seismodb import query_ROB_Official_MacroCatalog
+		from .rob.seismodb import query_ROB_Official_MacroCatalog
 		return query_ROB_Official_MacroCatalog(self.ID, Imax=Imax, min_val=min_val,
 			group_by_main_village=group_by_main_village, agg_function=agg_function,
 			verbose=verbose)
 
 	def get_macroseismic_enquiries(self, min_fiability=20, verbose=False):
-		from .seismodb import query_ROB_Web_enquiries
+		from .rob.seismodb import query_ROB_Web_enquiries
 		ensemble = query_ROB_Web_enquiries(self.ID, min_fiability=min_fiability,
 											verbose=verbose)
 		return ensemble
 
 	def get_focal_mechanism(self, verbose=False):
-		from .seismodb import query_ROB_FocalMechanisms
+		from .rob.seismodb import query_ROB_FocalMechanisms
 		try:
 			return query_ROB_FocalMechanisms(id_earth=self.ID, verbose=verbose)[0]
 		except IndexError:

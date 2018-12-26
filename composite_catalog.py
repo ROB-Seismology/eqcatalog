@@ -9,8 +9,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import numpy as np
-from .completeness import DEFAULT_COMPLETENESS
-from .eqcatalog import EQCatalog, read_source_model
+from .rob.completeness import DEFAULT_COMPLETENESS
+from .eqcatalog import EQCatalog
 
 
 
@@ -133,6 +133,7 @@ class CompositeEQCatalog:
 		"""
 		import osr
 		from mapping.geotools.coordtrans import WGS84, get_utm_spec, get_utm_srs
+		from .rob.source_models import read_source_model
 
 		zone_areas = dict.fromkeys(self.zone_catalogs.keys())
 		model_data = read_source_model(self.source_model_name, verbose=False)
