@@ -56,6 +56,36 @@ class Completeness:
 						in zip(self.min_dates, self.min_mags)])
 		return s
 
+	def print_table(self):
+		"""
+		Print completeness dates and magnitues in a table
+		"""
+		try:
+			from prettytable import PrettyTable
+		except:
+			has_prettytable = False
+		else:
+			has_prettytable = True
+
+		col_names = ["Start date", "Mmin"]
+		if has_prettytable:
+			tab = PrettyTable(col_names)
+		else:
+			tab = []
+		for (date, mag) in zip(self.min_dates, self.min_mags):
+			row = [str(date), "%.2f" % mag]
+			if has_prettytable:
+				tab.add_row(row)
+			else:
+				tab.append(row)
+
+		if has_prettytable:
+			print(tab)
+		else:
+			print('\t'.join(col_names))
+			for row in tab:
+				print('\t'.join(row))
+
 	@property
 	def start_date(self):
 		return self.min_dates.min()
