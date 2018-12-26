@@ -563,7 +563,7 @@ def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
-		if isinstance(rec['id_db'], (int, long)):
+		if isinstance(rec['id_db'], (int, str)):
 			db_ids = [rec['id_db']]
 		else:
 			db_ids = list(map(int, rec['id_db'].split(',')))
