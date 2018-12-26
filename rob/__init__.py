@@ -44,3 +44,4 @@ if not reloading:
 	from . import seismodb
 else:
 	reload(seismodb)
+from .seismodb import *
