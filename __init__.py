@@ -95,8 +95,7 @@ if not reloading:
 	from . import eqcatalog
 else:
 	reload(eqcatalog)
-from .eqcatalog import (EQCatalog, read_catalog_sql,
-	read_catalog_gis, read_catalog_csv, read_named_catalog, plot_catalogs_map,
+from .eqcatalog import (EQCatalog, plot_catalogs_map,
 	concatenate_catalogs, get_catalogs_map, plot_catalogs_magnitude_time,
 	plot_depth_statistics)
 
@@ -106,6 +105,14 @@ if not reloading:
 else:
 	reload(composite_catalog)
 from .composite_catalog import CompositeEQCatalog
+
+## io submodule (depends on eqrecord, eqcatalog, time_functions_np)
+if not reloading:
+	from . import io
+else:
+	reload(io)
+from .io import (read_named_catalog, read_catalog_sql, read_catalog_csv,
+				read_catalog_gis)
 
 """
 ## seismodb (depends on eqrecord, macrorecord, eqcatalog)
