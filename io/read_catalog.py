@@ -50,14 +50,22 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	# TODO: add ROB (but only with default parameters)?
-	if catalog_name.upper() in ("HARVARD_CMT", "HARVARD CMT"):
-		from .harvard_cmt import ROOT_FOLDER
+	if catalog_name.upper() == "ROB":
+		from ..rob import query_local_eq_catalog
+		region = (0., 8., 49., 52.)
+		start_date = datetime.date(1350, 1, 1)
+		return query_local_eq_catalog(region=region, start_date=start_date,
+									verbose=verbose)
+
+	elif catalog_name.upper() in ("HARVARD_CMT", "HARVARD CMT"):
+		from ..harvard_cmt import ROOT_FOLDER
 		sql_file = os.path.join(ROOT_FOLDER, "SQLite", "HarvardCMT.sqlite")
 		#harvard_cmt = HarvardCMTCatalog(sql_file)
 		#return harvard_cmt.to_eq_catalog()
 		sqldb = simpledb.SQLiteDB(sql_file)
 		table_name = 'harvard_cmt'
+		if not sqldb.HAS_SPATIALITE:
+			sqldb.connection.create_function("LOG10", 1, np.log10)
 		query = ('SELECT *, ((2./3) * (exp + LOG10(moment)) - 10.73) '
 				'as "MW" FROM harvard_cmt')
 		column_map =  {'ID': 'ID', 'datetime': 'hypo_date_time',
@@ -66,57 +74,58 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 		return read_catalog_sql(sqldb, table_name, query=query, column_map=column_map,
 								verbose=verbose)
 
-	date_sep = '/'
-	if catalog_name.upper() == "SHEEC":
-		gis_filespec = os.path.join(GIS_ROOT, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
-		column_map = {'lon': 'Lon', 'lat': 'Lat',
-					'year': 'Year', 'month': 'Mo', 'day': 'Da',
-					'hour': 'Ho', 'minute': 'Mi', 'second': 'Se',
-					'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
-		#convert_zero_magnitudes = True
-	elif catalog_name.upper() == "CENEC":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-									"CENEC", "CENEC 2008.TAB")
-		column_map = {'lon': 'lon', 'lat': 'lat',
-					'year': 'year', 'month': 'month', 'day': 'day',
-					'hour': 'hour', 'minute': 'minute',
-					'MW': 'Mw', 'depth': 'depth', 'intensity_max': 'Imax'}
-		#convert_zero_magnitudes = True
-	elif catalog_name.upper() == "ISC-GEM":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-									"ISC-GEM", "isc-gem-cat.TAB")
-		column_map = {'ID': 'eventid', 'lon': 'lon', 'lat': 'lat',
-					'date': 'date', 'time': 'time',
-					'MW': 'mw', 'depth': 'depth',
-					'errz': 'unc', 'errM': 'unc_2'}
-		#convert_zero_magnitudes = True
-	elif catalog_name.upper() == "CEUS-SCR":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-									"CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
-		column_map = {'lon': 'Longitude', 'lat': 'Latitude',
-					'year': 'Year', 'month': 'Month', 'day': 'Day',
-					'hour': 'Hour', 'minute': 'Minute', 'second': 'Second',
-					'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
-		#convert_zero_magnitudes = True
-	elif catalog_name.upper() == "BGS":
-		gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-									"BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
-		column_map = {'ID': 'ID', 'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR',
-					'hour': 'HR', 'minute': 'MN', 'second': 'SECS',
-					'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'name': 'LOCALITY',
-					'intensity_max': 'INT'}
-		#convert_zero_magnitudes = True
 	else:
-		raise Exception("Catalog not recognized: %s" % catalog_name)
+		date_sep = '/'
+		if catalog_name.upper() == "SHEEC":
+			gis_filespec = os.path.join(GIS_ROOT, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
+			column_map = {'lon': 'Lon', 'lat': 'Lat',
+						'year': 'Year', 'month': 'Mo', 'day': 'Da',
+						'hour': 'Ho', 'minute': 'Mi', 'second': 'Se',
+						'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
+			#convert_zero_magnitudes = True
+		elif catalog_name.upper() == "CENEC":
+			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+										"CENEC", "CENEC 2008.TAB")
+			column_map = {'lon': 'lon', 'lat': 'lat',
+						'year': 'year', 'month': 'month', 'day': 'day',
+						'hour': 'hour', 'minute': 'minute',
+						'MW': 'Mw', 'depth': 'depth', 'intensity_max': 'Imax'}
+			#convert_zero_magnitudes = True
+		elif catalog_name.upper() == "ISC-GEM":
+			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+										"ISC-GEM", "isc-gem-cat.TAB")
+			column_map = {'ID': 'eventid', 'lon': 'lon', 'lat': 'lat',
+						'date': 'date', 'time': 'time',
+						'MW': 'mw', 'depth': 'depth',
+						'errz': 'unc', 'errM': 'unc_2'}
+			#convert_zero_magnitudes = True
+		elif catalog_name.upper() == "CEUS-SCR":
+			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+										"CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
+			column_map = {'lon': 'Longitude', 'lat': 'Latitude',
+						'year': 'Year', 'month': 'Month', 'day': 'Day',
+						'hour': 'Hour', 'minute': 'Minute', 'second': 'Second',
+						'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
+			#convert_zero_magnitudes = True
+		elif catalog_name.upper() == "BGS":
+			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
+										"BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
+			column_map = {'ID': 'ID', 'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR',
+						'hour': 'HR', 'minute': 'MN', 'second': 'SECS',
+						'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'name': 'LOCALITY',
+						'intensity_max': 'INT'}
+			#convert_zero_magnitudes = True
+		else:
+			raise Exception("Catalog not recognized: %s" % catalog_name)
 
-	if not os.path.exists(gis_filespec):
-		raise Exception("Catalog file not found: %s" % gis_filespec)
-	ID_prefix = catalog_name + "-"
-	#eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months,
-	#					convert_zero_magnitudes=convert_zero_magnitudes, ID_prefix=ID_prefix, verbose=verbose)
-	eqc = read_catalog_gis(gis_filespec, column_map, date_sep=date_sep, ID_prefix=ID_prefix, verbose=verbose)
-	eqc.name = catalog_name
-	return eqc
+		if not os.path.exists(gis_filespec):
+			raise Exception("Catalog file not found: %s" % gis_filespec)
+		ID_prefix = catalog_name + "-"
+		#eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months,
+		#					convert_zero_magnitudes=convert_zero_magnitudes, ID_prefix=ID_prefix, verbose=verbose)
+		eqc = read_catalog_gis(gis_filespec, column_map, date_sep=date_sep, ID_prefix=ID_prefix, verbose=verbose)
+		eqc.name = catalog_name
+		return eqc
 
 
 def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
