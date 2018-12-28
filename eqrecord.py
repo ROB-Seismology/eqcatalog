@@ -356,6 +356,9 @@ class LocalEarthquake:
 		MW_key = column_map.get('MW', 'MW')
 		MW = float(rec.get(MW_key, np.nan) or np.nan)
 		mag['MW'] = MW
+		mb_key = column_map.get('mb', 'mb')
+		mb = float(rec.get(mb_key, np.nan) or np.nan)
+		mag['mb'] = mb
 
 		name_key = column_map.get('name', 'name')
 		name = rec.get(name_key, "")
@@ -477,6 +480,37 @@ class LocalEarthquake:
 
 		return HYPDAT(latitude, longitude, year, month, day, minutes, tseconds,
 						depth, magnitude, 0, 0, 0)
+
+	def print_table(self):
+		"""
+		Print earthquake attributes in pretty table.
+		"""
+		try:
+			from prettytable import PrettyTable
+		except:
+			has_prettytable = False
+		else:
+			has_prettytable = True
+
+		col_names = ["Attribute", "Value"]
+		if has_prettytable:
+			tab = PrettyTable(col_names)
+		else:
+			tab = []
+		for attrib in ['ID', 'name', 'date', 'time', 'lon', 'lat', 'depth',
+						'ML', 'MS', 'MW', 'mb', 'intensity_max', 'macro_radius']:
+			row = [attrib, getattr(self, attrib)]
+			if has_prettytable:
+				tab.add_row(row)
+			else:
+				tab.append(row)
+
+		if has_prettytable:
+			print(tab)
+		else:
+			print('\t'.join(col_names))
+			for row in tab:
+				print('\t'.join(row))
 
 	## date-time-related methods
 
