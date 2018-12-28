@@ -260,6 +260,49 @@ class EQCatalog:
 		dct = {key: self.__dict__}
 		return json.dumps(dct, default=json_handler)
 
+	## Time methods
+
+	def get_datetimes(self):
+		"""
+		Return list of datetimes for all earthquakes in catalog
+		"""
+		return np.array([eq.datetime for eq in self])
+
+	def get_years(self):
+		"""
+		Return array of integer years for all earthquakes in catalog
+		"""
+		return tf.to_year(self.get_datetimes())
+
+	def get_fractional_years(self):
+		"""
+		Return array with fractional years for all earthquakes in catalog
+		"""
+		years = tf.to_fractional_year(self.get_datetimes())
+		return years
+
+	def Tminmax(self, Mmax=None, Mtype="MW", Mrelation="default"):
+		"""
+		Return tuple with oldest date and youngest date in catalog.
+
+		:param Mmax:
+			Float, maximum magnitude. Useful to check completeness periods.
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		"""
+		datetimes = self.get_datetimes()
+		if Mmax != None:
+			Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
+			datetimes = datetimes[np.where(Mags < Mmax)]
+		try:
+			return (datetimes.min(), datetimes.max())
+		except ValueError:
+			return (None, None)
+
 	def get_time_delta(self):
 		"""
 		Return duration of catalog as timedelta object
@@ -316,24 +359,7 @@ class EQCatalog:
 		start_date, end_date = self.start_date, self.end_date
 		return tf.timespan(start_date, end_date, unit=unit)
 
-	def get_datetimes(self):
-		"""
-		Return list of datetimes for all earthquakes in catalog
-		"""
-		return np.array([eq.datetime for eq in self])
-
-	def get_years(self):
-		"""
-		Return array of integer years for all earthquakes in catalog
-		"""
-		return tf.to_year(self.get_datetimes())
-
-	def get_fractional_years(self):
-		"""
-		Return array with fractional years for all earthquakes in catalog
-		"""
-		years = tf.to_fractional_year(self.get_datetimes())
-		return years
+	## Magnitude methods
 
 	def get_magnitudes(self, Mtype="MW", Mrelation="default"):
 		"""
@@ -352,6 +378,56 @@ class EQCatalog:
 		"""
 		Mags = [eq.get_or_convert_mag(Mtype, Mrelation) for eq in self]
 		return np.array(Mags)
+
+	def Mminmax(self, Mtype="MW", Mrelation="default"):
+		"""
+		Return tuple with minimum and maximum magnitude in catalog.
+
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		"""
+		Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
+		return (np.nanmin(Mags), np.nanmax(Mags))
+
+	def get_Mmin(self, Mtype="MW", Mrelation="default"):
+		"""
+		Compute minimum magnitude in catalog
+
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			Float, maximum observed magnitude
+		"""
+		return np.nanmin(self.get_magnitudes(Mtype, Mrelation))
+
+	def get_Mmax(self, Mtype="MW", Mrelation="default"):
+		"""
+		Compute maximum magnitude in catalog
+
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			Float, maximum observed magnitude
+		"""
+		if len(self) > 0:
+			Mmax = np.nanmax(self.get_magnitudes(Mtype, Mrelation))
+		else:
+			Mmax = np.nan
+		return Mmax
 
 	def get_magnitude_uncertainties(self, min_uncertainty=0.3):
 		"""
@@ -401,162 +477,6 @@ class EQCatalog:
 				else:
 					Mtype_counts[comb_Mtype] = 1
 		return Mtype_counts
-
-	def get_max_intensities(self):
-		"""
-		Return array with maximum intensities
-
-		:return:
-			1-D numpy int array, maximum intensities
-		"""
-		return np.array([eq.intensity_max for eq in self])
-
-	def get_depths(self):
-		"""
-		Return array of focal depths for all earthquakes in catalog
-
-		:return:
-			1-D numpy float array, earthquake focal depths
-		"""
-		return np.array([eq.depth for eq in self])
-
-	def get_longitudes(self):
-		"""
-		Return array of longitudes for all earthquakes in catalog
-
-		:return:
-			1-D numpy float array, epicenter longitudes
-		"""
-		return np.array([eq.lon for eq in self])
-
-	def get_latitudes(self):
-		"""
-		Return array of latitudes for all earthquakes in catalog
-
-		:return:
-			1-D numpy float array, epicenter latitudes
-		"""
-		return np.array([eq.lat for eq in self])
-
-	def get_cartesian_coordinates(self, proj="lambert1972"):
-		"""
-		Return cartesian coordinates
-
-		:param proj:
-			String, projection name: either "lambert1972" or "utm31"
-
-		:return:
-			List with (easting, northing) tuples
-		"""
-		import mapping.geotools.coordtrans as coordtrans
-		lons, lats = self.get_longitudes(), self.get_latitudes()
-		coord_list = list(zip(lons, lats))
-		if proj.lower() == "lambert1972":
-			return coordtrans.lonlat_to_lambert1972(coord_list)
-		elif proj.lower() == "utm31n":
-			return coordtrans.utm_to_lonlat(coord_list, proj)
-
-	def Tminmax(self, Mmax=None, Mtype="MW", Mrelation="default"):
-		"""
-		Return tuple with oldest date and youngest date in catalog.
-
-		:param Mmax:
-			Float, maximum magnitude. Useful to check completeness periods.
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		"""
-		datetimes = self.get_datetimes()
-		if Mmax != None:
-			Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
-			datetimes = datetimes[np.where(Mags < Mmax)]
-		try:
-			return (datetimes.min(), datetimes.max())
-		except ValueError:
-			return (None, None)
-
-	def Mminmax(self, Mtype="MW", Mrelation="default"):
-		"""
-		Return tuple with minimum and maximum magnitude in catalog.
-
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		"""
-		Mags = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
-		return (np.nanmin(Mags), np.nanmax(Mags))
-
-	def depth_minmax(self):
-		"""
-		Return tuple with minimum and maximum depth in catalog.
-		"""
-		depths = self.get_depths()
-		return (depths.min(), depths.max())
-
-	def lon_minmax(self):
-		"""
-		Return tuple with minimum and maximum longitude in catalog.
-		"""
-		longitudes = self.get_longitudes()
-		return (longitudes.min(), longitudes.max())
-
-	def lat_minmax(self):
-		"""
-		Return tuple with minimum and maximum latitude in catalog.
-		"""
-		latitudes = self.get_latitudes()
-		return (latitudes.min(), latitudes.max())
-
-	def get_region(self):
-		"""
-		Return (w, e, s, n) tuple with geographic extent of catalog
-		"""
-		try:
-			return self.lon_minmax() + self.lat_minmax()
-		except:
-			return None
-
-	def get_Mmin(self, Mtype="MW", Mrelation="default"):
-		"""
-		Compute minimum magnitude in catalog
-
-		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
-		:param Mrelation":
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-
-		:return:
-			Float, maximum observed magnitude
-		"""
-		return np.nanmin(self.get_magnitudes(Mtype, Mrelation))
-
-	def get_Mmax(self, Mtype="MW", Mrelation="default"):
-		"""
-		Compute maximum magnitude in catalog
-
-		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
-		:param Mrelation":
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-
-		:return:
-			Float, maximum observed magnitude
-		"""
-		if len(self) > 0:
-			Mmax = np.nanmax(self.get_magnitudes(Mtype, Mrelation))
-		else:
-			Mmax = np.nan
-		return Mmax
 
 	def get_M0(self, Mrelation="default"):
 		"""
@@ -617,6 +537,152 @@ class EQCatalog:
 						 	/ subcatalog.timespan(time_unit))
 		return M0rate
 
+	## Intensity methods
+
+	def get_max_intensities(self):
+		"""
+		Return array with maximum intensities
+
+		:return:
+			1-D numpy array, maximum intensities
+		"""
+		return np.array([eq.intensity_max for eq in self])
+
+	def get_macro_radii(self):
+		"""
+		Return array with macroseismic radii
+
+		:return:
+			1-D numpy array, macroseismic radii
+		"""
+		return np.array([eq.macro_radius for eq in self])
+
+	## Coordinate-related methods
+
+	def get_depths(self):
+		"""
+		Return array of focal depths for all earthquakes in catalog
+
+		:return:
+			1-D numpy float array, earthquake focal depths
+		"""
+		return np.array([eq.depth for eq in self])
+
+	def get_longitudes(self):
+		"""
+		Return array of longitudes for all earthquakes in catalog
+
+		:return:
+			1-D numpy float array, epicenter longitudes
+		"""
+		return np.array([eq.lon for eq in self])
+
+	def get_latitudes(self):
+		"""
+		Return array of latitudes for all earthquakes in catalog
+
+		:return:
+			1-D numpy float array, epicenter latitudes
+		"""
+		return np.array([eq.lat for eq in self])
+
+	def get_cartesian_coordinates(self, proj="lambert1972"):
+		"""
+		Return cartesian coordinates
+
+		:param proj:
+			String, projection name: either "lambert1972" or "utm31"
+
+		:return:
+			List with (easting, northing) tuples
+		"""
+		import mapping.geotools.coordtrans as coordtrans
+		lons, lats = self.get_longitudes(), self.get_latitudes()
+		coord_list = list(zip(lons, lats))
+		if proj.lower() == "lambert1972":
+			return coordtrans.lonlat_to_lambert1972(coord_list)
+		elif proj.lower() == "utm31n":
+			return coordtrans.utm_to_lonlat(coord_list, proj)
+
+	def depth_minmax(self):
+		"""
+		Return tuple with minimum and maximum depth in catalog.
+		"""
+		depths = self.get_depths()
+		return (depths.min(), depths.max())
+
+	def lon_minmax(self):
+		"""
+		Return tuple with minimum and maximum longitude in catalog.
+		"""
+		longitudes = self.get_longitudes()
+		return (longitudes.min(), longitudes.max())
+
+	def lat_minmax(self):
+		"""
+		Return tuple with minimum and maximum latitude in catalog.
+		"""
+		latitudes = self.get_latitudes()
+		return (latitudes.min(), latitudes.max())
+
+	def get_region(self):
+		"""
+		Return (w, e, s, n) tuple with geographic extent of catalog
+		"""
+		try:
+			return self.lon_minmax() + self.lat_minmax()
+		except:
+			return None
+
+	def get_bbox(self):
+		"""
+		Compute bounding box of earthquake catalog
+
+		:return:
+			(ll_lon, ll_lat, ur_lon, ur_lat) tuple
+		"""
+		ll_lon, ur_lon = self.lon_minmax()
+		ll_lat, ur_lat = self.lat_minmax()
+		return (ll_lon, ll_lat, ur_lon, ur_lat)
+
+	def get_epicentral_distances(self, lon, lat):
+		"""
+		Compute epicentral distances between catalog earthquakes and a
+		given point.
+
+		:param lon:
+			float, longitude of reference point
+		:param lat:
+			float, latitude of reference point
+
+		:return:
+			float, epicentral distance in km
+		"""
+		distances = geodetic.spherical_distance(lon, lat, self.get_longitudes(), self.get_latitudes())
+		return distances / 1000.
+
+	def get_hypocentral_distances(self, lon, lat, z=0):
+		"""
+		Compute hypocentral distances between catalog earthquakes and a
+		given point.
+
+		:param lon:
+			float, longitude of reference point
+		:param lat:
+			float, latitude of reference point
+		:param z:
+			float, depth of reference point in km
+			(default: 0)
+
+		:return:
+			float, hypocentral distance in km
+		"""
+		d_epi = self.get_epicentral_distances(lon, lat)
+		d_hypo = np.sqrt(d_epi**2 + (self.get_depths() - z)**2)
+		return d_hypo
+
+	## Sorting
+
 	def get_sorted(self, key="datetime", order="asc"):
 		"""
 		Get copy of catalog sorted by earthquake attribute.
@@ -653,6 +719,8 @@ class EQCatalog:
 		reverse = {"asc": False, "desc": True}[order]
 		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key), reverse=reverse)
 		self.eq_list = eq_list
+
+	## Subselection and splitting methods
 
 	def subselect(self,
 		region=None,
@@ -778,6 +846,265 @@ class EQCatalog:
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=region, name=catalog_name)
 
+	def subselect_distance(self, point, distance, catalog_name=""):
+		"""
+		Subselect earthquakes in a given radius around a given point
+
+		:param point:
+			(lon, lat) tuple
+		:param distance:
+			float, distance in km
+		:param catalog_name:
+			Str, name of resulting catalog
+			(default: "")
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		from itertools import compress
+
+		distances = self.get_epicentral_distances(*point)
+		eq_list = list(compress(self.eq_list, distances <= distance))
+		if not catalog_name:
+			catalog_name = self.name + " (%s km radius from %s)" % (distance, point)
+		lons, lats = geodetic.spherical_point_at(*point, distance=distance*1000,
+												azimuth=np.arange(0, 360, 90))
+		region = (lons.min(), lons.max(), lats.min(), lats.max())
+		subcat = EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
+		return subcat
+
+	def subselect_polygon(self, poly_obj, catalog_name=""):
+		"""
+		Subselect earthquakes from catalog situated inside a polygon
+
+		:param poly_obj:
+			polygon or closed linestring object (ogr geometry object
+			or oqhazlib.geo.polygon.Polygon object)
+		:param catalog_name:
+			Str, name of resulting catalog
+			(default: "")
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		from osgeo import ogr
+
+		if isinstance(poly_obj, ogr.Geometry):
+			## Construct WGS84 projection system corresponding to earthquake coordinates
+			from mapping.geotools.coordtrans import WGS84
+
+			## Point object that will be used to test if earthquake is inside zone
+			point = ogr.Geometry(ogr.wkbPoint)
+			point.AssignSpatialReference(WGS84)
+
+			if poly_obj.GetGeometryName() in ("POLYGON", "LINESTRING"):
+				## Objects other than polygons or closed polylines will be skipped
+				if poly_obj.GetGeometryName() == "LINESTRING":
+					line_obj = poly_obj
+					if line_obj.IsRing() and line_obj.GetPointCount() > 3:
+						# Note: Could not find a way to convert linestrings to polygons
+						# The following only works for linearrings (what is the difference??)
+						#poly_obj = ogr.Geometry(ogr.wkbPolygon)
+						#poly_obj.AddGeometry(line_obj)
+						wkt = line_obj.ExportToWkt().replace("LINESTRING (", "POLYGON ((") + ")"
+						poly_obj = ogr.CreateGeometryFromWkt(wkt)
+					else:
+						return None
+				eq_list = []
+				for i, eq in enumerate(self.eq_list):
+					point.SetPoint(0, eq.lon, eq.lat)
+					if point.Within(poly_obj):
+						eq_list.append(eq)
+
+				## Determine bounding box (region)
+				linear_ring = poly_obj.GetGeometryRef(0)
+				## In some versions of ogr, GetPoints method does not exist
+				#points = linear_ring.GetPoints()
+				points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
+				lons, lats = zip(*points)[:2]
+
+		else:
+			import openquake.hazardlib as oqhazlib
+			if isinstance(poly_obj, oqhazlib.geo.Polygon):
+				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(), depths=None)
+				intersects = poly_obj.intersects(mesh)
+				#idxs = np.argwhere(intersects == True)
+				#idxs = [idx[0] for idx in idxs]
+				idxs = np.where(intersects == True)[0]
+				zone_catalog = self.__getitem__(idxs)
+				lons = zone_catalog.get_longitudes()
+				lats = zone_catalog.get_latitudes()
+				eq_list = zone_catalog.eq_list
+			else:
+				raise Exception("poly_obj not recognized!")
+
+		if len(eq_list):
+			region = (min(lons), max(lons), min(lats), max(lats))
+		else:
+			region = None
+		if not catalog_name:
+			catalog_name = self.name + " (inside polygon)"
+		return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
+
+	def split_into_zones(self,
+		source_model_name, ID_colname="",
+		fix_mi_lambert=True,
+		verbose=True):
+		"""
+		Split catalog into subcatalogs according to a
+		source-zone model stored in a GIS (MapInfo) table.
+
+		:param source_model_name:
+			String, name of source-zone model containing area sources
+			or else full path to GIS file containing area sources
+			or rshalib SourceModel object
+		:param ID_colname:
+			String, name of GIS column containing record ID
+			(default: "")
+		:param fix_mi_lambert:
+			bool, whether or not to apply spatial reference system fix for
+			old MapInfo files in Lambert 1972 system
+			(default: True)
+		:param verbose:
+			Boolean, whether or not to print information while reading
+			GIS table (default: True)
+
+		:return:
+			ordered dict {String sourceID: EQCatalog}
+		"""
+		from .rob.source_models import read_source_model
+
+		zone_catalogs = OrderedDict()
+
+		if isinstance(source_model_name, basestring):
+			## Read zone model from GIS file
+			model_data = read_source_model(source_model_name, ID_colname=ID_colname, fix_mi_lambert=fix_mi_lambert, verbose=verbose)
+
+			for zoneID, zone_data in model_data.items():
+				zone_poly = zone_data['obj']
+				if zone_poly.GetGeometryName() == "POLYGON" or zone_poly.IsRing():
+					## Fault sources will be skipped
+					zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
+		else:
+			import hazard.rshalib as rshalib
+			if isinstance(source_model_name, rshalib.source.SourceModel):
+				source_model = source_model_name
+				for src in source_model.sources:
+					if isinstance(src, rshalib.source.AreaSource):
+						zone_poly = src.polygon
+						zoneID = src.source_id
+						zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
+
+		return zone_catalogs
+
+	def split_into_time_intervals(self, time_interval):
+		"""
+		:param time_interval:
+			int (years) or instance of :class:`np.timedelta64`
+			(precision of days or better)
+
+		:return:
+			list with instances of :class:`EQCatalog`
+		"""
+		subcatalogs = []
+		start_date = self.start_date
+		if isinstance(time_interval, int):
+			time_interval = np.timedelta64(time_interval, 'Y')
+		end_date = self.start_date + time_interval
+		unit = str(end_date.dtype).split('[')[1].split(']')[0]
+		max_end_date = self.end_date + np.timedelta64(1, unit)
+		while start_date <= self.end_date:
+			catalog = self.subselect(start_date=start_date, end_date=min(end_date, max_end_date),
+									include_right_edges=False)
+			subcatalogs.append(catalog)
+			start_date = end_date
+			end_date = start_date + time_interval
+
+		return subcatalogs
+
+	def subselect_completeness(self,
+		completeness=DEFAULT_COMPLETENESS,
+		Mtype="MW", Mrelation="default",
+		catalog_name="",
+		verbose=True):
+		"""
+		Subselect earthquakes in the catalog that conform with the specified
+		completeness criterion.
+
+		:param completeness:
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param catalog_name:
+			str, name of resulting catalog
+			(default: "")
+		:param verbose:
+			Bool, whether or not some info should be printed (default: True)
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		if completeness:
+			start_date = min(completeness.min_dates)
+			if completeness.Mtype != Mtype:
+				raise Exception("Magnitude type of completeness "
+								"not compatible with specified Mtype!")
+		else:
+			start_date = self.start_date
+		end_date = self.end_date
+
+		## Select magnitudes according to completeness criteria
+		if completeness:
+			eq_list = []
+			for eq in self.eq_list:
+				M = eq.get_or_convert_mag(Mtype, Mrelation)
+				if M >= completeness.get_completeness_magnitude(eq.date):
+					eq_list.append(eq)
+		else:
+			eq_list = self.eq_list
+
+		if verbose:
+			print("Number of events constrained by completeness criteria: %d out of %d"
+					% (len(eq_list), len(self.eq_list)))
+
+		if not catalog_name:
+			catalog_name = self.name + " (completeness-constrained)"
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
+						region=self.region, name=catalog_name)
+
+	def split_completeness(self,
+		completeness=DEFAULT_COMPLETENESS,
+		Mtype="MW", Mrelation="default"):
+		"""
+		Split catlog in subcatalogs according to completeness periods and magnitudes
+
+		:param completeness:
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+		:param Mtype:
+			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
+		:param Mrelation":
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+
+		:return:
+			list of instances of :class:`EQCatalog`
+		"""
+		assert Mtype == completeness.Mtype
+		completeness_catalogs = []
+		min_mags = completeness.min_mags[::-1]
+		max_mags = list(min_mags[1:]) + [None]
+		start_dates = completeness.min_dates[::-1]
+		for Mmin, Mmax, start_date in zip(min_mags, max_mags, start_dates):
+			catalog = self.subselect(Mmin=Mmin, Mmax=Mmax, start_date=start_date,
+									end_date=self.end_date)
+			completeness_catalogs.append(catalog)
+		return completeness_catalogs
+
 	def subselect_declustering(self,
 		method="Cluster",
 		window="GardnerKnopoff1974",
@@ -862,88 +1189,7 @@ class EQCatalog:
 		# TODO: implement get_dependent_events, get_foreshocks, get_aftershocks
 		# methods in LocalEarthquake class
 
-	def subselect_completeness(self,
-		completeness=DEFAULT_COMPLETENESS,
-		Mtype="MW", Mrelation="default",
-		catalog_name="",
-		verbose=True):
-		"""
-		Subselect earthquakes in the catalog that conform with the specified
-		completeness criterion.
-
-		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
-		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
-		:param Mrelation":
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param catalog_name:
-			str, name of resulting catalog
-			(default: "")
-		:param verbose:
-			Bool, whether or not some info should be printed (default: True)
-
-		:return:
-			instance of :class:`EQCatalog`
-		"""
-		if completeness:
-			start_date = min(completeness.min_dates)
-			if completeness.Mtype != Mtype:
-				raise Exception("Magnitude type of completeness "
-								"not compatible with specified Mtype!")
-		else:
-			start_date = self.start_date
-		end_date = self.end_date
-
-		## Select magnitudes according to completeness criteria
-		if completeness:
-			eq_list = []
-			for eq in self.eq_list:
-				M = eq.get_or_convert_mag(Mtype, Mrelation)
-				if M >= completeness.get_completeness_magnitude(eq.date):
-					eq_list.append(eq)
-		else:
-			eq_list = self.eq_list
-
-		if verbose:
-			print("Number of events constrained by completeness criteria: %d out of %d"
-					% (len(eq_list), len(self.eq_list)))
-
-		if not catalog_name:
-			catalog_name = self.name + " (completeness-constrained)"
-		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
-						region=self.region, name=catalog_name)
-
-	def split_completeness(self,
-		completeness=DEFAULT_COMPLETENESS,
-		Mtype="MW", Mrelation="default"):
-		"""
-		Split catlog in subcatalogs according to completeness periods and magnitudes
-
-		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
-		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
-		:param Mrelation":
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-
-		:return:
-			list of instances of :class:`EQCatalog`
-		"""
-		assert Mtype == completeness.Mtype
-		completeness_catalogs = []
-		min_mags = completeness.min_mags[::-1]
-		max_mags = list(min_mags[1:]) + [None]
-		start_dates = completeness.min_dates[::-1]
-		for Mmin, Mmax, start_date in zip(min_mags, max_mags, start_dates):
-			catalog = self.subselect(Mmin=Mmin, Mmax=Mmax, start_date=start_date,
-									end_date=self.end_date)
-			completeness_catalogs.append(catalog)
-		return completeness_catalogs
+	## Various binning methods
 
 	def bin_by_year(self,
 		start_year, end_year, dYear,
@@ -1141,6 +1387,40 @@ class EQCatalog:
 		bins_N, _ = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
+	def get_daily_nightly_mean(self,
+		Mmin=None, Mmax=None,
+		Mtype="MW", Mrelation="default",
+		start_year=None, end_year=None,
+		day=(7, 19)):
+		"""
+		Report mean number of earthquakes for different times of day
+
+		:param Mmin:
+			Float, minimum magnitude (inclusive) (default: None)
+		:param Mmax:
+			Float, maximum magnitude (inclusive) (default: None)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param start_year:
+			Int, lower year to bin (default: None)
+		:param end_year:
+			Int, upper year to bin (default: None)
+		:param day:
+			Tuple (min_hour, max_hour), default: (7, 19)
+
+		:return:
+			Tuple (mean, daily mean, nightly mean)
+		"""
+		bins_N, _ = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
+		mean = np.mean(bins_N)
+		mean_day = np.mean(bins_N[day[0]:day[1]])
+		mean_night = np.mean(np.concatenate([bins_N[:day[0]], bins_N[day[1]:]]))
+		return (mean, mean_day, mean_night)
+
 	def bin_by_depth(self,
 		min_depth=0, max_depth=30, bin_width=2,
 		depth_error=None,
@@ -1326,6 +1606,8 @@ class EQCatalog:
 
 		return bins_N, bins_Mag
 
+	## Completeness methods
+
 	def get_initial_completeness_dates(self, magnitudes,
 									completeness=DEFAULT_COMPLETENESS):
 		"""
@@ -1398,7 +1680,9 @@ class EQCatalog:
 			completeness = Completeness([min_date], [min_mag], Mtype="MW")
 		return completeness.get_completeness_timespans(magnitudes, self.end_date, unit=unit)
 
-	def get_incremental_MagFreq(self,
+	## MFD methods
+
+	def get_incremental_mag_freqs(self,
 		Mmin, Mmax, dM=0.2,
 		Mtype="MW", Mrelation="default",
 		completeness=DEFAULT_COMPLETENESS,
@@ -1447,7 +1731,7 @@ class EQCatalog:
 
 		return bins_N_incremental, bins_Mag
 
-	def get_incremental_MFD(self,
+	def get_incremental_mfd(self,
 		Mmin, Mmax, dM=0.2,
 		Mtype="MW", Mrelation="default",
 		completeness=DEFAULT_COMPLETENESS,
@@ -1481,14 +1765,14 @@ class EQCatalog:
 			instance of nhlib :class:`EvenlyDiscretizedMFD`
 		"""
 		from hazard.rshalib.mfd import EvenlyDiscretizedMFD
-		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax,
+		bins_N_incremental, bins_Mag = self.get_incremental_mag_freqs(Mmin, Mmax,
 					dM, Mtype, Mrelation, completeness, trim, verbose=verbose)
 		## Mmin may have changed depending on completeness
 		Mmin = bins_Mag[0]
 		return EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental),
 									Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self,
+	def get_cumulative_mag_freqs(self,
 		Mmin, Mmax, dM=0.1,
 		Mtype="MW", Mrelation="default",
 		completeness=DEFAULT_COMPLETENESS,
@@ -1523,12 +1807,529 @@ class EQCatalog:
 			bins_N_cumulative: cumulative annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N_incremental, bins_Mag = self.get_incremental_MagFreq(Mmin, Mmax,
+		bins_N_incremental, bins_Mag = self.get_incremental_mag_freqs(Mmin, Mmax,
 				dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
 		## Reverse arrays for calculating cumulative number of events
 		bins_N_incremental = bins_N_incremental[::-1]
-		bins_N_cumulative = np.add.accumulate(bins_N_incremental)
+		bins_N_cumulative = np.cumsum(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
+
+	def calcGR_LSQ(self,
+		Mmin, Mmax, dM=0.1,
+		cumul=True,
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		b_val=None,
+		weighted=False,
+		verbose=False):
+		"""
+		Calculate a and b values of Gutenberg-Richter relation using
+		linear regression (least-squares).
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param cumul:
+			Bool, whether to use cumulative (True) or incremental (False)
+			occurrence rates for linear regression (default: True)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+		:param b_val:
+			Float, fixed b value to constrain MLE estimation (default: None)
+			This parameter is currently ignored.
+		:param weighted:
+			bool, whether or not magnitude bins should be weighted by the
+			number of events in them
+			(default: False)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
+		Return value:
+			Tuple (a, b, stda, stdb)
+			- a: a value (intercept)
+			- b: b value (slope, taken positive)
+			- stda: standard deviation on a value
+			- stdb: standard deviation on b value
+		"""
+		from hazard.rshalib.mfd import get_a_separation
+		from .calcGR import calcGR_LSQ
+
+		if weighted:
+			bins_N, _ = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+			weights = bins_N
+		else:
+			weights = None
+
+		if cumul:
+			rates, magnitudes = self.get_cumulative_mag_freqs(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
+		else:
+			rates, magnitudes = self.get_incremental_mag_freqs(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
+
+		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, weights=weights, verbose=verbose)
+		if not cumul:
+			a += get_a_separation(b, dM)
+		return a, b, stda, stdb
+
+	def calcGR_Aki(self,
+		Mmin=None, Mmax=None, dM=0.1,
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		b_val=None,
+		verbose=False):
+		"""
+		Calculate a and b values of Gutenberg-Richter relation using original
+		maximum likelihood estimation by Aki (1965)
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning (ignored)
+		:param Mmax:
+			Float, maximum magnitude to use for binning (ignored)
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+		:param b_val:
+			Float, fixed b value to constrain MLE estimation (ignored)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
+		:return:
+			Tuple (a, b, stdb)
+			- a: a value
+			- b: b value
+			- stdb: standard deviation on b value
+		"""
+		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+
+	def calcGR_Weichert(self,
+		Mmin, Mmax, dM=0.1,
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		b_val=None,
+		verbose=True):
+		"""
+		Calculate a and b values of Gutenberg-Richter relation using maximum
+		likelihood estimation for variable observation periods for different
+		magnitude increments.
+		Adapted from calB.m and calBfixe.m Matlab modules written by Philippe
+		Rosset (ROB, 2004), which is based on the method by Weichert, 1980
+		(BSSA, 70, Nr 4, 1337-1346).
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+		:param b_val:
+			Float, fixed b value to constrain MLE estimation (default: None)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
+		:return:
+			Tuple (a, b, stdb)
+			- a: a value
+			- b: b value
+			- stda: standard deviation of a value
+			- stdb: standard deviation of b value
+
+		Note:
+		This regression depends on the Mmax specified, as empty magnitude bins
+		are taken into account. It is therefore important to specify Mmax as
+		the evaluated Mmax for the specific region or source.
+		"""
+		from .calcGR import calcGR_Weichert
+		## Note: don't use get_incremental_mag_freqs here, as completeness
+		## is taken into account in the Weichert algorithm !
+		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date, b_val=b_val, verbose=verbose)
+
+		"""
+		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
+		bins_Mag += dM/2.0
+
+		if not b_val:
+			## Initial trial value
+			BETA = 1.5
+		else:
+			## Fixed beta
+			BETA = b_val * np.log(10)
+		BETL = 0
+		while(np.abs(BETA-BETL)) >= 0.0001:
+			#print(BETA)
+
+			SNM = 0.0
+			NKOUNT = 0.0
+			STMEX = 0.0
+			SUMTEX = 0.0
+			STM2X = 0.0
+			SUMEXP = 0.0
+
+			for k in range(len(bins_N)):
+				SNM += bins_N[k] * bins_Mag[k]
+				NKOUNT += bins_N[k]
+				TJEXP = bins_timespans[k] * np.exp(-BETA * bins_Mag[k])
+				TMEXP = TJEXP * bins_Mag[k]
+				SUMEXP += np.exp(-BETA * bins_Mag[k])
+				STMEX += TMEXP
+				SUMTEX += TJEXP
+				STM2X += bins_Mag[k] * TMEXP
+
+			#print(SNM, NKOUNT, STMEX, SUMTEX, STM2X, SUMEXP)
+
+			try:
+				DLDB = STMEX / SUMTEX
+			except:
+				break
+			else:
+				D2LDB2 = NKOUNT * (DLDB*DLDB - STM2X/SUMTEX)
+				DLDB = DLDB * NKOUNT - SNM
+				BETL = BETA
+				if not b_val:
+					BETA -= DLDB/D2LDB2
+
+		B = BETA / np.log(10)
+		if not b_val:
+			STDBETA = np.sqrt(-1.0/D2LDB2)
+			STDB = STDBETA / np.log(10)
+		else:
+			STDB = 0
+			STDBETA = 0
+		FNGTMO = NKOUNT * SUMEXP / SUMTEX
+		FN0 = FNGTMO * np.exp(BETA * (bins_Mag[0] - dM/2.0))
+		FLGN0 = np.log10(FN0)
+		A = FLGN0
+		STDFN0 = FN0 / np.sqrt(NKOUNT)
+		## Applying error propogation for base-10 logarithm
+		STDA = STDFN0 / (2.303 * FN0)
+		#print(STDA)
+		## Note: the following formula in Philippe Rosset's program is equivalent
+		#A = np.log10(FNGTMO) + B * (bins_Mag[0] - dM/2.0)
+		## This is also equivalent to:
+		#A = np.log10(FNGTMO * np.exp(-BETA * (0. - (bins_Mag[0] - (dM/2.0)))))
+
+		if verbose:
+			FN5 = FNGTMO * np.exp(-BETA * (5. - (bins_Mag[0] - dM/2.0)))
+			STDFN5 = FN5 / np.sqrt(NKOUNT)
+			print("Maximum-likelihood estimation (Weichert)")
+			print("BETA=%.3f +/- %.3f; B=%.3f +/- %.3f" % (BETA, STDBETA, B, STDB))
+			print("Total number of events: %d" % NKOUNT)
+			print("LOG(annual rate above M0): %.3f" % FLGN0)
+			print("Annual rate above M5: %.3f +/- %.3f" % (FN5, STDFN5))
+
+		## Other parameters computed in Philippe Rosset's version
+		#STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
+		#STDA = np.sqrt(abs(A)/NKOUNT)
+		#ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
+		#STDALPHA = ALPHA / np.sqrt(NKOUNT)
+		#if Mc !=None:
+		#	LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
+		#	STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
+		#if verbose:
+		#	print("Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)"
+		# 		% (A, STDA, B, STDB, BETA, STDBETA))
+		#if Mc != None:
+		#	return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
+		#else:
+		#	return (A, B, BETA, STDA, STDB, STDBETA)
+
+		return A, B, STDB
+		"""
+
+	#TODO: averaged Weichert method (Felzer, 2007)
+
+	def get_estimated_mfd(self,
+		Mmin, Mmax, dM=0.1,
+		method="Weichert",
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		b_val=None,
+		verbose=True):
+		"""
+		Compute a and b values of Gutenberg Richter relation, and return
+		as TruncatedGRMFD object.
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param method:
+			String, computation method, either "Weichert", "Aki", "LSQc", "LSQc", "LSQi", "wLSQc" or "wLSQi"
+			(default: "Weichert")
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+		:param b_val:
+			Float, fixed b value to constrain MLE estimation
+			Currently only supported by Weichert method (default: None)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+
+		:return:
+			instance of :class:`mfd.TruncatedGRMFD`
+		"""
+		from hazard.rshalib.mfd import TruncatedGRMFD
+
+		kwargs = {}
+		if "LSQc" in method:
+			kwargs['cumul'] = True
+		elif "LSQi" in method:
+			kwargs['cumul'] = False
+		if "LSQ" in method:
+			if method[0] == 'w':
+				kwargs['weighted'] = True
+			else:
+				kwargs['weighted'] = False
+			method = "LSQ"
+		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
+		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose, **kwargs)
+		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
+
+	def plot_mfd(self,
+		Mmin, Mmax, dM=0.2,
+		method="Weichert",
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		b_val=None,
+		num_sigma=0,
+		color_observed="b",
+		color_estimated="r",
+		plot_completeness_limits=True,
+		Mrange=(), Freq_range=(),
+		title=None, lang="en",
+		fig_filespec=None, fig_width=0, dpi=300,
+		verbose=False):
+		"""
+		Compute GR MFD from observed MFD, and plot result
+
+		:param Mmin:
+			Float, minimum magnitude to use for binning
+		:param Mmax:
+			Float, maximum magnitude to use for binning
+		:param dM:
+			Float, magnitude interval to use for binning (default: 0.1)
+		:param method:
+			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi", "wLSQc" or "wLSQi"
+			(default: "Weichert"). If None, only observed MFD will be plotted.
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param completeness:
+			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+		:param b_val:
+			Float, fixed b value to constrain Weichert estimation (default: None)
+		:param num_sigma:
+			Int, number of standard deviations to consider for plotting uncertainty
+			(default: 0)
+		:param color_observed:
+			matplotlib color specification for observed MFD
+		:param color_estimated:
+			matplotlib color specification for estimated MFD
+		:param plot_completeness_limits:
+			Bool, whether or not to plot completeness limits (default: True)
+		:param Mrange:
+			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
+			(default: ())
+		:param Freq_range:
+			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
+			(Y) axis (default: ())
+		:param title:
+			String, plot title. If None, title will be automatically generated
+			(default: None)
+		:param lang:
+			String, language of plot axis labels (default: "en")
+		:param fig_filespec:
+			String, full path to output image file, if None plot to screen
+			(default: None)
+		:param fig_width:
+			Float, figure width in cm, used to recompute :param:`dpi` with
+			respect to default figure width (default: 0)
+		:param dpi:
+			Int, image resolution in dots per inch (default: 300)
+		:param verbose:
+			Bool, whether some messages should be printed or not (default: False)
+		"""
+		from hazard.rshalib.mfd import plot_mfd
+
+		mfd_list, labels, colors, styles = [], [], [], []
+		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
+		observed_mfd = cc_catalog.get_incremental_mfd(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		mfd_list.append(observed_mfd)
+		label = {"en": "Observed", "nl": "Waargenomen"}[lang]
+		labels.append(label)
+		colors.append(color_observed)
+
+		styles.append('o')
+		if method:
+			estimated_mfd = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+			mfd_list.append(estimated_mfd)
+			a, b, stdb = estimated_mfd.a_val, estimated_mfd.b_val, estimated_mfd.b_sigma
+			label = {"en": "Computed", "nl": "Berekend"}[lang]
+			label += " (%s): " % method
+			label += "a=%.3f, b=%.3f" % (a, b)
+			if not b_val:
+				label += " ($\pm$%.3f)" % stdb
+			labels.append(label)
+			colors.append(color_estimated)
+			styles.append('-')
+			if num_sigma:
+				sigma_mfd1 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b+num_sigma*stdb, verbose=verbose)
+				mfd_list.append(sigma_mfd1)
+				label = {"en": "Computed", "nl": "Berekend"}[lang]
+				label += " $\pm$ %d sigma" % num_sigma
+				labels.append(label)
+				colors.append(color_estimated)
+				styles.append('--')
+				sigma_mfd2 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b-num_sigma*stdb, verbose=verbose)
+				mfd_list.append(sigma_mfd2)
+				labels.append("_nolegend_")
+				colors.append(color_estimated)
+				styles.append('--')
+
+		if title is None:
+			num_events = len(cc_catalog)
+			Mmax_obs = cc_catalog.get_Mmax(Mtype, Mrelation)
+			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
+		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
+		end_year = tf.to_year(self.end_date)
+		plot_mfd(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+
+	## Random catalogs
+
+	def generate_synthetic_catalogs(self, num_samples, num_sigma=2, random_seed=None):
+		"""
+		Generate synthetic catalogs by random sampling of the magnitude
+		and epicenter of each earthquake.
+
+		:param num_samples:
+			Int, number of random synthetic catalogs to generate
+		:param num_sigma:
+			Float, number of standard deviations to consider
+		:param random_seed:
+			None or int, seed to initialize internal state of random number
+			generator (default: None, will seed from current time)
+
+		:return:
+			list of instances of :class:`EQCatalog`
+		"""
+		import copy
+		import scipy.stats
+
+		np.random.seed(seed=random_seed)
+
+		num_eq = len(self)
+		ML = np.zeros((num_eq, num_samples))
+		MS = np.zeros((num_eq, num_samples))
+		MW = np.zeros((num_eq, num_samples))
+		lons = np.zeros((num_eq, num_samples))
+		lats = np.zeros((num_eq, num_samples))
+		# depths relevant in declustering?
+		depths = np.zeros((num_eq, num_samples))
+
+		for i, eq in enumerate(self):
+			# TODO: write function to generate errM, errh based on date (use completeness dates?)
+			if not eq.errM:
+				if eq.year < 1910:
+					errM = 0.5
+				elif 1910 <= eq.year < 1985:
+					if eq.MS > 0:
+						errM = 0.2
+					else:
+						errM = 0.3
+				elif eq.year >= 1985:
+					eq.errM = 0.2
+			elif eq.errM >= 1.:
+				# A lot of earthquakes have errM = 9.9 ???
+				errM = 0.3
+			else:
+				errM = eq.errM
+
+			if not eq.errh:
+				if eq.year < 1650:
+					errh = 25
+				elif 1650 <= eq.year < 1910:
+					errh = 15
+				elif 1910 <= eq.year < 1930:
+					errh = 10
+				elif 1930 <= eq.year < 1960:
+					errh = 5.
+				elif 1960 <= eq.year < 1985:
+					errh = 2.5
+				elif eq.year >= 1985:
+					errh = 1.5
+			else:
+				errh = eq.errh
+
+			## Convert uncertainty in km to uncertainty in lon, lat
+			errlon = errh / ((40075./360.) * np.cos(np.radians(eq.lat)))
+			errlat = errh / (40075./360.)
+
+			if not eq.errz:
+				errz = 5.
+			else:
+				errz = eq.errz
+
+			if eq.ML:
+				ML[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.ML, errM, size=num_samples)
+			if eq.MS:
+				MS[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MS, errM, size=num_samples)
+			if eq.MW:
+				MW[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MW, errM, size=num_samples)
+			lons[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lon, errlon, size=num_samples)
+			lats[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lat, errlat, size=num_samples)
+			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.depth, errz, size=num_samples)
+		depths.clip(min=0.)
+
+		synthetic_catalogs = []
+		for n in range(num_samples):
+			eq_list = []
+			for i, eq in enumerate(self):
+				new_eq = copy.deepcopy(eq)
+				new_eq.ML = ML[i,n]
+				new_eq.MS = MS[i,n]
+				new_eq.MW = MW[i,n]
+				new_eq.lon = lons[i,n]
+				new_eq.lat = lats[i,n]
+				new_eq.depth = depths[i,n]
+				eq_list.append(new_eq)
+			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date, self.end_date, region=self.region))
+
+		return synthetic_catalogs
+
+	## Mmax estimation
 
 	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
 					b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
@@ -1602,7 +2403,7 @@ class EQCatalog:
 				a_val, b_val, stda, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag,
 						Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation,
 						completeness=completeness, b_val=b_val, verbose=verbose)
-			mfd = cc_catalog.get_incremental_MFD(Mmin=completeness.min_mag,
+			mfd = cc_catalog.get_incremental_mfd(Mmin=completeness.min_mag,
 						Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation,
 						completeness=completeness, verbose=verbose)
 		else:
@@ -1703,6 +2504,8 @@ class EQCatalog:
 		else:
 			pylab.show()
 
+	## Various plots
+
 	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW",
 		Mrelation="default", color="b", title=None, fig_filespec=None, verbose=False):
 		"""
@@ -1794,7 +2597,7 @@ class EQCatalog:
 		if start_year <= catalog_start_year:
 			start_year = catalog_start_year
 		bins_N, bins_Years = self.bin_by_year(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
-		bins_N_cumul = np.add.accumulate(bins_N)
+		bins_N_cumul = np.cumsum(bins_N)
 		start_year_index = np.where(bins_Years == start_year)[0][0]
 		bins_N = bins_N[start_year_index:]
 		bins_Years = bins_Years[start_year_index:]
@@ -1881,9 +2684,9 @@ class EQCatalog:
 			#bins_Dates = np.arange((end_date - start_date).days + 1)
 			subcatalog = self.subselect(start_date=start_date, end_date=end_date)
 			Dates = tf.timespan(start_date, self.get_datetimes(), 'D')
-		bins_M0_cumul = np.add.accumulate(bins_M0)
+		bins_M0_cumul = np.cumsum(bins_M0)
 		unbinned_M0 = subcatalog.get_M0(Mrelation=Mrelation)
-		M0_cumul = np.add.accumulate(unbinned_M0)
+		M0_cumul = np.cumsum(unbinned_M0)
 
 		## Construct arrays with duplicate points in order to plot horizontal
 		## lines between subsequent points
@@ -2161,36 +2964,6 @@ class EQCatalog:
 			else:
 				edge_colors.append('k')
 		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness, completeness_color=completeness_color, vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi, ax=ax)
-
-	def DailyNightlyMean(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default", start_year=None, end_year=None, day=(7, 19)):
-		"""
-		Report mean number of earthquakes for different times of day
-
-		:param Mmin:
-			Float, minimum magnitude (inclusive) (default: None)
-		:param Mmax:
-			Float, maximum magnitude (inclusive) (default: None)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param start_year:
-			Int, lower year to bin (default: None)
-		:param end_year:
-			Int, upper year to bin (default: None)
-		:param day:
-			Tuple (min_hour, max_hour), default: (7, 19)
-
-		:return:
-			Tuple (mean, daily mean, nightly mean)
-		"""
-		bins_N, _ = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
-		mean = np.mean(bins_N)
-		mean_day = np.mean(bins_N[day[0]:day[1]])
-		mean_night = np.mean(np.concatenate([bins_N[:day[0]], bins_N[day[1]:]]))
-		return (mean, mean_day, mean_night)
 
 	def plot_HourHistogram(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default", start_year=None, end_year=None):
 		"""
@@ -2556,380 +3329,6 @@ class EQCatalog:
 			title = self.name
 
 		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], edge_widths=[edge_width], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, sm_label_colname=sm_label_colname, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
-
-	def calcGR_LSQ(self, Mmin, Mmax, dM=0.1, cumul=True, Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, weighted=False, verbose=False):
-		"""
-		Calculate a and b values of Gutenberg-Richter relation using a linear regression (least-squares).
-
-		:param Mmin:
-			Float, minimum magnitude to use for binning
-		:param Mmax:
-			Float, maximum magnitude to use for binning
-		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
-		:param cumul:
-			Bool, whether to use cumulative (True) or incremental (False)
-			occurrence rates for linear regression (default: True)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
-		:param b_val:
-			Float, fixed b value to constrain MLE estimation (default: None)
-			This parameter is currently ignored.
-		:param weighted:
-			bool, whether or not magnitude bins should be weighted by the
-			number of events in them
-			(default: False)
-		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
-
-		Return value:
-			Tuple (a, b, stda, stdb)
-			- a: a value (intercept)
-			- b: b value (slope, taken positive)
-			- stda: standard deviation on a value
-			- stdb: standard deviation on b value
-		"""
-		from hazard.rshalib.mfd import get_a_separation
-		from .calcGR import calcGR_LSQ
-
-		if weighted:
-			bins_N, _ = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
-			weights = bins_N
-		else:
-			weights = None
-
-		if cumul:
-			rates, magnitudes = self.get_cumulative_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
-		else:
-			rates, magnitudes = self.get_incremental_MagFreq(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
-
-		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, weights=weights, verbose=verbose)
-		if not cumul:
-			a += get_a_separation(b, dM)
-		return a, b, stda, stdb
-
-	def calcGR_Aki(self, Mmin=None, Mmax=None, dM=0.1, Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, verbose=False):
-		"""
-		Calculate a and b values of Gutenberg-Richter relation using original
-		maximum likelihood estimation by Aki (1965)
-
-		:param Mmin:
-			Float, minimum magnitude to use for binning (ignored)
-		:param Mmax:
-			Float, maximum magnitude to use for binning (ignored)
-		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
-		:param b_val:
-			Float, fixed b value to constrain MLE estimation (ignored)
-		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
-
-		:return:
-			Tuple (a, b, stdb)
-			- a: a value
-			- b: b value
-			- stdb: standard deviation on b value
-		"""
-		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
-
-	def calcGR_Weichert(self, Mmin, Mmax, dM=0.1, Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, verbose=True):
-		"""
-		Calculate a and b values of Gutenberg-Richter relation using maximum likelihood estimation
-		for variable observation periods for different magnitude increments.
-		Adapted from calB.m and calBfixe.m Matlab modules written by Philippe Rosset (ROB, 2004),
-		which is based on the method by Weichert, 1980 (BSSA, 70, Nr 4, 1337-1346).
-
-		:param Mmin:
-			Float, minimum magnitude to use for binning
-		:param Mmax:
-			Float, maximum magnitude to use for binning
-		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
-		:param b_val:
-			Float, fixed b value to constrain MLE estimation (default: None)
-		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
-
-		:return:
-			Tuple (a, b, stdb)
-			- a: a value
-			- b: b value
-			- stda: standard deviation of a value
-			- stdb: standard deviation of b value
-
-		Note:
-		This regression depends on the Mmax specified, as empty magnitude bins
-		are taken into account. It is therefore important to specify Mmax as
-		the evaluated Mmax for the specific region or source.
-		"""
-		from .calcGR import calcGR_Weichert
-		## Note: don't use get_incremental_MagFreq here, as completeness
-		## is taken into account in the Weichert algorithm !
-		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
-		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date, b_val=b_val, verbose=verbose)
-
-		"""
-		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
-		bins_Mag += dM/2.0
-
-		if not b_val:
-			## Initial trial value
-			BETA = 1.5
-		else:
-			## Fixed beta
-			BETA = b_val * np.log(10)
-		BETL = 0
-		while(np.abs(BETA-BETL)) >= 0.0001:
-			#print(BETA)
-
-			SNM = 0.0
-			NKOUNT = 0.0
-			STMEX = 0.0
-			SUMTEX = 0.0
-			STM2X = 0.0
-			SUMEXP = 0.0
-
-			for k in range(len(bins_N)):
-				SNM += bins_N[k] * bins_Mag[k]
-				NKOUNT += bins_N[k]
-				TJEXP = bins_timespans[k] * np.exp(-BETA * bins_Mag[k])
-				TMEXP = TJEXP * bins_Mag[k]
-				SUMEXP += np.exp(-BETA * bins_Mag[k])
-				STMEX += TMEXP
-				SUMTEX += TJEXP
-				STM2X += bins_Mag[k] * TMEXP
-
-			#print(SNM, NKOUNT, STMEX, SUMTEX, STM2X, SUMEXP)
-
-			try:
-				DLDB = STMEX / SUMTEX
-			except:
-				break
-			else:
-				D2LDB2 = NKOUNT * (DLDB*DLDB - STM2X/SUMTEX)
-				DLDB = DLDB * NKOUNT - SNM
-				BETL = BETA
-				if not b_val:
-					BETA -= DLDB/D2LDB2
-
-		B = BETA / np.log(10)
-		if not b_val:
-			STDBETA = np.sqrt(-1.0/D2LDB2)
-			STDB = STDBETA / np.log(10)
-		else:
-			STDB = 0
-			STDBETA = 0
-		FNGTMO = NKOUNT * SUMEXP / SUMTEX
-		FN0 = FNGTMO * np.exp(BETA * (bins_Mag[0] - dM/2.0))
-		FLGN0 = np.log10(FN0)
-		A = FLGN0
-		STDFN0 = FN0 / np.sqrt(NKOUNT)
-		## Applying error propogation for base-10 logarithm
-		STDA = STDFN0 / (2.303 * FN0)
-		#print(STDA)
-		## Note: the following formula in Philippe Rosset's program is equivalent
-		#A = np.log10(FNGTMO) + B * (bins_Mag[0] - dM/2.0)
-		## This is also equivalent to:
-		#A = np.log10(FNGTMO * np.exp(-BETA * (0. - (bins_Mag[0] - (dM/2.0)))))
-
-		if verbose:
-			FN5 = FNGTMO * np.exp(-BETA * (5. - (bins_Mag[0] - dM/2.0)))
-			STDFN5 = FN5 / np.sqrt(NKOUNT)
-			print("Maximum-likelihood estimation (Weichert)")
-			print("BETA=%.3f +/- %.3f; B=%.3f +/- %.3f" % (BETA, STDBETA, B, STDB))
-			print("Total number of events: %d" % NKOUNT)
-			print("LOG(annual rate above M0): %.3f" % FLGN0)
-			print("Annual rate above M5: %.3f +/- %.3f" % (FN5, STDFN5))
-
-		## Other parameters computed in Philippe Rosset's version
-		#STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
-		#STDA = np.sqrt(abs(A)/NKOUNT)
-		#ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
-		#STDALPHA = ALPHA / np.sqrt(NKOUNT)
-		#if Mc !=None:
-		#	LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
-		#	STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
-		#if verbose:
-		#	print("Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)"
-		# 		% (A, STDA, B, STDB, BETA, STDBETA))
-		#if Mc != None:
-		#	return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
-		#else:
-		#	return (A, B, BETA, STDA, STDB, STDBETA)
-
-		return A, B, STDB
-		"""
-
-	#TODO: averaged Weichert method (Felzer, 2007)
-
-	def get_estimated_MFD(self, Mmin, Mmax, dM=0.1, method="Weichert", Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, verbose=True):
-		"""
-		Compute a and b values of Gutenberg Richter relation, and return
-		as TruncatedGRMFD object.
-
-		:param Mmin:
-			Float, minimum magnitude to use for binning
-		:param Mmax:
-			Float, maximum magnitude to use for binning
-		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
-		:param method:
-			String, computation method, either "Weichert", "Aki", "LSQc", "LSQc", "LSQi", "wLSQc" or "wLSQi"
-			(default: "Weichert")
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
-		:param b_val:
-			Float, fixed b value to constrain MLE estimation
-			Currently only supported by Weichert method (default: None)
-		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
-
-		:return:
-			instance of :class:`mfd.TruncatedGRMFD`
-		"""
-		from hazard.rshalib.mfd import TruncatedGRMFD
-
-		kwargs = {}
-		if "LSQc" in method:
-			kwargs['cumul'] = True
-		elif "LSQi" in method:
-			kwargs['cumul'] = False
-		if "LSQ" in method:
-			if method[0] == 'w':
-				kwargs['weighted'] = True
-			else:
-				kwargs['weighted'] = False
-			method = "LSQ"
-		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
-		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose, **kwargs)
-		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
-
-	def plot_MFD(self, Mmin, Mmax, dM=0.2, method="Weichert", Mtype="MW", Mrelation="default", completeness=DEFAULT_COMPLETENESS, b_val=None, num_sigma=0, color_observed="b", color_estimated="r", plot_completeness_limits=True, Mrange=(), Freq_range=(), title=None, lang="en", fig_filespec=None, fig_width=0, dpi=300, verbose=False):
-		"""
-		Compute GR MFD from observed MFD, and plot result
-
-		:param Mmin:
-			Float, minimum magnitude to use for binning
-		:param Mmax:
-			Float, maximum magnitude to use for binning
-		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
-		:param method:
-			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi", "wLSQc" or "wLSQi"
-			(default: "Weichert"). If None, only observed MFD will be plotted.
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
-		:param b_val:
-			Float, fixed b value to constrain Weichert estimation (default: None)
-		:param num_sigma:
-			Int, number of standard deviations to consider for plotting uncertainty
-			(default: 0)
-		:param color_observed:
-			matplotlib color specification for observed MFD
-		:param color_estimated:
-			matplotlib color specification for estimated MFD
-		:param plot_completeness_limits:
-			Bool, whether or not to plot completeness limits (default: True)
-		:param Mrange:
-			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
-			(default: ())
-		:param Freq_range:
-			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
-			(Y) axis (default: ())
-		:param title:
-			String, plot title. If None, title will be automatically generated
-			(default: None)
-		:param lang:
-			String, language of plot axis labels (default: "en")
-		:param fig_filespec:
-			String, full path to output image file, if None plot to screen
-			(default: None)
-		:param fig_width:
-			Float, figure width in cm, used to recompute :param:`dpi` with
-			respect to default figure width (default: 0)
-		:param dpi:
-			Int, image resolution in dots per inch (default: 300)
-		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
-		"""
-		from hazard.rshalib.mfd import plot_MFD
-
-		mfd_list, labels, colors, styles = [], [], [], []
-		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
-		observed_mfd = cc_catalog.get_incremental_MFD(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
-		mfd_list.append(observed_mfd)
-		label = {"en": "Observed", "nl": "Waargenomen"}[lang]
-		labels.append(label)
-		colors.append(color_observed)
-
-		styles.append('o')
-		if method:
-			estimated_mfd = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
-			mfd_list.append(estimated_mfd)
-			a, b, stdb = estimated_mfd.a_val, estimated_mfd.b_val, estimated_mfd.b_sigma
-			label = {"en": "Computed", "nl": "Berekend"}[lang]
-			label += " (%s): " % method
-			label += "a=%.3f, b=%.3f" % (a, b)
-			if not b_val:
-				label += " ($\pm$%.3f)" % stdb
-			labels.append(label)
-			colors.append(color_estimated)
-			styles.append('-')
-			if num_sigma:
-				sigma_mfd1 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b+num_sigma*stdb, verbose=verbose)
-				mfd_list.append(sigma_mfd1)
-				label = {"en": "Computed", "nl": "Berekend"}[lang]
-				label += " $\pm$ %d sigma" % num_sigma
-				labels.append(label)
-				colors.append(color_estimated)
-				styles.append('--')
-				sigma_mfd2 = cc_catalog.get_estimated_MFD(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b-num_sigma*stdb, verbose=verbose)
-				mfd_list.append(sigma_mfd2)
-				labels.append("_nolegend_")
-				colors.append(color_estimated)
-				styles.append('--')
-
-		if title is None:
-			num_events = len(cc_catalog)
-			Mmax_obs = cc_catalog.get_Mmax(Mtype, Mrelation)
-			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
-		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
-		end_year = tf.to_year(self.end_date)
-		plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	## Export methods
 
@@ -3327,318 +3726,149 @@ class EQCatalog:
 
 		return cls(eq_list, name=table_name)
 
-	def get_bbox(self):
+	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation="default", completeness=DEFAULT_COMPLETENESS, title=None, fig_filespec=None, verbose=True):
 		"""
-		Compute bounding box of earthquake catalog
+		Plot catalog distribution versus Poisson distribution
+		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
 
-		:return:
-			(lonmin, lonmax, latmin, latmax) tuple
-		"""
-		lons = self.get_longitudes()
-		lats = self.get_latitudes()
-		return (lons.min(), lons.max(), lats.min(), lats.max())
+		First, the specified completeness constraint is applied to the catalog.
+		The completeness-constrained catalog is then truncated to the
+		specified minimum magnitude and corresponding year of completeness.
+		The resulting catalog is divided into intervals of the specified
+		length, the number of events in each interval is counted, and a
+		histogram is computed of the number of intervals having the same
+		number of events up to nmax.
+		This histogram is compared to the theoretical Poisson distribution.
+		It seems to work best if :param:`interval` is larger (2 to 4 times)
+		than tau, the average return period.
 
-	def subselect_distance(self, point, distance, catalog_name=""):
-		"""
-		Subselect earthquakes in a given radius around a given point
-
-		:param point:
-			(lon, lat) tuple
-		:param distance:
-			float, distance in km
-		:param catalog_name:
-			Str, name of resulting catalog
-			(default: "")
-
-		:return:
-			instance of :class:`EQCatalog`
-		"""
-		from itertools import compress
-
-		distances = self.get_epicentral_distances(*point)
-		eq_list = list(compress(self.eq_list, distances <= distance))
-		if not catalog_name:
-			catalog_name = self.name + " (%s km radius from %s)" % (distance, point)
-		lons, lats = geodetic.spherical_point_at(*point, distance=distance*1000,
-												azimuth=np.arange(0, 360, 90))
-		region = (lons.min(), lons.max(), lats.min(), lats.max())
-		subcat = EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
-		return subcat
-
-	def subselect_polygon(self, poly_obj, catalog_name=""):
-		"""
-		Subselect earthquakes from catalog situated inside a polygon
-
-		:param poly_obj:
-			polygon or closed linestring object (ogr geometry object
-			or oqhazlib.geo.polygon.Polygon object)
-		:param catalog_name:
-			Str, name of resulting catalog
-			(default: "")
-
-		:return:
-			instance of :class:`EQCatalog`
-		"""
-		from osgeo import ogr
-
-		if isinstance(poly_obj, ogr.Geometry):
-			## Construct WGS84 projection system corresponding to earthquake coordinates
-			from mapping.geotools.coordtrans import WGS84
-
-			## Point object that will be used to test if earthquake is inside zone
-			point = ogr.Geometry(ogr.wkbPoint)
-			point.AssignSpatialReference(WGS84)
-
-			if poly_obj.GetGeometryName() in ("POLYGON", "LINESTRING"):
-				## Objects other than polygons or closed polylines will be skipped
-				if poly_obj.GetGeometryName() == "LINESTRING":
-					line_obj = poly_obj
-					if line_obj.IsRing() and line_obj.GetPointCount() > 3:
-						# Note: Could not find a way to convert linestrings to polygons
-						# The following only works for linearrings (what is the difference??)
-						#poly_obj = ogr.Geometry(ogr.wkbPolygon)
-						#poly_obj.AddGeometry(line_obj)
-						wkt = line_obj.ExportToWkt().replace("LINESTRING (", "POLYGON ((") + ")"
-						poly_obj = ogr.CreateGeometryFromWkt(wkt)
-					else:
-						return None
-				eq_list = []
-				for i, eq in enumerate(self.eq_list):
-					point.SetPoint(0, eq.lon, eq.lat)
-					if point.Within(poly_obj):
-						eq_list.append(eq)
-
-				## Determine bounding box (region)
-				linear_ring = poly_obj.GetGeometryRef(0)
-				## In some versions of ogr, GetPoints method does not exist
-				#points = linear_ring.GetPoints()
-				points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
-				lons, lats = zip(*points)[:2]
-
-		else:
-			import openquake.hazardlib as oqhazlib
-			if isinstance(poly_obj, oqhazlib.geo.Polygon):
-				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(), depths=None)
-				intersects = poly_obj.intersects(mesh)
-				#idxs = np.argwhere(intersects == True)
-				#idxs = [idx[0] for idx in idxs]
-				idxs = np.where(intersects == True)[0]
-				zone_catalog = self.__getitem__(idxs)
-				lons = zone_catalog.get_longitudes()
-				lats = zone_catalog.get_latitudes()
-				eq_list = zone_catalog.eq_list
-			else:
-				raise Exception("poly_obj not recognized!")
-
-		if len(eq_list):
-			region = (min(lons), max(lons), min(lats), max(lats))
-		else:
-			region = None
-		if not catalog_name:
-			catalog_name = self.name + " (inside polygon)"
-		return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name)
-
-	def split_into_zones(self, source_model_name, ID_colname="", fix_mi_lambert=True, verbose=True):
-		"""
-		Split catalog into subcatalogs according to a
-		source-zone model stored in a GIS (MapInfo) table.
-
-		:param source_model_name:
-			String, name of source-zone model containing area sources
-			or else full path to GIS file containing area sources
-			or rshalib SourceModel object
-		:param ID_colname:
-			String, name of GIS column containing record ID
-			(default: "")
-		:param fix_mi_lambert:
-			bool, whether or not to apply spatial reference system fix for
-			old MapInfo files in Lambert 1972 system
-			(default: True)
-		:param verbose:
-			Boolean, whether or not to print information while reading
-			GIS table (default: True)
-
-		:return:
-			ordered dict {String sourceID: EQCatalog}
-		"""
-		from .rob.source_models import read_source_model
-
-		zone_catalogs = OrderedDict()
-
-		if isinstance(source_model_name, basestring):
-			## Read zone model from GIS file
-			model_data = read_source_model(source_model_name, ID_colname=ID_colname, fix_mi_lambert=fix_mi_lambert, verbose=verbose)
-
-			for zoneID, zone_data in model_data.items():
-				zone_poly = zone_data['obj']
-				if zone_poly.GetGeometryName() == "POLYGON" or zone_poly.IsRing():
-					## Fault sources will be skipped
-					zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
-		else:
-			import hazard.rshalib as rshalib
-			if isinstance(source_model_name, rshalib.source.SourceModel):
-				source_model = source_model_name
-				for src in source_model.sources:
-					if isinstance(src, rshalib.source.AreaSource):
-						zone_poly = src.polygon
-						zoneID = src.source_id
-						zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
-
-		return zone_catalogs
-
-	def split_into_time_intervals(self, time_interval):
-		"""
-		:param time_interval:
-			int (years) or instance of :class:`np.timedelta64`
-			(precision of days or better)
-
-		:return:
-			list with instances of :class:`EQCatalog`
-		"""
-		subcatalogs = []
-		start_date = self.start_date
-		if isinstance(time_interval, int):
-			time_interval = np.timedelta64(time_interval, 'Y')
-		end_date = self.start_date + time_interval
-		unit = str(end_date.dtype).split('[')[1].split(']')[0]
-		max_end_date = self.end_date + np.timedelta64(1, unit)
-		while start_date <= self.end_date:
-			catalog = self.subselect(start_date=start_date, end_date=min(end_date, max_end_date),
-									include_right_edges=False)
-			subcatalogs.append(catalog)
-			start_date = end_date
-			end_date = start_date + time_interval
-
-		return subcatalogs
-
-	def generate_synthetic_catalogs(self, num_samples, num_sigma=2, random_seed=None):
-		"""
-		Generate synthetic catalogs by random sampling of the magnitude
-		and epicenter of each earthquake.
-
-		:param num_samples:
-			Int, number of random synthetic catalogs to generate
-		:param num_sigma:
-			Float, number of standard deviations to consider
-		:param random_seed:
-			None or int, seed to initialize internal state of random number
-			generator (default: None, will seed from current time)
-
-		:return:
-			list of instances of :class:`EQCatalog`
-		"""
-		import copy
-		import scipy.stats
-
-		np.random.seed(seed=random_seed)
-
-		num_eq = len(self)
-		ML = np.zeros((num_eq, num_samples))
-		MS = np.zeros((num_eq, num_samples))
-		MW = np.zeros((num_eq, num_samples))
-		lons = np.zeros((num_eq, num_samples))
-		lats = np.zeros((num_eq, num_samples))
-		# depths relevant in declustering?
-		depths = np.zeros((num_eq, num_samples))
-
-		for i, eq in enumerate(self):
-			# TODO: write function to generate errM, errh based on date (use completeness dates?)
-			if not eq.errM:
-				if eq.year < 1910:
-					errM = 0.5
-				elif 1910 <= eq.year < 1985:
-					if eq.MS > 0:
-						errM = 0.2
-					else:
-						errM = 0.3
-				elif eq.year >= 1985:
-					eq.errM = 0.2
-			elif eq.errM >= 1.:
-				# A lot of earthquakes have errM = 9.9 ???
-				errM = 0.3
-			else:
-				errM = eq.errM
-
-			if not eq.errh:
-				if eq.year < 1650:
-					errh = 25
-				elif 1650 <= eq.year < 1910:
-					errh = 15
-				elif 1910 <= eq.year < 1930:
-					errh = 10
-				elif 1930 <= eq.year < 1960:
-					errh = 5.
-				elif 1960 <= eq.year < 1985:
-					errh = 2.5
-				elif eq.year >= 1985:
-					errh = 1.5
-			else:
-				errh = eq.errh
-
-			## Convert uncertainty in km to uncertainty in lon, lat
-			errlon = errh / ((40075./360.) * np.cos(np.radians(eq.lat)))
-			errlat = errh / (40075./360.)
-
-			if not eq.errz:
-				errz = 5.
-			else:
-				errz = eq.errz
-
-			if eq.ML:
-				ML[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.ML, errM, size=num_samples)
-			if eq.MS:
-				MS[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MS, errM, size=num_samples)
-			if eq.MW:
-				MW[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MW, errM, size=num_samples)
-			lons[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lon, errlon, size=num_samples)
-			lats[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lat, errlat, size=num_samples)
-			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.depth, errz, size=num_samples)
-		depths.clip(min=0.)
-
-		synthetic_catalogs = []
-		for n in range(num_samples):
-			eq_list = []
-			for i, eq in enumerate(self):
-				new_eq = copy.deepcopy(eq)
-				new_eq.ML = ML[i,n]
-				new_eq.MS = MS[i,n]
-				new_eq.MW = MW[i,n]
-				new_eq.lon = lons[i,n]
-				new_eq.lat = lats[i,n]
-				new_eq.depth = depths[i,n]
-				eq_list.append(new_eq)
-			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date, self.end_date, region=self.region))
-
-		return synthetic_catalogs
-
-	def analyse_completeness_Stepp(self, dM=0.1, Mtype="MW", Mrelation="default", dt=5.0, increment_lock=True):
-		"""
-		Analyze catalog completeness with the Stepp method (1971). The GEM algorithm
-		from the OQ hazard modeller's toolkit is used.
-
-		:param dM:
-			Float, magnitude bin width (default: 0.1)
+		:param Mmin:
+			Float, minimum magnitude to consider in analysis (ideally
+			corresponding to one of the completeness magnitudes)
+		:param interval:
+			Int, length of interval (number of days) (default: 100)
+		:param nmax:
+			Int, maximum number of earthquakes in an interval to test
+			(default: 0, will determine automatically)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param dt:
-			Float, time interval (in years) (default: 5)
-		:param increment_lock:
-			Boolean, ensure completeness magnitudes always decrease with more
-			recent bins (default: True)
-
-		:return:
-			instance of :class:`Completeness`
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of completeness
+			and corresponding minimum magnitudes. If None, use start year of
+			catalog (default: DEFAULT_COMPLETENESS)
+		:param title:
+			String, plot title. (None = default title, "" = no title)
+			(default: None)
+		:param fig_filespec:
+			String, full path of image to be saved.
+			If None (default), histogram is displayed on screen.
+		:param verbose:
+			Bool, whether or not to print additional information
 		"""
-		from hmtk.seismicity.completeness.comp_stepp_1971 import Stepp1971
-		ec = self.get_hmtk_catalogue(Mtype=Mtype, Mrelation=Mrelation)
-		stepp_1971_algorithm = Stepp1971()
-		result = stepp_1971_algorithm.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
-		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
-		return Completeness(Min_Years, Min_Mags, Mtype=Mtype)
+		from scipy.misc import factorial
+		from .time_functions import time_delta_to_days
+
+		def poisson(n, t, tau):
+			## Probability of n events in period t
+			## given average recurrence interval tau
+			return (t / tau)**n * np.exp(-t/tau) / factorial(n)
+
+		## Apply completeness constraint, and truncate result to completeness
+		## year for specified minimum magnitude
+		min_date = completeness.get_initial_completeness_date(Mmin)
+		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
+
+		num_events = len(catalog)
+		td = catalog.get_time_delta()
+		catalog_num_days = time_delta_to_days(td)
+		num_intervals = np.ceil(catalog_num_days / interval)
+
+		## Real catalog distribution
+		## Compute interval index for each event
+		time_deltas = catalog.get_time_deltas()
+		time_delta_days = np.array([time_delta_to_days(td) for td in time_deltas])
+		interval_indexes = np.floor(time_delta_days / interval)
+		## Compute number of events in each interval
+		num_events_per_interval, _ = np.histogram(interval_indexes, np.arange(num_intervals))
+		if not nmax:
+			nmax = num_events_per_interval.max()
+		## Compute number of intervals having n events
+		bins_num_events, _ = np.histogram(num_events_per_interval, bins=np.arange(nmax+1))
+
+		## Theoretical Poisson distribution
+		n = np.arange(nmax)
+		tau = catalog_num_days / num_events
+		if verbose:
+			print("Number of events in catalog: %d" % num_events)
+			print("Number of days in catalog: %s" % catalog_num_days)
+			print("Number of %d-day intervals: %d" % (interval, num_intervals))
+			print("Average return period for M>=%s: %d days" % (Mmin, tau))
+		poisson_probs = poisson(n, interval, tau)
+		poisson_n = poisson_probs * num_intervals
+
+		## Plot
+		pylab.bar(n-0.5, bins_num_events, label="Catalog distribution")
+		pylab.plot(n, poisson_n, 'r', lw=2, label="Poisson distribution")
+		pylab.xlabel("Number of events per interval", fontsize="x-large")
+		pylab.ylabel("Number of intervals", fontsize="x-large")
+		pylab.legend()
+		ymin, ymax = pylab.ylim()
+		pylab.axis((-0.5, nmax, ymin, ymax))
+
+		ax = pylab.gca()
+		for label in ax.get_xticklabels() + ax.get_yticklabels():
+			label.set_size('large')
+		if title is None:
+			title = r"Poisson test for $M\geq%.1f$ (t=%d, $\tau$=%.1f days, nt=%d)" % (Mmin, interval, tau, num_intervals)
+		pylab.title(title, fontsize="x-large")
+
+		if fig_filespec:
+			pylab.savefig(fig_filespec)
+			pylab.clf()
+		else:
+			pylab.show()
+
+	def plot_3d(self, limits=None, Mtype=None, Mrelation="default"):
+		"""
+		Plot catalog in 3D. Points are colored by magnitude.
+
+		:param limits:
+			Tuple of six floats, defining respectively minumum and maximum for
+			longitude scale, minumum and maximum for latitude scale and minumum,
+			and minimum and maximum for depth scale (default: None). This param
+			should be used to create plots with identical scales.
+		:param Mtype:
+			See :method: get_magnitudes.
+		:param Mrelation:
+			See :method: get_magnitudes.
+		"""
+		from mpl_toolkits.mplot3d.axes3d import Axes3D
+		fig = plt.figure()
+		ax = fig.add_subplot(111, projection='3d')
+		kwargs = {}
+		if Mtype:
+			kwargs['Mtype'] = Mtype
+		if Mrelation:
+			kwargs['Mrelation'] = Mrelation
+		p = ax.scatter(self.get_longitudes(), self.get_latitudes(), self.get_depths()*-1, c=self.get_magnitudes(**kwargs), cmap=plt.cm.jet)
+		## set labels
+		ax.set_xlabel('longitude')
+		ax.set_ylabel('latitude')
+		ax.set_zlabel('depth')
+		## set limits
+		if limits:
+			ax.set_xlim(*limits[0:2])
+			ax.set_ylim(*limits[2:4])
+			ax.set_zlim(limits[5]*-1, limits[4])
+		## create colorbar
+		fig.colorbar(p)
+		## plot
+		plt.show()
 
 	def analyse_completeness_CUVI(self, magnitudes, start_year, dYear, year1=None, year2=None, reg_line=None, Mtype="MW", Mrelation="default", title=None, fig_filespec="", fig_width=0, dpi=300):
 		"""
@@ -3679,7 +3909,7 @@ class EQCatalog:
 		for i, magnitude in enumerate(magnitudes):
 			bins_N, bins_Years = self.bin_by_year(self.start_date.year,
 				self.end_date.year+1, dYear, magnitude, max_mag, Mtype=Mtype, Mrelation=Mrelation)
-			bins_N_cumul = np.add.accumulate(bins_N)
+			bins_N_cumul = np.cumsum(bins_N)
 			if not start_year_index:
 				start_year_index = np.abs(bins_Years - start_year).argmin()
 			bins_Years = bins_Years[start_year_index:]
@@ -3718,6 +3948,37 @@ class EQCatalog:
 			pylab.clf()
 		else:
 			pylab.show()
+
+	## HMTK wrappers
+
+	def analyse_completeness_Stepp(self, dM=0.1, Mtype="MW", Mrelation="default", dt=5.0, increment_lock=True):
+		"""
+		Analyze catalog completeness with the Stepp method (1971). The GEM algorithm
+		from the OQ hazard modeller's toolkit is used.
+
+		:param dM:
+			Float, magnitude bin width (default: 0.1)
+		:param Mtype:
+			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML") (default: None, will
+			select the default relation for the given Mtype)
+		:param dt:
+			Float, time interval (in years) (default: 5)
+		:param increment_lock:
+			Boolean, ensure completeness magnitudes always decrease with more
+			recent bins (default: True)
+
+		:return:
+			instance of :class:`Completeness`
+		"""
+		from hmtk.seismicity.completeness.comp_stepp_1971 import Stepp1971
+		ec = self.get_hmtk_catalogue(Mtype=Mtype, Mrelation=Mrelation)
+		stepp_1971_algorithm = Stepp1971()
+		result = stepp_1971_algorithm.completeness(ec, {'magnitude_bin': dM, 'time_bin': dt, 'increment_lock': increment_lock})
+		Min_Years, Min_Mags = result[:, 0].astype('i'), result[:,1]
+		return Completeness(Min_Years, Min_Mags, Mtype=Mtype)
 
 	def decluster_new(self, method="gardner-knopoff", window_opt="GardnerKnopoff", fs_time_prop=0., time_window=60., Mtype="MW", Mrelation="default"):
 		"""
@@ -3891,43 +4152,6 @@ class EQCatalog:
 		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table, dM, method, aM, dt)
 		return np.log10(a), b, stda, stdb
 
-	def plot_3d(self, limits=None, Mtype=None, Mrelation="default"):
-		"""
-		Plot catalog in 3D. Points are colored by magnitude.
-
-		:param limits:
-			Tuple of six floats, defining respectively minumum and maximum for
-			longitude scale, minumum and maximum for latitude scale and minumum,
-			and minimum and maximum for depth scale (default: None). This param
-			should be used to create plots with identical scales.
-		:param Mtype:
-			See :method: get_magnitudes.
-		:param Mrelation:
-			See :method: get_magnitudes.
-		"""
-		from mpl_toolkits.mplot3d.axes3d import Axes3D
-		fig = plt.figure()
-		ax = fig.add_subplot(111, projection='3d')
-		kwargs = {}
-		if Mtype:
-			kwargs['Mtype'] = Mtype
-		if Mrelation:
-			kwargs['Mrelation'] = Mrelation
-		p = ax.scatter(self.get_longitudes(), self.get_latitudes(), self.get_depths()*-1, c=self.get_magnitudes(**kwargs), cmap=plt.cm.jet)
-		## set labels
-		ax.set_xlabel('longitude')
-		ax.set_ylabel('latitude')
-		ax.set_zlabel('depth')
-		## set limits
-		if limits:
-			ax.set_xlim(*limits[0:2])
-			ax.set_ylim(*limits[2:4])
-			ax.set_zlim(limits[5]*-1, limits[4])
-		## create colorbar
-		fig.colorbar(p)
-		## plot
-		plt.show()
-
 	def get_hmtk_catalogue(self, Mtype='MW', Mrelation="default"):
 		"""
 		Convert ROB catalog to hmtk catalogue
@@ -3967,7 +4191,6 @@ class EQCatalog:
 		catalogue.load_from_array(keys_int, np.array(data_int, dtype=np.int))
 		return catalogue
 
-
 	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation="default", completeness=DEFAULT_COMPLETENESS):
 		"""
 		"""
@@ -3980,149 +4203,6 @@ class EQCatalog:
 		completeness_table = completeness.to_hmtk_table()
 		data = smoothed_seismicity.run_analysis(catalogue=catalogue, config=config, completeness_table=completeness_table, smoothing_kernel=None, end_year=None)
 		return data
-
-	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation="default", completeness=DEFAULT_COMPLETENESS, title=None, fig_filespec=None, verbose=True):
-		"""
-		Plot catalog distribution versus Poisson distribution
-		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
-
-		First, the specified completeness constraint is applied to the catalog.
-		The completeness-constrained catalog is then truncated to the
-		specified minimum magnitude and corresponding year of completeness.
-		The resulting catalog is divided into intervals of the specified
-		length, the number of events in each interval is counted, and a
-		histogram is computed of the number of intervals having the same
-		number of events up to nmax.
-		This histogram is compared to the theoretical Poisson distribution.
-		It seems to work best if :param:`interval` is larger (2 to 4 times)
-		than tau, the average return period.
-
-		:param Mmin:
-			Float, minimum magnitude to consider in analysis (ideally
-			corresponding to one of the completeness magnitudes)
-		:param interval:
-			Int, length of interval (number of days) (default: 100)
-		:param nmax:
-			Int, maximum number of earthquakes in an interval to test
-			(default: 0, will determine automatically)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
-		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: DEFAULT_COMPLETENESS)
-		:param title:
-			String, plot title. (None = default title, "" = no title)
-			(default: None)
-		:param fig_filespec:
-			String, full path of image to be saved.
-			If None (default), histogram is displayed on screen.
-		:param verbose:
-			Bool, whether or not to print additional information
-		"""
-		from scipy.misc import factorial
-		from .time_functions import time_delta_to_days
-
-		def poisson(n, t, tau):
-			## Probability of n events in period t
-			## given average recurrence interval tau
-			return (t / tau)**n * np.exp(-t/tau) / factorial(n)
-
-		## Apply completeness constraint, and truncate result to completeness
-		## year for specified minimum magnitude
-		min_date = completeness.get_initial_completeness_date(Mmin)
-		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
-		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
-
-		num_events = len(catalog)
-		td = catalog.get_time_delta()
-		catalog_num_days = time_delta_to_days(td)
-		num_intervals = np.ceil(catalog_num_days / interval)
-
-		## Real catalog distribution
-		## Compute interval index for each event
-		time_deltas = catalog.get_time_deltas()
-		time_delta_days = np.array([time_delta_to_days(td) for td in time_deltas])
-		interval_indexes = np.floor(time_delta_days / interval)
-		## Compute number of events in each interval
-		num_events_per_interval, _ = np.histogram(interval_indexes, np.arange(num_intervals))
-		if not nmax:
-			nmax = num_events_per_interval.max()
-		## Compute number of intervals having n events
-		bins_num_events, _ = np.histogram(num_events_per_interval, bins=np.arange(nmax+1))
-
-		## Theoretical Poisson distribution
-		n = np.arange(nmax)
-		tau = catalog_num_days / num_events
-		if verbose:
-			print("Number of events in catalog: %d" % num_events)
-			print("Number of days in catalog: %s" % catalog_num_days)
-			print("Number of %d-day intervals: %d" % (interval, num_intervals))
-			print("Average return period for M>=%s: %d days" % (Mmin, tau))
-		poisson_probs = poisson(n, interval, tau)
-		poisson_n = poisson_probs * num_intervals
-
-		## Plot
-		pylab.bar(n-0.5, bins_num_events, label="Catalog distribution")
-		pylab.plot(n, poisson_n, 'r', lw=2, label="Poisson distribution")
-		pylab.xlabel("Number of events per interval", fontsize="x-large")
-		pylab.ylabel("Number of intervals", fontsize="x-large")
-		pylab.legend()
-		ymin, ymax = pylab.ylim()
-		pylab.axis((-0.5, nmax, ymin, ymax))
-
-		ax = pylab.gca()
-		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('large')
-		if title is None:
-			title = r"Poisson test for $M\geq%.1f$ (t=%d, $\tau$=%.1f days, nt=%d)" % (Mmin, interval, tau, num_intervals)
-		pylab.title(title, fontsize="x-large")
-
-		if fig_filespec:
-			pylab.savefig(fig_filespec)
-			pylab.clf()
-		else:
-			pylab.show()
-
-	def get_epicentral_distances(self, lon, lat):
-		"""
-		Compute epicentral distances between catalog earthquakes and a
-		given point.
-
-		:param lon:
-			float, longitude of reference point
-		:param lat:
-			float, latitude of reference point
-
-		:return:
-			float, epicentral distance in km
-		"""
-		distances = geodetic.spherical_distance(lon, lat, self.get_longitudes(), self.get_latitudes())
-		return distances / 1000.
-
-	def get_hypocentral_distances(self, lon, lat, z=0):
-		"""
-		Compute hypocentral distances between catalog earthquakes and a
-		given point.
-
-		:param lon:
-			float, longitude of reference point
-		:param lat:
-			float, latitude of reference point
-		:param z:
-			float, depth of reference point in km
-			(default: 0)
-
-		:return:
-			float, hypocentral distance in km
-		"""
-		d_epi = self.get_epicentral_distances(lon, lat)
-		d_hypo = np.sqrt(d_epi**2 + (self.get_depths() - z)**2)
-		return d_hypo
 
 
 def concatenate_catalogs(catalog_list, name=""):
@@ -5616,10 +5696,10 @@ if __name__ == "__main__":
 	#catalog.plot_Mhistogram(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness)
 
 	## Plot Magnitude/Frequency diagram
-	#catalog.MagFreq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
+	#catalog.mag_freqs(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
 	#fig_filespec = os.path.join(r"C:\PSHA\MagFreq", "MagFreq " + catalog.name + ".PNG")
 	fig_filespec = None
-	#catalog.plot_MagFreq(Mmin, Mmax, dM, discrete=True, Mtype=Mtype, completeness=completeness, verbose=True, Mrange=Mrange, Freq_range=Freq_range, want_exponential=True, fig_filespec=fig_filespec)
+	#catalog.plot_mag_freqs(Mmin, Mmax, dM, discrete=True, Mtype=Mtype, completeness=completeness, verbose=True, Mrange=Mrange, Freq_range=Freq_range, want_exponential=True, fig_filespec=fig_filespec)
 
 	## Plot histogram with number of events per year for a given magnitude range and year interval
 	#catalog.plot_YearHistogram(1960, end_date.year, 1, 1.8, 3.0, Mtype=Mtype)
@@ -5678,7 +5758,7 @@ if __name__ == "__main__":
 	## Read catalog from MapInfo, and plot Magnitude/Frequency for entire catalog
 	"""
 	catalog = read_catalogMI(region=region, start_date=start_date, end_date=end_date, verbose=True)
-	catalog.plot_MagFreq(Mmin, Mmax, dM, discrete=False, Mtype=Mtype, completeness=completeness, verbose=True)
+	catalog.plot_mag_freqs(Mmin, Mmax, dM, discrete=False, Mtype=Mtype, completeness=completeness, verbose=True)
 	"""
 
 	## Read catalog from pickled file and plot Magnitude/Frequency diagram
@@ -5686,7 +5766,7 @@ if __name__ == "__main__":
 	#f = open(filespec, "r")
 	#catalog = cPickle.load(f)
 	#f.close()
-	#catalog.plot_MagFreq(Mmin, Mmax, dM, discrete=True, Mtype=Mtype, completeness=completeness, verbose=True, Mrange=Mrange, Freq_range=Freq_range)
+	#catalog.plot_mag_freqs(Mmin, Mmax, dM, discrete=True, Mtype=Mtype, completeness=completeness, verbose=True, Mrange=Mrange, Freq_range=Freq_range)
 
 	## Report total seismic moment
 	#historical_catalog = catalog.subselect(end_date=datetime.date(1909, 12, 31))
@@ -5719,7 +5799,7 @@ if __name__ == "__main__":
 			dirname = os.path.join(r"C:\PSHA\MagFreq", zone_model)
 			fig_filespec = os.path.join(dirname, "MagFreq " + catalog.name + ".PNG")
 			try:
-				catalog.plot_MagFreq(Mmin, Mmax, dM, discrete=False, Mtype=Mtype, completeness=completeness, verbose=True, fig_filespec=fig_filespec, Mrange=Mrange, Freq_range=Freq_range, fixed_beta=cat.beta)
+				catalog.plot_mag_freqs(Mmin, Mmax, dM, discrete=False, Mtype=Mtype, completeness=completeness, verbose=True, fig_filespec=fig_filespec, Mrange=Mrange, Freq_range=Freq_range, fixed_beta=cat.beta)
 			except:
 				pass
 
