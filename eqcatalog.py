@@ -49,8 +49,6 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.ticker import MultipleLocator, MaxNLocator
 
 
-# TODO: re-implement interface with (Hazard) Modelers' Toolkit
-
 ## Import ROB modules
 import mapping.geotools.geodetic as geodetic
 
@@ -61,6 +59,8 @@ from .completeness import Completeness
 from .rob.completeness import DEFAULT_COMPLETENESS
 from . import time_functions_np as tf
 
+
+# TODO: re-implement interface with (Hazard) Modelers' Toolkit
 
 class EQCatalog:
 	"""
@@ -359,7 +359,7 @@ class EQCatalog:
 		start_date, end_date = self.start_date, self.end_date
 		return tf.timespan(start_date, end_date, unit=unit)
 
-	## Magnitude methods
+	## Magnitude / moment methods
 
 	def get_magnitudes(self, Mtype="MW", Mrelation="default"):
 		"""
@@ -902,8 +902,8 @@ class EQCatalog:
 				if poly_obj.GetGeometryName() == "LINESTRING":
 					line_obj = poly_obj
 					if line_obj.IsRing() and line_obj.GetPointCount() > 3:
-						# Note: Could not find a way to convert linestrings to polygons
-						# The following only works for linearrings (what is the difference??)
+						## Note: Could not find a way to convert linestrings to polygons
+						## The following only works for linearrings (what is the difference??)
 						#poly_obj = ogr.Geometry(ogr.wkbPolygon)
 						#poly_obj.AddGeometry(line_obj)
 						wkt = line_obj.ExportToWkt().replace("LINESTRING (", "POLYGON ((") + ")"
@@ -918,7 +918,7 @@ class EQCatalog:
 
 				## Determine bounding box (region)
 				linear_ring = poly_obj.GetGeometryRef(0)
-				## In some versions of ogr, GetPoints method does not exist
+				## Note: in some versions of ogr, GetPoints method does not exist
 				#points = linear_ring.GetPoints()
 				points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
 				lons, lats = zip(*points)[:2]
@@ -926,7 +926,8 @@ class EQCatalog:
 		else:
 			import openquake.hazardlib as oqhazlib
 			if isinstance(poly_obj, oqhazlib.geo.Polygon):
-				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(), depths=None)
+				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(),
+										depths=None)
 				intersects = poly_obj.intersects(mesh)
 				#idxs = np.argwhere(intersects == True)
 				#idxs = [idx[0] for idx in idxs]
@@ -978,13 +979,15 @@ class EQCatalog:
 
 		if isinstance(source_model_name, basestring):
 			## Read zone model from GIS file
-			model_data = read_source_model(source_model_name, ID_colname=ID_colname, fix_mi_lambert=fix_mi_lambert, verbose=verbose)
+			model_data = read_source_model(source_model_name, ID_colname=ID_colname,
+								fix_mi_lambert=fix_mi_lambert, verbose=verbose)
 
 			for zoneID, zone_data in model_data.items():
 				zone_poly = zone_data['obj']
 				if zone_poly.GetGeometryName() == "POLYGON" or zone_poly.IsRing():
 					## Fault sources will be skipped
-					zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
+					zone_catalogs[zoneID] = self.subselect_polygon(zone_poly,
+															catalog_name=zoneID)
 		else:
 			import hazard.rshalib as rshalib
 			if isinstance(source_model_name, rshalib.source.SourceModel):
@@ -993,7 +996,8 @@ class EQCatalog:
 					if isinstance(src, rshalib.source.AreaSource):
 						zone_poly = src.polygon
 						zoneID = src.source_id
-						zone_catalogs[zoneID] = self.subselect_polygon(zone_poly, catalog_name=zoneID)
+						zone_catalogs[zoneID] = self.subselect_polygon(zone_poly,
+															catalog_name=zoneID)
 
 		return zone_catalogs
 
@@ -1415,7 +1419,8 @@ class EQCatalog:
 		:return:
 			Tuple (mean, daily mean, nightly mean)
 		"""
-		bins_N, _ = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
+		bins_N, _ = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation,
+									start_year=start_year, end_year=end_year)
 		mean = np.mean(bins_N)
 		mean_day = np.mean(bins_N[day[0]:day[1]])
 		mean_night = np.mean(np.concatenate([bins_N[:day[0]], bins_N[day[1]:]]))
@@ -1864,17 +1869,23 @@ class EQCatalog:
 		from .calcGR import calcGR_LSQ
 
 		if weighted:
-			bins_N, _ = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+			bins_N, _ = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation,
+										completeness=completeness, verbose=False)
 			weights = bins_N
 		else:
 			weights = None
 
 		if cumul:
-			rates, magnitudes = self.get_cumulative_mag_freqs(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
+			rates, magnitudes = self.get_cumulative_mag_freqs(Mmin, Mmax, dM,
+									Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
+									trim=False, verbose=verbose)
 		else:
-			rates, magnitudes = self.get_incremental_mag_freqs(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, trim=False, verbose=verbose)
+			rates, magnitudes = self.get_incremental_mag_freqs(Mmin, Mmax, dM,
+									Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
+									trim=False, verbose=verbose)
 
-		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, weights=weights, verbose=verbose)
+		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, weights=weights,
+									verbose=verbose)
 		if not cumul:
 			a += get_a_separation(b, dM)
 		return a, b, stda, stdb
@@ -1914,7 +1925,8 @@ class EQCatalog:
 			- b: b value
 			- stdb: standard deviation on b value
 		"""
-		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype,
+								Mrelation=Mrelation, completeness=completeness)
 
 	def calcGR_Weichert(self,
 		Mmin, Mmax, dM=0.1,
@@ -1964,8 +1976,10 @@ class EQCatalog:
 		from .calcGR import calcGR_Weichert
 		## Note: don't use get_incremental_mag_freqs here, as completeness
 		## is taken into account in the Weichert algorithm !
-		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
-		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date, b_val=b_val, verbose=verbose)
+		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation,
+										completeness=completeness, verbose=verbose)
+		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date,
+								b_val=b_val, verbose=verbose)
 
 		"""
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
@@ -2079,7 +2093,8 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "Aki", "LSQc", "LSQc", "LSQi", "wLSQc" or "wLSQi"
+			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi",
+			"wLSQc" or "wLSQi"
 			(default: "Weichert")
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
@@ -2111,8 +2126,12 @@ class EQCatalog:
 			else:
 				kwargs['weighted'] = False
 			method = "LSQ"
-		calcGR_func = {"Weichert": self.calcGR_Weichert, "Aki": self.calcGR_Aki, "LSQ": self.calcGR_LSQ}[method]
-		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose, **kwargs)
+		calcGR_func = {"Weichert": self.calcGR_Weichert,
+						"Aki": self.calcGR_Aki,
+						"LSQ": self.calcGR_LSQ}[method]
+		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype,
+								Mrelation=Mrelation, completeness=completeness,
+								b_val=b_val, verbose=verbose, **kwargs)
 		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
 
 	def plot_mfd(self,
@@ -2139,7 +2158,8 @@ class EQCatalog:
 		:param dM:
 			Float, magnitude interval to use for binning (default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi", "wLSQc" or "wLSQi"
+			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi",
+			"wLSQc" or "wLSQi"
 			(default: "Weichert"). If None, only observed MFD will be plotted.
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
@@ -2185,8 +2205,10 @@ class EQCatalog:
 		from hazard.rshalib.mfd import plot_mfd
 
 		mfd_list, labels, colors, styles = [], [], [], []
-		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation, verbose=verbose)
-		observed_mfd = cc_catalog.get_incremental_mfd(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation,
+												verbose=verbose)
+		observed_mfd = cc_catalog.get_incremental_mfd(Mmin, Mmax, dM=dM, Mtype=Mtype,
+								Mrelation=Mrelation, completeness=completeness)
 		mfd_list.append(observed_mfd)
 		label = {"en": "Observed", "nl": "Waargenomen"}[lang]
 		labels.append(label)
@@ -2194,7 +2216,9 @@ class EQCatalog:
 
 		styles.append('o')
 		if method:
-			estimated_mfd = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b_val, verbose=verbose)
+			estimated_mfd = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
+							Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
+							b_val=b_val, verbose=verbose)
 			mfd_list.append(estimated_mfd)
 			a, b, stdb = estimated_mfd.a_val, estimated_mfd.b_val, estimated_mfd.b_sigma
 			label = {"en": "Computed", "nl": "Berekend"}[lang]
@@ -2206,14 +2230,18 @@ class EQCatalog:
 			colors.append(color_estimated)
 			styles.append('-')
 			if num_sigma:
-				sigma_mfd1 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b+num_sigma*stdb, verbose=verbose)
+				sigma_mfd1 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
+								Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
+								b_val=b+num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd1)
 				label = {"en": "Computed", "nl": "Berekend"}[lang]
 				label += " $\pm$ %d sigma" % num_sigma
 				labels.append(label)
 				colors.append(color_estimated)
 				styles.append('--')
-				sigma_mfd2 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, b_val=b-num_sigma*stdb, verbose=verbose)
+				sigma_mfd2 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
+								Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
+								b_val=b-num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd2)
 				labels.append("_nolegend_")
 				colors.append(color_estimated)
@@ -2225,7 +2253,11 @@ class EQCatalog:
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
 		end_year = tf.to_year(self.end_date)
-		plot_mfd(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_mfd(mfd_list, colors=colors, styles=styles, labels=labels,
+				completeness=completeness_limits, end_year=end_year,
+				Mrange=Mrange, Freq_range=Freq_range,
+				title=title, lang=lang,
+				fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	## Random catalogs
 
@@ -2303,14 +2335,20 @@ class EQCatalog:
 				errz = eq.errz
 
 			if eq.ML:
-				ML[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.ML, errM, size=num_samples)
+				ML[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.ML,
+													errM, size=num_samples)
 			if eq.MS:
-				MS[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MS, errM, size=num_samples)
+				MS[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MS,
+													errM, size=num_samples)
 			if eq.MW:
-				MW[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MW, errM, size=num_samples)
-			lons[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lon, errlon, size=num_samples)
-			lats[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lat, errlat, size=num_samples)
-			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.depth, errz, size=num_samples)
+				MW[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MW,
+													errM, size=num_samples)
+			lons[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lon,
+													errlon, size=num_samples)
+			lats[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lat,
+													errlat, size=num_samples)
+			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.depth,
+													errz, size=num_samples)
 		depths.clip(min=0.)
 
 		synthetic_catalogs = []
@@ -2325,7 +2363,8 @@ class EQCatalog:
 				new_eq.lat = lats[i,n]
 				new_eq.depth = depths[i,n]
 				eq_list.append(new_eq)
-			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date, self.end_date, region=self.region))
+			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date,
+									self.end_date, region=self.region))
 
 		return synthetic_catalogs
 
@@ -2473,7 +2512,9 @@ class EQCatalog:
 		:param verbose:
 			Bool, whether or not to print additional information (default: True)
 		"""
-		prior, likelihood, posterior, params = self.get_Bayesian_Mmax_pdf(prior_model, Mmin_n, b_val=b_val, dM=dM, truncation=truncation, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		prior, likelihood, posterior, params = self.get_Bayesian_Mmax_pdf(prior_model,
+					Mmin_n, b_val=b_val, dM=dM, truncation=truncation, Mtype=Mtype,
+					Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		mmax_obs, n, a_val, b_val = params
 		mags = prior.values
 
@@ -2534,7 +2575,8 @@ class EQCatalog:
 			String, full path of image to be saved.
 			If None (default), histogram is displayed on screen.
 		"""
-		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
+		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, completeness=completeness,
+								Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
 		pylab.bar(bins_Mag, bins_N, width=dM, color=color)
 		pylab.xlabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
 		pylab.ylabel("Number of events", fontsize="x-large")
@@ -2596,7 +2638,8 @@ class EQCatalog:
 		catalog_start_year = tf.to_year(self.start_date) // dYear * dYear
 		if start_year <= catalog_start_year:
 			start_year = catalog_start_year
-		bins_N, bins_Years = self.bin_by_year(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		bins_N, bins_Years = self.bin_by_year(catalog_start_year, end_year, dYear,
+									Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		bins_N_cumul = np.cumsum(bins_N)
 		start_year_index = np.where(bins_Years == start_year)[0][0]
 		bins_N = bins_N[start_year_index:]
@@ -2618,11 +2661,16 @@ class EQCatalog:
 			yfit = bins_N_cumul[regression_xmin:regression_xmax+1]
 			m, b = pylab.polyfit(xfit, yfit, 1)
 			#arr = pylab.Arrow(completeness_year, min(bins_N_cumul), 0, bins_N_cumul[year_index], facecolor='r', edgecolor='white', width=2)
-			arr = FancyArrowPatch((completeness_year, min(bins_N_cumul)),(completeness_year, bins_N_cumul[year_index]), arrowstyle='-|>', mutation_scale=30, facecolor='r', edgecolor='r', lw=2)
+			arr = FancyArrowPatch((completeness_year, min(bins_N_cumul)),
+							(completeness_year, bins_N_cumul[year_index]),
+							arrowstyle='-|>', mutation_scale=30, facecolor='r',
+							edgecolor='r', lw=2)
 			pylab.plot(xfit, m*xfit+b, 'r--', lw=2, label="Regression")
 
 		pylab.xlabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang], fontsize='x-large')
-		pylab.ylabel({"en": "Cumulative number of events since", "nl": "Gecumuleerd aantal aardbevingen sinds"}[lang] + " %d" % tf.to_year(self.start_date), fontsize='x-large')
+		pylab.ylabel({"en": "Cumulative number of events since",
+					"nl": "Gecumuleerd aantal aardbevingen sinds"}[lang]
+					+ " %d" % tf.to_year(self.start_date), fontsize='x-large')
 		pylab.title("%s (M %.1f - %.1f)" % (self.name, Mmin, Mmax), fontsize='xx-large')
 		majorLocator = MultipleLocator(major_ticks)
 		minorLocator = MultipleLocator(minor_ticks)
@@ -2639,7 +2687,11 @@ class EQCatalog:
 		pylab.axis((start_year, end_year, 0, ymax))
 		pylab.show()
 
-	def plot_CumulatedM0(self, start_date=None, end_date=None, bin_width=10, bin_width_spec="years", binned=False, histogram=True, Mrelation="default", M0max=None, fig_filespec=None):
+	def plot_CumulatedM0(self,
+		start_date=None, end_date=None, bin_width=10, bin_width_spec="years",
+		binned=False, histogram=True,
+		Mrelation="default", M0max=None,
+		fig_filespec=None):
 		"""
 		Plot cumulated seismic moment versus time.
 
@@ -2675,12 +2727,15 @@ class EQCatalog:
 			end_date = self.end_date
 
 		if bin_width_spec.lower()[:4] == "year":
-			bins_M0, bins_Dates = self.bin_M0_by_year(tf.to_year(start_date), tf.to_year(end_date), bin_width, Mrelation=Mrelation)
+			bins_M0, bins_Dates = self.bin_M0_by_year(tf.to_year(start_date),
+							tf.to_year(end_date), bin_width, Mrelation=Mrelation)
 			#bins_Dates = np.arange(start_date.year, end_date.year+bin_width, bin_width)
-			subcatalog = self.subselect(start_date=tf.to_year(start_date), end_date=tf.to_year(end_date))
+			subcatalog = self.subselect(start_date=tf.to_year(start_date),
+										end_date=tf.to_year(end_date))
 			Dates = [eq.year for eq in subcatalog]
 		elif bin_width_spec.lower()[:3] == "day":
-			bins_M0, bins_Dates = self.bin_M0_by_day(tf.as_np_date(start_date), tf.as_np_date(end_date), bin_width, Mrelation=Mrelation)
+			bins_M0, bins_Dates = self.bin_M0_by_day(tf.as_np_date(start_date),
+						tf.as_np_date(end_date), bin_width, Mrelation=Mrelation)
 			#bins_Dates = np.arange((end_date - start_date).days + 1)
 			subcatalog = self.subselect(start_date=start_date, end_date=end_date)
 			Dates = tf.timespan(start_date, self.get_datetimes(), 'D')
@@ -2690,10 +2745,10 @@ class EQCatalog:
 
 		## Construct arrays with duplicate points in order to plot horizontal
 		## lines between subsequent points
-		bins_M0_cumul2 = np.array(zip(np.concatenate([np.zeros(1, 'd'), bins_M0_cumul[:-1]]), bins_M0_cumul)).flatten()
-		M0_cumul2 = np.array(zip(np.concatenate([np.zeros(1, 'd'), M0_cumul[:-1]]), M0_cumul)).flatten()
-		bins_Dates2 = np.array(zip(bins_Dates, bins_Dates)).flatten()
-		Dates2 = np.array(zip(Dates, Dates)).flatten()
+		bins_M0_cumul2 = np.concatenate([[0.], np.repeat(bins_M0_cumul, 2)[:-1]])
+		M0_cumul2 = np.concatenate([[0.], np.repeat(M0_cumul, 2)[:-1]])
+		bins_Dates2 = np.repeat(bins_Dates, 2)
+		Dates2 = np.repeat(Dates, 2)
 
 		## Plot
 		if binned:
@@ -2725,7 +2780,9 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_DateHistogram(self, start_date=None, end_date=None, ddate=1, ddate_spec="year", mag_limits=[2,3], Mtype="MW", Mrelation="default"):
+	def plot_DateHistogram(self,
+		start_date=None, end_date=None, ddate=1, ddate_spec="year",
+		mag_limits=[2,3], Mtype="MW", Mrelation="default"):
 		"""
 		Plot histogram with number of earthqukes versus date
 		for different magnitude ranges.
@@ -2796,7 +2853,12 @@ class EQCatalog:
 		pylab.xlabel("Time (%s)" % ddate_spec)
 		pylab.show()
 
-	def plot_depth_magnitude(self, start_date=None, Mtype="MW", Mrelation="default", remove_undetermined=False, title=None, fig_filespec="", fig_width=0, dpi=300):
+	def plot_depth_magnitude(self,
+		start_date=None,
+		Mtype="MW", Mrelation="default",
+		remove_undetermined=False,
+		title=None,
+		fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Plot magnitude versus depth
 
@@ -2811,7 +2873,8 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param remove_undetermined:
-			Boolean, remove the earthquake for which depth equals zero if true (default: False)
+			Boolean, remove the earthquake for which depth equals zero if true
+			(default: False)
 		:param title:
 			String, plot title (None = default title, "" = no title)
 			(default: None)
@@ -2841,7 +2904,9 @@ class EQCatalog:
 		pylab.grid(True)
 
 		if title is None:
-			title='Depth-Magnitude function {0}-{1}, {2} events'.format(tf.to_year(subcatalog.start_date), tf.to_year(subcatalog.end_date), len(magnitudes))
+			title = ('Depth-Magnitude function %d-%d, %d events'
+				% (tf.to_year(subcatalog.start_date), tf.to_year(subcatalog.end_date),
+					len(magnitudes)))
 
 		pylab.title(title)
 
@@ -2877,7 +2942,15 @@ class EQCatalog:
 		pylab.grid(True)
 		pylab.show()
 
-	def plot_magnitude_time(self, symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50, Mtype="MW", Mrelation="default", Mrange=(None, None), overlay_catalog=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300, ax=None):
+	def plot_magnitude_time(self,
+		symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50,
+		Mtype="MW", Mrelation="default", Mrange=(None, None),
+		overlay_catalog=None,
+		completeness=None, completeness_color="r",
+		vlines=False, grid=True,
+		plot_date=False, major_tick_interval=None, minor_tick_interval=1,
+		title=None, lang="en", legend_location=0,
+		fig_filespec=None, fig_width=0, dpi=300, ax=None):
 		"""
 		Plot time versus magnitude
 
@@ -2963,9 +3036,19 @@ class EQCatalog:
 				edge_colors.append('r')
 			else:
 				edge_colors.append('k')
-		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors, fill_colors=[fill_color], labels=[label], symbol_size=symbol_size, Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness, completeness_color=completeness_color, vlines=vlines, grid=grid, plot_date=plot_date, major_tick_interval=major_tick_interval, minor_tick_interval=minor_tick_interval, title=title, lang=lang, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi, ax=ax)
+		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors,
+				fill_colors=[fill_color], labels=[label], symbol_size=symbol_size,
+				Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness,
+				completeness_color=completeness_color, vlines=vlines, grid=grid,
+				plot_date=plot_date, major_tick_interval=major_tick_interval,
+				minor_tick_interval=minor_tick_interval, title=title, lang=lang,
+				legend_location=legend_location, fig_filespec=fig_filespec,
+				fig_width=fig_width, dpi=dpi, ax=ax)
 
-	def plot_HourHistogram(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default", start_year=None, end_year=None):
+	def plot_HourHistogram(self,
+		Mmin=None, Mmax=None,
+		Mtype="MW", Mrelation="default",
+		start_year=None, end_year=None):
 		"""
 		Plot histogram with number of earthquakes per hour of the day.
 
@@ -2984,7 +3067,8 @@ class EQCatalog:
 		:param end_year:
 			Int, upper year to bin (default: None)
 		"""
-		bins_N, bins_Hr = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
+		bins_N, bins_Hr = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype,
+					Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		pylab.bar(bins_Hr, bins_N)
 		ymin, ymax = pylab.ylim()
 		pylab.axis((0, 24, ymin, ymax))
@@ -3003,7 +3087,8 @@ class EQCatalog:
 			Mmin = self.get_Mmin()
 		if Mmax is None:
 			Mmax = self.get_Mmax()
-		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax))
+		pylab.title("Hourly Histogram %d - %d, M %.1f - %.1f"
+					% (start_year, end_year, Mmin, Mmax))
 		pylab.show()
 
 	def plot_depth_histogram(self,
@@ -3086,7 +3171,8 @@ class EQCatalog:
 			bins_N = []
 			for mmin in bins_mag[::-1]:
 				mmax = mmin + dM
-				bins_n, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width, depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date)
+				bins_n, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width,
+						depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date)
 				bins_N.append(bins_n)
 			if isinstance(color, (list, np.ndarray)):
 				colors = color
@@ -3097,7 +3183,8 @@ class EQCatalog:
 				colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 
 		else:
-			bins_N, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date)
+			bins_N, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width,
+					depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date)
 			bins_N = [bins_N]
 			colors = [color]
 			bins_mag = [Mmin]
@@ -3198,7 +3285,8 @@ class EQCatalog:
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		bins_M0, bins_depth = self.bin_M0_by_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mrelation, start_year, end_year)
+		bins_M0, bins_depth = self.bin_M0_by_depth(min_depth, max_depth, bin_width,
+						depth_error, Mmin, Mmax, Mrelation, start_year, end_year)
 		try:
 			pylab.barh(bins_depth, bins_M0, height=bin_width, log=log, color=color)
 		except:
@@ -3221,7 +3309,8 @@ class EQCatalog:
 				Mmin = self.get_Mmin()
 			if Mmax is None:
 				Mmax = self.get_Mmax()
-			title = "Depth Histogram %d - %d, M %.1f - %.1f" % (start_year, end_year, Mmin, Mmax)
+			title = ("Depth Histogram %d - %d, M %.1f - %.1f"
+					% (start_year, end_year, Mmin, Mmax))
 		pylab.title(title)
 
 		if fig_filespec:
@@ -3328,7 +3417,14 @@ class EQCatalog:
 		if title is None:
 			title = self.name
 
-		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color], fill_colors=[fill_color], edge_widths=[edge_width], labels=[label], symbol_size=symbol_size, symbol_size_inc=symbol_size_inc, Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection, resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model, sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width, sm_label_colname=sm_label_colname, title=title, legend_location=legend_location, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color],
+				fill_colors=[fill_color], edge_widths=[edge_width], labels=[label],
+				symbol_size=symbol_size, symbol_size_inc=symbol_size_inc,
+				Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection,
+				resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model,
+				sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width,
+				sm_label_colname=sm_label_colname, title=title, legend_location=legend_location,
+				fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	## Export methods
 
@@ -3374,7 +3470,8 @@ class EQCatalog:
 			f = open(csv_filespec, "w")
 
 		if Mtype:
-			f.write('ID,Date,Time,Name,Lon,Lat,Depth,%s,Intensity_max,Macro_radius\n' % Mtype)
+			f.write('ID,Date,Time,Name,Lon,Lat,Depth,%s,Intensity_max,Macro_radius\n'
+					% Mtype)
 		else:
 			f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
 		for eq in self.eq_list:
@@ -3388,13 +3485,22 @@ class EQCatalog:
 			else:
 				eq_name = ""
 			if Mtype:
-				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.get_or_convert_mag(Mtype, Mrelation), eq.intensity_max, eq.macro_radius))
+				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%s,%s\n'
+					% (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth,
+					eq.get_or_convert_mag(Mtype, Mrelation), eq.intensity_max,
+					eq.macro_radius))
 			else:
-				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%.2f,%.2f,%s,%s\n' % (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth, eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
+				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%.2f,%.2f,%s,%s\n'
+					% (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth,
+					eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
 		if csv_filespec != None:
 			f.close()
 
-	def export_KML(self, kml_filespec=None, time_folders=True, instrumental_start_year=1910, color_by_depth=False):
+	def export_KML(self,
+		kml_filespec=None,
+		time_folders=True,
+		instrumental_start_year=1910,
+		color_by_depth=False):
 		"""
 		Export earthquake catalog to KML.
 
@@ -3441,7 +3547,8 @@ class EQCatalog:
 			inst_folder.appendChild(folder_lastyear)
 
 			decade_folders = {}
-			for decade in range(max(instrumental_start_year, eq_years.min()), current_year, 10)[::-1]:
+			for decade in range(max(instrumental_start_year, eq_years.min()),
+								current_year, 10)[::-1]:
 				folder_name = "%d - %d" % (decade, min(current_year - 1, decade + 9))
 				decade_folder = kmldoc.createFolder(folder_name, visible=True, open=False)
 				inst_folder.appendChild(decade_folder)
@@ -3451,8 +3558,10 @@ class EQCatalog:
 			last_century = ((instrumental_start_year - 1) // 100) * 100
 			for century in eq_centuries:
 				if century <= last_century:
-					folder_name = "%d - %d" % (century, min(instrumental_start_year, century + 99))
-					century_folder = kmldoc.createFolder(folder_name, visible=True, open=False)
+					folder_name = ("%d - %d"
+						% (century, min(instrumental_start_year, century + 99)))
+					century_folder = kmldoc.createFolder(folder_name, visible=True,
+														open=False)
 					hist_folder.appendChild(century_folder)
 					century_folders[century] = century_folder
 
@@ -3528,18 +3637,20 @@ class EQCatalog:
 					color = (255, 0, 0)
 
 			t = eq.time()
-			#url = '<a href="http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d">ROB web page</a>' % eq.ID
+			#url = 'http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d' % eq.ID
 			try:
 				hash = eq.get_rob_hash()
 			except:
 				url = None
 			else:
-				url = '<a href="http://seismologie.oma.be/en/seismology/earthquakes-in-belgium/%s">ROB web page</a>' % hash
+				url = 'http://seismologie.oma.be/en/seismology/earthquakes-in-belgium/%s' % hash
+			url = '<a href="' + url + '">ROB web page</a>'
 
 			values = OrderedDict()
 			values['ID'] = eq.ID
 			values['Date'] = str(eq.date)
-			values['Time'] = "%02d:%02d:%02d" % (t.hour, t.minute, int(round(t.second + t.microsecond/1e+6)))
+			values['Time'] = ("%02d:%02d:%02d"
+				% (t.hour, t.minute, int(round(t.second + t.microsecond/1e+6))))
 			values['Name'] = mykml.xmlstr(eq.name)
 			values['ML'] = eq.ML
 			values['MS'] = eq.MS
@@ -3550,21 +3661,27 @@ class EQCatalog:
 			if len(event_types) > 1:
 				values['Event type'] = eq.event_type
 			values[None] = url
-			name = "%s %.1f %s %s %s" % (Mtype, values[Mtype], values['Date'], values['Time'], values['Name'])
+			name = ("%s %.1f %s %s %s"
+				% (Mtype, values[Mtype], values['Date'], values['Time'], values['Name']))
 			labelstyle = kmldoc.createLabelStyle(scale=0)
 			#iconstyle = kmldoc.createStandardIconStyle(palette="pal2", icon_nr=26, scale=0.75+(values[Mtype]-3.0)*0.15, rgb=color)
 			icon_href = "http://kh.google.com:80/flatfile?lf-0-icons/shield3_nh.png"
-			iconstyle = kmldoc.createIconStyle(href=icon_href, scale=0.75+(values[Mtype]-3.0)*0.15, rgb=color)
+			iconstyle = kmldoc.createIconStyle(href=icon_href,
+								scale=0.75+(values[Mtype]-3.0)*0.15, rgb=color)
 			style = kmldoc.createStyle(styles=[labelstyle, iconstyle])
 			ts = kmldoc.createTimeSpan(begin=tf.to_py_datetime(eq.datetime))
-			kmldoc.addPointPlacemark(name, eq.lon, eq.lat, folder=folder, description=values, style=style, visible=visible, timestamp=ts)
+			kmldoc.addPointPlacemark(name, eq.lon, eq.lat, folder=folder,
+				description=values, style=style, visible=visible, timestamp=ts)
 
 		if kml_filespec:
 			kmldoc.write(kml_filespec)
 		else:
 			return kmldoc.root.toxml()
 
-	def export_VTK(self, vtk_filespec, proj="lambert1972", Mtype="MW", Mrelation="default"):
+	def export_VTK(self,
+		vtk_filespec,
+		proj="lambert1972",
+		Mtype="MW", Mrelation="default"):
 		"""
 		Export earthquake catalog to VTK format for 3D viewing
 
@@ -3726,7 +3843,13 @@ class EQCatalog:
 
 		return cls(eq_list, name=table_name)
 
-	def plot_Poisson_test(self, Mmin, interval=100, nmax=0, Mtype='MW', Mrelation="default", completeness=DEFAULT_COMPLETENESS, title=None, fig_filespec=None, verbose=True):
+	def plot_Poisson_test(self,
+		Mmin, interval=100, nmax=0,
+		Mtype='MW', Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		title=None,
+		fig_filespec=None,
+		verbose=True):
 		"""
 		Plot catalog distribution versus Poisson distribution
 		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
@@ -3757,9 +3880,10 @@ class EQCatalog:
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
 		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness` containing initial years of
+			completeness and corresponding minimum magnitudes.
+			If None, use start year of catalog
+			(default: DEFAULT_COMPLETENESS)
 		:param title:
 			String, plot title. (None = default title, "" = no title)
 			(default: None)
@@ -3780,7 +3904,8 @@ class EQCatalog:
 		## Apply completeness constraint, and truncate result to completeness
 		## year for specified minimum magnitude
 		min_date = completeness.get_initial_completeness_date(Mmin)
-		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation, completeness=completeness)
+		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation,
+												completeness=completeness)
 		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
 
 		num_events = len(catalog)
@@ -3824,7 +3949,8 @@ class EQCatalog:
 		for label in ax.get_xticklabels() + ax.get_yticklabels():
 			label.set_size('large')
 		if title is None:
-			title = r"Poisson test for $M\geq%.1f$ (t=%d, $\tau$=%.1f days, nt=%d)" % (Mmin, interval, tau, num_intervals)
+			title = (r"Poisson test for $M\geq%.1f$ (t=%d, $\tau$=%.1f days, nt=%d)"
+					% (Mmin, interval, tau, num_intervals))
 		pylab.title(title, fontsize="x-large")
 
 		if fig_filespec:
@@ -3855,7 +3981,8 @@ class EQCatalog:
 			kwargs['Mtype'] = Mtype
 		if Mrelation:
 			kwargs['Mrelation'] = Mrelation
-		p = ax.scatter(self.get_longitudes(), self.get_latitudes(), self.get_depths()*-1, c=self.get_magnitudes(**kwargs), cmap=plt.cm.jet)
+		p = ax.scatter(self.get_longitudes(), self.get_latitudes(), self.get_depths()*-1,
+						c=self.get_magnitudes(**kwargs), cmap=plt.cm.jet)
 		## set labels
 		ax.set_xlabel('longitude')
 		ax.set_ylabel('latitude')
@@ -3870,7 +3997,13 @@ class EQCatalog:
 		## plot
 		plt.show()
 
-	def analyse_completeness_CUVI(self, magnitudes, start_year, dYear, year1=None, year2=None, reg_line=None, Mtype="MW", Mrelation="default", title=None, fig_filespec="", fig_width=0, dpi=300):
+	def analyse_completeness_CUVI(self,
+		magnitudes,
+		start_year, dYear, year1=None, year2=None,
+		reg_line=None,
+		Mtype="MW", Mrelation="default",
+		title=None,
+		fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Analyze catalog completeness with the CUVI method (Mulargia, 1987).
 
@@ -3934,7 +4067,8 @@ class EQCatalog:
 		plt.xlabel('Time (years)', fontsize='large')
 		plt.ylabel('Cumulative number of events since' + ' %d' % self.start_date.year,
 			fontsize='large')
-		title = title or 'CUVI completeness analysis for magnitudes %.1f - %.1f' % (magnitudes[0], magnitudes[-1])
+		title = title or ('CUVI completeness analysis for magnitudes %.1f - %.1f'
+						% (magnitudes[0], magnitudes[-1]))
 		plt.title(title, fontsize='x-large')
 		plt.legend(loc=0)
 		plt.grid()
