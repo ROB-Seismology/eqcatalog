@@ -66,28 +66,42 @@ class LocalEarthquake:
 		dict, mapping magnitude types (str) to magnitude values (floats)
 	:param ML:
 		Float, local magnitude
+		(default: np.nan)
 	:param MS:
 		Float, surface-wave magnitude
+		(default: np.nan)
 	:param MW:
 		Float, moment magnitude
+		(default: np.nan)
 	:param mb:
 		Float, body-wave magnitude
+		(default: np.nan)
 	:param name:
-		String, name of location (default: "")
+		String, name of location
+		(default: "")
 	:param intensity_max:
-		Int, maximum intensity (default: None)
+		Int, maximum intensity
+		(default: None)
 	:param macro_radius:
 		Float, macroseismic radius (default: None)
 	:param errh:
-		Float, uncertainty on epicentral location, in km (default: 0)
+		Float, uncertainty on epicentral location, in km
+		(default: 0)
 	:param errz:
-		Float, uncertainty on hypocentral depth, in km (default: 0)
+		Float, uncertainty on hypocentral depth, in km
+		(default: 0)
 	:param errt:
-		Float, uncertainty on origin time, in s (default: 0)
+		Float, uncertainty on origin time, in s
+		(default: 0)
 	:param errM:
-		Float, uncertainty on magnitude (default: 0)
+		Float, uncertainty on magnitude
+		(default: 0)
 	:param zone:
-		Str, seismotectonic zone the earthquake belongs to (default: "")
+		Str, seismotectonic zone the earthquake belongs to
+		(default: "")
+	:param event_type:
+		str, type of event
+		(default: "ke" = known earthquake)
 	"""
 	def __init__(self,
 			ID,
@@ -498,12 +512,15 @@ class LocalEarthquake:
 		else:
 			tab = []
 		for attrib in ['ID', 'name', 'date', 'time', 'lon', 'lat', 'depth',
-						'ML', 'MS', 'MW', 'mb', 'intensity_max', 'macro_radius']:
-			row = [attrib, getattr(self, attrib)]
-			if has_prettytable:
-				tab.add_row(row)
-			else:
-				tab.append(row)
+						'ML', 'MS', 'MW', 'mb', 'intensity_max', 'macro_radius',
+						'zone', 'errt', 'errh', 'errz', 'errM', 'event_type']:
+			val = getattr(self, attrib)
+			if val and not val is np.nan:
+				row = [attrib, val]
+				if has_prettytable:
+					tab.add_row(row)
+				else:
+					tab.append(row)
 
 		if has_prettytable:
 			print(tab)
