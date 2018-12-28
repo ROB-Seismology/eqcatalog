@@ -155,13 +155,13 @@ class EQCatalog:
 					% (Mtype, count, mags.min(), mags.max()))
 		lons = self.get_longitudes()
 		lons = lons[np.isfinite(lons)]
-		print("Longitude bounds: %.4f - %.4f" % (lons.min(), lons.max()))
+		print("Longitude bounds: %.4f / %.4f" % (lons.min(), lons.max()))
 		lats = self.get_latitudes()
 		lats = lats[np.isfinite(lats)]
-		print("Latitude bounds: %.4f - %.4f" % (lats.min(), lats.max()))
+		print("Latitude bounds: %.4f / %.4f" % (lats.min(), lats.max()))
 		depths = self.get_depths()
 		depths = depths[np.isfinite(depths)]
-		print("Depth range %.1f - %.1f km" % (depths.min(), depths.max()))
+		print("Depth range: %.1f - %.1f km" % (depths.min(), depths.max()))
 
 	def print_list(self):
 		"""
@@ -280,7 +280,7 @@ class EQCatalog:
 			(default: None, will take the start time of the catalog)
 
 		:return:
-			list of instances of :class:`np.timedelta64`
+			array with instances of :class:`np.timedelta64`
 		"""
 		if not start_datetime:
 			start_datetime = self.start_date
@@ -586,7 +586,7 @@ class EQCatalog:
 		"""
 		return np.sum(self.get_M0(Mrelation=Mrelation))
 
-	def get_M0rate(self, completeness=None, Mrelation="default", time_unit='Y'):
+	def get_M0_rate(self, completeness=None, Mrelation="default", time_unit='Y'):
 		"""
 		Compute seismic moment rate.
 
@@ -654,10 +654,15 @@ class EQCatalog:
 		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key), reverse=reverse)
 		self.eq_list = eq_list
 
-	def subselect(self, region=None, start_date=None, end_date=None, Mmin=None,
-					Mmax=None, min_depth=None, max_depth=None, attr_val=(),
-					Mtype="MW", Mrelation="default", include_right_edges=True,
-					catalog_name=""):
+	def subselect(self,
+		region=None,
+		start_date=None, end_date=None,
+		Mmin=None, Mmax=None,
+		min_depth=None, max_depth=None,
+		attr_val=(),
+		Mtype="MW", Mrelation="default",
+		include_right_edges=True,
+		catalog_name=""):
 		"""
 		Make a subselection from the catalog.
 
@@ -773,9 +778,13 @@ class EQCatalog:
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=region, name=catalog_name)
 
-	def subselect_declustering(self, method="Cluster", window="GardnerKnopoff1974",
-								fa_ratio=0.5, Mtype="MW", Mrelation="default",
-								return_triggered_catalog=False, catalog_name=""):
+	def subselect_declustering(self,
+		method="Cluster",
+		window="GardnerKnopoff1974",
+		fa_ratio=0.5,
+		Mtype="MW", Mrelation="default",
+		return_triggered_catalog=False,
+		catalog_name=""):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		declustering method and params.
@@ -853,8 +862,11 @@ class EQCatalog:
 		# TODO: implement get_dependent_events, get_foreshocks, get_aftershocks
 		# methods in LocalEarthquake class
 
-	def subselect_completeness(self, completeness=DEFAULT_COMPLETENESS, Mtype="MW",
-							Mrelation="default", catalog_name="", verbose=True):
+	def subselect_completeness(self,
+		completeness=DEFAULT_COMPLETENESS,
+		Mtype="MW", Mrelation="default",
+		catalog_name="",
+		verbose=True):
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		completeness criterion.
@@ -904,8 +916,9 @@ class EQCatalog:
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=self.region, name=catalog_name)
 
-	def split_completeness(self, completeness=DEFAULT_COMPLETENESS, Mtype="MW",
-							Mrelation="default"):
+	def split_completeness(self,
+		completeness=DEFAULT_COMPLETENESS,
+		Mtype="MW", Mrelation="default"):
 		"""
 		Split catlog in subcatalogs according to completeness periods and magnitudes
 
@@ -921,6 +934,7 @@ class EQCatalog:
 		:return:
 			list of instances of :class:`EQCatalog`
 		"""
+		assert Mtype == completeness.Mtype
 		completeness_catalogs = []
 		min_mags = completeness.min_mags[::-1]
 		max_mags = list(min_mags[1:]) + [None]
@@ -931,8 +945,10 @@ class EQCatalog:
 			completeness_catalogs.append(catalog)
 		return completeness_catalogs
 
-	def bin_year(self, start_year, end_year, dYear, Mmin=None, Mmax=None,
-				Mtype="MW", Mrelation="default"):
+	def bin_by_year(self,
+		start_year, end_year, dYear,
+		Mmin=None, Mmax=None,
+		Mtype="MW", Mrelation="default"):
 		"""
 		Bin earthquakes into year intervals
 
@@ -966,10 +982,12 @@ class EQCatalog:
 		bins_N, bins_Years = np.histogram(Years, bins_Years)
 		return (bins_N, bins_Years[:-1])
 
-	def bin_year_by_M0(self, start_year, end_year, dYear, Mmin=None, Mmax=None,
-						Mrelation="default"):
+	def bin_M0_by_year(self,
+		start_year, end_year, dYear,
+		Mmin=None, Mmax=None,
+		Mrelation="default"):
 		"""
-		Bin earthquakes moments into year intervals
+		Bin earthquake moments into year intervals
 
 		:param start_year:
 			Int, lower year to bin (left edge of first bin)
@@ -1007,9 +1025,10 @@ class EQCatalog:
 				bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_Years
 
-
-	def bin_day(self, start_date, end_date, dday, Mmin=None, Mmax=None, Mtype="MW",
-				Mrelation="default"):
+	def bin_by_day(self,
+		start_date, end_date, dday,
+		Mmin=None, Mmax=None,
+		Mtype="MW", Mrelation="default"):
 		"""
 		Bin earthquakes into day intervals
 
@@ -1044,8 +1063,10 @@ class EQCatalog:
 		bins_N, bins_Days = np.histogram(Days, bins_Days)
 		return (bins_N, bins_Days[:-1])
 
-	def bin_day_by_M0(self, start_date, end_date, dday, Mmin=None, Mmax=None,
-					Mrelation="default"):
+	def bin_M0_by_day(self,
+		start_date, end_date, dday,
+		Mmin=None, Mmax=None,
+		Mrelation="default"):
 		"""
 		Bin earthquake moments into day intervals.
 
@@ -1086,8 +1107,10 @@ class EQCatalog:
 				bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_Days
 
-	def bin_hour(self, Mmin=None, Mmax=None, Mtype="MW", Mrelation="default",
-				start_year=None, end_year=None):
+	def bin_by_hour(self,
+		Mmin=None, Mmax=None,
+		Mtype="MW", Mrelation="default",
+		start_year=None, end_year=None):
 		"""
 		Bin earthquakes into hour intervals
 
@@ -1118,17 +1141,12 @@ class EQCatalog:
 		bins_N, _ = np.histogram(hours, bins_Hr)
 		return bins_N, bins_Hr[:-1]
 
-	def bin_depth(self,
-		min_depth=0,
-		max_depth=30,
-		bin_width=2,
+	def bin_by_depth(self,
+		min_depth=0, max_depth=30, bin_width=2,
 		depth_error=None,
-		Mmin=None,
-		Mmax=None,
-		Mtype="MW",
-		Mrelation="default",
-		start_date=None,
-		end_date=None):
+		Mmin=None, Mmax=None,
+		Mtype="MW", Mrelation="default",
+		start_date=None, end_date=None):
 		"""
 		Bin earthquakes into depth bins
 
@@ -1182,9 +1200,12 @@ class EQCatalog:
 		bins_N, _ = np.histogram(depths, bins_depth)
 		return bins_N, bins_depth[:-1]
 
-	def bin_depth_by_M0(self, min_depth=0, max_depth=30, bin_width=2,
-					depth_error=None, Mmin=None, Mmax=None, Mrelation="default",
-					start_date=None, end_date=None):
+	def bin_M0_by_depth(self,
+		min_depth=0, max_depth=30, bin_width=2,
+		depth_error=None,
+		Mmin=None, Mmax=None,
+		Mrelation="default",
+		start_date=None, end_date=None):
 		"""
 		Bin earthquake moments into depth bins
 
@@ -1229,7 +1250,8 @@ class EQCatalog:
 			min_depth_error = -1
 			depth_error = 100
 		for eq in subcatalog:
-			if eq.depth not in (None, 0) and min_depth_error < eq.errz < depth_error:
+			if (eq.depth not in (None, 0, np.nan)
+				and min_depth_error < eq.errz < depth_error):
 				try:
 					#bin_id = np.where((bins_depth + bin_width) >= eq.depth)[0][0]
 					bin_id = np.where(bins_depth <= eq.depth)[0][-1]
@@ -1240,8 +1262,11 @@ class EQCatalog:
 					bins_M0[bin_id] += eq.get_M0(Mrelation=Mrelation)
 		return bins_M0, bins_depth
 
-	def bin_mag(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default",
-				completeness=None, verbose=True):
+	def bin_by_mag(self,
+		Mmin, Mmax, dM=0.2,
+		Mtype="MW", Mrelation="default",
+		completeness=None,
+		verbose=True):
 		"""
 		Bin all earthquake magnitudes in catalog according to specified
 		magnitude interval.
@@ -1373,9 +1398,12 @@ class EQCatalog:
 			completeness = Completeness([min_date], [min_mag], Mtype="MW")
 		return completeness.get_completeness_timespans(magnitudes, self.end_date, unit=unit)
 
-	def get_incremental_MagFreq(self, Mmin, Mmax, dM=0.2, Mtype="MW",
-						Mrelation="default", completeness=DEFAULT_COMPLETENESS,
-						trim=False, verbose=True):
+	def get_incremental_MagFreq(self,
+		Mmin, Mmax, dM=0.2,
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		trim=False,
+		verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1405,7 +1433,7 @@ class EQCatalog:
 			bins_N_incremental: incremental annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype,
+		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype,
 				Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
 
@@ -1419,8 +1447,12 @@ class EQCatalog:
 
 		return bins_N_incremental, bins_Mag
 
-	def get_incremental_MFD(self, Mmin, Mmax, dM=0.2, Mtype="MW", Mrelation="default",
-					completeness=DEFAULT_COMPLETENESS, trim=False, verbose=True):
+	def get_incremental_MFD(self,
+		Mmin, Mmax, dM=0.2,
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		trim=False,
+		verbose=True):
 		"""
 		Compute incremental magnitude-frequency distribution.
 
@@ -1456,9 +1488,12 @@ class EQCatalog:
 		return EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental),
 									Mtype=Mtype)
 
-	def get_cumulative_MagFreq(self, Mmin, Mmax, dM=0.1, Mtype="MW",
-						Mrelation="default", completeness=DEFAULT_COMPLETENESS,
-						trim=False, verbose=True):
+	def get_cumulative_MagFreq(self,
+		Mmin, Mmax, dM=0.1,
+		Mtype="MW", Mrelation="default",
+		completeness=DEFAULT_COMPLETENESS,
+		trim=False,
+		verbose=True):
 		"""
 		Compute cumulative magnitude-frequency distribution.
 
@@ -1696,7 +1731,7 @@ class EQCatalog:
 			String, full path of image to be saved.
 			If None (default), histogram is displayed on screen.
 		"""
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
+		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, completeness=completeness, Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
 		pylab.bar(bins_Mag, bins_N, width=dM, color=color)
 		pylab.xlabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
 		pylab.ylabel("Number of events", fontsize="x-large")
@@ -1714,7 +1749,14 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_CumulativeYearHistogram(self, start_year, end_year, dYear, Mmin, Mmax, Mtype="MW", Mrelation="default", major_ticks=10, minor_ticks=1, completeness_year=None, regression_range=[], lang="en"):
+	def plot_CumulativeYearHistogram(self,
+		start_year, end_year, dYear,
+		Mmin, Mmax,
+		Mtype="MW", Mrelation="default",
+		major_ticks=10, minor_ticks=1,
+		completeness_year=None,
+		regression_range=[],
+		lang="en"):
 		"""
 		Plot cumulative number of earthquakes versus year
 
@@ -1751,7 +1793,7 @@ class EQCatalog:
 		catalog_start_year = tf.to_year(self.start_date) // dYear * dYear
 		if start_year <= catalog_start_year:
 			start_year = catalog_start_year
-		bins_N, bins_Years = self.bin_year(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
+		bins_N, bins_Years = self.bin_by_year(catalog_start_year, end_year, dYear, Mmin, Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		bins_N_cumul = np.add.accumulate(bins_N)
 		start_year_index = np.where(bins_Years == start_year)[0][0]
 		bins_N = bins_N[start_year_index:]
@@ -1830,12 +1872,12 @@ class EQCatalog:
 			end_date = self.end_date
 
 		if bin_width_spec.lower()[:4] == "year":
-			bins_M0, bins_Dates = self.bin_year_by_M0(tf.to_year(start_date), tf.to_year(end_date), bin_width, Mrelation=Mrelation)
+			bins_M0, bins_Dates = self.bin_M0_by_year(tf.to_year(start_date), tf.to_year(end_date), bin_width, Mrelation=Mrelation)
 			#bins_Dates = np.arange(start_date.year, end_date.year+bin_width, bin_width)
 			subcatalog = self.subselect(start_date=tf.to_year(start_date), end_date=tf.to_year(end_date))
 			Dates = [eq.year for eq in subcatalog]
 		elif bin_width_spec.lower()[:3] == "day":
-			bins_M0, bins_Dates = self.bin_day_by_M0(tf.as_np_date(start_date), tf.as_np_date(end_date), bin_width, Mrelation=Mrelation)
+			bins_M0, bins_Dates = self.bin_M0_by_day(tf.as_np_date(start_date), tf.as_np_date(end_date), bin_width, Mrelation=Mrelation)
 			#bins_Dates = np.arange((end_date - start_date).days + 1)
 			subcatalog = self.subselect(start_date=start_date, end_date=end_date)
 			Dates = tf.timespan(start_date, self.get_datetimes(), 'D')
@@ -2144,7 +2186,7 @@ class EQCatalog:
 		:return:
 			Tuple (mean, daily mean, nightly mean)
 		"""
-		bins_N, _ = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
+		bins_N, _ = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		mean = np.mean(bins_N)
 		mean_day = np.mean(bins_N[day[0]:day[1]])
 		mean_night = np.mean(np.concatenate([bins_N[:day[0]], bins_N[day[1]:]]))
@@ -2169,7 +2211,7 @@ class EQCatalog:
 		:param end_year:
 			Int, upper year to bin (default: None)
 		"""
-		bins_N, bins_Hr = self.bin_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
+		bins_N, bins_Hr = self.bin_by_hour(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation, start_year=start_year, end_year=end_year)
 		pylab.bar(bins_Hr, bins_N)
 		ymin, ymax = pylab.ylim()
 		pylab.axis((0, 24, ymin, ymax))
@@ -2192,24 +2234,15 @@ class EQCatalog:
 		pylab.show()
 
 	def plot_depth_histogram(self,
-		min_depth=0,
-		max_depth=30,
-		bin_width=2,
+		min_depth=0, max_depth=30, bin_width=2,
 		depth_error=None,
 		normalized=False,
-		Mmin=None,
-		Mmax=None,
-		dM=None,
-		Mtype="MW",
-		Mrelation="default",
-		start_date=None,
-		end_date=None,
+		Mmin=None, Mmax=None, dM=None,
+		Mtype="MW", Mrelation="default",
+		start_date=None, end_date=None,
 		color='b',
-		title=None,
-		fig_filespec="",
-		fig_width=0,
-		dpi=300,
-		legend_location=0,
+		title=None, legend_location=0,
+		fig_filespec="", fig_width=0, dpi=300,
 		ax=None):
 		"""
 		Plot histogram with number of earthquakes versus depth.
@@ -2253,6 +2286,9 @@ class EQCatalog:
 		:param title:
 			String, title (None = default title, empty string = no title)
 			(default: None)
+		:param legend_location:
+			Int, matplotlib legend location code
+			(default: 0)
 		:param fig_filespec:
 			String, full path to output image file, if None plot to screen
 			(default: None)
@@ -2261,9 +2297,6 @@ class EQCatalog:
 			respect to default figure width (default: 0)
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
-		:param legend_location:
-			Int, matplotlib legend location code
-			(default: 0)
 		:param ax:
 			matplotlib Axes instance
 			(default: None)
@@ -2276,11 +2309,11 @@ class EQCatalog:
 		if dM:
 			## Compute depth histogram for each magnitude bin
 			assert not None in (Mmin, Mmax)
-			_, bins_mag = self.bin_mag(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation)
+			_, bins_mag = self.bin_by_mag(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation)
 			bins_N = []
 			for mmin in bins_mag[::-1]:
 				mmax = mmin + dM
-				bins_n, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date)
+				bins_n, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width, depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date)
 				bins_N.append(bins_n)
 			if isinstance(color, (list, np.ndarray)):
 				colors = color
@@ -2291,7 +2324,7 @@ class EQCatalog:
 				colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 
 		else:
-			bins_N, bins_depth = self.bin_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date)
+			bins_N, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date)
 			bins_N = [bins_N]
 			colors = [color]
 			bins_mag = [Mmin]
@@ -2342,7 +2375,16 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_Depth_M0_Histogram(self, min_depth=0, max_depth=30, bin_width=2, depth_error=None, Mmin=None, Mmax=None, Mrelation="default", start_year=None, end_year=None, color='b', title=None, log=True, fig_filespec="", fig_width=0, dpi=300):
+	def plot_Depth_M0_Histogram(self,
+		min_depth=0, max_depth=30, bin_width=2,
+		depth_error=None,
+		Mmin=None, Mmax=None,
+		Mrelation="default",
+		start_year=None, end_year=None,
+		color='b',
+		title=None,
+		log=True,
+		fig_filespec="", fig_width=0, dpi=300):
 		"""
 		Plot histogram with seismic moment versus depth.
 
@@ -2383,7 +2425,7 @@ class EQCatalog:
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		"""
-		bins_M0, bins_depth = self.bin_depth_by_M0(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mrelation, start_year, end_year)
+		bins_M0, bins_depth = self.bin_M0_by_depth(min_depth, max_depth, bin_width, depth_error, Mmin, Mmax, Mrelation, start_year, end_year)
 		try:
 			pylab.barh(bins_depth, bins_M0, height=bin_width, log=log, color=color)
 		except:
@@ -2420,7 +2462,16 @@ class EQCatalog:
 		else:
 			pylab.show()
 
-	def plot_map(self, symbol='o', edge_color='r', fill_color=None, edge_width=1, label="Epicenters", symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation="default", region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_colname="ShortName", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
+	def plot_map(self,
+		symbol='o', edge_color='r', fill_color=None, edge_width=1,
+		label="Epicenters",
+		symbol_size=9, symbol_size_inc=4,
+		Mtype="MW", Mrelation="default",
+		region=None, projection="merc", resolution="i", dlon=1., dlat=1.,
+		source_model=None,
+		sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_colname="ShortName",
+		title=None, legend_location=0,
+		fig_filespec=None, fig_width=0, dpi=300):
 		"""
 		Plot map of catalog
 
@@ -2548,7 +2599,7 @@ class EQCatalog:
 		from .calcGR import calcGR_LSQ
 
 		if weighted:
-			bins_N, _ = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
+			bins_N, _ = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=False)
 			weights = bins_N
 		else:
 			weights = None
@@ -2636,7 +2687,7 @@ class EQCatalog:
 		from .calcGR import calcGR_Weichert
 		## Note: don't use get_incremental_MagFreq here, as completeness
 		## is taken into account in the Weichert algorithm !
-		bins_N, bins_Mag = self.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
+		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date, b_val=b_val, verbose=verbose)
 
 		"""
@@ -2879,6 +2930,8 @@ class EQCatalog:
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
 		end_year = tf.to_year(self.end_date)
 		plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels, completeness=completeness_limits, end_year=end_year, Mrange=Mrange, Freq_range=Freq_range, title=title, lang=lang, fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+
+	## Export methods
 
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation="default"):
 		"""
@@ -3624,7 +3677,7 @@ class EQCatalog:
 		max_mag = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
 		start_year_index = None
 		for i, magnitude in enumerate(magnitudes):
-			bins_N, bins_Years = self.bin_year(self.start_date.year,
+			bins_N, bins_Years = self.bin_by_year(self.start_date.year,
 				self.end_date.year+1, dYear, magnitude, max_mag, Mtype=Mtype, Mrelation=Mrelation)
 			bins_N_cumul = np.add.accumulate(bins_N)
 			if not start_year_index:
@@ -5032,8 +5085,8 @@ def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colo
 		if start_year:
 			xmin = start_year
 		else:
-			xmin = min(catalog.start_date.year for catalog in catalogs)
-		xmax = max(catalog.end_date.year for catalog in catalogs)+1
+			xmin = min(tf.to_year(catalog.start_date) for catalog in catalogs)
+		xmax = max(tf.to_year(catalog.end_date) for catalog in catalogs)+1
 
 	## Set range of Y axis
 	try:
@@ -5557,7 +5610,7 @@ if __name__ == "__main__":
 	#catalog.plot_MagnitudeDate()
 
 	## Bin magnitudes with verbose output
-	#bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
+	#bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
 
 	## Plot magnitude histogram
 	#catalog.plot_Mhistogram(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness)
@@ -5638,8 +5691,8 @@ if __name__ == "__main__":
 	## Report total seismic moment
 	#historical_catalog = catalog.subselect(end_date=datetime.date(1909, 12, 31))
 	#instrumental_catalog = catalog.subselect(start_date = datetime.date(1910, 1, 1))
-	#M0_historical = historical_catalog.get_M0rate(Mrelation="geller")
-	#M0_instrumental = instrumental_catalog.get_M0rate(Mrelation="hinzen")
+	#M0_historical = historical_catalog.get_M0_rate(Mrelation="geller")
+	#M0_instrumental = instrumental_catalog.get_M0_rate(Mrelation="hinzen")
 	#M0_total = M0_historical + M0_instrumental
 	#print("Total seismic moment: %.2E (historical) + %.2E (instrumental) = %.2E N.m" % (M0_historical, M0_instrumental, M0_total))
 	#catalog.plot_CumulatedM0(ddate=10, ddate_spec="years", Mrelation=None)
@@ -5649,7 +5702,7 @@ if __name__ == "__main__":
 	catalog = read_catalogSQL(region=region, start_date=start_date, end_date=end_date)
 	cat = DummyClass()
 	cat.a, cat.b, cat.beta, cat.stda, cat.stdb, cat.stdbeta = catalog.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
-	bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=False)
+	bins_N, bins_Mag, bins_Years, num_events, Mmax = catalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=False)
 	cat.num_events = num_events
 	"""
 
@@ -5700,7 +5753,7 @@ if __name__ == "__main__":
 				a, b, r = catalog.calcGR_lsq(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
 				a, b, beta, stda, stdb, stdbeta = catalog.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True)
 				zone.a, zone.b, zone.beta, zone.stda, zone.stdb, zone.stdbeta = catalog.calcGR_mle(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, verbose=True, beta=BETA)
-				zone.num_events = catalog.bin_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=True, verbose=False)[3]
+				zone.num_events = catalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, completeness=completeness, trim=True, verbose=False)[3]
 			except:
 				pass
 			else:
