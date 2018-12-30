@@ -103,6 +103,21 @@ def as_np_timedelta(td):
 		return np.array(td, dtype=np.timedelta64)
 
 
+def get_datetime_unit(dt64):
+	"""
+	Extract time unit from numpy datetime64 or timedelta64 object
+
+	:param dt64:
+		instance of :class:`np.datetime64` or :class:`np.timedelta64`
+		or array of such types
+
+	:return:
+		str, time unit
+	"""
+	assert is_np_datetime(dt64) or is_np_timedelta(dt64)
+	return str(dt64.dtype).split('[')[1].split(']')[0]
+
+
 def time_tuple_to_np_datetime(year, month=0, day=0, hour=0, minute=0, second=0,
 							microsecond=0):
 	"""
