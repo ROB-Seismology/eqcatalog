@@ -1003,17 +1003,22 @@ class EQCatalog:
 
 		return zone_catalogs
 
-	def split_into_time_intervals(self, time_interval):
+	def split_into_time_intervals(self, time_interval, start_date=None):
 		"""
 		:param time_interval:
 			int (years) or instance of :class:`datetime.timedelta` or
 			:class:`np.timedelta64` (precision of days or better)
+		:param start_date:
+			Int or date or datetime object specifying start of time window of interest
+			If integer, start_date is interpreted as start year
+			(default: None)
 
 		:return:
 			list with instances of :class:`EQCatalog`
 		"""
 		subcatalogs = []
-		start_date = self.start_date
+		if start_date is None:
+			start_date = self.start_date
 		if isinstance(time_interval, int):
 			time_interval = np.timedelta64(time_interval, 'Y')
 		else:
