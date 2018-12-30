@@ -41,6 +41,21 @@ def is_np_datetime(dt):
 		return False
 
 
+def is_np_timedelta(td):
+	"""
+	Check if argument is a numpy timedelta64 object
+
+	:return:
+		bool
+	"""
+	if isinstance(td, np.timedelta64):
+		return True
+	elif isinstance(td, np.ndarray) and np.issubdtype(td.dtype, np.timedelta64):
+		return True
+	else:
+		return False
+
+
 def as_np_datetime(dt, unit='s'):
 	"""
 	Convert to numpy datetime64
@@ -67,6 +82,25 @@ def as_np_datetime(dt, unit='s'):
 		return np.datetime64(dt, unit)
 	elif isinstance(dt, list):
 		return np.array(dt, dtype='M8[%s]' % unit)
+
+
+def as_np_timedelta(td):
+	"""
+	Convert to numpy timedelta64
+
+	:param td:
+		instance of :class:`datetime.timedelta` or list with such instances
+		or instance of :class:`np.timedelta64` or array of type timedelta64
+
+	:return:
+		instance of :class:`np.timedelta64` or array of type timedelta64
+	"""
+	if is_np_timedelta(td):
+		return td
+	elif isinstance(td, datetime.timedelta):
+		return np.timedelta64(td)
+	elif isinstance(td, list):
+		return np.array(td, dtype=np.timedelta64)
 
 
 def time_tuple_to_np_datetime(year, month=0, day=0, hour=0, minute=0, second=0,
