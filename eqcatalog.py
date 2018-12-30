@@ -2273,7 +2273,7 @@ class EQCatalog:
 		:param verbose:
 			Bool, whether some messages should be printed or not (default: False)
 		"""
-		from hazard.rshalib.mfd import plot_mfd
+		from hazard.rshalib.mfd import plot_MFD
 
 		mfd_list, labels, colors, styles = [], [], [], []
 		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation,
@@ -2324,7 +2324,7 @@ class EQCatalog:
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
 		end_year = tf.to_year(self.end_date)
-		plot_mfd(mfd_list, colors=colors, styles=styles, labels=labels,
+		plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels,
 				completeness=completeness_limits, end_year=end_year,
 				Mrange=Mrange, Freq_range=Freq_range,
 				title=title, lang=lang,
