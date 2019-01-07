@@ -384,7 +384,7 @@ c--- test for spatial clustering
      1           jtime,lat2,xlat2,lon2,xlon2,dep2,xmag2,erh2,erz2,q2,
      2           cmag1(list(i)),cluster,ierradj)
 
-      if (cluster .eq. .false.) goto 200
+      if (cluster .eqv. .false.) goto 200
 
 c---- cluster declared
 c     if event i and event j are both already associated with 
