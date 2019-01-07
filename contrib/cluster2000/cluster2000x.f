@@ -226,6 +226,7 @@ C--HYPO71-2000 FORMAT
      1                     lon1,iew,xlon1,dep1,xmag1,erh1,erz1,q1
  2010 format (4i2,1x,2i2,6x,i3,a1,f5.2,i4,a1,f5.2,
      1        f7.2,2x,f5.2,17x,2f5.1,1x,a1)
+      itime(1) = itime(1) + icent*100
       goto 108
 
 C--FREE FORMAT - INPUT
@@ -288,7 +289,7 @@ c        write (6,*)
 
       write (6,39) iy1, iy2, xmagcut, inrec, neq, ntimrej, 
      1             nmagrej, nquarej
-   39 format ('   RANGE OF YEARS TO ACCEPT: ', I2, ' TO ', I2, /
+   39 format ('   RANGE OF YEARS TO ACCEPT: ', I4, ' TO ', I4, /
      1        ' ...USING MINIMUM MAGNITUDE CUTOFF = ', F5.2 /
      1        i12, '   EVENTS READ', / 
      2        i12, '   EVENTS ACCEPTED' / 
@@ -571,6 +572,8 @@ C-- MAIN OUTPUT LOOP
       icr = 43
       if (list(i).ne.0) icr = mod(list(i)-1,26)+65
       ichr = char(icr)
+      
+      itime(1) = itime(1) - icent * 100
 
 C-------- OUTPUT FORMATS--------------------------------------
 c--------- HYPOINVERSE
@@ -760,12 +763,19 @@ c                   the magnitude of the first.
       end if
 
 C Write out cluster summary to "output" file
+			icent0 = INT(ctim0(1,k) / 100)
+      ctim0(1,k) = ctim0(1,k) - icent0 * 100
+			icent1 = INT(ctim1(1,k) / 100)
+      ctim1(1,k) = ctim1(1,k) - icent1 * 100
+			icent2 = INT(ctim2(1,k) / 100)
+      ctim2(1,k) = ctim2(1,k) - icent2 * 100
+
       ichr = char(mod(k-1,26)+65)
   510 write (2,511) ichr,k,(ctim0(it,k),it=1,5),cdur(k),nc(k),lat,xlat,
-     1       lon,xlon,cdep(k),xmag,(ctim1(it,k),it=1,5),cmag1(k),
-     2       (ctim2(it,k),it=1,5),cmag2(k),fore,DT,DM
+     1       lon,xlon,cdep(k),xmag,icent1,(ctim1(it,k),it=1,5),cmag1(k),
+     2       icent2,(ctim2(it,k),it=1,5),cmag2(k),fore,DT,DM
   511 format (1x,a1,i4,1x,3i2.2,1x,2i2.2,2x,f8.3,2x,i5,
-     1        2(i4,f6.2),2f6.2,2(3x,5i2.2,1x,f6.2),i5,1x,f7.3,f6.2)
+     1        2(i4,f6.2),2f6.2,2(3x,6i2.2,1x,f6.2),i5,1x,f7.3,f6.2)
 
 c--- Write out (append) the "equivalent events" to declustered catalog
 c    Use error parameters from largest event in cluster
