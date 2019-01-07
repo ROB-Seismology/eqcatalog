@@ -1,5 +1,7 @@
-FC	= f77 
-FFLAGS	=  -g  -Nl50
+#FC	= f77 
+FC	= gfortran
+#FFLAGS	=  -g  -Nl50
+FFLAGS	= -std=gnu
 
 cluster2000x:   cluster2000x.o
 	$(FC) $(FFLAGS)  -o cluster2000x cluster2000x.o
