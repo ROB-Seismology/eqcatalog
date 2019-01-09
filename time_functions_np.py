@@ -15,6 +15,12 @@ except:
 import datetime
 import numpy as np
 
+from distutils.version import LooseVersion
+assert LooseVersion(np.__version__) >= LooseVersion('1.7.0')
+if LooseVersion(np.__version__) <= LooseVersion('1.11.0'):
+	print("Warning: this version of numpy applies timezone offset in datetime64")
+	print("Please upgrade to version 1.11.0 or higher")
+
 
 AVG_SECS_PER_YEAR = 31556925.9747
 SECS_PER_MINUTE = 60
