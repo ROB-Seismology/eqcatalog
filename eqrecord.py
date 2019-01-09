@@ -192,6 +192,12 @@ class LocalEarthquake:
 		self.zone = u'' + zone
 		self.event_type = event_type
 
+	def __eq__(self, eq):
+		if isinstance(eq, self.__class__) and self.ID == eq.ID:
+			return True
+		else:
+			return False
+
 	@classmethod
 	def from_json(cls, s):
 		"""
@@ -495,6 +501,31 @@ class LocalEarthquake:
 		return HYPDAT(latitude, longitude, year, month, day, minutes, tseconds,
 						depth, magnitude, 0, 0, 0)
 
+	def to_hypo71(self, Mtype='MW', Mrelation="default"):
+		year, month, day = map(int, str(self.date).split('-'))
+		hr, minute, sec = str(self.time).split(':')
+		hr, minute, sec = int(hr), int(minute), float(sec)
+		lonmin, londeg = np.modf(self.lon)
+		lonmin, londeg = lonmin * 60, np.abs(londeg)
+		ew = 'E' if self.lon > 0 else ' '
+		latmin, latdeg = np.modf(self.lat)
+		latmin, latdeg = latmin * 60, np.abs(latdeg)
+		ns = 'S' if self.lat < 0 else ' '
+		mag = self.get_M(Mtype, Mrelation)
+		hypo71 = ('%04d%02d%02d ' % (year, month, day),
+				'%02d%02d%6.2f' % (hr, minute, sec),
+				'%3.0f%c%5.2f' % (latdeg, ns, latmin),
+				'%4.0f%c%5.2f' % (londeg, ew, lonmin),
+				'%7.2f ' % self.depth,
+				'%c%5.2f' % (Mtype[-1], mag),
+				' ' * 17,
+				'%5.1f%5.1f' % (self.errh, self.errz),
+				' ' * 4,
+				'%10s' % str(self.ID)[:10],
+				' ' * 5)
+		hypo71 = ''.join(hypo71)
+		return hypo71
+
 	def print_table(self):
 		"""
 		Print earthquake attributes in pretty table.
@@ -794,14 +825,21 @@ class LocalEarthquake:
 		and taking into account depth
 
 		:param pt:
-			(lon, lat) tuple or other instance of :class:`LocalEarthquake`
-			Note that lon, lat may also be arrays
+			(lon, lat, [z]) tuple or other instance of :class:`LocalEarthquake`
+			Note that lon, lat, z may also be arrays
 
 		:return:
 			Float, hypocentral distance in km
 		"""
 		d_epi = self.epicentral_distance(pt)
-		d_hypo = np.sqrt(d_epi**2 + self.depth**2)
+		if hasattr(pt, 'depth'):
+			depth2 = pt.depth
+		elif isinstance(pt, (tuple, list)) and len(pt) == 3:
+			depth2 = pt[2]
+		else:
+			depth2 = 0.
+		delta_depth = np.abs(self.depth - depth2)
+		d_hypo = np.sqrt(d_epi**2 + delta_depth**2)
 		return d_hypo
 
 	def azimuth_to(self, pt):
