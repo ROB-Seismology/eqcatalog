@@ -26,51 +26,9 @@ import numpy as np
 
 import db.simpledb as simpledb
 
+from .moment import (moment_to_mag, mag_to_moment)
 
 ROOT_FOLDER = "D:\\seismo-gis\\collections\\Harvard_CMT"
-
-
-def moment_to_mag(moment, unit='dyn.cm'):
-	"""
-	Convert seismic moment to moment magnitude
-
-	:param moment:
-		array-like, seismic moment (in dyn.cm)
-	:param unit:
-		str, moment unit, either 'dyn.cm' or 'N.m'
-		(default: 'dyn.cm')
-
-	:return:
-		array-like, moment magnitude
-	"""
-	base_term = (2./3) * np.log10(moment)
-	if unit == 'dyn.cm':
-		return base_term - 10.73
-	elif unit == 'N.m':
-		return base_term - 6.06
-	else:
-		raise Exception("Moment unit %s not supported!" % unit)
-
-
-def mag_to_moment(mag, unit='dyn.cm'):
-	"""
-	Convert moment magnitude to seismic moment
-
-	:param mag:
-		array-like, moment magnitude
-	:param unit:
-		str, moment unit, either 'dyn.cm' or 'N.m'
-		(default: 'dyn.cm')
-
-	:return:
-		array-like, seismic moment (in dyn.cm)
-	"""
-	if unit == 'dyn.cm':
-		return 10**(1.5*mag + 16.095)
-	elif unit == 'N.m':
-		return 10**(1.5*mag + 9.09)
-	else:
-		raise Exception("Moment unit %s not supported!" % unit)
 
 
 HarvardCMTColDef = [
@@ -252,7 +210,7 @@ class HarvardCMTRecord:
 
 	@property
 	def MW(self):
-		return moment_to_mag(self.get_moment())
+		return moment_to_mag(self.get_moment(), unit='dyn.cm')
 
 	def get_moment(self, unit='dyn.cm'):
 		"""
@@ -493,7 +451,7 @@ class HarvardCMTCatalog:
 		self.import_ndk([ndk_url], start_date=start_date)
 
 		## Create SpatiaLite geometries
-		if self.db.has_spatialite:
+		if self.db.HAS_SPATIALITE:
 			if not 'spatial_ref_sys' in self.db.list_tables():
 				self.db.init_spatialite()
 			self.db.add_geometry_column(self.table_name, 'geom')
@@ -527,11 +485,11 @@ class HarvardCMTCatalog:
 			clause = "hypo_depth <= %f" % max_depth
 			where_clauses.append(clause)
 		if Mmin:
-			min_moment = mag_to_moment(Mmin)
+			min_moment = mag_to_moment(Mmin, unit='dyn.cm')
 			clause = "(moment * POWER(10, exp)) >= %E" % min_moment
 			where_clauses.append(clause)
 		if Mmax:
-			max_moment = mag_to_moment(Mmax)
+			max_moment = mag_to_moment(Mmax, unit='dyn.cm')
 			clause = "(moment * POWER(10, exp)) <= %E" % max_moment
 			where_clauses.append(clause)
 

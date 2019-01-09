@@ -29,6 +29,13 @@ else:
 
 ## Import submodules
 
+## moment (no internal dependencies)
+if not reloading:
+	from . import moment
+else:
+	reload(moment)
+from .moment import (moment_to_mag, mag_to_moment)
+
 ## time_functions (no internal dependencies)
 if not reloading:
 	from . import time_functions_np as time_functions
