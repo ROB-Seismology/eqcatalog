@@ -526,7 +526,7 @@ class LocalEarthquake:
 		hypo71 = ''.join(hypo71)
 		return hypo71
 
-	def print_table(self):
+	def print_info(self):
 		"""
 		Print earthquake attributes in pretty table.
 		"""
