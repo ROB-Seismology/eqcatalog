@@ -90,11 +90,11 @@ class EQCatalog:
 		if not start_date:
 			self.start_date = Tmin
 		else:
-			self.start_date = tf.as_np_datetime(start_date)
+			self.start_date = tf.as_np_datetime(start_date, unit='ms')
 		if not end_date:
 			self.end_date = Tmax
 		else:
-			self.end_date = tf.as_np_datetime(end_date)
+			self.end_date = tf.as_np_datetime(end_date, unit='ms')
 		self.region = region
 		self.name = name
 
@@ -119,11 +119,47 @@ class EQCatalog:
 							end_date=self.end_date, region=self.region,
 							name=self.name + " %s" % item)
 		elif isinstance(item, (list, np.ndarray)):
+			## item can contain indexes or bool
 			eq_list = []
-			for index in item:
-				eq_list.append(self.eq_list[index])
+			if len(item):
+				idxs = np.arange(len(self))
+				idxs = idxs[np.asarray(item)]
+				for idx in idxs:
+					eq_list.append(self.eq_list[idx])
 			return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date,
 							region=self.region, name=self.name + " %s" % item)
+
+	def __contains__(self, eq):
+		"""
+		Determine whether or not given earthquake is in catalog
+		(based on its ID)
+
+		:param eq:
+			instance of :class:`LocalEarthquake`
+
+		:return:
+			bool
+		"""
+		assert isinstance(eq, LocalEarthquake)
+		return eq.ID in self.get_ids()
+
+	def __eq__(self, other_catalog):
+		return sorted(self.get_ids()) == sorted(other_catalog.get_ids())
+
+	def __add__(self, other_catalog):
+		return self.get_union(other_catalog)
+
+	def __sub__(self, other_catalog):
+		return self.get_difference(other_catalog)
+
+	def append(self, eq):
+		"""
+		Append earthquake to catalog
+
+		:param eq:
+			instance of :class:`LocalEarthquake`
+		"""
+		self.eq_list.append(eq)
 
 	@property
 	def lons(self):
@@ -137,7 +173,192 @@ class EQCatalog:
 	def mags(self):
 		return self.get_magnitudes()
 
-	def print_report(self):
+	## Methods related to earthquake IDs
+
+	def get_ids(self):
+		"""
+		Return earthquake IDs
+
+		:return:
+			list of strings or integers
+		"""
+		return [eq.ID for eq in self]
+
+	def get_unique_ids(self):
+		"""
+		Return unqiue earthquake IDs
+		"""
+		return np.unique(self.get_ids())
+
+	def has_unique_ids(self):
+		"""
+		Determine whether or not earthquakes in catalog have unique IDs
+
+		:return:
+			bool
+		"""
+		num_unique_ids = len(self.get_unique_ids())
+		if num_unique_ids == len(self):
+			return True
+		else:
+			return False
+
+	def get_event_by_id(self, id):
+		"""
+		Extract event with given ID
+
+		:param id:
+			int or str, earthquake ID
+
+		:return:
+			instance of :class:`LocalEarthquake`
+		"""
+		str_ids = list(map(str, self.get_ids()))
+		try:
+			idx = str_ids.index(str(id))
+		except IndexError:
+			return None
+		else:
+			return self.__getitem__(idx)
+
+	def get_duplicate_idxs(self):
+		"""
+		Determine indexes of duplicate earthquakes in catalog
+
+		:return:
+			int array, indexes of duplicates
+		"""
+		ids = self.get_ids()
+		unique_ids, duplicate_idxs = [], []
+		for i, id in enumerate(ids):
+			if not id in unique_ids:
+				unique_ids.append(id)
+			else:
+				duplicate_idxs.append(i)
+		return duplicate_idxs
+
+	def remove_duplicates(self):
+		"""
+		Return catalog with duplicates removed
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		duplicate_idxs = self.get_duplicate_idxs()
+		return self.remove_events_by_index(duplicate_idxs)
+
+	def remove_events_by_index(self, idxs):
+		"""
+		Return catalog with earthquakes corresponding to indexes removed
+
+		:param idxs:
+			int list or array, indexes of earthquakes to be removed
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		all_idxs = np.arange(len(self))
+		remaining_idxs = set(all_idxs) - set(idxs)
+		remaining_idxs = np.array(sorted(remaining_idxs))
+		return self.__getitem__(remaining_idxs)
+
+	def get_union(self, other_catalog, name=None):
+		"""
+		Return catalog of all events in catalog and in other catalog
+		(without duplicates)
+
+		:param other_catalog:
+			instance of :class:`EQCatalog`
+		:param name:
+			str, name of resulting catalog
+			(default: None, will generate name automatically)
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		assert isinstance(other_catalog, EQCatalog)
+		ids = set(self.get_ids())
+		other_ids = set(other_catalog.get_ids())
+		union = list(ids.union(other_ids))
+		cat1 = self.subselect(attr_val=('ID', union))
+		cat2 = other_catalog.subselect(attr_val=('ID', union))
+		if name is None:
+			name = "Union(%s, %s)" % (self.name, other_catalog.name)
+		return concatenate_catalogs([cat1, cat2], name=name)
+
+	def get_intersection(self, other_catalog, name=None):
+		"""
+		Return catalog of events that are both in catalog and in
+		other catalog
+
+		:param other_catalog:
+			instance of :class:`EQCatalog`
+		:param name:
+			str, name of resulting catalog
+			(default: None, will generate name automatically)
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		assert isinstance(other_catalog, EQCatalog)
+		ids = set(self.get_ids())
+		other_ids = set(other_catalog.get_ids())
+		intersection = list(ids.intersection(other_ids))
+		catalog = self.subselect(attr_val=('ID', intersection))
+		if name is None:
+			name = "Intersection(%s, %s)" % (self.name, other_catalog.name)
+		catalog.name = name
+		return catalog
+
+	def get_difference(self, other_catalog, name=None):
+		"""
+		Return catalog of events that are in catalog but not in
+		other catalog
+
+		:param other_catalog:
+			instance of :class:`EQCatalog`
+		:param name:
+			str, name of resulting catalog
+			(default: None, will generate name automatically)
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		assert isinstance(other_catalog, EQCatalog)
+		ids = set(self.get_ids())
+		other_ids = set(other_catalog.get_ids())
+		diff = list(ids - other_ids)
+		catalog = self.subselect(attr_val=('ID', diff))
+		if name is None:
+			name = "Difference(%s, %s)" % (self.name, other_catalog.name)
+		catalog.name = name
+		return catalog
+
+	def get_symmetric_difference(self, other_catalog, name=None):
+		"""
+		Return catalog of events that are only in catalog or in
+		other catalog
+
+		:param other_catalog:
+			instance of :class:`EQCatalog`
+		:param name:
+			str, name of resulting catalog
+			(default: None, will generate name automatically)
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		assert isinstance(other_catalog, EQCatalog)
+		ids = set(self.get_ids())
+		other_ids = set(other_catalog.get_ids())
+		diff = list(ids.symmetric_difference(other_ids))
+		catalog = self.subselect(attr_val=('ID', diff))
+		if name is None:
+			name = "Symmetric Difference(%s, %s)" % (self.name, other_catalog.name)
+		catalog.name = name
+		return catalog
+
+	def print_info(self):
 		"""
 		Print some useful information about the catalog.
 		"""
@@ -196,22 +417,6 @@ class EQCatalog:
 			print('\t'.join(col_names))
 			for row in tab:
 				print('\t'.join(row))
-
-	def get_record(self, ID):
-		"""
-		Fetch record with given ID
-
-		:param ID:
-			str or int, ID of earthquake in ROB database
-
-		:return:
-			instance of :class:`LocalEarthquake`
-		"""
-		events = [rec for rec in self if str(rec.ID) == str(ID)]
-		if len(events) == 1:
-			return events[0]
-		else:
-			return None
 
 	@classmethod
 	def from_json(cls, s):
@@ -428,6 +633,19 @@ class EQCatalog:
 		else:
 			Mmax = np.nan
 		return Mmax
+
+	def convert_magnitudes(self, Mtype="MW", Mrelation="default"):
+		"""
+		Convert magnitude to given magnitude type and store in
+		earthquake objects.
+
+		:param Mtype:
+		:param Mrelation:
+			see :meth:`get_magnitudes`
+		"""
+		mags = self.get_magnitudes(Mtype, Mrelation)
+		for eq, mag in zip(self.eq_list, mags):
+			eq.set_mag(Mtype, mag)
 
 	def get_magnitude_uncertainties(self, min_uncertainty=0.3):
 		"""
@@ -822,7 +1040,10 @@ class EQCatalog:
 				eq_list = [eq for eq in eq_list if eq.depth < max_depth]
 		if len(attr_val) == 2:
 			attr, val = attr_val
-			eq_list = [eq for eq in eq_list if getattr(eq, attr) == val]
+			if isinstance(val, (list, np.ndarray)):
+				eq_list = [eq for eq in eq_list if getattr(eq, attr) in val]
+			else:
+				eq_list = [eq for eq in eq_list if getattr(eq, attr) == val]
 
 		## Update catalog information
 		if region is None:
@@ -3565,6 +3786,29 @@ class EQCatalog:
 					% (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth,
 					eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
 		if csv_filespec != None:
+			f.close()
+
+	def export_hypo71(self, h71_filespec=None, Mtype=None, Mrelation="default"):
+		"""
+		Export earthquake catalog to text file in HYPO71-2000 format
+
+		:param h71_filespec:
+			str, full path to output file.
+			If None, output is printed on screen
+			(default: None)
+		:param Mtype:
+		:param Mrelation:
+			see :meth:`get_magnitudes`
+		"""
+		if h71_filespec == None:
+			f = sys.stdout
+		else:
+			f = open(h71_filespec, "w")
+
+		for eq in self.eq_list:
+			f.write('%s\n' % eq.to_hypo71())
+
+		if h71_filespec != None:
 			f.close()
 
 	def export_KML(self,
