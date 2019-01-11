@@ -652,6 +652,17 @@ class LocalEarthquake:
 		"""
 		return self.mag.get(Mtype, np.nan)
 
+	def set_mag(self, Mtype, mag):
+		"""
+		Set magnitude type to given value
+
+		:param Mtype:
+			str, magnitude type to set
+		:param mag:
+			float, magnitude value
+		"""
+		self.mag[Mtype] = mag
+
 	def get_or_convert_mag(self, Mtype, Mrelation={}):
 		"""
 		Return particular magnitude. If the magnitude type is not defined,
