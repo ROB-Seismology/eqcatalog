@@ -502,6 +502,16 @@ class LocalEarthquake:
 						depth, magnitude, 0, 0, 0)
 
 	def to_hypo71(self, Mtype='MW', Mrelation="default"):
+		"""
+		Convert earthquake record to HYPO71-2000 format.
+
+		:param Mtype:
+		:param Mrelation:
+			see :meth:`get_mag`
+
+		:return:
+			str
+		"""
 		year, month, day = map(int, str(self.date).split('-'))
 		hr, minute, sec = str(self.time).split(':')
 		hr, minute, sec = int(hr), int(minute), float(sec)
