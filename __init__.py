@@ -67,14 +67,12 @@ if not reloading:
 else:
 	reload(declustering)
 
-"""
 ## source_models (no internal dependencies)
 if not reloading:
 	from . import source_models
 else:
 	reload(source_models)
-from .source_models import (read_source_model, rob_source_models_dict)
-"""
+#from .source_models import (read_source_model, rob_source_models_dict)
 
 ## rob (depends on completeness, indirectly on eqrecord, eqcatalog, macrorecord)
 if not reloading:
