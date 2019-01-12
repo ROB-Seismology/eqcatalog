@@ -286,6 +286,7 @@ class EQCatalog:
 			name = "Union(%s, %s)" % (self.name, other_catalog.name)
 		return concatenate_catalogs([cat1, cat2], name=name)
 
+	# TODO: set catalog start and end dates!
 	def get_intersection(self, other_catalog, name=None):
 		"""
 		Return catalog of events that are both in catalog and in
@@ -351,12 +352,12 @@ class EQCatalog:
 		assert isinstance(other_catalog, EQCatalog)
 		ids = set(self.get_ids())
 		other_ids = set(other_catalog.get_ids())
-		diff = list(ids.symmetric_difference(other_ids))
-		catalog = self.subselect(attr_val=('ID', diff))
+		symdiff = list(ids.symmetric_difference(other_ids))
+		cat1 = self.subselect(attr_val=('ID', symdiff))
+		cat2 = other_catalog.subselect(attr_val=('ID', symdiff))
 		if name is None:
 			name = "Symmetric Difference(%s, %s)" % (self.name, other_catalog.name)
-		catalog.name = name
-		return catalog
+		return concatenate_catalogs([cat1, cat2], name=name)
 
 	def print_info(self):
 		"""
