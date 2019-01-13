@@ -203,6 +203,22 @@ class EQCatalog:
 		else:
 			return False
 
+	def index(self, id):
+		"""
+		Get index of event with given ID
+
+		:param id:
+			int or str, earthquake ID
+
+		:return:
+			int, index in catalog
+		"""
+		str_ids = list(map(str, self.get_ids()))
+		try:
+			idx = str_ids.index(str(id))
+		except IndexError:
+			return None
+
 	def get_event_by_id(self, id):
 		"""
 		Extract event with given ID
@@ -213,12 +229,8 @@ class EQCatalog:
 		:return:
 			instance of :class:`LocalEarthquake`
 		"""
-		str_ids = list(map(str, self.get_ids()))
-		try:
-			idx = str_ids.index(str(id))
-		except IndexError:
-			return None
-		else:
+		idx = self.index(id)
+		if id:
 			return self.__getitem__(idx)
 
 	def get_duplicate_idxs(self):
@@ -1093,9 +1105,11 @@ class EQCatalog:
 	def subselect_distance(self, point, distance, catalog_name=""):
 		"""
 		Subselect earthquakes in a given radius around a given point
+		If point contains Z coordinate, hypocentral distances are used,
+		else epicentral distances.
 
 		:param point:
-			(lon, lat) tuple
+			(lon, lat, [z]) tuple
 		:param distance:
 			float, distance in km
 		:param catalog_name:
@@ -1107,7 +1121,10 @@ class EQCatalog:
 		"""
 		from itertools import compress
 
-		distances = self.get_epicentral_distances(*point)
+		if len(point) == 2:
+			distances = self.get_epicentral_distances(*point)
+		elif len(point) == 3:
+			distances = self.get_hypocentral_distances(*point)
 		eq_list = list(compress(self.eq_list, distances <= distance))
 		if not catalog_name:
 			catalog_name = self.name + " (%s km radius from %s)" % (distance, point)
@@ -1361,6 +1378,33 @@ class EQCatalog:
 		return completeness_catalogs
 
 	def subselect_declustering(self,
+		dc_method,
+		dc_window,
+		Mrelation="default",
+		catalog_name=None):
+		"""
+		Decluster catalog using the given method and window definition
+
+		:param dc_method:
+			instance of :class:`declustering.DeclusteringMethod`
+		:param dc_window:
+			instance of :class:`declustering.DeclusteringWindow`
+		:param Mrelation:
+			dict specifying how to convert catalog magnitudes to MW
+			(default: "default")
+		:param catalog_name:
+			str, name of resultig catalog
+			(default: None)
+
+		:return:
+			instance of :class:`EQCatalog`, declustered catalog
+		"""
+		dc_cat = dc_method.decluster_catalog(self, dc_window, Mrelation)
+		if catalog_name != None:
+			dc_cat.name = catalog_name
+		return dc_cat
+
+	def subselect_declustering_legacy(self,
 		method="Cluster",
 		window="GardnerKnopoff1974",
 		fa_ratio=0.5,
@@ -1370,6 +1414,12 @@ class EQCatalog:
 		"""
 		Subselect earthquakes in the catalog that conform with the specified
 		declustering method and params.
+
+		This is the original implementation written by Bart Vleminckx,
+		which calls his original methods in declustering.py, but
+		contain bugs.
+
+		Left here for repeatability purposes.
 
 		:param method:
 			String, declustering method: "Window" or "Cluster" (default: Cluster).
