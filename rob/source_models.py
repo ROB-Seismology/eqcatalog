@@ -6,26 +6,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import os
-from collections import OrderedDict
 
+from ..source_models import SourceModelDefinition
 from . import GIS_ROOT
 
 ROB_directory = os.path.join(GIS_ROOT, "KSB-ORB", "Source Zone Models")
 SHARE_directory = os.path.join(GIS_ROOT, "SHARE")
 SHARE_CSS_directory = os.path.join(SHARE_directory, "Task 3.2", "DATA")
 
-
-# TODO: move SourceModelDefinition to eqcatalog.source_models
-# TODO: add read function?
-
-class SourceModelDefinition:
-	def __init__(self, name, gis_filespec, column_map):
-		self.name = name
-		self.gis_filespec = gis_filespec
-		self.column_map = column_map
-
-	def __getitem__(self, key):
-		return getattr(self, key)
 
 
 ## Dictionary with data for ROB source models
@@ -453,11 +441,11 @@ rob_source_models_dict[name] = SHARE_AS_Belgium
 def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True,
 					verbose=True):
 	"""
-	Read source-zone model stored in a GIS (MapInfo) table.
+	Read ROB source-zone model stored in a GIS (MapInfo) table.
 
 	:param source_model_name:
-		String, name of source-zone model containing area sources
-		or else full path to GIS file containing area sources
+		String, name of ROB source-zone model containing seismic sources
+		or else full path to GIS file containing source model
 	:param ID_colname:
 		String, name of GIS column containing record ID
 		(default: "")
@@ -473,12 +461,8 @@ def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True,
 		ordered dict {String sourceID: dict {String column_name: value}}
 		Note: special key 'obj' contains instance of :class:`osgeo.ogr.Geometry`}
 	"""
-	from mapping.geotools.read_gis import read_gis_file
+	from ..source_models import read_source_model
 
-	## Read zone model from MapInfo file
-	#source_model_table = ZoneModelTables[source_model_name.lower()]
-	#gis_filespec = os.path.join(GIS_ROOT, "KSB-ORB", "Source Zone Models",
-	# 							source_model_table + ".TAB")
 	try:
 		gis_filespec = rob_source_models_dict[source_model_name]["gis_filespec"]
 	except:
@@ -487,16 +471,5 @@ def read_source_model(source_model_name, ID_colname="", fix_mi_lambert=True,
 		if not ID_colname:
 			ID_colname = rob_source_models_dict[source_model_name]["column_map"]["id"]
 
-	zone_records = read_gis_file(gis_filespec, verbose=verbose, encoding=None)
-	if ID_colname:
-		zone_ids = [rec[ID_colname] for rec in zone_records]
-	else:
-		zone_ids = range(1, len(zone_records)+1)
-
-	zone_data = OrderedDict()
-	for id, rec in zip(zone_ids, zone_records):
-		if rec["obj"].GetGeometryName() == "POLYGON":
-			rec["obj"].CloseRings()
-		zone_data[id] = rec
-
-	return zone_data
+	return read_source_model(gis_filespec, ID_colname,
+							fix_mi_lambert=fix_mi_lambert, verbose=verbose)
