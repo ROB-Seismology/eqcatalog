@@ -902,6 +902,26 @@ class EQCatalog:
 
 	## Sorting
 
+	def argsort(self, key="datetime", order="asc"):
+		"""
+		Return indexes that would sort catalog by given key
+
+		:param key:
+			str, property of :class:`LocalEarthquake` to use as sort key
+			(default: "datetime")
+		:param order:
+			str, sorting order: "asc" or "desc"
+			(default: "asc")
+
+		:return:
+			int array, indexes that sort catalog
+		"""
+		values = np.array([getattr(eq, key) for eq in self])
+		idxs = np.argsort(values)
+		if order == "desc":
+			idxs = idxs[::-1]
+		return idxs
+
 	def get_sorted(self, key="datetime", order="asc"):
 		"""
 		Get copy of catalog sorted by earthquake attribute.
