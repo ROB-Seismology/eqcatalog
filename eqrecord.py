@@ -515,11 +515,11 @@ class LocalEarthquake:
 		year, month, day = map(int, str(self.date).split('-'))
 		hr, minute, sec = str(self.time).split(':')
 		hr, minute, sec = int(hr), int(minute), float(sec)
-		lonmin, londeg = np.modf(self.lon)
-		lonmin, londeg = lonmin * 60, np.abs(londeg)
+		lonmin, londeg = np.modf(np.abs(self.lon))
+		lonmin, londeg = lonmin * 60, londeg
 		ew = 'E' if self.lon > 0 else ' '
-		latmin, latdeg = np.modf(self.lat)
-		latmin, latdeg = latmin * 60, np.abs(latdeg)
+		latmin, latdeg = np.modf(np.abs(self.lat))
+		latmin, latdeg = latmin * 60, latdeg
 		ns = 'S' if self.lat < 0 else ' '
 		mag = self.get_M(Mtype, Mrelation)
 		hypo71 = ('%04d%02d%02d ' % (year, month, day),
