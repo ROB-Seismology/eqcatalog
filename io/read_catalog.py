@@ -38,7 +38,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 	Read a known catalog (corresponding files should be in standard location)
 
 	:param catalog_name:
-		str, name of catalog ("HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
+		str, name of catalog ("ROB", HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
 		"CEUS-SCR", "BGS")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
