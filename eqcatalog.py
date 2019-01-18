@@ -400,6 +400,9 @@ class EQCatalog:
 	def print_list(self):
 		"""
 		Print list of earthquakes in catalog
+
+		:return:
+			str or instance of :class:`PrettyTable`
 		"""
 		# TODO: detect and skip columns that are empty or have only NaN values
 		try:
@@ -430,6 +433,8 @@ class EQCatalog:
 			print('\t'.join(col_names))
 			for row in tab:
 				print('\t'.join(row))
+
+		return tab
 
 	@classmethod
 	def from_json(cls, s):
@@ -3812,7 +3817,10 @@ class EQCatalog:
 					% (eq.lon, eq.lat, year, month, day, M, eq.depth, hour, minute))
 		f.close()
 
-	def export_csv(self, csv_filespec=None, Mtype=None, Mrelation="default"):
+	def export_csv(self, csv_filespec=None,
+					columns=['ID', 'date', 'time', 'lon', 'lat', 'depth',
+					'ML', 'MS', 'MW', 'intensity_max', 'macro_radius'],
+					Mtype=None, Mrelation="default"):
 		"""
 		Export earthquake list to a csv file.
 
@@ -3832,12 +3840,44 @@ class EQCatalog:
 		else:
 			f = open(csv_filespec, "w")
 
-		if Mtype:
-			f.write('ID,Date,Time,Name,Lon,Lat,Depth,%s,Intensity_max,Macro_radius\n'
-					% Mtype)
-		else:
-			f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
+		column_format_dict = {
+			'ID': '%s',
+			'date': '%s',
+			'time': '%s',
+			'datetime': '%s',
+			'name': '"%s"',
+			'lon': '%.4f',
+			'lat': '%.4f',
+			'depth': '%.1f',
+			'ML': '%.2f',
+			'MS': '%.2f',
+			'MW': '%.2f',
+			'mb': '%.2f',
+			'errt': '%.2f',
+			'errh': '%.2f',
+			'errz': '%.2f',
+			'errM': '%.1f',
+			'intensity_max': '%d',
+			'macro_radius': '%s',
+			'zone': '%s',
+			'agency': '%s',
+			'event_type': '%s'}
+
+		#if Mtype:
+		#	f.write('ID,Date,Time,Name,Lon,Lat,Depth,%s,Intensity_max,Macro_radius\n'
+		#			% Mtype)
+		#else:
+		#	f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
+
+		f.write(', '.join(columns) + '\n')
+
 		for eq in self.eq_list:
+			output_line = ', '.join([column_format_dict.get(col, '%s')
+									for col in columns])
+			values = [getattr(eq, col) for col in columns]
+			output_line %= tuple(values)
+			f.write(output_line + '\n')
+			"""
 			date = eq.date
 			time = eq.time.isoformat()
 			if eq.name != None:
@@ -3856,6 +3896,7 @@ class EQCatalog:
 				f.write('%d,%s,%s,"%s",%.3f,%.3f,%.1f,%.2f,%.2f,%.2f,%s,%s\n'
 					% (eq.ID, date, time, eq_name, eq.lon, eq.lat, eq.depth,
 					eq.ML, eq.MS, eq.MW, eq.intensity_max, eq.macro_radius))
+			"""
 		if csv_filespec != None:
 			f.close()
 
