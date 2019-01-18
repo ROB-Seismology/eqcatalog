@@ -170,7 +170,7 @@ class Reasenberg1985Window(DeclusteringWindow):
 			deltam = max(0, deltam)
 			## denom: expected rate of aftershocks
 			denom = 10**((deltam - 1.) * 2./3)
-			top = - np.log(1. - P1) * td
+			top = -np.log(1. - P1) * td
 			tau = top / denom
 			## Truncate tau to not exceed TAUMAX or drop below TAUMIN
 			tau = max(tau_min, min(tau_max, tau))
@@ -571,7 +571,7 @@ class Cluster():
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		return EQCatalog(self.eq_list, name=self.ID)
+		return EQCatalog(self.eq_list, name="Cluster #%s" % self.ID)
 
 	def get_end_of_time_windows(self, dc_window):
 		"""
@@ -1429,6 +1429,11 @@ class ClusterMethod(DeclusteringMethod):
 
 			## Keep getting jth events until we are out of cluster's time window
 			for j in range(i+1, len(catalog)):
+				## Skip the jth event if it is already identified as being part
+				## of the cluster associated with the ith event
+				if (dc_idxs[i] == dc_idxs[j]) and (dc_idxs[i] > -1):
+					continue
+
 				eqj = catalog[j]
 				end_dt = clust.get_combined_time_window(dc_window)[1]
 				if eqj.datetime > end_dt:
@@ -1457,9 +1462,6 @@ class ClusterMethod(DeclusteringMethod):
 							k = dc_idxs[j]
 							clusters[k].append(eqi)
 							dc_idxs[i] = k
-						elif dc_idxs[i] == dc_idxs[j]:
-							## Events i and j already associated with same cluster
-							k = dc_idxs[i]
 						else:
 							## Combine existing clusters by merging into earlier cluster
 							k = min(dc_idxs[i], dc_idxs[j])
@@ -1703,7 +1705,8 @@ class ReasenbergMethod(DeclusteringMethod):
 			## Calculate tau (minutes), the look-ahead time for event i
 			if dc_idxs[i] == -1:
 				## Event is not (yet) clustered
-				cmag1 = 0.
+				#cmag1 = 0.
+				cmag1 = magi
 				time_delta = 0.
 			else:
 				## When event i belongs to a cluster, tau is a function of
@@ -1711,12 +1714,16 @@ class ReasenbergMethod(DeclusteringMethod):
 				## in the cluster
 				ctim1 = clusters[dc_idxs[i]].datetime1()
 				cmag1 = clusters[dc_idxs[i]].mag1()
-				#time_delta = ctim1 - itime
 				time_delta = itime - ctim1
 			tau = dc_window.get_time_window(cmag1, time_delta, tau_min, tau_max)
 
 			## Keep getting jth events until time_delta_ij > tau
 			for j in range(i+1, len(catalog)):
+				## Skip the jth event if it is already identified as being part
+				## of the cluster associated with the ith event
+				if (dc_idxs[i] == dc_idxs[j]) and (dc_idxs[i] > -1):
+					continue
+
 				eqj = catalog[j]
 				## Test for temporal clustering
 				jtime = eqj.datetime
@@ -1728,13 +1735,14 @@ class ReasenbergMethod(DeclusteringMethod):
 					if dc_idxs[i] != -1:
 						cmag1 = clusters[dc_idxs[i]].mag1()
 					else:
-						cmag1 = 0.
+						#cmag1 = 0.
+						cmag1 = magi
 					is_clustered = self.is_in_dist_window(eqi, eqj, magi, cmag1,
 								dc_window, rfact=rfact, dsigma=dsigma, rmax=rmax,
 								ignore_location_errors=ignore_location_errors)
 					if is_clustered:
 						## Cluster declared
-						if dc_idxs[i] == -1 and dc_idxs[j] == -1:
+						if dc_idxs[i] == dc_idxs[j] == -1:
 							## Initialize new cluster
 							ncl = len(clusters)
 							cluster = Cluster([eqi, eqj], ncl, Mrelation)
@@ -1754,9 +1762,6 @@ class ReasenbergMethod(DeclusteringMethod):
 							k = dc_idxs[j]
 							clusters[k].append(eqi)
 							dc_idxs[i] = k
-						elif dc_idxs[i] == dc_idxs[j]:
-							## Events i and j already associated with same cluster
-							pass
 						else:
 							## Combine existing clusters by merging into earlier cluster
 							k = min(dc_idxs[i], dc_idxs[j])
