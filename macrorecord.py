@@ -420,7 +420,7 @@ class MacroseismicEnquiryEnsemble():
 		idxs = np.where(all_distances <= radius)[0]
 		return self.__getitem__(idxs)
 
-	def calc_distances(self, lon, lat):
+	def calc_distances(self, lon, lat, z=0):
 		"""
 		Compute distances with respect to a particular point
 
@@ -428,6 +428,9 @@ class MacroseismicEnquiryEnsemble():
 			float, longitude of point (in degrees)
 		:param lat:
 			float, latitude of point (in degrees)
+		:param z:
+			float, depth of point (in km)
+			(default: 0)
 
 		:return:
 			array, distances (in km)
@@ -435,7 +438,9 @@ class MacroseismicEnquiryEnsemble():
 		import mapping.geotools.geodetic as geodetic
 		rec_lons = np.array(self.get_prop_values('longitude'))
 		rec_lats = np.array(self.get_prop_values('latitude'))
-		return geodetic.spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
+		dist = geodetic.spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
+		dist = np.sqrt(dist**2 + z**2)
+		return dist
 
 	def subselect_by_zip_country_tuples(self, zip_country_tuples):
 		"""
@@ -454,6 +459,29 @@ class MacroseismicEnquiryEnsemble():
 			ensemble = self.__getitem__(idxs)
 			zip_ensemble_recs.extend(ensemble.recs)
 		return self.__class__(self.id_earth, zip_ensemble_recs)
+
+	def get_addresses(self):
+		"""
+		Return list of addresses for each record
+
+		:return:
+			list of strings
+		"""
+		streets = self.get_prop_values('street')
+		zips = self.get_prop_values('zip')
+		communes = self.get_prop_values('city')
+		countries = self.get_prop_values('country')
+
+		addresses = []
+		for i in range(len(self)):
+			## Filter out empty streets or zips
+			if streets[i] and zips[i]:
+				address = "%s, %s %s, %s"
+				address %= (streets[i], zips[i], communes[i], countries[i])
+			else:
+				address = ""
+			addresses.append(address)
+		return addresses
 
 	def get_zip_country_tuples(self):
 		"""
