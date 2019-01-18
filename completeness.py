@@ -67,7 +67,7 @@ class Completeness:
 		else:
 			has_prettytable = True
 
-		col_names = ["Start date", "Mmin"]
+		col_names = ["Start date", "Mmin (%s)" % self.Mtype]
 		if has_prettytable:
 			tab = PrettyTable(col_names)
 		else:
