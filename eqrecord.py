@@ -99,6 +99,9 @@ class LocalEarthquake:
 	:param zone:
 		Str, seismotectonic zone the earthquake belongs to
 		(default: "")
+	:param agency:
+		str, agency reporting the event
+		(default: "")
 	:param event_type:
 		str, type of event
 		(default: "ke" = known earthquake)
@@ -123,6 +126,7 @@ class LocalEarthquake:
 			errt=0.,
 			errM=0.,
 			zone="",
+			agency="",
 			event_type="ke"):
 		self.ID = ID
 		try:
@@ -190,6 +194,7 @@ class LocalEarthquake:
 		self.errM = errM
 
 		self.zone = u'' + zone
+		self.agency = u'' + agency
 		self.event_type = event_type
 
 	def __eq__(self, eq):
@@ -414,9 +419,16 @@ class LocalEarthquake:
 		zone_key = column_map.get('zone', 'zone')
 		zone = rec.get(zone_key, "")
 
+		agency_key = column_map.get('agency', 'agency')
+		agency = rec.get(agency_key, agency_key)
+
+		event_type_key = column_map.get('event_type', 'event_type')
+		event_type = rec.get(event_type_key, 'ke')
+
 		return cls(ID, date, time, lon, lat, depth, mag, name=name,
 						intensity_max=intensity_max, macro_radius=macro_radius,
-						errh=errh, errz=errz, errt=errt, errM=errM, zone=zone)
+						errh=errh, errz=errz, errt=errt, errM=errM, zone=zone,
+						agency=agency, event_type=event_type)
 
 	def to_dict(self):
 		"""
@@ -554,7 +566,8 @@ class LocalEarthquake:
 			tab = []
 		for attrib in ['ID', 'name', 'date', 'time', 'lon', 'lat', 'depth',
 						'ML', 'MS', 'MW', 'mb', 'intensity_max', 'macro_radius',
-						'zone', 'errt', 'errh', 'errz', 'errM', 'event_type']:
+						'zone', 'errt', 'errh', 'errz', 'errM', 'zone',
+						'agency', 'event_type']:
 			val = getattr(self, attrib)
 			if val and not val is np.nan:
 				row = [attrib, val]
