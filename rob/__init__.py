@@ -48,6 +48,13 @@ else:
 from .source_models import (read_source_model,
 	rob_source_models_dict as source_models_dict)
 
+## eqrecord (depends on ..eqrecord)
+if not reloading:
+	from . import eqrecord
+else:
+	reload(eqrecord)
+from .eqrecord import ROBLocalEarthquake
+
 ## seismodb (depends on ..eqrecord, ..macrorecord, ..eqcatalog)
 if not reloading:
 	from . import seismodb
