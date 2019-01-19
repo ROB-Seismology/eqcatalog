@@ -17,6 +17,13 @@ Required modules:
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+try:
+	## Python 2
+	basestring
+except:
+	## Python 3
+	basestring = str
+
 
 ## Import standard python modules
 import datetime
@@ -164,7 +171,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	from ..eqcatalog import EQCatalog
 
 	## Convert input arguments, if necessary
-	if isinstance(id_earth, (int, str)):
+	if isinstance(id_earth, (int, basestring)):
 		id_earth = [id_earth]
 
 	if isinstance(start_date, int):
@@ -355,7 +362,7 @@ def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 	"""
 	from ..eqrecord import FocMecRecord
 
-	if isinstance(id_earth, (int, str)):
+	if isinstance(id_earth, (int, basestring)):
 		id_earth = [id_earth]
 
 	## Construct SQL query
@@ -564,7 +571,7 @@ def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
 		id_com = rec['id_com']
 		I = rec['Intensity']
 		lon, lat = rec['longitude'], rec['latitude']
-		if isinstance(rec['id_db'], (int, str)):
+		if isinstance(rec['id_db'], (int, basestring)):
 			db_ids = [rec['id_db']]
 		else:
 			db_ids = list(map(int, rec['id_db'].split(',')))
