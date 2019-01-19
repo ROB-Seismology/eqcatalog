@@ -309,6 +309,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		eq_list.append(eq)
 
 	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
+	start_date, end_date = np.datetime64(start_date), np.datetime64(end_date)
 	return EQCatalog(eq_list, start_date, end_date, region=region, name=name)
 
 
