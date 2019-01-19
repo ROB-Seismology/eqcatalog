@@ -527,6 +527,6 @@ def combine_np_date_and_py_time(dt64, py_time, unit='s'):
 	:return:
 		instance of :class:`np.datetime64`
 	"""
-	dt64 = as_np_datetime(dt64, 'D')
+	dt64 = as_np_datetime(dt64, 'us')
 	td = py_time_to_np_timedelta(py_time)
 	return as_np_datetime(dt64 + td, unit=unit)
