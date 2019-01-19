@@ -16,6 +16,7 @@ Required modules:
 
 
 from __future__ import absolute_import, division, print_function, unicode_literals
+from builtins import int
 
 try:
 	## Python 2
@@ -167,7 +168,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	from ..eqrecord import LocalEarthquake
+	from .eqrecord import ROBLocalEarthquake
 	from ..eqcatalog import EQCatalog
 
 	## Convert input arguments, if necessary
@@ -310,7 +311,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 			mb = np.nan
 
-		eq = LocalEarthquake(id_earth, date, time, lon, lat, depth, {},
+		eq = ROBLocalEarthquake(id_earth, date, time, lon, lat, depth, {},
 							ML, MS, MW, mb, name, intensity_max, macro_radius,
 							errh, errz, errt, errM, event_type=etype)
 		eq_list.append(eq)
