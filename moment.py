@@ -11,12 +11,12 @@ import numpy as np
 __all__ = ["moment_to_mag", "mag_to_moment"]
 
 
-def moment_to_mag(moment, unit='N.m'):
+def log_moment_to_mag(log_moment, unit='N.m'):
 	"""
 	Convert seismic moment to moment magnitude
 
-	:param moment:
-		float or float array, seismic moment (in dyn.cm)
+	:param log_moment:
+		float or float array, log10 of seismic moment
 	:param unit:
 		str, moment unit, either 'dyn.cm' or 'N.m'
 		(default: 'N.m')
@@ -24,11 +24,51 @@ def moment_to_mag(moment, unit='N.m'):
 	:return:
 		float or float array, moment magnitude
 	"""
-	base_term = (2./3) * np.log10(moment)
+	base_term = (2./3) * log_moment
 	if unit == 'dyn.cm':
 		return base_term - 10.73
 	elif unit == 'N.m':
 		return base_term - 6.06
+	else:
+		raise Exception("Moment unit %s not supported!" % unit)
+
+
+def moment_to_mag(moment, unit='N.m'):
+	"""
+	Convert seismic moment to moment magnitude
+
+	:param moment:
+		float or float array, seismic moment
+	:param unit:
+		str, moment unit, either 'dyn.cm' or 'N.m'
+		(default: 'N.m')
+
+	:return:
+		float or float array, moment magnitude
+	"""
+	log_moment = np.log10(moment)
+	return log_moment_to_mag(log_moment, unit=unit)
+
+
+def mag_to_log_moment(mag, unit='N.m'):
+	"""
+	Convert moment magnitude to log10 of seismic moment
+
+	:param mag:
+		float or float array, moment magnitude
+	:param unit:
+		str, moment unit, either 'dyn.cm' or 'N.m'
+		(default: 'N.m')
+
+	:return:
+		float or float array, log10 of seismic moment
+	"""
+	mag = np.asarray(mag)
+
+	if unit == 'dyn.cm':
+		return 1.5*mag + 16.095
+	elif unit == 'N.m':
+		return 1.5*mag + 9.09
 	else:
 		raise Exception("Moment unit %s not supported!" % unit)
 
@@ -46,14 +86,8 @@ def mag_to_moment(mag, unit='N.m'):
 	:return:
 		float or float array, seismic moment
 	"""
-	mag = np.asarray(mag)
-
-	if unit == 'dyn.cm':
-		return 10**(1.5*mag + 16.095)
-	elif unit == 'N.m':
-		return 10**(1.5*mag + 9.09)
-	else:
-		raise Exception("Moment unit %s not supported!" % unit)
+	log_moment = mag_to_log_moment(mag, unit=unit)
+	return 10**log_moment
 
 
 def calc_rupture_radius(mag, stress_drop=3E+6):
