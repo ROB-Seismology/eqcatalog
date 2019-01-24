@@ -313,7 +313,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 		eq = ROBLocalEarthquake(id_earth, date, time, lon, lat, depth, {},
 							ML, MS, MW, mb, name, intensity_max, macro_radius,
-							errh, errz, errt, errM, event_type=etype)
+							errh, errz, errt, errM, agency="ROB", event_type=etype)
 		eq_list.append(eq)
 
 	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
