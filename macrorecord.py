@@ -460,7 +460,7 @@ class MacroseismicEnquiryEnsemble():
 			zip_ensemble_recs.extend(ensemble.recs)
 		return self.__class__(self.id_earth, zip_ensemble_recs)
 
-	def get_addresses(self):
+	def get_addresses(self, exclude_empty_streets=True):
 		"""
 		Return list of addresses for each record
 
@@ -474,14 +474,65 @@ class MacroseismicEnquiryEnsemble():
 
 		addresses = []
 		for i in range(len(self)):
-			## Filter out empty streets or zips
-			if streets[i] and zips[i]:
-				address = "%s, %s %s, %s"
-				address %= (streets[i], zips[i], communes[i], countries[i])
-			else:
+			street = streets[i].upper()
+			zip = zips[i]
+			commune = communes[i].upper()
+			country = countries[i].upper()
+			zip_commune = "%s %s" % (zip, commune)
+			## Sometimes people fill out full address instead of just street
+			street = street.replace(zip_commune, '').strip().rstrip(',')
+
+			if exclude_empty_streets and not street:
+				## Filter out empty streets or zips
 				address = ""
+			else:
+				address = "%s, %s, %s"
+				address %= (street, zip_commune, country)
 			addresses.append(address)
 		return addresses
+
+	def geocode(self, provider, bbox=None, start_idx=0, max_requests=100,
+				sleep_every=10, **kwargs):
+		"""
+		:param provider:
+			str, name of geocoding provider understood by geocoder
+		:param bbox:
+			[west, south, east, north] tuple of coordinates
+			Not supported by many providers.
+
+		:return:
+			list with (lon, lat, confidence) tuples
+		"""
+		import time
+		import geocoder
+
+		results = []
+		num_requests = 0
+		for address in self.get_addresses():
+			success = False
+			if address:
+				if num_requests < max_requests:
+					if num_requests % sleep_every == 0:
+						time.sleep(1)
+					try:
+						g = geocoder.get(address, provider=provider, proximity=bbox, **kwargs)
+					except:
+						pass
+					else:
+						num_requests += 1
+						if g.ok:
+							success = True
+
+			if success:
+				if (bbox and (bbox[0] <= g.lng <= bbox[2])
+						and (bbox[1] <= g.lat <= bbox[3])):
+					results.append((g.lng, g.lat, g.confidence))
+				else:
+					success = False
+			if not success:
+				results.append(tuple())
+
+		return results
 
 	def get_zip_country_tuples(self):
 		"""
@@ -716,7 +767,8 @@ class MacroseismicEnquiryEnsemble():
 			if not (rec.get('id_main') and keep_existing):
 				rec['id_main'] = main_commune_ids[r]
 
-	def set_locations_from_communes(self, comm_key="id_com", keep_unmatched=True):
+	def set_locations_from_communes(self, comm_key="id_com", keep_unmatched=True,
+									max_quality=5):
 		"""
 		Set location of all records from corresponding communes
 
@@ -725,6 +777,10 @@ class MacroseismicEnquiryEnsemble():
 		:param keep_unmatched:
 			bool, whether or not to keep unmatched records untouched
 			(default: True)
+		:param max_quality:
+			int, maximum location quality, only overwrite location
+			if location quality is <= max_quality
+			(default: 5)
 
 		:return:
 			None, 'longitude' and 'latitude' values of :prop:`recs`
@@ -732,16 +788,21 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		comm_rec_dict = self.get_communes_from_db(comm_key=comm_key)
 		for rec in self.recs:
-			if comm_key in ("id_com", "id_main"):
-				key = rec[comm_key]
-			elif comm_key == "zip":
-				key = (rec[comm_key], rec['country'])
-			comm_rec = comm_rec_dict.get(key)
-			if comm_rec:
-				rec['longitude'] = comm_rec['longitude']
-				rec['latitude'] = comm_rec['latitude']
-			elif not keep_unmatched:
-				rec['longitude'] = rec['latitude'] = np.nan
+			if rec['quality'] <= max_quality:
+				if comm_key in ("id_com", "id_main"):
+					key = rec[comm_key]
+				elif comm_key == "zip":
+					key = (rec[comm_key], rec['country'])
+				comm_rec = comm_rec_dict.get(key)
+				if comm_rec:
+					rec['longitude'] = comm_rec['longitude']
+					rec['latitude'] = comm_rec['latitude']
+					# TODO: decide on location quality
+					rec['quality'] = {'id_com': 7,
+										'zip': 7,
+										'id_main': 5}[comm_key]
+				elif not keep_unmatched:
+					rec['longitude'] = rec['latitude'] = rec['quality'] = np.nan
 
 	def set_locations_from_geolocation(self, keep_unmatched=True):
 		"""
@@ -770,8 +831,9 @@ class MacroseismicEnquiryEnsemble():
 			if db_rec:
 				rec['longitude'] = db_rec['longitude']
 				rec['latitude'] = db_rec['latitude']
+				rec['quality'] = db_rec['quality']
 			elif not keep_unmatched:
-				rec['longitude'] = rec['latitude'] = np.nan
+				rec['longitude'] = rec['latitude'] = rec['quality'] = np.nan
 
 	def get_bad_zip_country_tuples(self):
 		zip_country_tuples = set(self.get_unique_zip_country_tuples())
