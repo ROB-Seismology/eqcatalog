@@ -2,7 +2,7 @@
 Read earthquake catalogs from various sources
 """
 
-from __future__ import absolute_import, division, print_function, unicode_literals
+from __future__ import absolute_import, division, print_function #, unicode_literals
 
 try:
 	## Python 2
@@ -29,6 +29,8 @@ from ..eqcatalog import EQCatalog
 from ..rob import GIS_ROOT
 
 
+# TODO: use seismo-gis
+
 __all__ = ["read_named_catalog", "read_catalog_sql", "read_catalog_csv",
 			"read_catalog_gis"]
 
@@ -39,7 +41,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 
 	:param catalog_name:
 		str, name of catalog ("ROB", HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
-		"CEUS-SCR", "BGS")
+		"CEUS-SCR", "BGS", "EMEC")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
@@ -70,9 +72,18 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 				'as "MW" FROM harvard_cmt')
 		column_map =  {'ID': 'ID', 'datetime': 'hypo_date_time',
 					'lon': 'hypo_lon', 'lat': 'hypo_lat', 'depth': 'hypo_depth',
-					'MS': 'ref_MS', 'MW': 'MW', 'name': 'location'}
+					'MS': 'ref_MS', 'MW': 'MW', 'name': 'location',
+					'agency': 'Harvard CMT'}
 		return read_catalog_sql(sqldb, table_name, query=query, column_map=column_map,
 								verbose=verbose)
+
+	elif catalog_name.upper() == "EMEC":
+		csv_file = "D:\\seismo-gis\\collections\\EMEC\TXT\EMEC.txt"
+		column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
+					'lat': 5, 'lon': 6, 'depth': 7, 'intensity_max': 8,
+					'MW': 11, 'errM': 12, 'agency': 13}
+		return read_catalog_csv(csv_file, column_map, has_header=False,
+							ID_prefix='EMEC', delimiter=';')
 
 	else:
 		date_sep = '/'
@@ -97,7 +108,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 			column_map = {'ID': 'eventid', 'lon': 'lon', 'lat': 'lat',
 						'date': 'date', 'time': 'time',
 						'MW': 'mw', 'depth': 'depth',
-						'errz': 'unc', 'errM': 'unc_2'}
+						'errz': 'unc', 'errM': 'unc_2', 'agency': 'ISC-GEM'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "CEUS-SCR":
 			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
@@ -113,7 +124,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 			column_map = {'ID': 'ID', 'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR',
 						'hour': 'HR', 'minute': 'MN', 'second': 'SECS',
 						'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'name': 'LOCALITY',
-						'intensity_max': 'INT'}
+						'intensity_max': 'INT', 'agency': 'BGS'}
 			#convert_zero_magnitudes = True
 		else:
 			raise Exception("Catalog not recognized: %s" % catalog_name)
