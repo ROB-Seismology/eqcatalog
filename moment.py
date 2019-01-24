@@ -16,13 +16,13 @@ def moment_to_mag(moment, unit='N.m'):
 	Convert seismic moment to moment magnitude
 
 	:param moment:
-		array-like, seismic moment (in dyn.cm)
+		float or float array, seismic moment (in dyn.cm)
 	:param unit:
 		str, moment unit, either 'dyn.cm' or 'N.m'
 		(default: 'N.m')
 
 	:return:
-		array-like, moment magnitude
+		float or float array, moment magnitude
 	"""
 	base_term = (2./3) * np.log10(moment)
 	if unit == 'dyn.cm':
@@ -38,13 +38,13 @@ def mag_to_moment(mag, unit='N.m'):
 	Convert moment magnitude to seismic moment
 
 	:param mag:
-		array-like, moment magnitude
+		float or float array, moment magnitude
 	:param unit:
 		str, moment unit, either 'dyn.cm' or 'N.m'
 		(default: 'N.m')
 
 	:return:
-		array-like, seismic moment
+		float or float array, seismic moment
 	"""
 	mag = np.asarray(mag)
 
@@ -54,3 +54,41 @@ def mag_to_moment(mag, unit='N.m'):
 		return 10**(1.5*mag + 9.09)
 	else:
 		raise Exception("Moment unit %s not supported!" % unit)
+
+
+def calc_rupture_radius(mag, stress_drop=3E+6):
+	"""
+	Compute radius of circular rupture from magnitude (and stress drop)
+
+	:param mag:
+		float or float array, magnitude
+	:param stress_drop:
+		float, stress drop (in Pa)
+		(default: 3E+6 = interplate average)
+
+	:return:
+		float or float array, rupture radius (in km)
+	"""
+	moment = mag_to_moment(mag)
+	R = ((7. / 16) * (moment / stress_drop))**(1./3)
+	return R / 1000.
+
+
+def calc_moment(rupture_area, displacement, rigidity=3E+10):
+	"""
+	Compute seismic moment from rupture area and average displacement
+
+	:param rupture_area:
+		float or float array, rupture area (in km2)
+	:param displacement:
+		float or float array, average displacement over rupture area (in m2)
+	:param rigidity:
+		float, rigidity of crust (in N/m2)
+		(default: 3E+10)
+
+	:return:
+		float or float array, seismic moment (in N.m)
+	"""
+	## Convert rupture area from km2 to m2
+	rupture_area *= 1E+6
+	return rigidity * rupture_area * displacement
