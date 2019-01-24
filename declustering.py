@@ -138,9 +138,9 @@ class Reasenberg1985Window(DeclusteringWindow):
 		and the time since the largest event in the cluster
 
 		:param mag:
-			float, magnitude of largest event in cluster
+			float or array, magnitude of largest event in cluster
 		:param time_delta:
-			numpy timedelta64 or float,
+			numpy timedelta64 or float or array,
 			time difference between event and largest event in cluster
 			(in minutes if float)
 			(default: 0 = case where no cluster has been defined yet)
@@ -154,27 +154,37 @@ class Reasenberg1985Window(DeclusteringWindow):
 		:return:
 			numpy timedelta64
 		"""
-		from .time_functions_np import fractional_time_delta
+		from .time_functions_np import fractional_time_delta, is_np_timedelta
 
+		is_scalar = np.isscalar(mag)
+		if is_scalar:
+			mag = np.array([mag])
+		else:
+			mag = np.asarray(mag)
 		# TODO: xmeff should be function argument
 		P1, XK, XMEFF = 0.99, 0.5, 1.5
-		if isinstance(time_delta, np.timedelta64):
+		if is_np_timedelta(time_delta):
 			td = fractional_time_delta(time_delta, 'm')
 		else:
 			td = float(time_delta)
-		if td <= 0:
-			tau = tau_min
-		else:
+		if (np.isscalar(td) or len(td) == 1):
+			td = np.repeat(td, len(mag))
+		tau = np.ones_like(mag) * tau_min
+		pos_idxs = (td > 0)
+		if pos_idxs.any():
 			## deltam: delta in magnitude
-			deltam = (1. - XK) * mag - XMEFF
-			deltam = max(0, deltam)
+			deltam = (1. - XK) * mag[pos_idxs] - XMEFF
+			deltam = np.maximum(0, deltam)
 			## denom: expected rate of aftershocks
 			denom = 10**((deltam - 1.) * 2./3)
-			top = -np.log(1. - P1) * td
-			tau = top / denom
+			top = -np.log(1. - P1) * td[pos_idxs]
+			_tau = top / denom
 			## Truncate tau to not exceed TAUMAX or drop below TAUMIN
-			tau = max(tau_min, min(tau_max, tau))
-		return np.timedelta64(int(round(tau * 60)), 's')
+			tau[pos_idxs] = np.maximum(tau_min, np.minimum(tau_max, _tau))
+		tau_td = np.round(tau * 60).astype('m8[s]')
+		if is_scalar:
+			tau_td = tau_td[0]
+		return tau_td
 
 	def get_dist_window(self, mag, cluster_mag=0,
 						rfact=10, dsigma=30, rmax=30):
@@ -216,7 +226,7 @@ class Reasenberg1985Window(DeclusteringWindow):
 		r1 = rfact * dsigma_term * 10**(0.4 * mag)
 		rmain = dsigma_term * 10**(0.4 * cluster_mag)
 		## Limit interaction distance to one crustal thickness
-		rtest = min(rmax, r1 + rmain)
+		rtest = np.minimum(rmax, r1 + rmain)
 		return rtest
 
 
@@ -1828,4 +1838,60 @@ def get_window_by_name(window_name):
 	return get_available_windows()[window_name]
 
 
-## TODO plot time and distance windows
+def plot_declustering_windows(fig_filespec=None, dpi=300):
+	"""
+	Plot time and distance windows of available declustering windows
+	"""
+	import matplotlib.pyplot as plt
+	from matplotlib.ticker import MultipleLocator
+	from .time_functions_np import fractional_time_delta
+	#from .moment import calc_rupture_radius
+
+	dc_windows = get_available_windows()
+
+	Mmin, Mmax, dM = 0., 9., 0.1
+	mags = np.arange(Mmin, Mmax, dM)
+
+	fig = plt.figure()
+	ax1 = fig.add_subplot(121)
+	ax2 = fig.add_subplot(122)
+	#lines = []
+	#labels = []
+	for dc_window_name, dc_window in dc_windows.items():
+		print(dc_window_name)
+		dc_window = dc_window()
+		tw = fractional_time_delta(dc_window.get_time_window(mags), 'D')
+		dw = dc_window.get_dist_window(mags)
+		l = ax1.plot(mags, tw, linewidth=2, label=dc_window_name)
+		ax2.plot(mags, dw, linewidth=2, label='_nolegend_')
+		#lines += l
+		#labels.append(dc_window_name)
+	#ax2.plot(mags, calc_rupture_radius(mags) * 2, linewidth=2)
+	ax1.yaxis.set_major_locator(MultipleLocator(100.))
+	ax1.yaxis.set_minor_locator(MultipleLocator(50.))
+	ax1.xaxis.set_major_locator(MultipleLocator(1.0))
+	ax1.xaxis.set_minor_locator(MultipleLocator(0.5))
+	ax2.yaxis.set_major_locator(MultipleLocator(10.))
+	ax2.yaxis.set_minor_locator(MultipleLocator(5.))
+	ax2.xaxis.set_major_locator(MultipleLocator(1.0))
+	ax2.xaxis.set_minor_locator(MultipleLocator(0.5))
+	ax1.set_ylim(0, 1500)
+	ax2.set_ylim(0, 150)
+	ax1.grid(which='both')
+	ax2.grid(which='both')
+	ax1.set_xlabel('Magnitude ($M_W$)')
+	ax2.set_xlabel('Magnitude ($M_W$)')
+	ax1.set_ylabel('Time (days)')
+	ax2.set_ylabel('Distance (km)')
+	ax1.set_title('Time window')
+	ax2.set_title('Distance window')
+	fig.subplots_adjust(wspace=0.5)
+	#fig.legend(lines, labels, 9, bbox_to_anchor=(0.50,0.95), ncol=2, prop={'size': 12})
+	ax1.legend(loc=2)
+	#plt.tight_layout(pad=0.25, w_pad=1.0)
+
+	if fig_filespec:
+		plt.savefig(fig_filespec, dpi=dpi)
+		plt.clf()
+	else:
+		plt.show()
