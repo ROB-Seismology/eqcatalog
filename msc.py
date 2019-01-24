@@ -9,6 +9,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy as np
 
+from .moment import log_moment_to_mag
+
 
 
 class MSCE(object):
@@ -64,12 +66,8 @@ class Ahorner1983(MSCE_ML_MW):
 		:return:
 			moment magnitude(s), same type as input
 		"""
-		input_type = type(ML)
-		ML = np.array(ML, copy=False, ndmin=1)
 		log_Mo_dyncm = 17.4 + 1.1 * ML
-		MW = (2. / 3.) * log_Mo_dyncm - 10.73
-		if input_type != np.ndarray:
-			MW = input_type(MW)
+		MW = log_moment_to_mag(log_Mo_dyncm, unit='dyn.cm')
 		return MW
 
 	def get_sigma(self, ML):
@@ -82,11 +80,8 @@ class Ahorner1983(MSCE_ML_MW):
 		:return:
 			standard deviation(s), same type as input
 		"""
-		input_type = type(ML)
 		sigma_log_Mo = 0.21
-		sigma = (2. / 3.) * sigma_log_Mo * np.ones_like(ML)
-		if input_type != np.ndarray:
-			sigma = input_type(sigma)
+		sigma = (2. / 3.) * sigma_log_Mo * np.ones_like(ML, dtype='float')
 		return sigma
 
 
@@ -102,18 +97,11 @@ class Ambraseys1985(MSCE_ML_MS):
 	Region: NW Europe
 	"""
 	def get_mean(self, ML):
-		input_type = type(ML)
-		ML = np.array(ML, copy=False, ndmin=1)
 		MS = 0.09 + 0.93 * ML
-		if input_type != np.ndarray:
-			MS = input_type(MS)
 		return MS
 
 	def get_sigma(self, ML):
-		input_type = type(ML)
-		sigma = 0.3 * np.ones_like(ML)
-		if input_type != np.ndarray:
-			sigma = input_type(sigma)
+		sigma = 0.3 * np.ones_like(ML, dtype='float')
 		return sigma
 
 
@@ -129,11 +117,7 @@ class Benouar1994(MSCE_ML_MS):
 	Region: Algeria
 	"""
 	def get_mean(self, ML):
-		input_type = type(ML)
-		ML = np.array(ML, copy=False, ndmin=1)
 		MS = 1.40 + 0.76 * ML
-		if input_type != np.ndarray:
-			MS = input_type(MS)
 		return MS
 
 	def get_sigma(self, ML=None):
@@ -152,23 +136,15 @@ class AmbraseysFree1997(MSCE_MS_MW):
 	Region: Europe, events < 30 km depth
 	"""
 	def get_mean(self, MS):
-		input_type = type(MS)
-		MS = np.array(MS, copy=False, ndmin=1)
 		## Events shallower than 30 km
 		log_Mo_dyncm = 23.123 - 0.505 * MS + 0.140 * MS**2
-		## Regression not taking deth into account
+		## Regression not taking depth into account
 		#log_Mo_dyncm = 24.401 - 0.895 * MS + 0.170 * MS**2
-		MW = (2. / 3.) * log_Mo_dyncm - 10.73
-		if input_type != np.ndarray:
-			MW = input_type(MW)
+		MW = log_moment_to_mag(log_Mo_dyncm, unit='dyn.cm')
 		return MW
 
 	def get_sigma(self, MS):
-		input_type = type(MS)
-		sigma_log_Mo = 0.225
-		sigma = (2. / 3.) * sigma_log_Mo * np.ones_like(MS)
-		if input_type != np.ndarray:
-			sigma = input_type(sigma)
+		sigma = (2. / 3.) * sigma_log_Mo * np.ones_like(MS, dtype='float')
 		return sigma
 
 
@@ -210,8 +186,8 @@ class BungumEtAl2003SEurope(MSCE_MS_MW):
 	def get_mean(self, MS):
 		## southern Europe
 		input_type = type(MS)
-		MS = np.array(MS, copy=False, ndmin=1)
-		MW = np.zeros_like(MS)
+		MS = np.asarray(MS)
+		MW = np.zeros_like(MS, dtype='float')
 		MW[MS >= 5.4] = 0.796 * MS[MS >= 5.4] + 1.280
 		MW[MS < 5.4] = 0.585 * MS[MS < 5.4] + 2.422
 		if input_type != np.ndarray:
@@ -236,8 +212,11 @@ class Camelbeeck1985(MSCE_ML_MW):
 	"""
 	def get_mean(self, ML):
 		log_Mo_dyncm = 18.22 + 0.99 * ML
-		MW = seismic_moment_to_moment_magnitude_dyncm(10**log_Mo_dyncm)
+		MW = log_moment_to_mag(log_Mo_dyncm, unit='dyn.cm')
 		return MW
+
+	def get_sigma(self, ML=None):
+		return None
 
 
 class Geller1976(MSCE_MS_MW):
@@ -254,13 +233,13 @@ class Geller1976(MSCE_MS_MW):
 	"""
 	def get_mean(self, MS):
 		input_type = type(MS)
-		MS = np.array(MS, copy=False, ndmin=1)
-		log_Mo_dyncm = np.zeros_like(MS)
+		MS = np.asarray(MS)
+		log_Mo_dyncm = np.zeros_like(MS, dtype='float')
 		log_Mo_dyncm[MS < 6.76] = MS[MS < 6.76] + 18.89
 		log_Mo_dyncm[MS >= 6.76] = (3. / 2.) * MS[MS >= 6.76] + 15.51
 		log_Mo_dyncm[MS >= 8.12] = 3. * MS[MS >= 8.12] + 3.33
 		log_Mo_dyncm[MS >= 8.22] = np.NaN
-		MW = (2. / 3.) * log_Mo_dyncm - 10.73
+		MW = log_moment_to_mag(log_Mo_dyncm, unit='dyn.cm')
 		if input_type != np.ndarray:
 			MW = input_type(MW)
 		return MW
@@ -275,6 +254,9 @@ class Goutbeek2008(MSCE_ML_MW):
 	def get_mean(self, ML):
 		MW = 0.843 * ML + 0.1954
 		return MW
+
+	def get_sigma(self, ML=None):
+		return None
 
 
 class GruenthalWahlstrom2003(MSCE_ML_MW):
@@ -328,8 +310,8 @@ class ISC_GEM2013(MSCE_MS_MW):
 	"""
 	def get_mean(self, MS):
 		input_type = type(MS)
-		MS = np.array(MS, copy=False, ndmin=1)
-		MW = np.zeros_like(MS)
+		MS = np.asarray(MS)
+		MW = np.zeros_like(MS, dtype='float')
 		MW[MS >= 3.6] = np.exp(-0.222 + 0.233 * MS[MS >= 3.6]) + 2.863
 		MW[MS < 3.6] = np.NaN
 		if input_type != np.ndarray:
@@ -349,8 +331,8 @@ class OkalRomanowicz1994(MSCE_MS_MW):
 	"""
 	def get_mean(self, MS):
 		input_type = type(MS)
-		MS = np.array(MS, copy=False, ndmin=1)
-		MW = np.zeros_like(MS)
+		MS = np.asarray(MS)
+		MW = np.zeros_like(MS, dtype='float')
 		MW[MS < 6.7] = (2./3) * MS[MS < 6.7] + 2.24
 		MW[MS >= 6.7] = MS[MS >= 6.7]
 		if input_type != np.ndarray:
@@ -375,7 +357,7 @@ class ReamerHinzen2004L(MSCE_ML_MW):
 	"""
 	def get_mean(self, ML):
 		log_Mo = 1.083 * ML + 10.215
-		MW = (2. / 3.) * log_Mo - 6.06
+		MW = log_moment_to_mag(log_Mo)
 		return MW
 
 	def get_sigma(self, ML=None):
@@ -396,7 +378,7 @@ class ReamerHinzen2004Q(MSCE_ML_MW):
 	"""
 	def get_mean(self, ML):
 		log_Mo = 0.049 * (ML**2) + 0.703 * ML + 10.897
-		MW = (2. / 3.) * log_Mo - 6.06
+		MW = log_moment_to_mag(log_Mo)
 		return MW
 
 	def get_sigma(self, ML=None):
@@ -416,8 +398,8 @@ class Scordilis2006(MSCE_MS_MW):
 	"""
 	def get_mean(self, MS):
 		input_type = type(MS)
-		MS = np.array(MS, copy=False, ndmin=1)
-		MW = np.zeros_like(MS)
+		MS = np.asarray(MS)
+		MW = np.zeros_like(MS, dtype='float')
 		MW[MS < 6.2] = 0.67 * MS[MS < 6.2] + 2.07
 		MW[MS >= 6.2] = 0.99 * MS[MS >= 6.2] + 0.08
 		MW[MS < 3.0] = np.NaN
@@ -428,8 +410,8 @@ class Scordilis2006(MSCE_MS_MW):
 
 	def get_sigma(self, MS):
 		input_type = type(MS)
-		MS = np.array(MS, copy=False, ndmin=1)
-		sigma = np.zeros_like(MS)
+		MS = np.asarray(MS)
+		sigma = np.zeros_like(MS, dtype='float')
 		sigma[MS < 6.2] = 0.17
 		sigma[MS >= 6.2] = 0.20
 		sigma[MS < 3.0] = np.NaN
@@ -454,9 +436,3 @@ class Utsu2002(MSCE_MS_MW):
 
 	def get_sigma(self, MS=None):
 		return None
-
-
-def seismic_moment_to_moment_magnitude_dyncm(M0):
-	"""
-	"""
-	return (2./3.)*np.log10(M0)-10.73
