@@ -37,6 +37,8 @@ class DeclusteringWindow():
 
 	__metaclass__ = abc.ABCMeta
 
+	name = ''
+
 	@abc.abstractmethod
 	def get_time_window(self, magnitude):
 		pass
@@ -62,6 +64,8 @@ class GardnerKnopoff1974Window(DeclusteringWindow):
 	"""
 	Class implementing Gardner-Knopoff (1974) declustering window
 	"""
+	name = "GardnerKnopoff1974"
+
 	def get_time_window(self, magnitude):
 		if np.isscalar(magnitude):
 			if magnitude >= 6.5:
@@ -86,6 +90,8 @@ class Uhrhammer1986Window(DeclusteringWindow):
 	"""
 	Class implementing Uhrhammer (1986) declustering window
 	"""
+	name = "Uhrhammer1986"
+
 	def get_time_window(self, magnitude):
 		t_window = np.exp(-2.870 + 1.235*magnitude)
 		if np.isscalar(t_window):
@@ -101,6 +107,8 @@ class Gruenthal2009Window(DeclusteringWindow):
 	"""
 	Class implementing Gruenthal (1985) declustering window
 	"""
+	name = "Gruenthal2009"
+
 	def get_time_window(self, magnitude):
 		if np.isscalar(magnitude):
 			if magnitude >= 6.5:
@@ -130,6 +138,8 @@ class Reasenberg1985Window(DeclusteringWindow):
 	method of Reasenberg (1985). This should only be used
 	in combination with :class:`ReasenbergMethod`
 	"""
+	name = "Reasenberg1985"
+
 	# TODO: add XK, XMEFF, rfact, dsigma to __init__ as properties?
 	def get_time_window(self, mag, time_delta=0,
 						tau_min=2880., tau_max=14400.):
@@ -1094,13 +1104,34 @@ class WindowMethod(DeclusteringMethod):
 			if dc_idxs[i] == -1 and not np.isnan(main_mag):
 				main_event = catalog[i]
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
+				## Do not include earthquakes that are already marked as
+				## belonging to the cluster of a larger mainshock
+				#in_window = in_window & (magnitudes < main_mag)
+				#in_window = in_window & (dc_idxs == -1)
 				if np.sum(in_window) > 1:
-					## main_event is always in window
-					dc_idxs[in_window & (magnitudes < main_mag)] = ncl
-					dc_idxs[i] = ncl
-					if verbose:
-						print("Found new cluster #%d" % ncl)
-					ncl += 1
+					## > 1 because main_event is always in window
+					in_window_and_already_clustered = in_window & (dc_idxs >= 0)
+					## If there is another cluster (belonging to a larger mainshock)
+					## in the window of this one, append to that cluster
+					## This corresponds to:
+					## "reset the dimensions of the window to the largest shock
+					## in the series, whether the largest was the first or a
+					## subsequent shock" (Knopoff & Gardner, 1972)
+					if np.sum(in_window_and_already_clustered) > 0:
+						_ncl = dc_idxs[in_window_and_already_clustered][0]
+						in_window_and_not_yet_clustered = in_window & (dc_idxs == -1)
+						dc_idxs[in_window_and_not_yet_clustered] = _ncl
+						if verbose:
+							print("Appending %d events to cluster #%d"
+							% (np.sum(in_window_and_not_yet_clustered), _ncl))
+					else:
+						dc_idxs[in_window] = ncl
+						## should not be necessary, as main_event is always in window
+						#dc_idxs[i] = ncl
+						if verbose:
+							print("Found new cluster #%d (n=%d)"
+									% (ncl, np.sum(in_window)))
+						ncl += 1
 
 		"""
 		## Only possible with fa_ratio = 0
@@ -1185,15 +1216,26 @@ class WindowMethod(DeclusteringMethod):
 		for i in order:
 			main_mag = magnitudes[i]
 			## If earthquake is not marked as triggered
-			if dc_idxs[i] == 1 and not np.isnan(main_mag):
+			if dc_idxs[i] == True and not np.isnan(main_mag):
 				## Create window index
 				main_event = catalog[i]
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
-				## Remove earthquake from window index
-				in_window[i] = False
-				## Apply window to declustering index,
-				## but avoid marking larger earthquakes as clustered
-				dc_idxs[in_window & (magnitudes < main_mag)] = False
+				num_in_window = np.sum(in_window)
+				if num_in_window > 1:
+					in_window_and_not_yet_clustered = (in_window & dc_idxs
+													& (magnitudes <= main_mag))
+					if num_in_window == np.sum(in_window_and_not_yet_clustered):
+						## All events in window belong to new cluster
+						## Current earthquake is mainshock, so remove from window index
+						in_window_and_not_yet_clustered[i] = False
+					else:
+						## There is another mainshock or cluster in the window
+						## Mark current earthquake as clustered
+						in_window_and_not_yet_clustered[i] = True
+
+					## Apply window to declustering index,
+					## but avoid marking larger earthquakes as clustered
+					dc_idxs[in_window_and_not_yet_clustered] = False
 
 		return catalog[dc_idxs]
 
@@ -1835,7 +1877,7 @@ def get_available_windows():
 
 
 def get_window_by_name(window_name):
-	return get_available_windows()[window_name]
+	return get_available_windows()[window_name]()
 
 
 def plot_declustering_windows(fig_filespec=None, dpi=300):
