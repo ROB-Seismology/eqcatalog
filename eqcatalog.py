@@ -218,6 +218,8 @@ class EQCatalog:
 			idx = str_ids.index(str(id))
 		except IndexError:
 			return None
+		else:
+			return idx
 
 	def get_event_by_id(self, id):
 		"""
@@ -397,9 +399,13 @@ class EQCatalog:
 		depths = depths[np.isfinite(depths)]
 		print("Depth range: %.1f - %.1f km" % (depths.min(), depths.max()))
 
-	def print_list(self):
+	def print_list(self, as_html=False):
 		"""
 		Print list of earthquakes in catalog
+
+		:param as_html:
+			bool, whether to return HTML or to print plain text
+			(default: False)
 
 		:return:
 			str or instance of :class:`PrettyTable`
@@ -428,13 +434,15 @@ class EQCatalog:
 				tab.append(row)
 
 		if has_prettytable:
-			print(tab)
+			if as_html:
+				return tab.get_html_string()
+			else:
+				print(tab)
+				return tab
 		else:
 			print('\t'.join(col_names))
 			for row in tab:
 				print('\t'.join(row))
-
-		return tab
 
 	@classmethod
 	def from_json(cls, s):
@@ -1478,7 +1486,7 @@ class EQCatalog:
 		lons = lons[idxs]
 		lats = lats[idxs]
 
-		d_index = methods[method].decluster(magnitudes, datetimes, lons, lats,
+		d_index = methods[method].decluster_legacy(magnitudes, datetimes, lons, lats,
 			windows[window], fa_ratio)
 
 		dc = self.__getitem__(np.where(d_index == 1)[0])
