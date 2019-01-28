@@ -1,6 +1,9 @@
 #!/usr/bin/python3
 
 """
+Source:
+https://github.com/kshramt/fortran_lib
+
 python3 make_catalog.py | sort -k1 -g >| catalog.tsv
 """
 
@@ -82,7 +85,8 @@ def _omori_integrate(t, c, p):
 
 def main(args):
     np.random.seed(42)
-    random.seed(42, version=2)
+    #random.seed(42, version=2)
+    random.seed(42)
     t_end = 1000
     mu = 0.1
     k = 10
@@ -92,8 +96,8 @@ def main(args):
     mr = 6
     tau = 1
     mag_fn = lambda m=None: random_gr(1, 2.5, 7)
-    for t, m, _, _ in gen_etas_seq(t_end, mu, k, c, alpha, p, mr, tau, mag_fn):
-        print(t, '\t', m)
+    for t, m, ID, parent_ID in gen_etas_seq(t_end, mu, k, c, alpha, p, mr, tau, mag_fn):
+        print(t, m, ID, parent_ID)
 
 
 if __name__ == '__main__':
