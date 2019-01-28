@@ -420,7 +420,7 @@ class LocalEarthquake:
 		zone = rec.get(zone_key, "")
 
 		agency_key = column_map.get('agency', 'agency')
-		agency = rec.get(agency_key, agency_key)
+		agency = rec.get(agency_key, agency_key if not agency_key == 'agency' else "")
 
 		event_type_key = column_map.get('event_type', 'event_type')
 		event_type = rec.get(event_type_key, 'ke')
