@@ -92,7 +92,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 			column_map = {'lon': 'Lon', 'lat': 'Lat',
 						'year': 'Year', 'month': 'Mo', 'day': 'Da',
 						'hour': 'Ho', 'minute': 'Mi', 'second': 'Se',
-						'MW': 'Mw', 'depth': 'H', 'ID': 'event_id'}
+						'MW': 'Mw', 'depth': 'H', 'ID': 'event_id',
+						'errh': 'LatUnc', 'errz': 'HUnc', 'errM': 'MwUnc'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "CENEC":
 			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
@@ -100,7 +101,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 			column_map = {'lon': 'lon', 'lat': 'lat',
 						'year': 'year', 'month': 'month', 'day': 'day',
 						'hour': 'hour', 'minute': 'minute',
-						'MW': 'Mw', 'depth': 'depth', 'intensity_max': 'Imax'}
+						'MW': 'Mw', 'depth': 'depth', 'intensity_max': 'Imax',
+						'agency': 'ref'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "ISC-GEM":
 			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
