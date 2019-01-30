@@ -201,7 +201,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		'ML',
 		'MS',
 		'MW',
-		'IF(MW, MW, IF(MS, MS, ML)) as M',
+		'MWH',
+		'IF(MWH, MWH, IF(MW, MW, IF(MS, MS, ML))) as M',
 		'intensity_max',
 		'macro_radius',
 		'errh',
@@ -265,6 +266,10 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		lon, lat = rec["longitude"], rec["latitude"]
 		depth = rec["depth"]
 		ML, MS, MW, M = rec["ML"], rec["MS"], rec["MW"], rec["M"]
+		## "Historical MW"
+		# TODO: may be necessary to add MWHp ('1/4', '1/2', '3/4') in the future
+		MWH = rec["MWH"]
+		MW = MWH or MW
 		intensity_max, macro_radius = rec["intensity_max"], rec["macro_radius"]
 		errh, errz, errt, errM = rec["errh"], rec["errz"], rec["errt"], rec["errM"]
 		etype = rec["type"]  ## Avoid conflict with event_type parameter!
