@@ -373,31 +373,66 @@ class EQCatalog:
 			name = "Symmetric Difference(%s, %s)" % (self.name, other_catalog.name)
 		return concatenate_catalogs([cat1, cat2], name=name)
 
-	def print_info(self):
+	def print_info(self, as_html=False):
 		"""
 		Print some useful information about the catalog.
+
+		:param as_html:
+			bool, whether to return HTML or to print plain text
+			(default: False)
+
+		:return:
+			str or instance of :class:`PrettyTable`
 		"""
-		print("Name: %s" % self.name)
-		print("Earthquake number: %d" % len(self))
-		print("Start time: %s" % self.start_date)
-		print("End time :  %s" % self.end_date)
+		try:
+			from prettytable import PrettyTable
+		except:
+			has_prettytable = False
+		else:
+			has_prettytable = True
+			tab = PrettyTable(["Parameter", "Value"])
+
+		rows = []
+		rows.append(["Catalog name", self.name])
+		rows.append(["Earthquake number", "%d" % len(self)])
+		rows.append(["Start time", "%s" % self.start_date])
+		rows.append(["End time", "%s" % self.end_date])
+
+		lons = self.get_longitudes()
+		lons = lons[np.isfinite(lons)]
+		rows.append(["Longitude bounds", "%.4f / %.4f" % (lons.min(), lons.max())])
+		lats = self.get_latitudes()
+		lats = lats[np.isfinite(lats)]
+		rows.append(["Latitude bounds", "%.4f / %.4f" % (lats.min(), lats.max())])
+		depths = self.get_depths()
+		depths = depths[np.isfinite(depths)]
+		rows.append(["Depth range", "%.1f / %.1f km" % (depths.min(), depths.max())])
+
 		for Mtype, count in self.get_Mtype_counts().items():
 			mags = self.get_magnitudes(Mtype=Mtype, Mrelation={})
 			mags = mags[np.isfinite(mags)]
 			if len(mags):
 				if mags.min() == 0:
 					mags = mags[mags > 0]
-				print("%s: n=%d, min=%.1f, max=%.1f"
-					% (Mtype, count, mags.min(), mags.max()))
-		lons = self.get_longitudes()
-		lons = lons[np.isfinite(lons)]
-		print("Longitude bounds: %.4f / %.4f" % (lons.min(), lons.max()))
-		lats = self.get_latitudes()
-		lats = lats[np.isfinite(lats)]
-		print("Latitude bounds: %.4f / %.4f" % (lats.min(), lats.max()))
-		depths = self.get_depths()
-		depths = depths[np.isfinite(depths)]
-		print("Depth range: %.1f - %.1f km" % (depths.min(), depths.max()))
+				rows.append([Mtype,
+					"n=%d, min=%.1f, max=%.1f" % (count, mags.min(), mags.max())])
+
+		etype_num_dict = self.count_num_by_event_type()
+		etype_str = ', '.join(["%s (n=%d)" % (etype, etype_num_dict[etype])
+											for etype in etype_num_dict])
+		rows.append(["Event types", etype_str])
+
+		if has_prettytable:
+			for row in rows:
+				tab.add_row(row)
+			if as_html:
+				return tab.get_html_string()
+			else:
+				print(tab)
+				return tab
+		else:
+			for row in tab:
+				print(' :\t'.join(row))
 
 	def print_list(self, as_html=False):
 		"""
@@ -423,7 +458,8 @@ class EQCatalog:
 		if has_prettytable:
 			tab = PrettyTable(col_names)
 		else:
-			tab = []
+			tab = [col_names]
+
 		for eq in self.eq_list:
 			row = [str(eq.ID), str(eq.date), str(eq.time), eq.name,
 					"%.4f" % eq.lon, "%.4f" % eq.lat, "%.1f" % eq.depth,
@@ -440,7 +476,6 @@ class EQCatalog:
 				print(tab)
 				return tab
 		else:
-			print('\t'.join(col_names))
 			for row in tab:
 				print('\t'.join(row))
 
@@ -490,6 +525,36 @@ class EQCatalog:
 		key = '__%s__' % self.__class__.__name__
 		dct = {key: self.__dict__}
 		return json.dumps(dct, default=json_handler)
+
+	## Methods related to event_type
+
+	def get_event_types(self):
+		"""
+		Return list of event types for all earthquakes in catalog
+		"""
+		return [eq.event_type for eq in self]
+
+	def get_unique_event_types(self):
+		"""
+		Return list of unique event types in catalog
+		"""
+		return sorted(set(self.get_event_types()))
+
+	def count_num_by_event_type(self):
+		"""
+		Count number of events for each event type
+
+		:return:
+			dict, mapping event type (str) to number of events (int)
+		"""
+		etype_num_dict = {}
+		for eq in self:
+			etype = eq.event_type
+			if not etype in etype_num_dict:
+				etype_num_dict[etype] = 1
+			else:
+				etype_num_dict[etype] += 1
+		return etype_num_dict
 
 	## Time methods
 
