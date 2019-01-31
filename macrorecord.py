@@ -141,7 +141,7 @@ class MacroseismicInfo():
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
 		"""
-		from .seismodb import query_local_eq_catalog_by_id
+		from .rob.seismodb import query_local_eq_catalog_by_id
 
 		if isinstance(self.id_earth, (int, str)):
 			[eq] = query_local_eq_catalog_by_id(self.id_earth)
@@ -157,7 +157,7 @@ class MacroseismicInfo():
 		:param verbose:
 			bool, whether or not to print useful information
 		"""
-		from .seismodb import query_web_macro_enquiries
+		from .rob.seismodb import query_web_macro_enquiries
 
 		if self.db_ids:
 			ensemble = query_web_macro_enquiries(web_ids=self.db_ids, verbose=verbose)
@@ -310,7 +310,7 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
 		"""
-		from .seismodb import query_local_eq_catalog_by_id
+		from .rob.seismodb import query_local_eq_catalog_by_id
 
 		if isinstance(self.id_earth, (int, str)):
 			[eq] = query_local_eq_catalog_by_id(self.id_earth)
@@ -353,7 +353,7 @@ class MacroseismicEnquiryEnsemble():
 		prop_values = self.get_prop_values(prop)
 		return sorted(set(prop_values))
 
-	def get_date_times(self):
+	def get_datetimes(self):
 		import datetime
 
 		format = "%Y-%m-%d %H:%M:%S"
@@ -364,7 +364,7 @@ class MacroseismicEnquiryEnsemble():
 
 	def get_elapsed_times(self):
 		eq = self.get_eq()
-		return self.get_date_times() - np.datetime64(eq.datetime)
+		return self.get_datetimes() - np.datetime64(eq.datetime)
 
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
@@ -570,7 +570,7 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			dict, mapping comm_key values to database records (dicts)
 		"""
-		from .seismodb import query_seismodb_table
+		from .rob.seismodb import query_seismodb_table
 		from difflib import SequenceMatcher as SM
 
 		if comm_key in ("id_com", "id_main"):
@@ -816,7 +816,7 @@ class MacroseismicEnquiryEnsemble():
 			None, 'longitude' and 'latitude' values of :prop:`recs`
 			are created or modified in place
 		"""
-		from .seismodb import query_seismodb_table
+		from .rob.seismodb import query_seismodb_table
 
 		table_clause = ['web_location']
 		column_clause = ['*']
@@ -1043,6 +1043,8 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			float array, felt indexes [range 0 - 1]
 		"""
+		# TODO: there are only 5 classes for other_felt,
+		# but values in database range from 0 to 5 !
 		other_felt_classes = np.array([0.72, 0.36, 0.72, 1, 1])
 		other_felt_classes_if_felt_is_zero = np.ma.array([0., 0., 0.36, 0.72, 1])
 		other_felt_classes_if_felt_is_zero.mask = np.isnan(other_felt_classes_if_felt_is_zero)
@@ -1144,7 +1146,11 @@ class MacroseismicEnquiryEnsemble():
 		damage_classes = np.array([0, 0.5, 0.75, 1, 1, 1, 0.5, 2, 2, 2, 3, 3, 3, 3])
 		damage_index = np.zeros(len(self), dtype='float')
 		for i in range(len(self)):
-			damage_index[i] = np.max(damage_classes[self.damage[i]])
+			if self.damage[i].any():
+				## Avoid crash all damage classes are set to False
+				damage_index[i] = np.max(damage_classes[self.damage[i]])
+			else:
+				damage_index[i] = 0.
 		return damage_index
 
 	def filter_floors(self, min_level=0, max_level=4, keep_nan_values=True):
@@ -1354,7 +1360,10 @@ class MacroseismicEnquiryEnsemble():
 		pct0 = np.percentile(cii, min_pct)
 		pct1 = np.percentile(cii, max_pct)
 		cii = cii[(cii >= pct0) & (cii <= pct1)]
-		return cii.mean()
+		if len(cii):
+			return cii.mean()
+		else:
+			return 1.
 
 	def calc_fiability(self, include_other_felt=True, include_heavy_appliance=False,
 						aggregate=False, filter_floors=False):
@@ -1978,7 +1987,7 @@ class MacroseismicEnquiryEnsemble():
 
 	def plot_cumulative_responses_vs_time(self):
 		import pylab
-		date_times = np.sort(self.get_date_times()).astype(object)
+		date_times = np.sort(self.get_datetimes()).astype(object)
 		pylab.plot(date_times, np.arange(self.num_replies)+1)
 		pylab.gcf().autofmt_xdate()
 		pylab.xlabel("Time")
