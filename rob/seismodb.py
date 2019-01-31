@@ -131,12 +131,16 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		(w, e, s, n) tuple specifying rectangular region of interest in
 		geographic coordinates (default: None)
 	:param start_date:
-		Int or date or datetime object specifying start of time window of interest
-		If integer, start_date is interpreted as start year
+		Int, year
+		or str, date(time) string
+		or datetime.date, datetime.datetime or np.datetime64 object
+		specifying start of time window of interest
 		(default: None)
 	:param end_date:
-		Int or date or datetime object specifying end of time window of interest
-		If integer, end_date is interpreted as end year
+		Int, year
+		or str, date(time) string
+		or datetime.date, datetime.datetime or np.datetime64 object
+		specifying end of time window of interest
 		(default: None)
 	:param Mmin:
 		Float, minimum magnitude to extract (default: None)
@@ -170,24 +174,26 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	"""
 	from .eqrecord import ROBLocalEarthquake
 	from ..eqcatalog import EQCatalog
+	from .. import time_functions_np as tf
 
 	## Convert input arguments, if necessary
 	if isinstance(id_earth, (int, basestring)):
 		id_earth = [id_earth]
 
 	if isinstance(start_date, int):
-		start_date = datetime.date(start_date, 1, 1)
-	elif isinstance(start_date, datetime.datetime):
-		start_date = start_date.date()
-	if not start_date:
-		start_date = datetime.date(1350, 1, 1)
+		start_date = '%d-01-01' % start_date
+	elif start_date is None:
+		start_date = '1350-01-01'
+	start_date = tf.as_np_datetime(start_date)
 
 	if isinstance(end_date, int):
-		end_date = datetime.date(end_date, 12, 31)
-	elif isinstance(end_date, datetime.datetime):
-		end_date = end_date.date()
-	if not end_date:
-		end_date = datetime.datetime.now().date()
+		end_date = '%d-12-31' % end_date
+	elif end_date is None:
+		end_date = np.datetime64('now')
+	end_date = tf.as_np_datetime(end_date)
+	if tf.to_py_time(end_date) == datetime.time(0):
+		end_time = datetime.time(23, 59, 59, 999999)
+		end_date = tf.combine_np_date_and_py_time(end_date, end_time)
 
 	## Construct SQL query
 	table_clause = "earthquakes"
@@ -221,19 +227,16 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 			where_clause += ' and type = "%s"' % event_type
 	if region:
 		w, e, s, n = region
-		where_clause += ' and longitude Between %f and %f' % (w, e)
-		where_clause += ' and latitude Between %f and %f' % (s, n)
-	if start_date or end_date:
-		if not end_date:
-			end_date = datetime.datetime.now()
-		if not start_date:
-			start_date = datetime.datetime(100, 1, 1)
-		where_clause += (' and date Between "%s" and "%s"'
-						% (start_date.isoformat(), end_date.isoformat()))
+		where_clause += ' AND longitude BETWEEN %f and %f' % (w, e)
+		where_clause += ' AND latitude BETWEEN %f and %f' % (s, n)
+
+	#where_clause += (' and date Between "%s" and "%s"'
+	where_clause += (' AND TIMESTAMP(date, time) BETWEEN "%s" and "%s"'
+					% (start_date, end_date))
 	if min_depth:
-		where_clause += ' and depth >= %f' % min_depth
+		where_clause += ' AND depth >= %f' % min_depth
 	if max_depth:
-		where_clause += ' and depth <= %f' % max_depth
+		where_clause += ' AND depth <= %f' % max_depth
 
 	having_clause = ""
 	if Mmax or Mmin != None:
@@ -241,7 +244,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 			Mmin = 0.0
 		if not Mmax:
 			Mmax = 10.0
-		having_clause += 'HAVING M Between %f and %f' % (Mmin, Mmax)
+		having_clause += 'HAVING M BETWEEN %f and %f' % (Mmin, Mmax)
 
 	if sort_order.lower()[:3] == "asc":
 		sort_order = "asc"
@@ -321,7 +324,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 							errh, errz, errt, errM, agency="ROB", event_type=etype)
 		eq_list.append(eq)
 
-	name = "ROB Catalog %s - %s" % (start_date.isoformat(), end_date.isoformat())
+	name = "ROB Catalog %s - %s" % (start_date, end_date)
 	start_date, end_date = np.datetime64(start_date), np.datetime64(end_date)
 	return EQCatalog(eq_list, start_date, end_date, region=region, name=name)
 
@@ -476,17 +479,18 @@ def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 	return focmec_list
 
 
-def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
+def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 					group_by_main_village=False, agg_function="maximum",
-					verbose=False, errf=None):
+					min_fiability=20, verbose=False, errf=None):
 	"""
 	Query ROB "official" macroseismic catalog (= commune inquiries)
 
 	:param id_earth:
 		int, earthquake ID
-	:param Imax:
-		bool, if True, intensity_max is returned, else intensity_min
-		(default: True)
+	:param min_or_max:
+		str, one of 'min', 'mean' or 'max' to select between
+		intensity_min and intensity_max values in database
+		(default: 'max')
 	:param min_val:
 		float, minimum intensity to return
 		(default: 1)
@@ -497,6 +501,9 @@ def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
 		str, aggregation function to use if :param:`group_by_main_village`
 		is True, one of "minimum", "maximum" or "average"
 		(default: "maximum")
+	:param min_fiability:
+		float, minimum fiability of enquiry
+		(default: 20.)
 	:param verbose:
 		Bool, if True the query string will be echoed to standard output
 	:param errf:
@@ -515,10 +522,12 @@ def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
 		query = 'SELECT id_com_main as "id_com",'
 		query += ' Longitude as "longitude", Latitude as "latitude",'
 		query += ' id as "id_db",'
-		if Imax:
+		if min_or_max == 'max':
 			query += ' Imax'
-		else:
+		elif min_or_max == 'min':
 			query += ' Imin'
+		elif min_or_max == 'mean':
+			query += ' (Imin + Imax) / 2.'
 		query += ' as "Intensity"'
 		query += ' from Macro18280223 Where country = "BE"'
 
@@ -537,24 +546,30 @@ def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
 
 		if group_by_main_village:
 			agg_function = AGG_FUNC_DICT.get(agg_function.lower(), "MAX")
-			if Imax:
-				column_clause.append('%s(macro_detail.intensity_max) as "Intensity"'
-									% agg_function)
-			else:
-				column_clause.append('%s(macro_detail.intensity_min) as "Intensity"'
-									% agg_function)
+			if min_or_max == 'max':
+				intensity_col = '%s(intensity_max) as "Intensity"' % agg_function
+			elif min_or_max == 'min':
+				intensity_col = '%s(intensity_min) as "Intensity"' % agg_function
+			elif min_or_max == 'mean':
+				intensity_col = ('%s((intensity_min + intensity_max) / 2.) '
+								'as "Intensity"' % agg_function)
+			column_clause.append(intensity_col)
 			group_clause = 'communes.id_main'
 			column_clause.append('GROUP_CONCAT(id_macro_detail SEPARATOR ",") AS id_db')
 		else:
-			if Imax:
-				column_clause.append('macro_detail.intensity_max as "Intensity"')
-			else:
-				column_clause.append('macro_detail.intensity_min as "Intensity"')
+			if min_or_max == 'max':
+				intensity_col = 'intensity_max as "Intensity"'
+			elif min_or_max == 'min':
+				intensity_col = 'intensity_min as "Intensity"'
+			elif min_or_max == 'mean':
+				intensity_col = ('(intensity_min + intensity_max)/2. '
+								'as "Intensity"')
+			column_clause.append(intensity_col)
 			group_clause = ""
 			column_clause.append('id_macro_detail as id_db')
 
 		where_clause = 'macro_detail.id_earth = %d' % id_earth
-		where_clause += ' and macro_detail.fiability != 0'
+		where_clause += ' and macro_detail.fiability >= %d' % min_fiability
 		#where_clause += ' and macro_detail.id_com = communes.id'
 
 		join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id')]
@@ -575,7 +590,7 @@ def query_official_macro_catalog(id_earth, Imax=True, min_val=1,
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
 	for rec in macro_recs:
 		id_com = rec['id_com']
-		I = rec['Intensity']
+		I = float(rec['Intensity'])
 		lon, lat = rec['longitude'], rec['latitude']
 		if isinstance(rec['id_db'], (int, basestring)):
 			db_ids = [rec['id_db']]
@@ -738,10 +753,10 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 	if isinstance(id_earth, int) or id_earth == "all":
 		## Only fetch enquiries assigned to an earthquake
 		if id_earth == "all":
-			where_clause = 'web_analyse.id_earth > 0 AND'
+			where_clause = 'web_analyse.id_earth > 0'
 		else:
-			where_clause = 'web_analyse.id_earth = %d AND ' % id_earth
-		where_clause += 'web_analyse.m_fiability >= %.1f' % float(min_fiability)
+			where_clause = 'web_analyse.id_earth = %d' % id_earth
+		where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
 		where_clause += ' AND web_analyse.deleted = false'
 		if id_com is not None:
 			where_clause += ' AND web_analyse.id_com=%d' % id_com
