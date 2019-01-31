@@ -102,13 +102,17 @@ class ROBLocalEarthquake(LocalEarthquake):
 			group_by_main_village=group_by_main_village, agg_function=agg_function,
 			min_fiability=min_fiability, verbose=verbose)
 
-	def get_macroseismic_enquiries(self, min_fiability=20, verbose=False):
+	def get_macroseismic_enquiries(self, min_fiability=20, min_location_quality=6,
+									verbose=False):
 		"""
 		Get all macroseismic enquiries for this earthquake
 
 		:param min_fiability:
 			float, minimum fiability of enquiry
 			(default: 20.)
+		:param min_location_quality:
+			int, minimum quality of location to read from web_location table
+			(default: 6)
 		:param verbose:
 			bool, if True the query string will be echoed to standard output
 			(default: False)
@@ -118,7 +122,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 		"""
 		from .seismodb import query_web_macro_enquiries
 		ensemble = query_web_macro_enquiries(self.ID, min_fiability=min_fiability,
-											verbose=verbose)
+										min_location_quality=min_location_quality,
+										verbose=verbose)
 		return ensemble
 
 	def get_Imax_web(self, min_replies=3, min_fiability=20, filter_floors=(0, 4),
