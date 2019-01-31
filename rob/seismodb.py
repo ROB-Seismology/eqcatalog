@@ -711,7 +711,8 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 
 
 def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
-						min_fiability=20, web_ids=[], verbose=False, errf=None):
+						min_fiability=20, min_location_quality=6,
+						web_ids=[], verbose=False, errf=None):
 	"""
 	Query internet enquiries.
 
@@ -730,6 +731,9 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 	:param min_fiability:
 		float, minimum fiability of enquiry
 		(default: 20.)
+	:param min_location_quality:
+		int, minimum quality of location to read from web_location table
+		(default: 6)
 	:param web_ids:
 		list of IDs of individual questionnaires
 		(default: [])
@@ -748,7 +752,8 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 	table_clause = ['web_input']
 
 	join_clause = [('JOIN', 'web_analyse', 'web_input.id_web=web_analyse.id_web'),
-					('LEFT JOIN', 'web_location', 'web_input.id_web=web_location.id_web')]
+					('LEFT JOIN', 'web_location', 'web_input.id_web=web_location.id_web'
+								' AND web_location.quality >= %d' % min_location_quality)]
 
 	if isinstance(id_earth, int) or id_earth == "all":
 		## Only fetch enquiries assigned to an earthquake
