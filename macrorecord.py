@@ -1363,7 +1363,7 @@ class MacroseismicEnquiryEnsemble():
 		if len(cii):
 			return cii.mean()
 		else:
-			return 1.
+			return 0.
 
 	def calc_fiability(self, include_other_felt=True, include_heavy_appliance=False,
 						aggregate=False, filter_floors=False):
