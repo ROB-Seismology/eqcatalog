@@ -8,13 +8,23 @@ import csv
 import db.simpledb as simpledb
 from seismodb_secrets import (host, database, user, passwd)
 
+from eqcatalog.rob.seismodb import query_seismodb_table
+
+
+## Read all id_web IDs currently in web_location database table
+table_name = 'web_location'
+column_clause = ['id_web', 'quality']
+db_recs = query_seismodb_table(table_name, column_clause=column_clause)
+web_ids = [rec['id_web'] for rec in db_recs]
+qualities = [rec['quality'] for rec in db_recs]
+
 
 ## Read geocoding results from CSV file
 csv_folder = "D:\\Earthquake Reports\\20180525\\DYFI geocoding"
 csv_filename = "macroseismic_inq_for_6625_modified_floorcorrected_no dupl_geocoded-ArcGIS_with comm.csv"
 csv_file = os.path.join(csv_folder, csv_filename)
 
-db_recs = []
+recs_to_add, recs_to_modify = [], []
 with open(csv_file) as csvf:
 	reader = csv.DictReader(csvf)
 	for row in reader:
@@ -22,7 +32,7 @@ with open(csv_file) as csvf:
 		rec['id_web'] = id_web = int(row['id_web'])
 		rec['longitude'] = lon = float(row['Geo_Longitude'])
 		rec['latitude'] = lat = float(row['Geo_Latitude'])
-		#rec['address_type'] = address_type = row['address type']
+		address_type = row['address type']
 
 		## Geocoder confidence:
 		## 10 : 250 m
@@ -50,7 +60,8 @@ with open(csv_file) as csvf:
 		## 8 Address level accuracy.
 		## 9 Premise (building name, property name, shopping center, etc.) level accuracy.
 
-		rec['quality'] = {'SubAddress': 10,
+		"""
+		rec['confidence'] = {'SubAddress': 10,
 							'PointAddress': 10,
 							'StreetAddress': 10,
 							'StreetInt': 9,
@@ -61,18 +72,44 @@ with open(csv_file) as csvf:
 							'PostalLoc': 7,
 							'PostalExt': 7,
 							'Postal': 7,
-							'POI': 7}.get(row['address type'], 0)
-		db_recs.append(rec)
+							'POI': 7}.get(address_type, 0)
+		"""
 
-		# ['PointAddress', 'Locality', 'PostalLoc', 'StreetAddress', 'StreetAddressExt', 'POI', 'StreetName']
-		print(id_web, lon, lat, rec['quality'])
+		rec['quality'] = {'SubAddress': 9,
+							'PointAddress': 9,
+							'StreetAddress': 8,
+							'StreetInt': 7,
+							'StreetAddressExt': 7,
+							'DistanceMarker': 7,
+							'StreetName': 6,
+							'Locality': 5,
+							'PostalLoc': 5,
+							'PostalExt': 5,
+							'Postal': 4,
+							'POI': 4}.get(address_type, 0)
+
+		try:
+			r = web_ids.index(id_web)
+		except:
+			recs_to_add.append(rec)
+		else:
+			## Only overwrite existing locations if quality is better
+			if rec['quality'] > qualities[r]:
+				recs_to_modify.append(rec)
+
+		#print(id_web, lon, lat, rec['quality'])
 
 #print set([rec['address_type'] for rec in db_recs])
-exit()
+
 
 ## Write to database
 user = 'kris'
 passwd = '***REMOVED***'
 seismodb = simpledb.MySQLDB(database, host, user, passwd)
 table_name = 'web_location'
-seismodb.add_records(table_name, db_recs, dry_run=True)
+if len(recs_to_add):
+	print("Adding %d new records" % len(recs_to_add))
+	#seismodb.add_records(table_name, recs_to_add, dry_run=True)
+if len(recs_to_modify):
+	print("Updating %d existing records" % len(recs_to_modify))
+	#seismodb.update_rows(table_name, recs_to_modify, 'id_web', dry_run=True)
