@@ -434,18 +434,121 @@ class EQCatalog:
 			for row in tab:
 				print(' :\t'.join(row))
 
-	def print_list(self, as_html=False):
+	def get_formatted_table(self, max_name_width=30, lonlat_decimals=3,
+							depth_decimals=1, mag_decimals=1,
+							padding_width=1):
 		"""
-		Print list of earthquakes in catalog
+		Return formatted table of earthquakes in catalog.
+
+		:param max_name_width:
+			int, max. width for 'name' column
+			(default: 30)
+		:param lonlat_decimals:
+			int, number of decimals for longitudes and latitudes
+			(default: 3)
+		:param depth_decimals:
+			int, number of decimals for depths
+			(default: 1)
+		:param mag_decimals:
+			int, number of decimals for magnitudes
+			(default: 1)
+
+		:return:
+			instance of :class:`PrettyTable`
+		"""
+		import prettytable as pt
+
+		tab = pt.PrettyTable()
+		tab.add_column('ID', self.get_ids(), align='r', valign='m')
+		tab.add_column('Date', [eq.date for eq in self], valign='m')
+		tab.add_column('Time', [eq.time for eq in self], valign='m')
+		tab.add_column('Name', [eq.name for eq in self], valign='m')
+		tab.add_column('Lon', self.get_longitudes(), align='r', valign='m')
+		tab.add_column('Lat', self.get_latitudes(), align='r', valign='m')
+		tab.add_column('Z', self.get_depths(), align='r', valign='m')
+		Mtypes = ('ML', 'MS', 'MW', 'mb')
+		for Mtype in Mtypes:
+			mags = self.get_magnitudes(Mtype, Mrelation={})
+			if not np.isnan(mags).all():
+				mags = [m if not np.isnan(m) else '' for m in mags]
+				tab.add_column(Mtype, mags, align='r', valign='m')
+		intensities = self.get_max_intensities()
+		if not (intensities == 0).all():
+			tab.add_column('Imax', intensities, align='r', valign='m')
+
+		tab.padding_width = padding_width
+		tab.max_width['Name'] = max_name_width
+		tab.float_format['Lon'] = tab.float_format['Lat'] = '.%d' % lonlat_decimals
+		tab.float_format['Z'] = '.%d' % depth_decimals
+		for Mtype in Mtypes:
+			if Mtype in tab.field_names:
+				tab.float_format[Mtype] = '.%d' % mag_decimals
+
+		return tab
+
+	def get_formatted_list(self, as_html=False, max_name_width=30,
+					lonlat_decimals=3, depth_decimals=1, mag_decimals=1,
+					padding_width=1):
+		"""
+		Return string representing formatted table of earthquakes
+		in catalog.
 
 		:param as_html:
 			bool, whether to return HTML or to print plain text
 			(default: False)
+		:param max_name_width:
+		:param lonlat_decimals:
+		:param depth_decimals:
+		:param mag_decimals:
+			see :meth:`get_formatted_table`
 
 		:return:
-			str or instance of :class:`PrettyTable`
+			str
 		"""
-		# TODO: detect and skip columns that are empty or have only NaN values
+		tab = self.get_formatted_table(max_name_width=max_name_width,
+					lonlat_decimals=lonlat_decimals, depth_decimals=depth_decimals,
+					mag_decimals=mag_decimals, padding_width=padding_width)
+		if as_html:
+			return tab.get_html_string()
+		else:
+			return tab.get_string()
+
+	def print_list(self, as_html=False, max_name_width=30, lonlat_decimals=3,
+					depth_decimals=1, mag_decimals=1, padding_width=1):
+		"""
+		Print list of earthquakes in catalog
+
+		:param as_html:
+		:param max_name_width:
+		:param lonlat_decimals:
+		:param depth_decimals:
+		:param mag_decimals:
+			see :meth:`get_formatted_list`
+
+		:return:
+			None or str if :param:`as_html` is True
+		"""
+		try:
+			from prettytable import PrettyTable
+		except:
+			from pprint import pprint
+			has_prettytable = False
+		else:
+			has_prettytable = True
+
+		if has_prettytable:
+			tab = self.get_formatted_table(max_name_width=max_name_width,
+						lonlat_decimals=lonlat_decimals, depth_decimals=depth_decimals,
+						mag_decimals=mag_decimals, padding_width=padding_width)
+			if as_html:
+				return tab.get_html_string()
+			else:
+				print(tab)
+
+		else:
+			pass
+
+		"""
 		try:
 			from prettytable import PrettyTable
 		except:
@@ -478,6 +581,7 @@ class EQCatalog:
 		else:
 			for row in tab:
 				print('\t'.join(row))
+		"""
 
 	@classmethod
 	def from_json(cls, s):
