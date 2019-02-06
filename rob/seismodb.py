@@ -48,7 +48,7 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 AGG_FUNC_DICT = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}
 
 
-def query_seismodb_table_generic(query, verbose=False, errf=None):
+def query_seismodb_table_generic(query, verbose=False, print_table=False, errf=None):
 	"""
 	Query MySQL table using clause components, returning each record as a dict
 
@@ -56,6 +56,9 @@ def query_seismodb_table_generic(query, verbose=False, errf=None):
 		str, SQL query
 	:param verbose:
 		bool, whether or not to print the query (default: False)
+	:param print_table:
+		rather than returning records
+		(default: False)
 	:param errf:
 		file object, where to print errors
 
@@ -74,15 +77,16 @@ def query_seismodb_table_generic(query, verbose=False, errf=None):
 	if "GROUP_CONCAT" in query.upper():
 		query0 = 'SET SESSION group_concat_max_len=4294967295'
 		query_mysql_db_generic(database, host, user, passwd, query0, port=port,
-									verbose=verbose, errf=errf)
+								verbose=verbose, errf=errf)
 
 	return query_mysql_db_generic(database, host, user, passwd, query, port=port,
-									verbose=verbose, errf=errf)
+							verbose=verbose, print_table=print_table, errf=errf)
 
 
 def query_seismodb_table(table_clause, column_clause="*", join_clause="",
 						where_clause="", having_clause="", order_clause="",
-						group_clause="", verbose=False, errf=None):
+						group_clause="", verbose=False, print_table=False,
+						errf=None):
 	"""
 	Query seismodb table using clause components
 
@@ -102,9 +106,9 @@ def query_seismodb_table(table_clause, column_clause="*", join_clause="",
 	:param group_clause:
 		str, group clause (default: "")
 	:param verbose:
-		bool, whether or not to print the query (default: False)
+	:param print_table:
 	:param errf:
-		file object, where to print errors
+		see :func:`query_seismodb_table_generic`
 
 	:return:
 		generator object, yielding a dictionary for each record
@@ -112,7 +116,8 @@ def query_seismodb_table(table_clause, column_clause="*", join_clause="",
 	query = build_sql_query(table_clause, column_clause, join_clause, where_clause,
 							having_clause, order_clause, group_clause)
 
-	return query_seismodb_table_generic(query, verbose=verbose, errf=errf)
+	return query_seismodb_table_generic(query, verbose=verbose,
+										print_table=print_table, errf=errf)
 
 
 def query_local_eq_catalog(region=None, start_date=None, end_date=None,
