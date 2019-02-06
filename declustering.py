@@ -1555,17 +1555,22 @@ class ClusterMethod(DeclusteringMethod):
 			main_mag = magnitudes[i]
 			if not np.isnan(main_mag):
 				main_event = catalog[i]
+				is_clustered = not dc_idxs[i]
 				## Find aftershocks of event i in catalog
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 				## Mark afterschocks as clustered in declustering index
-				dc_idxs[in_window] = False
+				dc_idxs[in_window & (magnitudes <= main_mag)] = False
 				## Set event i as unclustered, except if it is a foreshock
 				## If it is an aftershock of a higher magnitude, this will
 				## be overwritten
 				#if (np.sum(in_window) == 1)
-				if not(magnitudes[in_window][1:] >= main_mag).any():
+				if not(magnitudes[in_window][1:] > main_mag).any():
 					## No larger magnitude in window, hence no foreshock...
-					dc_idxs[i] = True
+					## Set as independent, except if marked as clustered before
+					if not is_clustered:
+						dc_idxs[i] = True
+				else:
+					dc_idxs[i] = False
 
 		"""
 		## Note: looping over catalog in reverse time order and
