@@ -480,7 +480,10 @@ class MacroseismicEnquiryEnsemble():
 			country = countries[i].upper()
 			zip_commune = "%s %s" % (zip, commune)
 			## Sometimes people fill out full address instead of just street
-			street = street.replace(zip_commune, '').strip().rstrip(',')
+			#street = street.replace(zip_commune, '').strip().rstrip(',')
+			street = street.replace('%d' % zip, '')
+			street = street.replace(commune, '')
+			street = street.strip().rstrip(',').strip()
 
 			if exclude_empty_streets and not street:
 				## Filter out empty streets or zips
