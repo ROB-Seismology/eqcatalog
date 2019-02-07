@@ -11,187 +11,19 @@ import os
 import numpy as np
 import matplotlib
 
-import eqcatalog
 import mapping.layeredbasemap as lbm
 
-
-GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
+from ..rob import SEISMOGIS_ROOT
+GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB", "TAB")
+#GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
 
 
 # TODO: add plot_official_macroseismic_map function
 # TODO: agg_function ?
 
 
-def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="merc",
-				graticule_interval=(1, 1), min_replies=3, query_info="cii", min_val=1,
-				min_fiability=20, filter_floors=(0, 4), aggregate_by="commune",
-				agg_function="average", int_conversion="round", symbol_style=None,
-				cmap="rob", color_gradient="discontinuous", event_style="default",
-				radii=[], recalc=False, plot_pie=None, title="", fig_filespec=None,
-				ax=None, copyright=u"© ROB", verbose=True):
-	"""
-	Plot internet macroseismic map for given earthquake
-
-	:param id_earth:
-		int, ID of earthquake in ROB database for which to plot map
-	:param region:
-	:param projection:
-	:param graticule_interval:
-		see :func:`plot_macroseismic_map`
-	:param min_replies:
-		int, minimum number of replies to use for plotting macroseismic data
-	:param query_info:
-		str, info to query from the database, either 'cii', 'cdi' or
-		'num_replies'
-		(default: 'cii')
-	:param min_val:
-		int, minimum intensity value to plot
-		(default: 1)
-	:param min_fiability:
-		int, minimum fiability of enquiries to include in plot
-		(default: 20)
-	:param filter_floors:
-		(lower_floor, upper_floor) tuple, floors outside this range
-			(basement floors and upper floors) are filtered out
-			(default: (0, 4))
-	:param aggregate_by:
-		str, type of aggregation, specifying how macroseismic data should
-		be aggregated in the map, one of:
-		- 'id_com' or 'commune'
-		- 'id_main' or 'main commune'
-		- 'grid_X' (where X is grid spacing in km)
-		- None or '' (= no aggregation, i.e. all replies are
-		plotted individually (potentially on top of each other)
-		(default: 'commune')
-
-	:param int_conversion:
-	:param symbol_style:
-	:param cmap:
-	:param color_gradient:
-	:param event_style:
-	:param radii:
-	:param plot_pie:
-	:param title:
-	:param fig_filespec:
-	:param ax:
-	:param copyright:
-	:param verbose:
-		see :func:`plot_macroseismic_map`
-	"""
-	query_info = query_info.lower()
-	if query_info == 'num_replies':
-		min_replies = 1
-
-	if aggregate_by == 'commune':
-		aggregate_by = 'id_com'
-	elif aggregate_by == 'main commune':
-		aggregate_by = 'id_main'
-	elif not aggregate_by:
-		min_replies = 1
-
-	[eq] = eqcatalog.rob.query_local_eq_catalog_by_id(id_earth)
-
-	## Retrieve macroseismic information from database
-	if not recalc:
-		if aggregate_by == 'id_com':
-			group_by_main_village = False
-		elif aggregate_by == 'id_main':
-			group_by_main_village = True
-		else:
-			print("Use recalc=True for aggregate_by=%s" % aggregate_by)
-			exit()
-		qi = query_info if query_info in ('cii', 'cdi') else 'cii'
-		recs = eq.get_macroseismic_data_aggregated_web(min_replies=min_replies,
-				query_info=qi, min_val=min_val, min_fiability=min_fiability,
-				group_by_main_village=group_by_main_village, filter_floors=filter_floors,
-				agg_function=agg_function, verbose=verbose)
-		try:
-			unassigned = recs.pop(None)
-		except KeyError:
-			unassigned = None
-
-		macro_recs = recs.values()
-
-	else:
-		from eqcatalog.macrorecord import MacroseismicInfo
-
-		ensemble = eqcatalog.rob.query_web_macro_enquiries(id_earth,
-						min_fiability=min_fiability, verbose=verbose)
-		ensemble = ensemble.fix_all()
-		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
-
-		if aggregate_by in ('id_com', 'id_main'):
-			comm_key = aggregate_by
-			ensemble.set_locations_from_communes(comm_key=comm_key, keep_unmatched=False)
-			agg_ensemble_dict = ensemble.aggregate_by_commune(comm_key=comm_key)
-		elif not aggregate_by:
-			if np.isnan(ensemble.get_prop_values('longitude')).all():
-				ensemble.set_locations_from_communes(comm_key='id_com')
-			agg_ensemble_dict = {}
-			for subensemble in ensemble:
-				lon = subensemble.recs[0]['longitude']
-				if lon:
-					lat = subensemble.recs[0]['latitude']
-					id_web = subensemble.recs[0]['id_web']
-					agg_ensemble_dict[id_web] = subensemble
-		elif aggregate_by[:4] == 'grid':
-			if np.isnan(ensemble.get_prop_values('longitude')).all():
-				ensemble.set_locations_from_communes(comm_key='id_com')
-			if '_' in aggregate_by:
-				_, grid_spacing = aggregate_by.split('_')
-				grid_spacing = float(grid_spacing)
-			else:
-				grid_spacing = 5
-			aggregate_by = 'grid'
-			agg_ensemble_dict = ensemble.aggregate_by_grid(grid_spacing)
-
-		try:
-			unassigned = agg_ensemble_dict.pop(0)
-		except KeyError:
-			unassigned = None
-
-		macro_recs = []
-		for key in agg_ensemble_dict.keys():
-			num_replies = agg_ensemble_dict[key].num_replies
-			if num_replies < min_replies:
-				agg_ensemble_dict.pop(key)
-				continue
-			if aggregate_by in ('id_com', 'id_main'):
-				id_com = agg_ensemble_dict[key].recs[0][comm_key]
-			else:
-				id_com = key
-			if aggregate_by in ('id_com', 'id_main') or not aggregate_by:
-				lon = agg_ensemble_dict[key].recs[0]['longitude']
-				lat = agg_ensemble_dict[key].recs[0]['latitude']
-			elif aggregate_by == 'grid':
-				lon, lat = key
-			web_ids = agg_ensemble_dict[key].get_prop_values('id_web')
-			if query_info == 'cii':
-				I = agg_ensemble_dict[key].calc_cii()
-				#I = agg_ensemble_dict[key].calc_mean_cii(filter_floors=None,
-				#				include_other_felt=False, remove_outliers=(0,100))
-			elif query_info == 'cdi':
-				I = agg_ensemble_dict[key].calc_cdi()
-			elif query_info == "num_replies":
-				I = 1
-			else:
-				print("Don't know how to recompute %s" % query_info)
-				exit()
-			rec = MacroseismicInfo(id_earth, id_com, I, aggregate_by, 'internet',
-									num_replies, lon, lat, web_ids)
-			macro_recs.append(rec)
-
-	if unassigned:
-		print("Note: %d enquiries are not assigned to a commune" % unassigned.num_replies)
-
-	plot_info = 'num_replies' if query_info == 'num_replies' else 'intensity'
-	plot_macroseismic_map(macro_recs, id_earth, region=region, projection=projection,
-				graticule_interval=graticule_interval, plot_info=plot_info,
-				int_conversion=int_conversion, symbol_style=symbol_style,
-				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
-				radii=radii, plot_pie=plot_pie, title=title,
-				fig_filespec=fig_filespec, ax=ax, copyright=copyright,
-				verbose=verbose)
+__all__ = ["plot_macroseismic_map", "plot_official_macroseismic_map",
+			"plot_web_macroseismic_map"]
 
 
 def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
@@ -250,7 +82,8 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		str, map title
 		(default: "")
 	:param fig_filespec:
-		str, full path to output file
+		str, full path to output file, or 'hold' to return map object
+		instead of plotting it.
 		(default: None, will plot map on screen)
 	:param ax:
 		matplotlib axes instance in which map should be plotted
@@ -260,6 +93,11 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		(default: u"© ROB")
 	:param verbose:
 		bool, whether or not to plot some useful information
+
+	:return:
+		None
+		or instance of :class:`LayeredBasemap` if :param:`ax` is not
+		None or if fig_filespec == 'hold'
 	"""
 	if len(macro_recs) == 0:
 		print("No macroseismic information provided! Nothing to plot.")
@@ -391,7 +229,7 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
 		cb_title = "Number of replies"
 
-	if color_gradient == "discontinuous":
+	if color_gradient in ("discontinuous", "discrete"):
 		#if query_info in ('cii', 'cdi'):
 		if plot_info == 'intensity':
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
@@ -435,9 +273,10 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		## Symbol size in function of number of replies
 		if plot_info != 'num_replies':
 			num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
-			num_replies = num_replies[num_replies >= min_replies]
+			#num_replies = num_replies[num_replies >= min_replies]
 			symbol_size = symbol_style.size
-			sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
+			#sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
+			sizes = symbol_size + np.log10(num_replies) * symbol_size
 			ts = lbm.ThematicStyleGradient(num_replies, sizes, value_key="num_replies")
 			symbol_style.size = ts
 		symbol_style.fill_color = tfc
@@ -528,48 +367,229 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		dpi = 300
 	else:
 		dpi = 90
-	map.plot(fig_filespec=fig_filespec, dpi=dpi)
+	return map.plot(fig_filespec=("hold" if ax else fig_filespec), dpi=dpi)
 
 
+def plot_official_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75),
+				projection="merc", graticule_interval=(1, 1), min_fiability=20,
+				min_or_max='mean', min_val=1, aggregate_by="commune",
+				agg_function="average", int_conversion="round",
+				symbol_style=None, cmap="rob", color_gradient="discontinuous",
+				event_style="default", radii=[], title="",
+				fig_filespec=None, ax=None, copyright=u"© ROB", verbose=True):
+	"""
+	"""
+	from ..rob import query_local_eq_catalog_by_id
 
-if __name__ == "__main__":
-	#region = (2, 7, 49.25, 51.75)
-	region = (4.9, 6, 50.5, 51.5)
-	projection = "tmerc"
-	graticule_interval = (0.5, 1)
-	#id_earth = 509
-	id_earth = 6625
-	min_replies = 3
-	#filter_floors = (-100, 900)
-	filter_floors = (0, 4)
-	query_info = "cii"
-	#query_info = "num_replies"
-	min_fiability = 20
-	#aggregate_by = 'grid_5'
-	#aggregate_by = None
-	aggregate_by = 'commune'
-	#aggregate_by = 'main commune'
-	color_gradient = "continuous"
-	cmap = "rob"
-	#cmap = "jet"
-	#symbol_style = lbm.PointStyle(shape='D', size=5)
-	symbol_style = None
-	#radii = [10, 25, 50]
-	radii = []
-	#plot_pie = 'asleep'
-	plot_pie = None
-	#title = "Kinrooi 25/05/2018"
-	title = ""
+	if aggregate_by in ('main commune', 'id_main'):
+		group_by_main_village = True
+	else:
+		group_by_main_village = False
 
-	out_folder = "D:\\Earthquake Reports\\20180525\\plots"
-	fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
-	#fig_filespec = os.path.join(out_folder, fig_filename)
-	fig_filespec = None
+	## Retrieve macroseismic information from database
+	[eq] = query_local_eq_catalog_by_id(id_earth)
 
-	plot_web_macroseismic_map(id_earth, region=region, projection=projection,
-					graticule_interval=graticule_interval, min_replies=min_replies,
-					query_info=query_info, min_fiability=min_fiability, filter_floors=filter_floors,
-					cmap=cmap, color_gradient=color_gradient, symbol_style=symbol_style,
-					aggregate_by=aggregate_by, radii=radii,
-					plot_pie=plot_pie, title=title, fig_filespec=fig_filespec,
-					recalc=True)
+	comm_rec_dict = eq.get_macroseismic_data_aggregated_official(min_or_max=min_or_max,
+			min_val=min_val, group_by_main_village=group_by_main_village,
+			agg_function=agg_function, verbose=verbose)
+
+	for id_com, rec in comm_rec_dict.items():
+		if rec.lon is None:
+			print("Commune #%s has no location!" % id_com)
+			comm_rec_dict.pop(id_com)
+	macro_recs = comm_rec_dict.values()
+
+	return plot_macroseismic_map(macro_recs, id_earth, region=region,
+				projection=projection, graticule_interval=graticule_interval,
+				plot_info='intensity', int_conversion=int_conversion,
+				symbol_style=symbol_style, cmap=cmap, color_gradient=color_gradient,
+				event_style=event_style, radii=radii, plot_pie=None, title=title,
+				fig_filespec=fig_filespec, ax=ax, copyright=copyright,
+				verbose=verbose)
+
+
+def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="merc",
+				graticule_interval=(1, 1), min_replies=3, query_info="cii", min_val=1,
+				min_fiability=20, filter_floors=(0, 4), aggregate_by="commune",
+				agg_function="average", recalc=False, int_conversion="round",
+				symbol_style=None, cmap="rob", color_gradient="discontinuous",
+				event_style="default", radii=[], plot_pie=None, title="",
+				fig_filespec=None, ax=None, copyright=u"© ROB", verbose=True):
+	"""
+	Plot internet macroseismic map for given earthquake
+
+	:param id_earth:
+		int or str, ID of earthquake in ROB database for which to plot map
+	:param region:
+	:param projection:
+	:param graticule_interval:
+		see :func:`plot_macroseismic_map`
+	:param min_replies:
+		int, minimum number of replies to use for plotting macroseismic data
+	:param query_info:
+		str, info to query from the database, either 'cii', 'cdi' or
+		'num_replies'
+		(default: 'cii')
+	:param min_val:
+		int, minimum intensity value to plot
+		(default: 1)
+	:param min_fiability:
+		int, minimum fiability of enquiries to include in plot
+		(default: 20)
+	:param filter_floors:
+		(lower_floor, upper_floor) tuple, floors outside this range
+			(basement floors and upper floors) are filtered out
+			(default: (0, 4))
+	:param aggregate_by:
+		str, type of aggregation, specifying how macroseismic data should
+		be aggregated in the map, one of:
+		- 'id_com' or 'commune'
+		- 'id_main' or 'main commune'
+		- 'grid_X' (where X is grid spacing in km)
+		- None or '' (= no aggregation, i.e. all replies are
+		plotted individually (potentially on top of each other)
+		(default: 'commune')
+	:param recalc:
+		bool, whether or not to recalculate aggregated intensity
+		(default: False)
+
+	:param int_conversion:
+	:param symbol_style:
+	:param cmap:
+	:param color_gradient:
+	:param event_style:
+	:param radii:
+	:param plot_pie:
+	:param title:
+	:param fig_filespec:
+	:param ax:
+	:param copyright:
+	:param verbose:
+		see :func:`plot_macroseismic_map`
+	"""
+	from ..rob import query_local_eq_catalog_by_id, query_web_macro_enquiries
+
+	query_info = query_info.lower()
+	if query_info == 'num_replies':
+		min_replies = 1
+
+	if aggregate_by == 'commune':
+		aggregate_by = 'id_com'
+	elif aggregate_by == 'main commune':
+		aggregate_by = 'id_main'
+	elif not aggregate_by:
+		min_replies = 1
+
+	## Retrieve macroseismic information from database
+	[eq] = query_local_eq_catalog_by_id(id_earth)
+	dyfi_ensemble = eq.get_macroseismic_enquiries(min_fiability)
+
+	## Aggregate
+	macro_recs = dyfi_ensemble.get_aggregated_info(aggregate_by, min_replies,
+							agg_info=query_info, min_fiability=min_fiability,
+							filter_floors=filter_floors, recalc=recalc)
+	"""
+	if not recalc:
+		if aggregate_by == 'id_com':
+			group_by_main_village = False
+		elif aggregate_by == 'id_main':
+			group_by_main_village = True
+		else:
+			# TODO !
+			print("Use recalc=True for aggregate_by=%s" % aggregate_by)
+			exit()
+		qi = query_info if query_info in ('cii', 'cdi') else 'cii'
+		recs = eq.get_macroseismic_data_aggregated_web(min_replies=min_replies,
+				query_info=qi, min_val=min_val, min_fiability=min_fiability,
+				group_by_main_village=group_by_main_village, filter_floors=filter_floors,
+				agg_function=agg_function, verbose=verbose)
+		try:
+			unassigned = recs.pop(None)
+		except KeyError:
+			unassigned = None
+
+		macro_recs = recs.values()
+
+	else:
+		from ..macrorecord import MacroseismicInfo
+
+		ensemble = query_web_macro_enquiries(id_earth, min_fiability=min_fiability,
+											verbose=verbose)
+		ensemble = ensemble.fix_all()
+		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
+
+		if aggregate_by in ('id_com', 'id_main'):
+			comm_key = aggregate_by
+			ensemble.set_locations_from_communes(comm_key=comm_key, keep_unmatched=False,
+												max_quality=10)
+			agg_ensemble_dict = ensemble.aggregate_by_commune(comm_key=comm_key)
+		elif not aggregate_by:
+			if np.isnan(ensemble.get_prop_values('longitude')).all():
+				ensemble.set_locations_from_communes(comm_key='id_com')
+			agg_ensemble_dict = {}
+			for subensemble in ensemble:
+				lon = subensemble.recs[0]['longitude']
+				if lon:
+					#lat = subensemble.recs[0]['latitude']
+					id_web = subensemble.recs[0]['id_web']
+					agg_ensemble_dict[id_web] = subensemble
+		elif aggregate_by[:4] == 'grid':
+			if np.isnan(ensemble.get_prop_values('longitude')).any():
+				ensemble.set_locations_from_communes(comm_key='id_com',
+													keep_unmatched=False)
+			if '_' in aggregate_by:
+				_, grid_spacing = aggregate_by.split('_')
+				grid_spacing = float(grid_spacing)
+			else:
+				grid_spacing = 5
+			aggregate_by = 'grid'
+			agg_ensemble_dict = ensemble.aggregate_by_grid(grid_spacing)
+
+		try:
+			unassigned = agg_ensemble_dict.pop(0)
+		except KeyError:
+			unassigned = None
+
+		macro_recs = []
+		for key in agg_ensemble_dict.keys():
+			num_replies = agg_ensemble_dict[key].num_replies
+			if num_replies < min_replies:
+				agg_ensemble_dict.pop(key)
+				continue
+			if aggregate_by in ('id_com', 'id_main'):
+				id_com = agg_ensemble_dict[key].recs[0][comm_key]
+			else:
+				id_com = key
+			if aggregate_by in ('id_com', 'id_main') or not aggregate_by:
+				lon = agg_ensemble_dict[key].recs[0]['longitude']
+				lat = agg_ensemble_dict[key].recs[0]['latitude']
+			elif aggregate_by == 'grid':
+				lon, lat = key
+			web_ids = agg_ensemble_dict[key].get_prop_values('id_web')
+			if query_info == 'cii':
+				I = agg_ensemble_dict[key].calc_cii()
+				#I = agg_ensemble_dict[key].calc_mean_cii(filter_floors=None,
+				#				include_other_felt=False, remove_outliers=(0,100))
+			elif query_info == 'cdi':
+				I = agg_ensemble_dict[key].calc_cdi()
+			elif query_info == "num_replies":
+				I = 1
+			else:
+				print("Don't know how to recompute %s" % query_info)
+				exit()
+			rec = MacroseismicInfo(id_earth, id_com, I, aggregate_by, 'internet',
+									num_replies, lon, lat, web_ids)
+			macro_recs.append(rec)
+
+	if unassigned:
+		print("Note: %d enquiries are not assigned to a commune" % unassigned.num_replies)
+	"""
+
+	plot_info = 'num_replies' if query_info == 'num_replies' else 'intensity'
+	return plot_macroseismic_map(macro_recs, id_earth, region=region, projection=projection,
+				graticule_interval=graticule_interval, plot_info=plot_info,
+				int_conversion=int_conversion, symbol_style=symbol_style,
+				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
+				radii=radii, plot_pie=plot_pie, title=title,
+				fig_filespec=fig_filespec, ax=ax, copyright=copyright,
+				verbose=verbose)
