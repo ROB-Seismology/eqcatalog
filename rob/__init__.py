@@ -30,6 +30,8 @@ if platform.uname()[0] == "Windows":
 else:
 	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
+from mapping.seismo_gis.seismo_gis import SEISMOGIS_ROOT
+
 
 ## Import submodules
 
