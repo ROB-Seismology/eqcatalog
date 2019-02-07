@@ -366,23 +366,37 @@ class LocalEarthquake:
 
 		mag = {}
 
+		## Magnitude specified as value and magnitude type
 		Mtype_key = column_map.get('Mtype', 'Mtype')
 		if Mtype_key in rec:
-			Mtype = rec[Mtype_key]
-			Mag_key = column_map.get('Mag', 'Mag')
-			M = float(rec.get(Mag_key, np.nan))
-			mag[Mtype] = M
+			Mtype = rec.get(Mtype_key)
+			if Mtype:
+				if len(Mtype) == 1:
+					Mtype = 'M' + Mtype
+				if Mtype[-1] == 'b':
+					Mtype = Mtype.lower()
+				else:
+					Mtype = Mtype.upper()
+				Mag_key = column_map.get('Mag', 'Mag')
+				M = float(rec.get(Mag_key, np.nan))
+				mag[Mtype] = M
+		## Specific magnitude type column
+		## takes precedence over value/magnitude type columns
 		ML_key = column_map.get('ML', 'ML')
-		ML = float(rec.get(ML_key, np.nan) or np.nan)
+		#ML = float(rec.get(ML_key, np.nan) or np.nan)
+		ML = float(rec.get(ML_key, mag.get('ML', np.nan)))
 		mag['ML'] = ML
 		MS_key = column_map.get('MS', 'MS')
-		MS = float(rec.get(MS_key, np.nan) or np.nan)
+		#MS = float(rec.get(MS_key, np.nan) or np.nan)
+		MS = float(rec.get(MS_key, mag.get('MS', np.nan)))
 		mag['MS'] = MS
 		MW_key = column_map.get('MW', 'MW')
-		MW = float(rec.get(MW_key, np.nan) or np.nan)
+		#MW = float(rec.get(MW_key, np.nan) or np.nan)
+		MW = float(rec.get(MW_key, mag.get('MW', np.nan)))
 		mag['MW'] = MW
 		mb_key = column_map.get('mb', 'mb')
-		mb = float(rec.get(mb_key, np.nan) or np.nan)
+		#mb = float(rec.get(mb_key, np.nan) or np.nan)
+		mb = float(rec.get(mb_key, mag.get('mb', np.nan)))
 		mag['mb'] = mb
 
 		name_key = column_map.get('name', 'name')
