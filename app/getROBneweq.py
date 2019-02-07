@@ -32,11 +32,9 @@ USERS = [dict(name="Kris", email="kris.vanneste@oma.be", tel="+32473499229"),
 		dict(name="Thomas", tel="+32496952990"),
 		dict(name="Michel", email="mvc@oma.be", tel="+32473518241"),
 		dict(name="Fabienne", tel="+32497430189"),
-		dict(name="Bart", email="bart.vleminckx@outlook.com", tel="+32495943247"),
 		dict(name="Henri", email="henri.martin.skq@gmail.com", tel="+32487615250"),
 		dict(name="Koen Van Noten", email="koen.vannoten@gmail.com", tel="+32486056357"),
-		dict(name="Baudouin", tel="+32494646244"),
-		dict(name="Koen Verbeeck", email="verbeeckkoen@gmail.com")]
+		dict(name="Baudouin", tel="+32494646244")]
 
 
 ## Mail settings
