@@ -81,7 +81,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 		csv_file = "D:\\seismo-gis\\collections\\EMEC\TXT\EMEC.txt"
 		column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
 					'lat': 5, 'lon': 6, 'depth': 7, 'intensity_max': 8,
-					'MW': 11, 'errM': 12, 'agency': 13}
+					'Mag': 9, 'Mtype': 10, 'MW': 11, 'errM': 12, 'agency': 13}
 		return read_catalog_csv(csv_file, column_map, has_header=False,
 							ID_prefix='EMEC', delimiter=';')
 
@@ -101,7 +101,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 			column_map = {'lon': 'lon', 'lat': 'lat',
 						'year': 'year', 'month': 'month', 'day': 'day',
 						'hour': 'hour', 'minute': 'minute',
-						'MW': 'Mw', 'depth': 'depth', 'intensity_max': 'Imax',
+						'Mag': 'Morig', 'Mtype': 'Mtype', 'MW': 'Mw',
+						'depth': 'depth', 'intensity_max': 'Imax',
 						'agency': 'ref'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "ISC-GEM":
