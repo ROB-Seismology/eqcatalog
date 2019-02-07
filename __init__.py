@@ -119,10 +119,8 @@ else:
 from .io import (read_named_catalog, read_catalog_sql, read_catalog_csv,
 				read_catalog_gis)
 
-"""
-## seismodb (depends on eqrecord, macrorecord, eqcatalog)
+## plot submodule (depends on macrorecord, rob)
 if not reloading:
-	from . import seismodb
+	from . import plot
 else:
-	reload(seismodb)
-"""
+	reload(plot)
