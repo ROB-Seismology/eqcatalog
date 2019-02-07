@@ -5,6 +5,7 @@ Processing of macroseismic and DYFI data
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
+from builtins import int
 
 try:
 	## Python 2
@@ -420,6 +421,21 @@ class MacroseismicEnquiryEnsemble():
 		idxs = np.where(all_distances <= radius)[0]
 		return self.__getitem__(idxs)
 
+	@property
+	def longitudes(self):
+		return np.array(self.get_prop_values('longitude'))
+
+	@property
+	def latitudes(self):
+		return np.array(self.get_prop_values('latitude'))
+
+	def is_geo_located(self):
+		"""
+		:return:
+			bool array, indicating whether or not location is available
+		"""
+		return ~(np.isnan(self.longitudes) | np.isnan(self.latitudes))
+
 	def calc_distances(self, lon, lat, z=0):
 		"""
 		Compute distances with respect to a particular point
@@ -436,8 +452,8 @@ class MacroseismicEnquiryEnsemble():
 			array, distances (in km)
 		"""
 		import mapping.geotools.geodetic as geodetic
-		rec_lons = np.array(self.get_prop_values('longitude'))
-		rec_lats = np.array(self.get_prop_values('latitude'))
+		rec_lons = self.longitudes
+		rec_lats = self.latitudes
 		dist = geodetic.spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
 		dist = np.sqrt(dist**2 + z**2)
 		return dist
@@ -481,7 +497,7 @@ class MacroseismicEnquiryEnsemble():
 			zip_commune = "%s %s" % (zip, commune)
 			## Sometimes people fill out full address instead of just street
 			#street = street.replace(zip_commune, '').strip().rstrip(',')
-			street = street.replace('%d' % zip, '')
+			street = street.replace('%s' % zip, '')
 			street = street.replace(commune, '')
 			street = street.strip().rstrip(',').strip()
 
@@ -584,9 +600,8 @@ class MacroseismicEnquiryEnsemble():
 			column_clause = ['*']
 			query_values = ','.join(map(str, unique_ids))
 			where_clause = 'id in (%s)' % query_values
-			comm_recs = query_seismodb_table(table_clause,
-						column_clause=column_clause, where_clause=where_clause,
-						verbose=verbose)
+			comm_recs = query_seismodb_table(table_clause, column_clause,
+								where_clause=where_clause, verbose=verbose)
 			comm_rec_dict = {rec['id']: rec for rec in comm_recs}
 		elif comm_key == "zip":
 			comm_rec_dict = {}
@@ -629,9 +644,8 @@ class MacroseismicEnquiryEnsemble():
 						where_clause = 'zip IN (%s)' % query_values
 					for table in com_tables:
 						table_clause = table
-						comm_recs = query_seismodb_table(table_clause,
-							column_clause=column_clause, where_clause=where_clause,
-							verbose=verbose)
+						comm_recs = query_seismodb_table(table_clause, column_clause,
+										where_clause=where_clause, verbose=verbose)
 						if country == "NL":
 							comm_recs = {(country, rec['zip'][:-3],
 									strip_accents(rec[com_col]).title()): rec
@@ -801,9 +815,9 @@ class MacroseismicEnquiryEnsemble():
 					rec['longitude'] = comm_rec['longitude']
 					rec['latitude'] = comm_rec['latitude']
 					# TODO: decide on location quality
-					rec['quality'] = {'id_com': 7,
-										'zip': 7,
-										'id_main': 5}[comm_key]
+					rec['quality'] = {'id_com': 5,
+										'zip': 5,
+										'id_main': 4}[comm_key]
 				elif not keep_unmatched:
 					rec['longitude'] = rec['latitude'] = rec['quality'] = np.nan
 
@@ -826,8 +840,8 @@ class MacroseismicEnquiryEnsemble():
 		web_ids = self.get_prop_values('id_web')
 		query_values = ','.join(map(str, web_ids))
 		where_clause = 'id_web in (%s)' % query_values
-		db_recs = query_seismodb_table(table_clause,
-					column_clause=column_clause, where_clause=where_clause)
+		db_recs = query_seismodb_table(table_clause, column_clause,
+										where_clause=where_clause)
 		db_rec_dict = {rec['id_web']: rec for rec in db_recs}
 		for rec in self.recs:
 			db_rec = db_rec_dict.get('id_web')
@@ -886,8 +900,8 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		grid_spacing *= 1000
 		import mapping.geotools.coordtrans as ct
-		lons = self.get_prop_values('longitude')
-		lats = self.get_prop_values('latitude')
+		lons = self.longitudes
+		lats = self.latitudes
 		mask = np.isnan(lons)
 		lons = np.ma.array(lons, mask=mask)
 		lats = np.ma.array(lats, mask=mask)
@@ -940,6 +954,121 @@ class MacroseismicEnquiryEnsemble():
 			bin_rec_dict[key] = self.__class__(self.id_earth, bin_rec_dict[key])
 
 		return bin_rec_dict
+
+	def get_aggregated_info(self, aggregate_by='id_com', min_replies=3, agg_info="cii",
+							min_fiability=20.0, filter_floors=False, recalc=False):
+		"""
+		Get aggregated macroseismic information.
+
+		:param aggregate_by:
+			str, type of aggregation, specifying how macroseismic data
+			should be aggregated, one of:
+			- 'id_com' or 'commune'
+			- 'id_main' or 'main commune'
+			- 'grid_X' (where X is grid spacing in km)
+			- None or '' (= no aggregation, i.e. info is returned for
+			  all replies individually)
+			(default: 'id_com')
+		:param min_replies:
+			int, minimum number of replies to use for aggregating
+			(default: 3)
+		:param agg_info:
+			str, info to aggregate, either 'cii', 'cdi' or 'num_replies'
+			(default: 'cii')
+		:param min_fiability:
+			int, minimum fiability of enquiries to include in aggregate
+			(default: 20)
+		:param filter_floors:
+			(lower_floor, upper_floor) tuple, floors outside this range
+			(basement floors and upper floors) are filtered out
+			(default: (0, 4))
+		:param recalc:
+			bool, whether or not to recalculate aggregated intensity
+			(default: False)
+
+		:return:
+			list with instances of :class:`MacroseismicInfo`
+		"""
+		ensemble = self[self.fiability >= min_fiability]
+		ensemble = ensemble.fix_all()
+		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
+
+		if aggregate_by in ('id_com', 'id_main'):
+			comm_key = aggregate_by
+			ensemble.set_locations_from_communes(comm_key=comm_key, max_quality=10,
+												keep_unmatched=False)
+			agg_ensemble_dict = ensemble.aggregate_by_commune(comm_key=comm_key)
+		elif not aggregate_by:
+			min_replies = 1
+			## If there are no locations, get them from the communes
+			if (~ensemble.is_geo_located()).all():
+				ensemble.set_locations_from_communes(comm_key='id_com')
+			agg_ensemble_dict = {}
+			for subensemble in ensemble:
+				if subensemble.is_geo_located()[0]:
+					id_web = subensemble.recs[0]['id_web']
+					agg_ensemble_dict[id_web] = subensemble
+		elif aggregate_by[:4] == 'grid':
+			## Include non-geocoded enquiries
+			# TODO: should this be an option?
+			ensemble.set_locations_from_communes(comm_key='id_com', max_quality=5,
+												keep_unmatched=False)
+			if '_' in aggregate_by:
+				_, grid_spacing = aggregate_by.split('_')
+				grid_spacing = float(grid_spacing)
+			else:
+				grid_spacing = 5
+			aggregate_by = 'grid'
+			agg_ensemble_dict = ensemble.aggregate_by_grid(grid_spacing)
+
+		try:
+			unassigned = agg_ensemble_dict.pop(0)
+		except KeyError:
+			unassigned = None
+		else:
+			print("Note: %d enquiries are not assigned to a commune"
+					% unassigned.num_replies)
+
+		macro_recs = []
+		for key in agg_ensemble_dict.keys():
+			num_replies = agg_ensemble_dict[key].num_replies
+			if num_replies < min_replies:
+				agg_ensemble_dict.pop(key)
+				continue
+			if aggregate_by in ('id_com', 'id_main'):
+				id_com = agg_ensemble_dict[key].recs[0][comm_key]
+			else:
+				id_com = key
+			if aggregate_by in ('id_com', 'id_main') or not aggregate_by:
+				lon = agg_ensemble_dict[key].longitudes[0]
+				lat = agg_ensemble_dict[key].latitudes[0]
+			elif aggregate_by == 'grid':
+				lon, lat = key
+			web_ids = agg_ensemble_dict[key].get_prop_values('id_web')
+
+			if agg_info == 'cii':
+				if recalc:
+					I = agg_ensemble_dict[key].calc_cii(filter_floors=False)
+				else:
+					I = agg_ensemble_dict[key].calc_mean_cii(filter_floors=False,
+								include_other_felt=False, remove_outliers=(0,100))
+			elif agg_info == 'cdi':
+				if recalc:
+					I = agg_ensemble_dict[key].calc_cdi()
+				else:
+					I = np.mean(agg_ensemble_dict[key].calc_cdi(aggregate=False,
+									filter_floors=False, include_other_felt=False,
+									include_heavy_appliance=True))
+			elif agg_info == "num_replies":
+				I = 1
+			else:
+				print("Don't know how to compute %s" % agg_info)
+				exit()
+			rec = MacroseismicInfo(ensemble.id_earth, id_com, I, aggregate_by,
+									'internet', num_replies, lon, lat, web_ids)
+			macro_recs.append(rec)
+
+		return macro_recs
 
 	def aggregate_by_zip(self):
 		# TODO: can be removed
