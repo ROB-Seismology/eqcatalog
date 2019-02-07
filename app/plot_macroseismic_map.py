@@ -89,7 +89,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 	elif not aggregate_by:
 		min_replies = 1
 
-	[eq] = eqcatalog.seismodb.query_ROB_LocalEQCatalogByID(id_earth)
+	[eq] = eqcatalog.rob.query_local_eq_catalog_by_id(id_earth)
 
 	## Retrieve macroseismic information from database
 	if not recalc:
@@ -115,7 +115,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 	else:
 		from eqcatalog.macrorecord import MacroseismicInfo
 
-		ensemble = eqcatalog.seismodb.query_ROB_Web_enquiries(id_earth,
+		ensemble = eqcatalog.rob.query_web_macro_enquiries(id_earth,
 						min_fiability=min_fiability, verbose=verbose)
 		ensemble = ensemble.fix_all()
 		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
@@ -194,8 +194,8 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 				verbose=verbose)
 
 
-def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75), projection="merc",
-				graticule_interval=(1, 1), plot_info="intensity",
+def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
+				projection="merc", graticule_interval=(1, 1), plot_info="intensity",
 				int_conversion="round", symbol_style=None,
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
@@ -267,7 +267,7 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75), pro
 
 	tot_num_replies = np.sum([rec.num_replies for rec in macro_recs])
 	if verbose:
-		print("Found %d aggregates (%d replies) for event %d:"
+		print("Found %d aggregates (%d replies) for event %s:"
 				% (len(macro_recs), tot_num_replies, id_earth))
 		intensities = [rec.I for rec in macro_recs]
 		idxs = np.argsort(intensities)
@@ -385,7 +385,8 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75), pro
 		enq_type = macro_recs[0].enq_type
 		cb_title = {'internet': "Community Internet Intensity",
 					'online': "Community Internet Intensity",
-					'official': "Macroseismic Intensity"}[enq_type]
+					'official': "Macroseismic Intensity"}.get(enq_type,
+													"Macroseismic Intensity")
 	elif plot_info == 'num_replies':
 		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
 		cb_title = "Number of replies"
@@ -546,7 +547,8 @@ if __name__ == "__main__":
 	min_fiability = 20
 	#aggregate_by = 'grid_5'
 	#aggregate_by = None
-	aggregate_by = 'main commune'
+	aggregate_by = 'commune'
+	#aggregate_by = 'main commune'
 	color_gradient = "continuous"
 	cmap = "rob"
 	#cmap = "jet"
