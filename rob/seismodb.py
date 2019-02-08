@@ -123,7 +123,7 @@ def query_seismodb_table(table_clause, column_clause="*", join_clause="",
 def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 						Mmin=None, Mmax=None, min_depth=None, max_depth=None,
 						id_earth=None, sort_key="date", sort_order="asc",
-						event_type="ke", convert_NULL=True, verbose=False, errf=None):
+						event_type="ke", null_value=0, verbose=False, errf=None):
 	"""
 	Query ROB catalog of local earthquakes.
 
@@ -166,9 +166,9 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		str, event type (one of "all", "cb", "ex", "ke", "ki", "km",
 		"kr", "kx", "qb", "sb", "se", "si", "sm", "sr", "sx" or "uk")
 		(default: "ke" = known earthquakes)
-	:param convert_NULL:
-		Bool, whether or not to convert NULL values to zero values
-		(default: True)
+	:param null_value:
+		float, value to use for NULL values (except magnitude)
+		(default: 0)
 	:param verbose:
 		Bool, if True the query string will be echoed to standard output
 	:param errf:
@@ -296,6 +296,21 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		hour, minutes, seconds = [int(s) for s in time.split(":")]
 		time = datetime.time(hour, minutes, seconds)
 
+		lon = null_value if lon is None else lon
+		lat = null_value if lat is None else lat
+		depth = null_value if depth is None else depth
+		ML = np.nan if ML is None else ML
+		MS = np.nan if MS is None else MS
+		MW = np.nan if MW is None else MW
+		mb = np.nan
+		intensity_max = null_value if intensity_max is None else intensity_max
+		macro_radius = null_value if macro_radius is None else macro_radius
+		errh = null_value if errh is None else errh
+		errz = null_value if errz is None else errz
+		errt = null_value if errt is None else errt
+		errM = null_value if errM is None else errM
+
+		"""
 		if convert_NULL:
 			if lon == None:
 				lon = 0.0
@@ -323,6 +338,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 				errM = 0.
 
 			mb = np.nan
+			"""
 
 		eq = ROBLocalEarthquake(id_earth, date, time, lon, lat, depth, {},
 							ML, MS, MW, mb, name, intensity_max, macro_radius,
