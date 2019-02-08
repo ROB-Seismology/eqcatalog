@@ -458,22 +458,31 @@ class EQCatalog:
 		"""
 		import prettytable as pt
 
+		def remove_nan_values(ar):
+			return [val if not np.isnan(val) else '' for val in ar]
+
 		tab = pt.PrettyTable()
 		tab.add_column('ID', self.get_ids(), align='r', valign='m')
 		tab.add_column('Date', [eq.date for eq in self], valign='m')
 		tab.add_column('Time', [eq.time for eq in self], valign='m')
-		tab.add_column('Name', [eq.name for eq in self], valign='m')
-		tab.add_column('Lon', self.get_longitudes(), align='r', valign='m')
-		tab.add_column('Lat', self.get_latitudes(), align='r', valign='m')
-		tab.add_column('Z', self.get_depths(), align='r', valign='m')
+		names = [eq.name for eq in self]
+		if sum([len(name) for name in names]):
+			tab.add_column('Name', names, valign='m')
+		lons = remove_nan_values(self.get_longitudes())
+		tab.add_column('Lon', lons, align='r', valign='m')
+		lats = remove_nan_values(self.get_latitudes())
+		tab.add_column('Lat', lats, align='r', valign='m')
+		depths = remove_nan_values(self.get_depths())
+		tab.add_column('Z', depths, align='r', valign='m')
 		Mtypes = ('ML', 'MS', 'MW', 'mb')
 		for Mtype in Mtypes:
 			mags = self.get_magnitudes(Mtype, Mrelation={})
 			if not np.isnan(mags).all():
-				mags = [m if not np.isnan(m) else '' for m in mags]
+				mags = remove_nan_values(mags)
 				tab.add_column(Mtype, mags, align='r', valign='m')
 		intensities = self.get_max_intensities()
-		if not (intensities == 0).all():
+		if not ((intensities == 0).all() or np.isnan(intensities).all()):
+			intensities = remove_nan_values(intensities)
 			tab.add_column('Imax', intensities, align='r', valign='m')
 
 		tab.padding_width = padding_width
