@@ -544,10 +544,18 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 	else:
 		## Construct SQL query
 		table_clause = ['macro_detail']
-		column_clause = [
-			'macro_detail.id_com',
-			'communes.longitude',
-			'communes.latitude']
+
+		if group_by_main_village:
+			column_clause = [
+				'communes.id_main AS id_com',
+				'main_communes.longitude',
+				'main_communes.latitude',
+				'COUNT(*) as num_replies']
+		else:
+			column_clause = [
+				'macro_detail.id_com',
+				'communes.longitude',
+				'communes.latitude']
 
 		if group_by_main_village:
 			agg_function = AGG_FUNC_DICT.get(agg_function.lower(), "MAX")
@@ -575,9 +583,11 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 
 		where_clause = 'macro_detail.id_earth = %d' % id_earth
 		where_clause += ' and macro_detail.fiability >= %d' % min_fiability
-		#where_clause += ' and macro_detail.id_com = communes.id'
 
 		join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id')]
+		if group_by_main_village:
+			join_clause.append(('JOIN', 'communes as main_communes',
+							'communes.id_main = main_communes.id'))
 
 		having_clause = 'Intensity >= %d' % min_val
 		order_clause = ''
@@ -597,12 +607,13 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 		id_com = rec['id_com']
 		I = float(rec['Intensity'])
 		lon, lat = rec['longitude'], rec['latitude']
+		num_replies = rec.get('num_replies', 1)
 		if isinstance(rec['id_db'], (int, basestring)):
 			db_ids = [rec['id_db']]
 		else:
 			db_ids = list(map(int, rec['id_db'].split(',')))
 		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
-											'official', num_replies=1,
+											'official', num_replies=num_replies,
 											lon=lon, lat=lat, db_ids=db_ids)
 
 	return macro_info
