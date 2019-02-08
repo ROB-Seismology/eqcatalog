@@ -35,7 +35,8 @@ __all__ = ["read_named_catalog", "read_catalog_sql", "read_catalog_csv",
 			"read_catalog_gis"]
 
 
-def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=True):
+def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=0,
+						verbose=True):
 	"""
 	Read a known catalog (corresponding files should be in standard location)
 
@@ -45,6 +46,9 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
+	:param null_value:
+		float, value to use for NULL values (except magnitude)
+		(default: 0)
 	:param verbose:
 		bool, whether or not to print information while reading
 		GIS table (default: True)
@@ -57,7 +61,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 		region = (0., 8., 49., 52.)
 		start_date = datetime.date(1350, 1, 1)
 		return query_local_eq_catalog(region=region, start_date=start_date,
-									verbose=verbose)
+									null_value=null_value, verbose=verbose)
 
 	elif catalog_name.upper() in ("HARVARD_CMT", "HARVARD CMT"):
 		from ..harvard_cmt import ROOT_FOLDER
@@ -75,7 +79,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 					'MS': 'ref_MS', 'MW': 'MW', 'name': 'location',
 					'agency': 'Harvard CMT'}
 		return read_catalog_sql(sqldb, table_name, query=query, column_map=column_map,
-								verbose=verbose)
+								null_value=null_value, verbose=verbose)
 
 	elif catalog_name.upper() == "EMEC":
 		csv_file = "D:\\seismo-gis\\collections\\EMEC\TXT\EMEC.txt"
@@ -83,7 +87,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 					'lat': 5, 'lon': 6, 'depth': 7, 'intensity_max': 8,
 					'Mag': 9, 'Mtype': 10, 'MW': 11, 'errM': 12, 'agency': 13}
 		return read_catalog_csv(csv_file, column_map, has_header=False,
-							ID_prefix='EMEC', delimiter=';')
+							ID_prefix='EMEC', delimiter=';', null_value=null_value)
 
 	else:
 		date_sep = '/'
@@ -137,14 +141,15 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, verbose=Tru
 		ID_prefix = catalog_name + "-"
 		#eqc = read_catalogGIS(gis_filespec, column_map, fix_zero_days_and_months=fix_zero_days_and_months,
 		#					convert_zero_magnitudes=convert_zero_magnitudes, ID_prefix=ID_prefix, verbose=verbose)
-		eqc = read_catalog_gis(gis_filespec, column_map, date_sep=date_sep, ID_prefix=ID_prefix, verbose=verbose)
+		eqc = read_catalog_gis(gis_filespec, column_map, date_sep=date_sep,
+					ID_prefix=ID_prefix, null_value=null_value, verbose=verbose)
 		eqc.name = catalog_name
 		return eqc
 
 
 def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 					date_sep='-', time_sep=':', date_order='YMD',
-					ignore_errors=False, verbose=True):
+					null_value=0, ignore_errors=False, verbose=True):
 	"""
 	Read catalog from SQL database
 
@@ -173,6 +178,9 @@ def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 	:param date_order:
 		str, order of year (Y), month (M), day (D) in date string
 		(default: 'YMD')
+	:param null_value:
+		float, value to use for NULL values (except magnitude)
+		(default: 0)
 	:param ignore_errors:
 		bool, whether or not records that cannot be parsed should be
 		silently ignored
@@ -200,7 +208,8 @@ def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 
 		try:
 			eq = LocalEarthquake.from_dict_rec(rec, column_map=column_map,
-				date_sep=date_sep, time_sep=time_sep, date_order=date_order)
+				date_sep=date_sep, time_sep=time_sep, date_order=date_order,
+				null_value=null_value)
 		except:
 			if not ignore_errors:
 				raise
@@ -218,7 +227,7 @@ def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 					date_sep='-', time_sep=':', date_order='YMD',
 					comment_char='#', ignore_chars=[], ignore_errors=False,
-					verbose=False, **fmtparams):
+					null_value=0, verbose=False, **fmtparams):
 	"""
 	Read earthquake catalog from CSV file with columns defining
 	earthquake properties: ID, datetime or (date or (year, month, day))
@@ -275,6 +284,9 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 		bool, whether or not records that cannot be parsed should be
 		silently ignored
 		(default: False, will raise exception)
+	:param null_value:
+		float, value to use for NULL values (except magnitude)
+		(default: 0)
 	:param verbose:
 		bool, whether or not to print information while reading file
 		(default: True)
@@ -348,7 +360,8 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 
 			try:
 				eq = LocalEarthquake.from_dict_rec(row, column_map=column_map,
-					date_sep=date_sep, time_sep=time_sep, date_order=date_order)
+					date_sep=date_sep, time_sep=time_sep, date_order=date_order,
+					null_value=null_value)
 			except:
 				if not ignore_errors:
 					raise
@@ -366,7 +379,8 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 
 def read_catalog_gis(gis_filespec, column_map={}, ID_prefix='',
 					date_sep='-', time_sep=':', date_order='YMD',
-					ignore_chars=[], ignore_errors=False, verbose=False):
+					null_value=0, ignore_chars=[], ignore_errors=False,
+					verbose=False):
 	"""
 	Read catalog from GIS file
 
@@ -390,6 +404,9 @@ def read_catalog_gis(gis_filespec, column_map={}, ID_prefix='',
 	:param date_order:
 		str, order of year (Y), month (M), day (D) in date string
 		(default: 'YMD')
+	:param null_value:
+		float, value to use for NULL values (except magnitude)
+		(default: 0)
 	:param ignore_chars:
 		string containing characters or list containing strings that may
 		sometimes be present in a column and should be ignored
@@ -436,7 +453,8 @@ def read_catalog_gis(gis_filespec, column_map={}, ID_prefix='',
 
 		try:
 			eq = LocalEarthquake.from_dict_rec(rec, column_map=column_map,
-				date_sep=date_sep, time_sep=time_sep, date_order=date_order)
+				date_sep=date_sep, time_sep=time_sep, date_order=date_order,
+				null_value=null_value)
 		except:
 			if not ignore_errors:
 				raise
