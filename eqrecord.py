@@ -248,7 +248,7 @@ class LocalEarthquake:
 
 	@classmethod
 	def from_dict_rec(cls, rec, column_map={}, date_sep='-', time_sep=':',
-					date_order='YMD'):
+					date_order='YMD', null_value=0):
 		"""
 		Construct instance of :class:`LocalEarthquake` from a dict-like
 		record mapping earthquake property names to values. If keys
@@ -271,6 +271,9 @@ class LocalEarthquake:
 		:param date_order:
 			str, order of year (Y), month (M), day (D) in date string
 			(default: 'YMD')
+		:param null_value:
+			float, value to use for NULL values (except magnitude)
+			(default: 0)
 
 		:return:
 			instance of :class:`LocalEarthquake`
@@ -356,13 +359,13 @@ class LocalEarthquake:
 
 		## Default value for lon, lat, depth is 0, but could also be nan
 		lon_key = column_map.get('lon', 'lon')
-		lon = float(rec.get(lon_key, 0) or 0)
+		lon = float(rec.get(lon_key, null_value) or null_value)
 
 		lat_key = column_map.get('lat', 'lat')
-		lat = float(rec.get(lat_key, 0) or 0)
+		lat = float(rec.get(lat_key, null_value) or null_value)
 
 		depth_key = column_map.get('depth', 'depth')
-		depth = float(rec.get(depth_key, 0) or 0)
+		depth = float(rec.get(depth_key, null_value) or null_value)
 
 		mag = {}
 
@@ -403,7 +406,7 @@ class LocalEarthquake:
 		name = rec.get(name_key, "")
 
 		intensity_max_key = column_map.get('intensity_max', 'intensity_max')
-		intensity_max = rec.get(intensity_max_key, 0)
+		intensity_max = rec.get(intensity_max_key, null_value)
 		if intensity_max:
 			if isinstance(intensity_max, basestring):
 				## Strip trailing + and - if present
@@ -419,16 +422,16 @@ class LocalEarthquake:
 		macro_radius = float(rec.get(macro_radius_key, 0) or 0)
 
 		errh_key = column_map.get('errh', 'errh')
-		errh = float(rec.get(errh_key, 0) or 0)
+		errh = float(rec.get(errh_key, null_value) or null_value)
 
 		errz_key = column_map.get('errz', 'errz')
-		errz = float(rec.get(errz_key, 0) or 0)
+		errz = float(rec.get(errz_key, null_value) or null_value)
 
 		errt_key = column_map.get('errt', 'errt')
-		errt = float(rec.get(errt_key, 0) or 0)
+		errt = float(rec.get(errt_key, null_value) or null_value)
 
 		errM_key = column_map.get('errM', 'errM')
-		errM = float(rec.get(errM_key, 0) or 0)
+		errM = float(rec.get(errM_key, null_value) or null_value)
 
 		zone_key = column_map.get('zone', 'zone')
 		zone = rec.get(zone_key, "")
