@@ -18,9 +18,6 @@ GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB
 #GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
 
 
-# TODO: add plot_official_macroseismic_map function
-# TODO: agg_function ?
-
 
 __all__ = ["plot_macroseismic_map", "plot_official_macroseismic_map",
 			"plot_web_macroseismic_map"]
@@ -108,9 +105,10 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		print("Found %d aggregates (%d replies) for event %s:"
 				% (len(macro_recs), tot_num_replies, id_earth))
 		intensities = [rec.I for rec in macro_recs]
-		idxs = np.argsort(intensities)
-		for idx in idxs:
-			print("  %s : %.2f (n=%d)" % (macro_recs[idx].id_com,
+		if verbose > 1:
+			idxs = np.argsort(intensities)
+			for idx in idxs:
+				print("  %s : %.2f (n=%d)" % (macro_recs[idx].id_com,
 							macro_recs[idx].I, macro_recs[idx].num_replies))
 
 	## Determine aggregation type from first record
@@ -150,19 +148,15 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 
 	if plot_info == 'intensity':
 		intensities = np.array([rec.I for rec in macro_recs])
-		if color_gradient == "discontinuous":
+		if color_gradient in ("discontinuous", "discrete"):
 			intensities = getattr(np, int_conversion)(intensities).astype('int')
 		## Store possibly rounded intensities in new 'intensity' attribute,
 		## keeping original 'I' attribute unmodified
 		for r, rec in enumerate(macro_recs):
 			setattr(rec, plot_info, intensities[r])
-		idxs = np.argsort(intensities)
-		for idx in idxs:
-			print("  %s : %.2f (n=%d)" % (macro_recs[idx].id_com, macro_recs[idx].intensity,
-												macro_recs[idx].num_replies))
+
 
 	layers = []
-
 
 	## Commune/grid layer
 	if aggregate_by == 'grid':
@@ -198,24 +192,20 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 			commune_data = None
 	else:
 		key = "ID_ROB"
-		#key = 'village_number'
 		joined_attributes = {}
 		joined_attributes[plot_info] = {'key': key,
 			'values': {rec.id_com: getattr(rec, plot_info) for rec in macro_recs}}
 		if plot_info != 'num_replies':
 			joined_attributes['num_replies'] = {'key': key,
 				'values': {rec.id_com: rec.num_replies for rec in macro_recs}}
-		#print(joined_attributes)
 		if verbose:
 			Imax = np.nanmax(joined_attributes[plot_info]['values'].values())
 			print("Max %s: %s" % (plot_info, Imax))
 
 		commune_data = lbm.GisData(gis_filespec, joined_attributes=joined_attributes)
 		#_, _, polygon_data = commune_data.get_data()
-		#print(len(polygon_data))
-		#print(polygon_data[0].value)
+		#print(len(polygon_data), len(polygon_data.values['intensity']))
 		#exit()
-		#print [val for val in polygon_data.values['cii'] if val != None]
 
 
 	if plot_info == 'intensity':
@@ -230,7 +220,6 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		cb_title = "Number of replies"
 
 	if color_gradient in ("discontinuous", "discrete"):
-		#if query_info in ('cii', 'cdi'):
 		if plot_info == 'intensity':
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
 										labels=["%d" % val for val in classes],
@@ -371,13 +360,61 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 
 
 def plot_official_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75),
-				projection="merc", graticule_interval=(1, 1), min_fiability=20,
-				min_or_max='mean', min_val=1, aggregate_by="commune",
-				agg_function="average", int_conversion="round",
+				projection="merc", graticule_interval=(1, 1), min_or_max='max',
+				aggregate_by="commune", agg_function="average", min_val=1,
+				min_fiability=20, int_conversion="round",
 				symbol_style=None, cmap="rob", color_gradient="discontinuous",
 				event_style="default", radii=[], title="",
 				fig_filespec=None, ax=None, copyright=u"© ROB", verbose=True):
 	"""
+	Plot "official" macroseismic map
+
+	:param id_earth:
+		int or str, ID of earthquake in ROB database for which to plot map
+	:param region:
+	:param projection:
+	:param graticule_interval:
+		see :func:`plot_macroseismic_map`
+
+	:param min_or_max:
+		str, one of 'min', 'mean' or 'max' to select between
+		intensity_min and intensity_max values in database
+		(default: 'max')
+	:param aggregate_by:
+		str, type of aggregation, specifying how macroseismic data should
+		be aggregated in the map, one of:
+		- 'id_com' or 'commune'
+		- 'id_main' or 'main commune'
+		(default: 'commune')
+	:param agg_function:
+		str, aggregation function to use if :param:`aggregate_by`
+		is 'main commune', one of "minimum", "maximum" or "average"
+		(default: "average")
+	:param min_val:
+		float, minimum intensity to return
+		(default: 1)
+	:param min_fiability:
+		float, minimum fiability of macroseismic record
+		(default: 20.)
+
+	:param int_conversion:
+	:param symbol_style:
+	:param cmap:
+	:param color_gradient:
+	:param event_style:
+	:param radii:
+	:param plot_pie:
+	:param title:
+	:param fig_filespec:
+	:param ax:
+	:param copyright:
+	:param verbose:
+		see :func:`plot_macroseismic_map`
+
+	:return:
+		None
+		or instance of :class:`LayeredBasemap` if :param:`ax` is not
+		None or if fig_filespec == 'hold'
 	"""
 	from ..rob import query_local_eq_catalog_by_id
 
@@ -408,10 +445,12 @@ def plot_official_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75),
 				verbose=verbose)
 
 
+# TODO: add agg_function for plot_web_macroseismic_map too?
+
 def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection="merc",
 				graticule_interval=(1, 1), min_replies=3, query_info="cii", min_val=1,
 				min_fiability=20, filter_floors=(0, 4), aggregate_by="commune",
-				agg_function="average", recalc=False, int_conversion="round",
+				recalc=False, int_conversion="round",
 				symbol_style=None, cmap="rob", color_gradient="discontinuous",
 				event_style="default", radii=[], plot_pie=None, title="",
 				fig_filespec=None, ax=None, copyright=u"© ROB", verbose=True):
@@ -424,6 +463,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 	:param projection:
 	:param graticule_interval:
 		see :func:`plot_macroseismic_map`
+
 	:param min_replies:
 		int, minimum number of replies to use for plotting macroseismic data
 	:param query_info:
@@ -466,6 +506,11 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 	:param copyright:
 	:param verbose:
 		see :func:`plot_macroseismic_map`
+
+	:return:
+		None
+		or instance of :class:`LayeredBasemap` if :param:`ax` is not
+		None or if fig_filespec == 'hold'
 	"""
 	from ..rob import query_local_eq_catalog_by_id, query_web_macro_enquiries
 
@@ -488,6 +533,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 	macro_recs = dyfi_ensemble.get_aggregated_info(aggregate_by, min_replies,
 							agg_info=query_info, min_fiability=min_fiability,
 							filter_floors=filter_floors, recalc=recalc)
+	# TODO: remove
 	"""
 	if not recalc:
 		if aggregate_by == 'id_com':
