@@ -523,7 +523,7 @@ class LocalEarthquake:
 		year, month, day, tm_hour, tm_min, tm_sec = tf.to_time_tuple(self.datetime)
 		minutes = int(round(tm_hour * 60 + tm_min))
 		tseconds = int(round(tm_sec / 0.1))
-		depth = int(round(np.nan_to_num(self.depth)) * 100000))
+		depth = int(round(np.nan_to_num(self.depth) * 100000))
 		M = self.get_M(Mtype, Mrelation)
 		magnitude = int(round(M * 10))
 
@@ -891,7 +891,7 @@ class LocalEarthquake:
 			depth2 = pt[2]
 		else:
 			depth2 = 0.
-		depth1 = np.nan_to_num(eq.depth))
+		depth1 = np.nan_to_num(eq.depth)
 		delta_depth = np.abs(depth1 - depth2)
 		d_hypo = np.sqrt(d_epi**2 + delta_depth**2)
 		return d_hypo
