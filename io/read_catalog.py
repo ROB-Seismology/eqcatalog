@@ -35,7 +35,7 @@ __all__ = ["read_named_catalog", "read_catalog_sql", "read_catalog_csv",
 			"read_catalog_gis"]
 
 
-def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=0,
+def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=np.nan,
 						verbose=True):
 	"""
 	Read a known catalog (corresponding files should be in standard location)
@@ -48,7 +48,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 		(default: False)
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
-		(default: 0)
+		(default: np.nan)
 	:param verbose:
 		bool, whether or not to print information while reading
 		GIS table (default: True)
@@ -149,7 +149,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 
 def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 					date_sep='-', time_sep=':', date_order='YMD',
-					null_value=0, ignore_errors=False, verbose=True):
+					null_value=np.nan, ignore_errors=False, verbose=True):
 	"""
 	Read catalog from SQL database
 
@@ -180,7 +180,7 @@ def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 		(default: 'YMD')
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
-		(default: 0)
+		(default: np.nan)
 	:param ignore_errors:
 		bool, whether or not records that cannot be parsed should be
 		silently ignored
@@ -227,7 +227,7 @@ def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 					date_sep='-', time_sep=':', date_order='YMD',
 					comment_char='#', ignore_chars=[], ignore_errors=False,
-					null_value=0, verbose=False, **fmtparams):
+					null_value=np.nan, verbose=False, **fmtparams):
 	"""
 	Read earthquake catalog from CSV file with columns defining
 	earthquake properties: ID, datetime or (date or (year, month, day))
@@ -286,7 +286,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 		(default: False, will raise exception)
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
-		(default: 0)
+		(default: np.nan)
 	:param verbose:
 		bool, whether or not to print information while reading file
 		(default: True)
@@ -379,7 +379,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 
 def read_catalog_gis(gis_filespec, column_map={}, ID_prefix='',
 					date_sep='-', time_sep=':', date_order='YMD',
-					null_value=0, ignore_chars=[], ignore_errors=False,
+					null_value=np.nan, ignore_chars=[], ignore_errors=False,
 					verbose=False):
 	"""
 	Read catalog from GIS file
@@ -406,7 +406,7 @@ def read_catalog_gis(gis_filespec, column_map={}, ID_prefix='',
 		(default: 'YMD')
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
-		(default: 0)
+		(default: np.nan)
 	:param ignore_chars:
 		string containing characters or list containing strings that may
 		sometimes be present in a column and should be ignored
