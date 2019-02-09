@@ -123,7 +123,7 @@ def query_seismodb_table(table_clause, column_clause="*", join_clause="",
 def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 						Mmin=None, Mmax=None, min_depth=None, max_depth=None,
 						id_earth=None, sort_key="date", sort_order="asc",
-						event_type="ke", null_value=0, verbose=False, errf=None):
+						event_type="ke", null_value=np.nan, verbose=False, errf=None):
 	"""
 	Query ROB catalog of local earthquakes.
 
@@ -168,7 +168,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		(default: "ke" = known earthquakes)
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
-		(default: 0)
+		(default: np.nan)
 	:param verbose:
 		Bool, if True the query string will be echoed to standard output
 	:param errf:
