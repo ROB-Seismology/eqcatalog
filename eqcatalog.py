@@ -398,15 +398,12 @@ class EQCatalog:
 		rows.append(["Start time", "%s" % self.start_date])
 		rows.append(["End time", "%s" % self.end_date])
 
-		lons = self.get_longitudes()
-		lons = lons[np.isfinite(lons)]
-		rows.append(["Longitude bounds", "%.4f / %.4f" % (lons.min(), lons.max())])
-		lats = self.get_latitudes()
-		lats = lats[np.isfinite(lats)]
-		rows.append(["Latitude bounds", "%.4f / %.4f" % (lats.min(), lats.max())])
-		depths = self.get_depths()
-		depths = depths[np.isfinite(depths)]
-		rows.append(["Depth range", "%.1f / %.1f km" % (depths.min(), depths.max())])
+		lonmin, lonmax = self.lon_minmax()
+		rows.append(["Longitude bounds", "%.4f / %.4f" % (lonmin, lonmax)])
+		latmin, latmax = self.lat_minmax()
+		rows.append(["Latitude bounds", "%.4f / %.4f" % (latmin, latmax)])
+		depth_min, depth_max = self.depth_minmax()
+		rows.append(["Depth range", "%.1f / %.1f km" % (depth_min, depth_max)])
 
 		for Mtype, count in self.get_Mtype_counts().items():
 			mags = self.get_magnitudes(Mtype=Mtype, Mrelation={})
@@ -856,13 +853,17 @@ class EQCatalog:
 		Return array with magnitude uncertainties
 
 		:param min_uncertainty:
-			Float, minimum uncertainty that will be used to replace zero values
+			Float, minimum uncertainty that will be used to replace zero
+			and nan values. If None, no values will be replaced.
+			(default: 0.3)
 
 		:return:
 			1-D numpy float array, magnitude uncertainties
 		"""
 		Mag_uncertainties = np.array([eq.errM for eq in self])
-		Mag_uncertainties[np.where(Mag_uncertainties == 0)] = min_uncertainty
+		if not min_uncertainty is None:
+			Mag_uncertainties[Mag_uncertainties == 0] = min_uncertainty
+			Mag_uncertainties[np.isnan(Mag_uncertainties)] = min_uncertainty
 		return Mag_uncertainties
 
 	def get_Mtypes(self):
@@ -1031,6 +1032,7 @@ class EQCatalog:
 		Return tuple with minimum and maximum depth in catalog.
 		"""
 		depths = self.get_depths()
+		depths = depths[np.isfinite(depths)]
 		return (depths.min(), depths.max())
 
 	def lon_minmax(self):
@@ -1038,6 +1040,7 @@ class EQCatalog:
 		Return tuple with minimum and maximum longitude in catalog.
 		"""
 		longitudes = self.get_longitudes()
+		longitudes = longitudes[np.isfinite(longitudes)]
 		return (longitudes.min(), longitudes.max())
 
 	def lat_minmax(self):
@@ -1045,6 +1048,7 @@ class EQCatalog:
 		Return tuple with minimum and maximum latitude in catalog.
 		"""
 		latitudes = self.get_latitudes()
+		latitudes = latitudes[np.isfinite(latitudes)]
 		return (latitudes.min(), latitudes.max())
 
 	def get_region(self):
@@ -1100,7 +1104,8 @@ class EQCatalog:
 			float, hypocentral distance in km
 		"""
 		d_epi = self.get_epicentral_distances(lon, lat)
-		d_hypo = np.sqrt(d_epi**2 + (self.get_depths() - z)**2)
+		depths = np.nan_to_num(self.get_depths())
+		d_hypo = np.sqrt(d_epi**2 + (depths - z)**2)
 		return d_hypo
 
 	## Sorting
@@ -2057,10 +2062,10 @@ class EQCatalog:
 		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
 						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		if max_depth_error:
-			depths = [eq.depth for eq in subcatalog
-					if not eq.depth in (None, 0) and 0 <= eq.errz <= max_depth_error]
+			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, np.nan)
+							and 0 <= np.nan_to_num(eq.errz) <= max_depth_error]
 		else:
-			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, 0)]
+			depths = np.nan_to_num(self.get_depths())
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, _ = np.histogram(depths, bins_depth)
 		return bins_N, bins_depth[:-1]
@@ -2100,8 +2105,8 @@ class EQCatalog:
 			max_depth_error = 100
 		M0 = subcatalog.get_M0(Mrelation=Mrelation)
 		for e, eq in enumerate(subcatalog):
-			if (eq.depth not in (None, 0, np.nan)
-				and 0 <= eq.errz <= max_depth_error):
+			if (eq.depth not in (None, np.nan)
+				and 0 <= np.nan_to_num(eq.errz) <= max_depth_error):
 				[bin_idx] = np.digitize([eq.depth], bins_depth) - 1
 				if 0 <= bin_idx < len(bins_M0):
 					bins_M0[bin_idx] += np.nansum(M0[e])
@@ -2847,7 +2852,7 @@ class EQCatalog:
 
 		for i, eq in enumerate(self):
 			# TODO: write function to generate errM, errh based on date (use completeness dates?)
-			if not eq.errM:
+			if eq.errM in (0, None, np.nan):
 				if eq.year < 1910:
 					errM = 0.5
 				elif 1910 <= eq.year < 1985:
@@ -2863,7 +2868,7 @@ class EQCatalog:
 			else:
 				errM = eq.errM
 
-			if not eq.errh:
+			if eq.errh in (0, None, np.nan):
 				if eq.year < 1650:
 					errh = 25
 				elif 1650 <= eq.year < 1910:
@@ -2883,26 +2888,26 @@ class EQCatalog:
 			errlon = errh / ((40075./360.) * np.cos(np.radians(eq.lat)))
 			errlat = errh / (40075./360.)
 
-			if not eq.errz:
+			if eq.errz in (0, None, np.nan):
 				errz = 5.
 			else:
 				errz = eq.errz
 
-			if eq.ML:
+			if not eq.ML in (None, np.nan):
 				ML[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.ML,
 													errM, size=num_samples)
-			if eq.MS:
+			if not eq.MS in (None, np.nan):
 				MS[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MS,
 													errM, size=num_samples)
-			if eq.MW:
+			if not eq.MW in (None, np.nan):
 				MW[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MW,
 													errM, size=num_samples)
 			lons[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lon,
 													errlon, size=num_samples)
 			lats[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lat,
 													errlat, size=num_samples)
-			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.depth,
-													errz, size=num_samples)
+			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma,
+								np.nan_to_num(eq.depth), errz, size=num_samples)
 		depths.clip(min=0.)
 
 		synthetic_catalogs = []
@@ -3426,8 +3431,8 @@ class EQCatalog:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML") (default: None, will
 			select the default relation for the given Mtype)
-		:param remove_undetermined:
-			Boolean, remove the earthquake for which depth equals zero if true
+		:param remove_zero_depths:
+			Boolean, remove earthquakes for which depth equals zero if true
 			(default: False)
 		:param title:
 			String, plot title (None = default title, "" = no title)
@@ -3445,10 +3450,10 @@ class EQCatalog:
 		magnitudes = subcatalog.get_magnitudes(Mtype, Mrelation)
 		depths = subcatalog.get_depths()
 
-		if remove_undetermined:
-			i=depths.nonzero()
-			depths=depths[i]
-			magnitudes=magnitudes[i]
+		if remove_zero_depths:
+			i = depths.nonzero()
+			depths = depths[i]
+			magnitudes = magnitudes[i]
 
 		pylab.plot(magnitudes, depths, '.')
 		pylab.xlabel("Magnitude (%s)" % Mtype)
