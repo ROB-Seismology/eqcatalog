@@ -269,7 +269,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					where_clause=where_clause, having_clause=having_clause,
 					order_clause=order_clause, verbose=verbose, errf=errf):
-		id_earth, name = rec["id_earth"], rec["name"]
+		id_earth, name = rec["id_earth"], rec["name"] or ''
 		date, time = rec["date"], rec["time"]
 		lon, lat = rec["longitude"], rec["latitude"]
 		depth = rec["depth"]
@@ -282,7 +282,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		errh, errz, errt, errM = rec["errh"], rec["errz"], rec["errt"], rec["errM"]
 		etype = rec["type"]  ## Avoid conflict with event_type parameter!
 
-		if name == lon == lat == depth == M == None:
+		## Skip records without lon,lat, depth and magnitude
+		if lon == lat == depth == M == None:
 			continue
 
 		year, month, day = [int(s) for s in date.split("-")]
