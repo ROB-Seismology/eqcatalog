@@ -530,3 +530,71 @@ def combine_np_date_and_py_time(dt64, py_time, unit='s'):
 	dt64 = as_np_datetime(dt64, 'us')
 	td = py_time_to_np_timedelta(py_time)
 	return as_np_datetime(dt64 + td, unit=unit)
+
+
+def get_py_tz_offset(tz=None):
+	"""
+	Get timezone offset with respect to UTC as python timedelta object
+
+	:param tz:
+		instance of :class:`pytz.timezone`
+		(default: None, will use timezone of platform)
+
+	:return:
+		instance of :class:`datetime.timedelta`
+	"""
+	if tz is None:
+		## Assume platform's timezone is set correctly
+		now_local, now_utc = datetime.datetime.now(), datetime.datetime.utcnow()
+		td = now_local - now_utc
+		return datetime.timedelta(td.days, td.seconds)
+	else:
+		now_local = datetime.datetime.now(tz)
+		return now_local.utcoffset()
+
+def get_np_tz_offset(tz=None):
+	"""
+	Get timezone offset with respect to UTC as numpy timedelta64 object
+
+	:param tz:
+		instance of :class:`pytz.timezone`
+		(default: None, will use timezone of platform)
+
+	:return:
+		instance of :class:`np.timedelta64`
+	"""
+	py_tz_offset = get_py_tz_offset(tz)
+	return np.timedelta64(py_tz_offset)
+
+
+def to_local_datetime(dt, tz=None):
+	"""
+	Convert datetime in UTC to datetime of local timezone
+
+	:param dt:
+		datetime spec understood by :func:`as_np_datetime`
+	:param tz:
+		instance of :class:`pytz.timezone`
+		(default: None, will use timezone of platform)
+
+	:return:
+		instance of :class:`np.datetime64`
+	"""
+	dt64 = as_np_datetime(dt)
+	tz_offset = get_np_tz_offset(tz)
+	return dt64 + tz_offset
+
+
+def to_belgian_local_datetime(dt):
+	"""
+	Convert datetime in UTC to Belgian local datetime
+
+	:param dt:
+		datetime spec understood by :func:`as_np_datetime`
+
+	:return:
+		instance of :class:`np.datetime64`
+	"""
+	import pytz
+	tz = pytz.timezone(pytz.country_timezones['BE'][0])
+	return to_local_datetime(dt, tz)
