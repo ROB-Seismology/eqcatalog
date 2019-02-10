@@ -231,8 +231,11 @@ class EQCatalog:
 		:return:
 			instance of :class:`LocalEarthquake`
 		"""
-		idx = self.index(id)
-		if id:
+		try:
+			idx = self.index(id)
+		except IndexError:
+			return None
+		else:
 			return self.__getitem__(idx)
 
 	def get_duplicate_idxs(self):
