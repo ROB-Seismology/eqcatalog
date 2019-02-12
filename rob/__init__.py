@@ -24,13 +24,16 @@ else:
 
 ## Directories with MapInfo tables for named catalogs and source models
 # TODO: should become seismo-gis folder
-import platform
+import os, platform
 if platform.uname()[0] == "Windows":
 	GIS_ROOT = "D:\\GIS-data"
 else:
 	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
-from mapping.seismo_gis.seismo_gis import SEISMOGIS_ROOT
+try:
+	from mapping.seismo_gis.seismo_gis import SEISMOGIS_ROOT
+except ImportError:
+	SEISMOGIS_ROOT = ''
 
 
 ## Import submodules
