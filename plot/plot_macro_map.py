@@ -148,7 +148,7 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 
 	if plot_info == 'intensity':
 		intensities = np.array([rec.I for rec in macro_recs])
-		if color_gradient in ("discontinuous", "discrete"):
+		if color_gradient[:4] == "disc":
 			intensities = getattr(np, int_conversion)(intensities).astype('int')
 		## Store possibly rounded intensities in new 'intensity' attribute,
 		## keeping original 'I' attribute unmodified
@@ -219,7 +219,7 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
 		cb_title = "Number of replies"
 
-	if color_gradient in ("discontinuous", "discrete"):
+	if color_gradient[:4] == "disc":
 		if plot_info == 'intensity':
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
 										labels=["%d" % val for val in classes],
