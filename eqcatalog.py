@@ -216,7 +216,7 @@ class EQCatalog:
 		str_ids = list(map(str, self.get_ids()))
 		try:
 			idx = str_ids.index(str(id))
-		except IndexError:
+		except ValueError:
 			return None
 		else:
 			return idx
@@ -231,11 +231,8 @@ class EQCatalog:
 		:return:
 			instance of :class:`LocalEarthquake`
 		"""
-		try:
-			idx = self.index(id)
-		except IndexError:
-			return None
-		else:
+		idx = self.index(id)
+		if idx:
 			return self.__getitem__(idx)
 
 	def get_duplicate_idxs(self):
