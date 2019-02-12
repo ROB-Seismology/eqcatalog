@@ -84,7 +84,10 @@ def as_np_datetime(dt, unit='s'):
 	"""
 	if is_np_datetime(dt):
 		return dt.astype('M8[%s]' % unit)
-	elif isinstance(dt, (datetime.datetime, datetime.date, basestring)):
+	elif isinstance(dt, datetime.date):
+		## For compatibility with numpy versions < 1.11
+		return np.datetime64(dt).astype('M8[%s]' % unit)
+	elif isinstance(dt, (datetime.datetime, basestring)):
 		return np.datetime64(dt, unit)
 	elif isinstance(dt, list):
 		return np.array(dt, dtype='M8[%s]' % unit)
