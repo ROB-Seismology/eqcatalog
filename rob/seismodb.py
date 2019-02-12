@@ -185,20 +185,22 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	if isinstance(id_earth, (int, basestring)):
 		id_earth = [id_earth]
 
-	if isinstance(start_date, int):
-		start_date = '%d-01-01' % start_date
-	elif start_date is None:
-		start_date = '1350-01-01'
-	start_date = tf.as_np_datetime(start_date)
+	else:
+		## Do not impose start or end date if id_earth is given
+		if isinstance(start_date, int):
+			start_date = '%d-01-01' % start_date
+		elif start_date is None:
+			start_date = '1350-01-01'
+		start_date = tf.as_np_datetime(start_date)
 
-	if isinstance(end_date, int):
-		end_date = '%d-12-31' % end_date
-	elif end_date is None:
-		end_date = np.datetime64('now')
-	end_date = tf.as_np_datetime(end_date)
-	if tf.to_py_time(end_date) == datetime.time(0):
-		end_time = datetime.time(23, 59, 59, 999999)
-		end_date = tf.combine_np_date_and_py_time(end_date, end_time)
+		if isinstance(end_date, int):
+			end_date = '%d-12-31' % end_date
+		elif end_date is None:
+			end_date = np.datetime64('now')
+		end_date = tf.as_np_datetime(end_date)
+		if tf.to_py_time(end_date) == datetime.time(0):
+			end_time = datetime.time(23, 59, 59, 999999)
+			end_date = tf.combine_np_date_and_py_time(end_date, end_time)
 
 	## Construct SQL query
 	table_clause = "earthquakes"
@@ -224,32 +226,32 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		'type']
 
 	where_clause = ""
+	having_clause = ""
 	if id_earth:
 		where_clause += 'id_earth in (%s)' % ",".join([str(item) for item in id_earth])
 	else:
 		where_clause += 'is_true = 1'
 		if event_type != "all":
 			where_clause += ' and type = "%s"' % event_type
-	if region:
-		w, e, s, n = region
-		where_clause += ' AND longitude BETWEEN %f and %f' % (w, e)
-		where_clause += ' AND latitude BETWEEN %f and %f' % (s, n)
+		if region:
+			w, e, s, n = region
+			where_clause += ' AND longitude BETWEEN %f and %f' % (w, e)
+			where_clause += ' AND latitude BETWEEN %f and %f' % (s, n)
 
-	#where_clause += (' and date Between "%s" and "%s"'
-	where_clause += (' AND TIMESTAMP(date, time) BETWEEN "%s" and "%s"'
-					% (start_date, end_date))
-	if min_depth:
-		where_clause += ' AND depth >= %f' % min_depth
-	if max_depth:
-		where_clause += ' AND depth <= %f' % max_depth
+		#where_clause += (' and date Between "%s" and "%s"'
+		where_clause += (' AND TIMESTAMP(date, time) BETWEEN "%s" and "%s"'
+						% (start_date, end_date))
+		if min_depth:
+			where_clause += ' AND depth >= %f' % min_depth
+		if max_depth:
+			where_clause += ' AND depth <= %f' % max_depth
 
-	having_clause = ""
-	if Mmax or Mmin != None:
-		if Mmin is None:
-			Mmin = 0.0
-		if not Mmax:
-			Mmax = 10.0
-		having_clause += 'HAVING M BETWEEN %f and %f' % (Mmin, Mmax)
+		if Mmax or Mmin != None:
+			if Mmin is None:
+				Mmin = 0.0
+			if not Mmax:
+				Mmax = 10.0
+			having_clause += 'HAVING M BETWEEN %f and %f' % (Mmin, Mmax)
 
 	if sort_order.lower()[:3] == "asc":
 		sort_order = "asc"
