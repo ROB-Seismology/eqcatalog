@@ -11,8 +11,6 @@ import os
 import numpy as np
 import matplotlib
 
-import mapping.layeredbasemap as lbm
-
 from ..rob import SEISMOGIS_ROOT
 GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB", "TAB")
 #GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
@@ -96,6 +94,8 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		or instance of :class:`LayeredBasemap` if :param:`ax` is not
 		None or if fig_filespec == 'hold'
 	"""
+	import mapping.layeredbasemap as lbm
+
 	if len(macro_recs) == 0:
 		print("No macroseismic information provided! Nothing to plot.")
 		return
