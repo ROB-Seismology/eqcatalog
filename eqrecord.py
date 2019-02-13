@@ -891,7 +891,7 @@ class LocalEarthquake:
 			depth2 = pt[2]
 		else:
 			depth2 = 0.
-		depth1 = np.nan_to_num(eq.depth)
+		depth1 = np.nan_to_num(self.depth)
 		delta_depth = np.abs(depth1 - depth2)
 		d_hypo = np.sqrt(d_epi**2 + delta_depth**2)
 		return d_hypo
