@@ -6,10 +6,9 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import numpy as np
+import pylab
 
 
-## ETAS source:
-## https://github.com/kshramt/fortran_lib
 
 class OmoriLaw():
 	"""
@@ -17,7 +16,7 @@ class OmoriLaw():
 	activity with time.
 
 	:param K:
-		float, productivity parameter (depends on magnitude)
+		float, productivity parameter (depends on mainshock magnitude)
 	:param c:
 		float (time unit), small positive constant,
 		usually between 0.003 and 0.3 days
@@ -27,8 +26,12 @@ class OmoriLaw():
 		float, cutoff magnitude, lower magnitude above which aftershocks
 		are counted
 	"""
-	def __init__(self, K, c, p, Mc):
+	def __init__(self, K, c, p, Mc, time_delta=np.timedelta64(1, 'D')):
 		# TODO: time unit?
+		assert K >= 0
+		assert c > 0
+		assert p > 0
+
 		self.K = K
 		self.c = c
 		self.p = p
@@ -132,6 +135,109 @@ class OmoriLaw():
 		K, c, p = self.K, self.c, self.p
 		return -np.log(1 - prob) * (delta_t + c)**p / K
 
+	def determine_K(self, N, delta_t2, delta_t1=0):
+		"""
+		Determine K from number of earthquakes in a time interval,
+		assuming c and p are known
+
+		:param N:
+			int, total number of earthquakes in time interval
+		:param delta_t2:
+			float, end of time interval since mainshock
+		:param delta_t1:
+			float, start of time interval since mainschock
+			(default: 0)
+
+		:return:
+			float, K value
+		"""
+		p, c = self.p, self.c
+		return (N * (p - 1)) / ((delta_t1 + c)**(1-p) - (delta_t2 + c)**(1-p))
+
+	@classmethod
+	def fit_rate(cls, delta_t, n, initial_guess=(1, 0.01, 1.2),
+				bounds=((0, 0.001, 0.1), (np.inf, 10, 10))):
+		from scipy.optimize import curve_fit
+
+		def omori_rate(delta_t, K, c, p):
+			return K * (delta_t + c)**-p
+
+		popt, pcov = curve_fit(omori_rate, delta_t, n, p0=initial_guess)
+		#					bounds=bounds)
+		perr = np.sqrt(np.diag(pcov))
+		return (popt, perr)
+
+	@classmethod
+	def fit_cumulative(cls, delta_t, N, initial_guess=(1, 0.01, 1.2),
+				bounds=((0, 0.001, 0.1), (np.inf, 10, 10))):
+		"""
+		Note: delta_t not necessarily binned
+		"""
+		from scipy.optimize import curve_fit
+
+		def omori_cumulative(delta_t, K, c, p):
+			if np.allclose(p, 1):
+				N = K * (np.log(delta_t/c + 1) - np.log(1/c + 1))
+			else:
+				N = K * (c**(1-p) - (delta_t + c)**(1-p)) / (p - 1)
+			return N
+
+		popt, pcov = curve_fit(omori_cumulative, delta_t, N, p0=initial_guess)
+		#					bounds=bounds)
+		perr = np.sqrt(np.diag(pcov))
+		return (popt, perr)
+
+	def plot_rate(self, delta_t):
+		as_rate = self.get_aftershock_rate(delta_t)
+		pylab.plot(delta_t, as_rate)
+		pylab.xlabel('Time since mainshock')
+		pylab.ylabel('Aftershock rate')
+		pylab.show()
+
+	def plot_cumulative(self, delta_t):
+		num_as = self.get_num_aftershocks(delta_t)
+		pylab.plot(delta_t, num_as)
+		pylab.xlabel('Time since mainshock')
+		pylab.ylabel('Number of aftershocks')
+		pylab.show()
+
+
+class EtasOmoriLaw(OmoriLaw):
+	"""
+	Omori law where K depends on difference between mainshock and
+	cutoff magnitude, and on efficiency parameter alpha
+
+	:param Mm:
+		float, mainshock magnitude
+	:param Mc:
+	:param A:
+		float, productivity parameter
+	:param c:
+	:param p:
+		see :class:`OmoriLaw`
+	:param alpha:
+		float, efficiency of a shock with a certain magnitude
+		to generate its aftershock activity,
+		ranges mostly from 0.2 to 3.0,
+		lower values typically represent swarm-type activity,
+		higher values represent typical mainshock-aftershock activity
+	"""
+	def __init__(self, Mm, Mc, A, c, p, alpha):
+		self.Mm = Mm
+		self.Mc = Mc
+		self.A = K
+		self.c = c
+		self.p = p
+		self.alpha = alpha
+
+	@property
+	def delta_M(self):
+		return self.Mm - self.Mc
+
+	@property
+	def K(self):
+		return self.A * np.exp(self.alpha * self.delta_M)
+
 
 class ReasenbergOmoriLaw(OmoriLaw):
 	"""
@@ -158,6 +264,25 @@ class ReasenbergOmoriLaw(OmoriLaw):
 	@property
 	def K(self):
 		return 10**(2 * (self.delta_M - 1.) / 3.)
+
+	def get_etas_rate(self, alpha, delta_t):
+		"""
+		:param alpha:
+			float, efficiency of a shock with a certain magnitude
+			to generate its aftershock activity,
+			ranges mostly from 0.2 to 3.0,
+			lower values typically represent swarm-type activity,
+			higher values represent typical mainshock-aftershock activity
+		:param delta_t:
+			float or float array, time interval since mainshock
+
+		:return:
+			float or float array
+		"""
+		return np.exp(alpha * self.delta_M) * self.get_aftershock_rate(delta_t)
+
+	def get_etas_num_aftershocks(self, alpha, delta_t2, delta_t1=0):
+		return np.exp(alpha * self.delta_M) * self.get_num_aftershocks(delta_t2, delta_t1)
 
 
 class GROmoriLaw(ReasenbergOmoriLaw):
