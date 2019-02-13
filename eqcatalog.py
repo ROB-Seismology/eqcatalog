@@ -1239,12 +1239,12 @@ class EQCatalog:
 			else:
 				eq_list = [eq for eq in eq_list if w <= eq.lon < e and s <= eq.lat < n]
 		if start_date != None:
-			eq_list = [eq for eq in eq_list if start_date <= eq.date]
+			eq_list = [eq for eq in eq_list if start_date <= eq.datetime]
 		if end_date != None:
 			if include_right_edges:
-				eq_list = [eq for eq in eq_list if eq.date <= end_date]
+				eq_list = [eq for eq in eq_list if eq.datetime <= end_date]
 			else:
-				eq_list = [eq for eq in eq_list if eq.date < end_date]
+				eq_list = [eq for eq in eq_list if eq.datetime < end_date]
 		if Mmin != None:
 			cat2 = EQCatalog(eq_list)
 			Mags = cat2.get_magnitudes(Mtype, Mrelation)
@@ -1281,11 +1281,11 @@ class EQCatalog:
 			else:
 				region = self.get_region()
 		if start_date is None:
-			start_date = self.start_date
+			start_date = self.start_datetime
 		else:
 			start_date = tf.as_np_datetime(start_date)
 		if end_date is None:
-			end_date = self.end_date
+			end_date = self.end_datetime
 		else:
 			end_date = tf.as_np_datetime(end_date)
 		if not include_right_edges:
