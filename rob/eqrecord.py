@@ -126,6 +126,20 @@ class ROBLocalEarthquake(LocalEarthquake):
 										verbose=verbose)
 		return ensemble
 
+	def get_num_macroseismic_enquiries(self, min_fiability=20):
+		"""
+		Count number of macroseismic enquiries for a particular event.
+
+		:param min_fiability:
+			float, minimum fiability of enquiries
+			(default: 20)
+
+		:return:
+			int, number of enquiries
+		"""
+		from .seismodb import get_num_macroseismic_enquiries
+		return get_num_macroseismic_enquiries(self.ID, min_fiability)
+
 	def get_Imax_web(self, min_replies=3, min_fiability=20, filter_floors=(0, 4),
 					include_other_felt=True, include_heavy_appliance=False,
 					remove_outliers=(2.5, 97.5)):
