@@ -1281,11 +1281,11 @@ class EQCatalog:
 			else:
 				region = self.get_region()
 		if start_date is None:
-			start_date = self.start_datetime
+			start_date = self.start_date
 		else:
 			start_date = tf.as_np_datetime(start_date)
 		if end_date is None:
-			end_date = self.end_datetime
+			end_date = self.end_date
 		else:
 			end_date = tf.as_np_datetime(end_date)
 		if not include_right_edges:
