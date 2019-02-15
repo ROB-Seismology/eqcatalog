@@ -1,4 +1,4 @@
-# -*- coding: iso-Latin-1 -*-
+ #-*- coding: iso-Latin-1 -*-
 
 """
 seismodb
@@ -830,24 +830,34 @@ def get_num_macroseismic_enquiries(id_earth, min_fiability=20):
 	Count number of macroseismic enquiries for a particular event.
 
 	:param id_earth:
-		int, ID of event in ROB catalog
+		int or list of ints, ID(s) of event in ROB catalog
 	:param min_fiability:
 		float, minimum fiability of enquiries
 		(default: 20)
 
 	:return:
-		int, number of enquiries
+		list of ints, number of enquiries for each earthquake
 	"""
-	table_clause = ['web_input']
-	column_clause = ['Count(*) as num_enquiries']
-	join_clause = [('JOIN', 'web_analyse', 'web_input.id_web=web_analyse.id_web')]
-	where_clause = 'web_analyse.id_earth = %d' % id_earth
-	where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
-	where_clause += ' AND web_analyse.deleted = false'
+	## Convert input arguments, if necessary
+	if isinstance(id_earth, (int, basestring)):
+		id_earth = [id_earth]
+
+	table_clause = ['earthquakes']
+	## Note: apply constraints on web_analyse to the join clause
+	## in order to get 0 if there are no entries in web_analyse for id_earth
+	join_where_clause = 'web_analyse.id_earth=earthquakes.id_earth'
+	join_where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
+	join_where_clause += ' AND web_analyse.deleted = false'
+	join_clause = [('LEFT JOIN', 'web_analyse', join_where_clause)]
+
+	column_clause = ['Count(web_analyse.id_earth) as num_enquiries']
+	where_clause = 'earthquakes.id_earth in (%s)'
+	where_clause %= ",".join([str(item) for item in id_earth])
+	group_clause = 'earthquakes.id_earth'
 
 	db_recs = query_seismodb_table(table_clause, column_clause, join_clause=join_clause,
-									where_clause=where_clause)
-	num_enquiries = list(db_recs)[0]['num_enquiries']
+								where_clause=where_clause, group_clause=group_clause)
+	num_enquiries = [rec['num_enquiries'] for rec in db_recs]
 	return num_enquiries
 
 
