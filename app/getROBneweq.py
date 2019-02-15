@@ -46,7 +46,7 @@ subject = ', '.join([user['tel'] for user in USERS if user.has_key('tel')])
 
 
 def construct_msg(eq):
-	date, time = eq.datetime.date(), eq.datetime.time()
+	date, time = eq.date, eq.time
 	#url = "http://seismologie.oma.be/active.php?LANG=NL&CNT=BE&LEVEL=211&id=%d" % last_eq.ID
 	hash = last_eq.get_rob_hash()
 	url = "http://seismologie.oma.be/en/seismology/earthquakes-in-belgium/%s" % hash
