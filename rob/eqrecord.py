@@ -138,7 +138,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 			int, number of enquiries
 		"""
 		from .seismodb import get_num_macroseismic_enquiries
-		return get_num_macroseismic_enquiries(self.ID, min_fiability)
+		[num_enquiries] = get_num_macroseismic_enquiries([self.ID], min_fiability)
+		return num_enquiries
 
 	def get_Imax_web(self, min_replies=3, min_fiability=20, filter_floors=(0, 4),
 					include_other_felt=True, include_heavy_appliance=False,
@@ -158,6 +159,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		:return:
 			float, Imax
 		"""
+		# TODO: add recalc argument and use get_aggregated_info method of dyfi
 		dyfi = self.get_macroseismic_enquiries(min_fiability)
 		Imax = 0
 		if len(dyfi):
