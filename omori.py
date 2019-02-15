@@ -10,7 +10,7 @@ import pylab
 
 
 
-class OmoriLaw():
+class OmoriLaw(object):
 	"""
 	Implements Modified Omori law, representing the decay of aftershock
 	activity with time.
@@ -23,8 +23,8 @@ class OmoriLaw():
 	:param p:
 		float, power-law coefficient, usually between 0.9 and 1.5
 	:param Mc:
-		float, cutoff magnitude, lower magnitude above which aftershocks
-		are counted
+		float, cutoff or completeness magnitude, lower magnitude above
+		which aftershocks are counted (and are assumed to be complete)
 	"""
 	def __init__(self, K, c, p, Mc, time_delta=np.timedelta64(1, 'D')):
 		# TODO: time unit?
@@ -162,8 +162,8 @@ class OmoriLaw():
 		def omori_rate(delta_t, K, c, p):
 			return K * (delta_t + c)**-p
 
-		popt, pcov = curve_fit(omori_rate, delta_t, n, p0=initial_guess)
-		#					bounds=bounds)
+		popt, pcov = curve_fit(omori_rate, delta_t, n, p0=initial_guess,
+							bounds=bounds)
 		perr = np.sqrt(np.diag(pcov))
 		return (popt, perr)
 
@@ -182,10 +182,15 @@ class OmoriLaw():
 				N = K * (c**(1-p) - (delta_t + c)**(1-p)) / (p - 1)
 			return N
 
-		popt, pcov = curve_fit(omori_cumulative, delta_t, N, p0=initial_guess)
-		#					bounds=bounds)
+		popt, pcov = curve_fit(omori_cumulative, delta_t, N, p0=initial_guess,
+							bounds=bounds)
 		perr = np.sqrt(np.diag(pcov))
 		return (popt, perr)
+
+	@classmethod
+	def fit_mle(cls):
+		## See https://towardsdatascience.com/a-gentle-introduction-to-maximum-likelihood-estimation-9fbff27ea12f
+		pass
 
 	def plot_rate(self, delta_t):
 		as_rate = self.get_aftershock_rate(delta_t)
@@ -297,7 +302,7 @@ class GROmoriLaw(ReasenbergOmoriLaw):
 	:param p:
 		see :class:`ReasenbergOmoriLaw`
 	:param A:
-		float, constant
+		float, aftershock productivity (independent of Mm and Mc)
 	:param b:
 		float, Gutenberg-Richter b-value
 	"""
@@ -308,7 +313,102 @@ class GROmoriLaw(ReasenbergOmoriLaw):
 
 	@property
 	def K(self):
-		return 10**(A + b*self.delta_M)
+		return 10**(self.A + self.b*self.delta_M)
+
+	def determine_A(self, K, Mc):
+		"""
+		Determine A from K and cutoff magnitude
+
+		:param K:
+			float, Omori K parameter
+		:param Mc:
+			float, cutoff magnitude
+
+		:return:
+			float, magnitude-independent aftershock productivity A
+		"""
+		return np.log10(K) - self.b * (self.Mm - Mc)
+
+	def to_new_Mc(self, new_Mc):
+		"""
+		Convert to GROmoriLaw for another cutoff magnitude
+
+		:param new_Mc:
+			float, new cutoff magnitude
+
+		:return:
+			instance of :class:`GROmoriLaw`
+		"""
+		K2 = 10 ** (np.log10(self.K) + self.b * (self.Mc - new_Mc))
+		return self.__class__(self.Mm, new_Mc, self.c, self.p, self.A, self.b)
+
+	# TODO: get_prob_one_or_more_aftershocks() method in function of aftershock magnitude!
+
+
+def estimate_omori_params(as_time_deltas, initial_guess=(0.01, 1.2),
+				bounds=((1E-5, 0.1), (10, 10)), Ts=0.,
+				minimize_method='Nelder-Mead', verbose=False):
+	"""
+	MLE estimation of Omori c and p parameters by simultaneous solving
+	equations 11 and 12 in Utsu et al. (1995)
+	K is determined from c and p using eq. 12 in Utsu et al. (1995)
+
+	:param as_time_deltas:
+		float array, fractional time differences (arbitrary time unit)
+		between aftershocks and mainshock
+	:param initial_guess:
+		(c, p) tuple: initial estimate for c and p
+	:param bounds:
+		((cmin, cmax), (pmin, pmax)): bounds for c and p
+		May be ignored by some minimization methods
+	:param Ts:
+		float, start timedelta in same time unit as :param:`as_time_deltas`
+		If None, as_time_deltas[0] will be used
+		(default: 0.)
+	:param minimize_method:
+		str, method name understood by :func:`scipy.optimize.minimize`
+		(default: 'Nelder-Mead')
+	:param verbose:
+		bool, whether or not intermediate solutions of Utsu equations
+		should be reported
+		(default: False)
+
+	:return:
+		(K, c, p) tuple of floats
+	"""
+	from scipy.optimize import minimize
+
+	N = len(as_time_deltas)
+	if Ts is None:
+		Ts = as_time_deltas[0]
+	Te = as_time_deltas[-1]
+
+	def minimize_cp(cp, args):
+		c, p = cp
+		Tsc_term, Tec_term = (Ts+c)**(1-p), (Te+c)**(1-p)
+		denominator = Tsc_term - Tec_term
+
+		eq1 = (np.sum(np.log(as_time_deltas + c))
+				- N/(p-1.)
+				- N * ((np.log(Ts+c) * Tsc_term - np.log(Te+c) * Tec_term)
+				/ denominator))
+
+		eq2 = (p * np.sum(1./(as_time_deltas + c))
+				- (N * (p-1) * ((Ts+c)**-p - (Te+c)**-p)) / denominator)
+
+		if verbose:
+			print(eq1, eq2)
+		return np.sum(eq1**2 + eq2**2)
+
+	x0 = np.array(initial_guess)
+	result = minimize(minimize_cp, x0, bounds=bounds, args=[],
+						method=minimize_method)
+	if result.success:
+		c, p = result.x
+		K = N * (p-1) / ((Ts+c)**(1-p) - (Te+c)**(1-p))
+		return (K, c, p)
+	else:
+		print(result.message)
 
 
 
