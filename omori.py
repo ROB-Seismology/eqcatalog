@@ -22,20 +22,35 @@ class OmoriLaw(object):
 		usually between 0.003 and 0.3 days
 	:param p:
 		float, power-law coefficient, usually between 0.9 and 1.5
+	:param Mm:
+		float, mainshock magnitude
 	:param Mc:
 		float, cutoff or completeness magnitude, lower magnitude above
 		which aftershocks are counted (and are assumed to be complete)
+	:param time_delta:
+		instance of :class:`np.timedelta64`, time unit in which Omori
+		law is expressed
+		(default: np.timedelta64(1, 'D') = 1 day)
+
+	Although Mm and Mc are not necessary to compute aftershock decay,
+	they are characteristic of the aftershock sequence.
+	Note that modifying Mm or Mc will not change the Omori law.
 	"""
-	def __init__(self, K, c, p, Mc, time_delta=np.timedelta64(1, 'D')):
+	def __init__(self, K, c, p, Mc, Mm, time_delta=np.timedelta64(1, 'D')):
 		# TODO: time unit?
 		assert K >= 0
 		assert c > 0
 		assert p > 0
 
-		self.K = K
-		self.c = c
-		self.p = p
-		self.Mc = Mc
+		self.K = float(K)
+		self.c = float(c)
+		self.p = float(p)
+		self.Mm = float(Mm)
+		self.Mc = float(Mc)
+
+	@property
+	def delta_M(self):
+		return self.Mm - self.Mc
 
 	def get_aftershock_rate(self, delta_t):
 		"""
@@ -121,7 +136,7 @@ class OmoriLaw(object):
 	def get_interaction_time(self, prob, delta_t):
 		"""
 		Compute time interval necessary to wait in order to be prob
-		confident of observing the next event in the sequance at
+		confident of observing the next event in the sequence at
 		time interval delta_t since the mainshock
 
 		:param prob:
@@ -207,14 +222,98 @@ class OmoriLaw(object):
 		pylab.show()
 
 
-class EtasOmoriLaw(OmoriLaw):
+class GROmoriLaw(OmoriLaw):
+	"""
+	Base class for Gutenberg-Richter Omori law, where aftershock
+	magnitudes follow a Gutenberg-Richter distribution.
+	"""
+	def get_random_magnitudes(self, n, random_seed=None):
+		"""
+		Generate random aftershock magnitudes
+
+		:param n:
+			int, length of aftershock sequence
+		:param random_seed:
+			int, seed for random number generator
+			(default: None)
+
+		:return:
+			float array, aftershock magnitudes
+		"""
+		np.random.seed(random_seed)
+		rnd = np.random.random(n)
+		beta = self.get_beta()
+		Mc, Mm = self.Mc, self.Mm
+		return (-1./beta) * np.log(np.exp(-beta*Mc)
+							- (1 - rnd) * (np.exp(-beta*Mc) - np.exp(-beta*Mm)))
+
+	def get_random_time_deltas(self, duration, random_seed=None):
+		"""
+		Generate random aftershock times with respect to mainshock at t=0
+
+		:param duration:
+			float, duration of aftershock sequence (in same time units
+			as Omori law)
+		:param random_seed:
+			int, seed for random number generator
+			(default: None)
+
+		:return:
+			float array, aftershock times (in same time units as Omori law)
+		"""
+		np.random.seed(random_seed)
+		tail_size = self.get_num_aftershocks(duration)
+		num_expected = np.random.poisson(tail_size)
+		n_values = tail_size * (1 - np.random.random(num_expected))
+		return np.sort(self.get_time_delta_for_n_aftershocks(n_values))
+
+	def gen_aftershock_sequence(self, duration, etas=True, random_seed=None):
+		"""
+		Generate aftershock sequence
+
+		:param duration:
+			float, duration of aftershock sequence (in same time units
+			as Omori law)
+		:param etas:
+			bool, whether or not to apply ETAS model, in which each
+			aftershock incites its own aftershock sequence
+			(self-exciting process)
+			(default: True)
+		:param random_seed:
+			int, seed for random number generator
+			(default: None)
+
+		:return:
+			(delta_time, magnitude, index, parent_index) tuples
+		"""
+		np.random.seed(random_seed)
+		current, parent = 0, -1
+		mainshock = (0, self.Mm, current, parent)
+		as_sequence = [mainshock]
+		#yield mainshock
+		for t_parent, m_parent, parent, _ in as_sequence:
+			self.Mm = m_parent
+			as_duration = duration - t_parent
+			time_deltas = t_parent + self.get_random_time_deltas(as_duration)
+			num_expected = len(time_deltas)
+			magnitudes = self.get_random_magnitudes(num_expected)
+			for i in range(num_expected):
+				current += 1
+				aftershock = (time_deltas[i], magnitudes[i], current, parent)
+				yield aftershock
+				if etas:
+					as_sequence.append(aftershock)
+		## Set mainshock magnitude back to original value
+		self.Mm = mainshock[1]
+
+
+class ExpGROmoriLaw(GROmoriLaw):
 	"""
 	Omori law where K depends on difference between mainshock and
-	cutoff magnitude, and on efficiency parameter alpha
+	cutoff magnitude, and on efficiency parameter alpha, which in fact
+	corresponds to the beta value (= b * ln(10)) of the aftershock
+	sequence in the exponential notation of the Gutenberg-Richte relation
 
-	:param Mm:
-		float, mainshock magnitude
-	:param Mc:
 	:param A:
 		float, productivity parameter
 	:param c:
@@ -226,22 +325,46 @@ class EtasOmoriLaw(OmoriLaw):
 		ranges mostly from 0.2 to 3.0,
 		lower values typically represent swarm-type activity,
 		higher values represent typical mainshock-aftershock activity
+	:param Mm:
+	:param Mc:
+		see :class:`OmoriLaw`
+
+	Note that, in contrast to :class:`OmoriLaw`, Mm and/or Mc can be
+	changed to adjust the Omori law!
 	"""
-	def __init__(self, Mm, Mc, A, c, p, alpha):
-		self.Mm = Mm
-		self.Mc = Mc
-		self.A = K
+	def __init__(self, A, c, p, alpha, Mm, Mc, time_delta=np.timedelta64(1, 'D')):
+		self.A = A
 		self.c = c
 		self.p = p
 		self.alpha = alpha
-
-	@property
-	def delta_M(self):
-		return self.Mm - self.Mc
+		self.Mm = Mm
+		self.Mc = Mc
+		self.time_delta = time_delta
 
 	@property
 	def K(self):
 		return self.A * np.exp(self.alpha * self.delta_M)
+
+	def get_b(self):
+		"""
+		Get Gutenberg-Richter b-value corresponding to alpha
+		"""
+		return self.alpha * np.log10(np.e)
+
+	def get_beta(self):
+		"""
+		Get Gutenberg-Richter beta value (= alpha)
+		"""
+		return self.alpha
+
+	def to_base10(self):
+		"""
+		Convert to :class:`Base10GROmoriLaw`
+		"""
+		A = np.log10(self.A)
+		b = self.get_b()
+		return Base10GROmoriLaw(A, self.c, self.p, b, self.Mm, self.Mc,
+						self.time_delta)
 
 
 class ReasenbergOmoriLaw(OmoriLaw):
@@ -263,57 +386,55 @@ class ReasenbergOmoriLaw(OmoriLaw):
 		self.p = p
 
 	@property
-	def delta_M(self):
-		return self.Mm - self.Mc
-
-	@property
 	def K(self):
 		return 10**(2 * (self.delta_M - 1.) / 3.)
 
-	def get_etas_rate(self, alpha, delta_t):
-		"""
-		:param alpha:
-			float, efficiency of a shock with a certain magnitude
-			to generate its aftershock activity,
-			ranges mostly from 0.2 to 3.0,
-			lower values typically represent swarm-type activity,
-			higher values represent typical mainshock-aftershock activity
-		:param delta_t:
-			float or float array, time interval since mainshock
 
-		:return:
-			float or float array
-		"""
-		return np.exp(alpha * self.delta_M) * self.get_aftershock_rate(delta_t)
-
-	def get_etas_num_aftershocks(self, alpha, delta_t2, delta_t1=0):
-		return np.exp(alpha * self.delta_M) * self.get_num_aftershocks(delta_t2, delta_t1)
-
-
-class GROmoriLaw(ReasenbergOmoriLaw):
+class Base10GROmoriLaw(GROmoriLaw):
 	"""
 	Omori law where K depends on difference between mainshock and
-	cutoff magnitude, as well as on Gutenberg-Richter b-value and
-	a constant A
+	cutoff magnitude, as well as on a constant A and the b-value
+	in the base-10 notation of the Gutenberg-Richter relation.
 
-	:param Mm:
-	:param Mc:
-	:param c:
-	:param p:
-		see :class:`ReasenbergOmoriLaw`
 	:param A:
 		float, aftershock productivity (independent of Mm and Mc)
+	:param c:
+	:param p:
+		see :class:`OmoriLaw`
 	:param b:
-		float, Gutenberg-Richter b-value
+		float, Gutenberg-Richter b-value (of the aftershock sequence)
+	:param Mm:
+	:param Mc:
+		see :class:`OmoriLaw`
+
+	Note that, in contrast to :class:`OmoriLaw`, Mm and/or Mc can be
+	changed to adjust the Omori law!
 	"""
-	def __init__(self, Mm, Mc, c, p, A, b):
-		super(GROmoriLaw, self).__init__(Mm, Mc, c, p)
+	def __init__(self, A, c, p, b, Mm, Mc, time_delta=np.timedelta64(1, 'D')):
+		#super(GROmoriLaw, self).__init__(Mm, Mc, c, p)
 		self.A = A
+		self.c = c
+		self.p = p
 		self.b = b
+		self.Mm = Mm
+		self.Mc = Mc
+		self.time_delta = time_delta
 
 	@property
 	def K(self):
 		return 10**(self.A + self.b*self.delta_M)
+
+	def get_alpha(self):
+		"""
+		Get alpha for equivalent exponential GROmoriLaw
+		"""
+		return self.b * np.log(10)
+
+	def get_beta(self):
+		"""
+		Get Gutenberg-Richter beta value (= alpha)
+		"""
+		return self.get_alpha()
 
 	def determine_A(self, K, Mc):
 		"""
@@ -329,20 +450,23 @@ class GROmoriLaw(ReasenbergOmoriLaw):
 		"""
 		return np.log10(K) - self.b * (self.Mm - Mc)
 
-	def to_new_Mc(self, new_Mc):
+	def determine_K_for_Mc(self, new_Mc):
 		"""
-		Convert to GROmoriLaw for another cutoff magnitude
+		Detemine K value for different cutoff magnitude
 
 		:param new_Mc:
 			float, new cutoff magnitude
-
-		:return:
-			instance of :class:`GROmoriLaw`
 		"""
-		K2 = 10 ** (np.log10(self.K) + self.b * (self.Mc - new_Mc))
-		return self.__class__(self.Mm, new_Mc, self.c, self.p, self.A, self.b)
+		return 10 ** (np.log10(self.K) - self.b * (new_Mc - self.Mc))
 
-	# TODO: get_prob_one_or_more_aftershocks() method in function of aftershock magnitude!
+	def to_exp(self):
+		"""
+		Convert to :class:`ExpGROmoriLaw`
+		"""
+		A = 10**self.A
+		alpha = self.get_alpha()
+		return ExpGROmoriLaw(A, self.c, self.p, alpha, self.Mm, self.Mc,
+							self.time_delta)
 
 
 def estimate_omori_params(as_time_deltas, initial_guess=(0.01, 1.2),
