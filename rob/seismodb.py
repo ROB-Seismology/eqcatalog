@@ -752,8 +752,10 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 	Query internet enquiries.
 
 	:param id_earth:
-		int, ROB earthquake ID or 'all': enquiries assigned to given
-		earthquake or to any earthquake
+		int, ROB earthquake ID: enquiries assigned to given earthquake
+		or 'all': enquiries assigned to any event type
+		or event type string (e.g., 'ke,ki'): enquiries assigned to
+		specific event type
 		or date string, datetime.date or np.datetime64: enquiries from
 		a particular date, but not assigned to any earthquake
 		(default: None = all unassigned enquiries)
@@ -790,14 +792,20 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 					('LEFT JOIN', 'web_location', 'web_input.id_web=web_location.id_web'
 								' AND web_location.quality >= %d' % min_location_quality)]
 
-	if isinstance(id_earth, int) or id_earth == "all":
+	if isinstance(id_earth, (int, basestring)):
+		where_clause = 'web_analyse.m_fiability >= %.1f' % float(min_fiability)
+		where_clause += ' AND web_analyse.deleted = false'
+
 		## Only fetch enquiries assigned to an earthquake
 		if id_earth == "all":
 			where_clause = 'web_analyse.id_earth > 0'
+		elif isinstance(id_earth, basestring):
+			event_types = ','.join(['"%s"' % et for et in id_earth.split(',')])
+			join_clause.append(('JOIN', 'earthquakes',
+					'web_analyse.id_earth = earthquakes.id_earth'
+					' AND earthquakes.type in (%s)' % event_types))
 		else:
-			where_clause = 'web_analyse.id_earth = %d' % id_earth
-		where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
-		where_clause += ' AND web_analyse.deleted = false'
+			where_clause += ' AND web_analyse.id_earth = %d' % id_earth
 		if id_com is not None:
 			where_clause += ' AND web_analyse.id_com=%d' % id_com
 		elif zip_code:
