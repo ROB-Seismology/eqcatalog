@@ -104,10 +104,29 @@ class OmoriLaw(object):
 			delta_t = ((N / K) * (1-p) + c**(1-p))**(1./(1-p)) - c
 		return delta_t
 
+	def get_prob_n_aftershocks(self, n, delta_t2, delta_t1=0):
+		"""
+		Compute probability of n aftershocks in a particular time interval,
+		assuming a Poisson process.
+
+		:param n:
+			int, number of aftershocks
+		:param delta_t2:
+		:param delta_t1:
+			see :meth:`get_num_aftershocks`
+
+		:return:
+			float, probability
+		"""
+		from scipy.misc import factorial
+
+		N = self.get_num_aftershocks(delta_t2, delta_t1)
+		return (np.exp(-N) * N**n) / factorial(n)
+
 	def get_prob_one_or_more_aftershocks(self, delta_t2, delta_t1=0):
 		"""
 		Compute probability of at least one aftershock in a particular
-		time interval
+		time interval, assuming a Poisson process.
 
 		:param delta_t2:
 		:param delta_t1:
@@ -118,6 +137,23 @@ class OmoriLaw(object):
 		"""
 		N = self.get_num_aftershocks(delta_t2, delta_t1)
 		return 1 - np.exp(-N)
+
+	def get_random_num_aftershocks(self, delta_t2, delta_t1=0, size=None,
+									random_seed=None):
+		"""
+		Randomly sample number of aftershocks in a particular time
+		interval, assuming a Poisson process.
+
+		:param delta_t2:
+		:param delta_t1:
+			see :meth:`get_num_aftershocks`
+
+		:return:
+			int array
+		"""
+		np.random.seed(random_seed)
+		N = self.get_num_aftershocks(delta_t2, delta_t1)
+		return np.random.poisson(N, size=size)
 
 	def get_aftershock_duration(self, mu):
 		"""
@@ -367,29 +403,6 @@ class ExpGROmoriLaw(GROmoriLaw):
 						self.time_delta)
 
 
-class ReasenbergOmoriLaw(OmoriLaw):
-	"""
-	Omori law where K depends on difference between mainshock and
-	cutoff magnitude according to the relation in Reasenberg (1985)
-
-	:param Mm:
-		float, mainshock magnitude
-	:param Mc:
-	:param c:
-	:param p:
-		see :class:`OmoriLaw`
-	"""
-	def __init__(self, Mm, Mc, c, p):
-		self.Mm = Mm
-		self.Mc = Mc
-		self.c = c
-		self.p = p
-
-	@property
-	def K(self):
-		return 10**(2 * (self.delta_M - 1.) / 3.)
-
-
 class Base10GROmoriLaw(GROmoriLaw):
 	"""
 	Omori law where K depends on difference between mainshock and
@@ -411,7 +424,6 @@ class Base10GROmoriLaw(GROmoriLaw):
 	changed to adjust the Omori law!
 	"""
 	def __init__(self, A, c, p, b, Mm, Mc, time_delta=np.timedelta64(1, 'D')):
-		#super(GROmoriLaw, self).__init__(Mm, Mc, c, p)
 		self.A = A
 		self.c = c
 		self.p = p
@@ -467,6 +479,25 @@ class Base10GROmoriLaw(GROmoriLaw):
 		alpha = self.get_alpha()
 		return ExpGROmoriLaw(A, self.c, self.p, alpha, self.Mm, self.Mc,
 							self.time_delta)
+
+
+class Reasenberg1985OmoriLaw(Base10GROmoriLaw):
+	"""
+	Version of Base10GROmoriLaw with A and b constants for California
+	(Reasenberg, 1985)
+
+	:param c:
+	:param p:
+	:param Mm:
+	:param Mc:
+	:param time_delta:
+		see :class:`Base10GROmoriLaw`
+	"""
+	def __init__(self, c, p, Mm, Mc, time_delta=np.timedelta64(1, 'D')):
+		A = -2./3
+		b = 2./3
+		super(Reasenberg1985OmoriLaw, self).__init__(A, c, p, b, Mm, Mc, time_delta)
+
 
 
 def estimate_omori_params(as_time_deltas, initial_guess=(0.01, 1.2),
@@ -537,9 +568,9 @@ def estimate_omori_params(as_time_deltas, initial_guess=(0.01, 1.2),
 
 
 if __name__ == "__main__":
-	K, c, p = 10., 0., 1.
-	Mc = 2.0
-	mol = OmoriLaw(K, c, p, Mc)
+	K, c, p = 10., 0.01, 1.
+	Mm, Mc = 6.5, 2.0
+	mol = OmoriLaw(K, c, p, Mm, Mc)
 	dt1 = 5
 	dt2 = 10
 	N = mol.get_num_aftershocks(dt2)
