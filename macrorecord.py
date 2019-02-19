@@ -304,18 +304,24 @@ class MacroseismicEnquiryEnsemble():
 			recs = [rec.copy() for rec in self.recs]
 			return self.__class__(self.id_earth, recs)
 
+	def get_eq_ids(self):
+		return self.get_prop_values('id_earth')
+
 	def get_eq(self):
 		"""
-		Fetch earthquake from ROB database
+		Fetch earthquake(s) from ROB database
 
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
+			or instance of :class:`eqcatalog.EQCatalog`
 		"""
 		from .rob.seismodb import query_local_eq_catalog_by_id
 
-		if isinstance(self.id_earth, (int, str)):
-			[eq] = query_local_eq_catalog_by_id(self.id_earth)
-			return eq
+		cat = query_local_eq_catalog_by_id(np.unique(self.get_eq_ids()))
+		if len(cat) == 1:
+			return cat[0]
+		else:
+			return cat
 
 	def get_prop_values(self, prop):
 		"""
