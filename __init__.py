@@ -67,6 +67,12 @@ if not reloading:
 else:
 	reload(declustering)
 
+## omori (no internal dependencies)
+if not reloading:
+	from . import omori
+else:
+	reload(omori)
+
 ## source_models (no internal dependencies)
 if not reloading:
 	from . import source_models
