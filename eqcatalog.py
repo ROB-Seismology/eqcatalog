@@ -481,6 +481,9 @@ class EQCatalog:
 		if not ((intensities == 0).all() or np.isnan(intensities).all()):
 			intensities = remove_nan_values(intensities)
 			tab.add_column('Imax', intensities, align='r', valign='m')
+		event_types = [eq.event_type for eq in self]
+		if len(set(event_types)) > 1:
+			tab.add_column('Type', event_types, valign='m')
 
 		tab.padding_width = padding_width
 		tab.max_width['Name'] = max_name_width
@@ -1228,6 +1231,11 @@ class EQCatalog:
 			end_date = tf.time_tuple_to_np_datetime(end_date, 12, 31)
 		else:
 			end_date = tf.as_np_datetime(end_date)
+		## If start_date and end_date are the same,
+		## set time of end date to end of the day
+		if start_date and end_date and end_date - start_date == np.timedelta64(0):
+			end_time = datetime.time(23, 59, 59, 999999)
+			end_date = tf.combine_np_date_and_py_time(end_date, end_time)
 
 		## Check each constraint separately
 		eq_list = self.eq_list
