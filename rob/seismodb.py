@@ -198,7 +198,9 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		elif end_date is None:
 			end_date = np.datetime64('now')
 		end_date = tf.as_np_datetime(end_date)
-		if tf.to_py_time(end_date) == datetime.time(0):
+		## If start_date and end_date are the same,
+		## set time of end date to end of the day
+		if start_date and end_date and end_date - start_date == np.timedelta64(0):
 			end_time = datetime.time(23, 59, 59, 999999)
 			end_date = tf.combine_np_date_and_py_time(end_date, end_time)
 
@@ -227,7 +229,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 	where_clause = ""
 	having_clause = ""
-	if id_earth:
+	if not (id_earth is None or id_earth in ([], '')):
 		where_clause += 'id_earth in (%s)' % ",".join([str(item) for item in id_earth])
 	else:
 		where_clause += 'is_true = 1'
