@@ -811,7 +811,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		comm_rec_dict = self.get_communes_from_db(comm_key=comm_key)
 		for rec in self.recs:
-			if rec['quality'] <= max_quality:
+			if not rec['quality'] or rec['quality'] <= max_quality:
 				if comm_key in ("id_com", "id_main"):
 					key = rec[comm_key]
 				elif comm_key == "zip":
@@ -1036,7 +1036,7 @@ class MacroseismicEnquiryEnsemble():
 					% unassigned.num_replies)
 
 		macro_recs = []
-		for key in agg_ensemble_dict.keys():
+		for key in list(agg_ensemble_dict.keys()):
 			num_replies = agg_ensemble_dict[key].num_replies
 			if num_replies < min_replies:
 				agg_ensemble_dict.pop(key)
