@@ -8,16 +8,107 @@ import eqcatalog.rob.seismodb as seismodb
 from eqcatalog.macrorecord import MacroseismicInfo
 
 
-def get_Imax_by_commune(enq_type='all', min_or_max='max', min_replies=3,
+def get_subcommunes(id_main):
+	"""
+	Return subcommune records for particular main commune
+
+	:param id_main:
+		int, main commune ID
+
+	:return:
+		list of dicts
+	"""
+	table_clause = 'communes'
+	where_clause = 'id_main = %d' %  id_main
+	return seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
+
+# TODO: recalc
+def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replies=3,
+				min_fiability=20, filter_floors=(0, 4), include_other_felt=True,
+				include_heavy_appliance=False, remove_outliers=(2.5, 97.5)):
+	"""
+	:return:
+		dict mapping earthquake IDs to intensities
+	"""
+	if as_main_commune:
+		subcommunes = get_subcommunes(id_com)
+		if len(subcommunes) == 0:
+			raise Exception("Commune #%d is not a main commune" % id_com)
+		## Use zip_code for query, as it is likely more reliable than id_com
+		## (should work for enquiries where commune assignment has failed)
+		zip_code = [r['code_p'] for r in subcommunes]
+		id_com = None
+	else:
+		zip_code = None
+
+	eq_intensities = {}
+	dyfi = seismodb.query_web_macro_enquiries('ke', id_com=id_com,
+						zip_code=zip_code, min_fiability=min_fiability)
+	if len(dyfi):
+		all_eq_ids = dyfi.get_eq_ids()
+		unique_eq_ids = np.unique(all_eq_ids)
+		for id_earth in unique_eq_ids:
+			eq_dyfi = dyfi[all_eq_ids == id_earth]
+			if filter_floors:
+				eq_dyfi = eq_dyfi.filter_floors(*filter_floors)
+			if len(eq_dyfi) >= min_replies:
+				I = eq_dyfi.calc_mean_cii(filter_floors=False,
+						include_other_felt=include_other_felt,
+						include_heavy_appliance=include_heavy_appliance,
+						remove_outliers=remove_outliers)
+				eq_intensities[id_earth] = I
+
+	return eq_intensities
+
+
+def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
+							min_or_max='mean', min_replies=3, min_fiability=20):
+	"""
+	:return:
+		dict mapping earthquake IDs to lists of intensities
+	"""
+	if as_main_commune:
+		subcommunes = get_subcommunes(id_com)
+		if len(subcommunes) == 0:
+			raise Exception("Commune #%d is not a main commune" % id_com)
+		id_com_str = ','.join(['%d' % sc['id'] for sc in subcommunes])
+	else:
+		id_com_str = id_com
+
+	table_clause = 'macro_detail'
+	where_clause = 'id_com IN (%s) AND fiability >= %d'
+	where_clause %= (id_com_str, min_fiability)
+	macro_recs = seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
+	eq_intensities = {}
+	for mrec in macro_recs:
+		id_earth = mrec['id_earth']
+		Imin, Imax = mrec['intensity_min'], mrec['intensity_max']
+		## Do not take into account Imin/Imax = 13 values
+		if Imin == 13:
+			continue
+		elif Imax == 13:
+			Imax = Imin
+
+		I = {'min': Imin, 'max': Imax, 'mean': np.mean([Imin, Imax])}[min_or_max]
+		if id_earth in eq_intensities:
+			eq_intensities[id_earth].append(I)
+		else:
+			eq_intensities[id_earth] = [I]
+
+	return eq_intensities
+
+
+# TODO: agg_subcommune_func
+def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 				min_fiability=20, filter_floors=(0, 4), include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
-				verbose=False):
+				by_main_commune=False, agg_subcommunes='mean', verbose=False):
 	"""
 	Determine historical Imax for every commune in Belgium
 
 	:param enq_type:
 		str, one of "internet", "official", "all"
-		(default: all)
+		(default: 'all')
 	:param min_or_max:
 		see :func:`seismodb.query_official_macro_catalog`
 	:param min_replies:
@@ -27,6 +118,14 @@ def get_Imax_by_commune(enq_type='all', min_or_max='max', min_replies=3,
 	:param include_heavy_appliance:
 	:param remove_outliers:
 		see :func:`seismodb.query_web_macro_enquiries`
+	:param by_main_commune:
+		bool, whether or not to aggregate communes by main commune
+		(default: False)
+	:param agg_subcommunes:
+		str, name of numpy function for aggregation of subcommunes if
+		:param:`by_main_commune` is True.
+		One of 'mean', 'minimum', 'maximum'
+		(default: 'mean')
 	:param verbose:
 		bool, whether or not to print progress information
 		(default: False)
@@ -34,49 +133,54 @@ def get_Imax_by_commune(enq_type='all', min_or_max='max', min_replies=3,
 	:return:
 		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
 	"""
+	agg_func = getattr(np, agg_subcommunes.lower())
+
 	## Fetch communes from database
 	table_clause = 'communes'
 	where_clause = 'country = "BE"'
+	if by_main_commune:
+		where_clause += ' AND id = id_main'
 	comm_recs = seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
-	comm_macro_dict = {}
 
+	comm_macro_dict = {}
 	for rec in comm_recs:
+		#if rec['id'] != 6:
+		#	continue
 		id_com = rec['id']
 		lon, lat = rec['longitude'], rec['latitude']
 		name = rec['name']
 
 		## Online enquiries
 		Imax_web = 0
+		num_replies_web = 0
 		eq_ids_web = []
 		if enq_type in ('all', 'internet', 'online'):
-			dyfi = seismodb.query_web_macro_enquiries('all', id_com,
-													min_fiability=min_fiability)
-			if len(dyfi):
-				all_eq_ids = np.array(dyfi.get_prop_values('id_earth'))
-				eq_ids_web = np.unique(all_eq_ids)
-				for eq_id in eq_ids_web:
-					eq_dyfi = dyfi[all_eq_ids == eq_id]
-					if len(eq_dyfi) >= min_replies:
-						I = eq_dyfi.calc_mean_cii(filter_floors=filter_floors,
-								include_other_felt=include_other_felt,
-								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers)
-						if I and I > Imax_web:
-							Imax_web = I
+			eq_intensities = get_eq_intensities_for_commune_web(id_com,
+				as_main_commune=by_main_commune, min_replies=min_replies,
+				min_fiability=min_fiability, filter_floors=filter_floors,
+				include_other_felt=include_other_felt,
+				include_heavy_appliance=include_heavy_appliance,
+				remove_outliers=remove_outliers)
+			eq_ids_web = eq_intensities.keys()
+			for id_earth in eq_ids_web:
+				I = eq_intensities[id_earth]
+				num_replies_web += 1
+				if I and I > Imax_web:
+					Imax_web = I
 
 		## Official / Historical macroseismic information
 		Imax_official = 0
+		num_replies_official = 0
 		eq_ids_official = []
 		if enq_type in ('all', 'official'):
-			table_clause = 'macro_detail'
-			where_clause = 'id_com = %d AND fiability >= %d' % (id_com, min_fiability)
-			macro_recs = seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
-			eq_ids_official = sorted([mrec['id_earth'] for mrec in macro_recs])
-			for mrec in macro_recs:
-				I = {'min': mrec['intensity_min'],
-				'max': mrec['intensity_max'],
-				'mean': np.mean([mrec['intensity_min'], mrec['intensity_max']])}[min_or_max]
-				if I > Imax_official:
+			eq_intensities = get_eq_intensities_for_commune_official(id_com,
+							as_main_commune=by_main_commune, min_or_max=min_or_max,
+							min_replies=min_replies, min_fiability=min_fiability)
+			eq_ids_official = eq_intensities.keys()
+			for id_earth in eq_ids_official:
+				I = agg_func(eq_intensities[id_earth])
+				num_replies_official += 1
+				if I > Imax_official and I < 13:
 					Imax_official = I
 
 		Imax = max(Imax_web, Imax_official)
@@ -84,25 +188,56 @@ def get_Imax_by_commune(enq_type='all', min_or_max='max', min_replies=3,
 		## Construct MacroseismicInfo
 		if Imax > 0:
 			id_earth = {'web': sorted(eq_ids_web), 'official': sorted(eq_ids_official)}
-			agg_type = 'id_com'
-			enq_type = 'internet / official'
-			num_replies = len(eq_ids_web) + len(eq_ids_official)
+			agg_type = 'id_main' if by_main_commune else 'id_com'
+			num_replies = num_replies_web + num_replies_official
 			db_ids = []
 			macro_info = MacroseismicInfo(id_earth, id_com, Imax, agg_type,
 										enq_type, num_replies, lon, lat, db_ids)
 			comm_macro_dict[id_com] = macro_info
 
-		if verbose:
-			msg = '%d (%s): Iweb=%d (n=%d) - Ioff=%d (n=%d)'
-			msg %= (id_com, name, Imax_web, len(eq_ids_web),
-					Imax_official, len(eq_ids_official))
-			print(msg)
+			if verbose:
+				msg = '%d (%s): Iweb=%d (n=%d) - Ioff=%d (n=%d)'
+				msg %= (id_com, name, Imax_web, len(eq_ids_web),
+						Imax_official, len(eq_ids_official))
+				print(msg)
 
 	return comm_macro_dict
 
 
 if __name__ == "__main__":
-	comm_macro_dict = get_Imax_by_commune(verbose=True, include_other_felt=False)
-	for id_com in comm_macro_dict:
-		macro_info = comm_macro_dict[id_com]
-		print("%d: Imax=%d (n=%d)" % (id_com, macro_info.I, macro_info.num_replies))
+	import os
+	from eqcatalog.plot import plot_macroseismic_map
+
+	#print(get_eq_intensities_for_commune_official(6, min_or_max='min', as_main_commune=False))
+	#print(get_eq_intensities_for_commune_official(6, min_or_max='max', as_main_commune=False))
+	#print(get_eq_intensities_for_commune_web(6, as_main_commune=False, include_other_felt=False))
+	#exit()
+
+	#enq_type = 'official'
+	enq_type = 'online'
+	by_main_commune = True
+	comm_macro_dict = get_Imax_by_commune(enq_type=enq_type, include_other_felt=False,
+										by_main_commune=by_main_commune, verbose=False)
+	print(sum(macro.num_replies for macro in comm_macro_dict.values()))
+	print([macro.I for macro in comm_macro_dict.values()])
+	#for id_com in comm_macro_dict:
+	#	macro_info = comm_macro_dict[id_com]
+	#	print("%d: Imax=%d (n=%d)" % (id_com, macro_info.I, macro_info.num_replies))
+
+	region = (2, 7, 49.25, 51.75)
+	projection = "merc"
+	graticule_interval = (2, 1)
+	title = "Maximum intensity by commune (%s)" % enq_type
+	fig_folder = "C:\\Temp"
+	if by_main_commune:
+		fig_filename = "Imax_by_main_commune_%s.PNG"
+	else:
+		fig_filename = "Imax_by_commune_%s.PNG"
+	fig_filename %= enq_type
+	fig_filespec = os.path.join(fig_folder, fig_filename)
+	#fig_filespec = None
+
+	plot_macroseismic_map(comm_macro_dict.values(), '', region=region,
+					projection=projection, graticule_interval=graticule_interval,
+					event_style=None, cmap="usgs", title=title,
+					fig_filespec=fig_filespec)
