@@ -762,10 +762,10 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 		a particular date, but not assigned to any earthquake
 		(default: None = all unassigned enquiries)
 	:param id_com:
-		int, ROB commune ID
+		int or list of ints, ROB commune ID
 		(default: None)
 	:param zip_code:
-		int, ZIP code
+		int or list of ints, ZIP code
 		(default: None)
 	:param min_fiability:
 		float, minimum fiability of enquiry
@@ -809,9 +809,18 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 		else:
 			where_clause += ' AND web_analyse.id_earth = %d' % id_earth
 		if id_com is not None:
-			where_clause += ' AND web_analyse.id_com=%d' % id_com
+			if isinstance(id_com, int):
+				where_clause += ' AND web_analyse.id_com=%d' % id_com
+			elif isinstance(id_com, (list, np.ndarray)):
+				id_com_str = ','.join(['%s' % id for id in id_com])
+				where_clause += ' AND web_analyse.id_com IN (%s)' % id_com_str
 		elif zip_code:
-			where_clause += ' AND web_input.zip=%d' % zip_code
+			if isinstance(zip_code, int):
+				where_clause += ' AND web_input.zip=%d' % zip_code
+			elif isinstance(zip_code, (list, np.ndarray)):
+				zip_code_str = ','.join(['%s' % zip for zip in zip_code])
+				where_clause += ' AND web_input.zip IN (%s)' % zip_code_str
+
 	elif web_ids:
 		where_clause = 'web_input.id_web in (%s)' % ','.join(['%d' % ID for ID in web_ids])
 	else:
