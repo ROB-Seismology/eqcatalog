@@ -22,10 +22,11 @@ def get_subcommunes(id_main):
 	where_clause = 'id_main = %d' %  id_main
 	return seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
 
-# TODO: recalc
+
 def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replies=3,
 				min_fiability=20, filter_floors=(0, 4), include_other_felt=True,
-				include_heavy_appliance=False, remove_outliers=(2.5, 97.5)):
+				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
+				recalc=False):
 	"""
 	:return:
 		dict mapping earthquake IDs to intensities
@@ -52,7 +53,13 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replie
 			if filter_floors:
 				eq_dyfi = eq_dyfi.filter_floors(*filter_floors)
 			if len(eq_dyfi) >= min_replies:
-				I = eq_dyfi.calc_mean_cii(filter_floors=False,
+				if recalc:
+					# TODO: fix_all
+					I = eq_dyfi.calc_cii(filter_floors=False,
+						include_other_felt=include_other_felt,
+						include_heavy_appliance=include_heavy_appliance)
+				else:
+					I = eq_dyfi.calc_mean_cii(filter_floors=False,
 						include_other_felt=include_other_felt,
 						include_heavy_appliance=include_heavy_appliance,
 						remove_outliers=remove_outliers)
@@ -102,7 +109,8 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 				min_fiability=20, filter_floors=(0, 4), include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
-				by_main_commune=False, agg_subcommunes='mean', verbose=False):
+				by_main_commune=False, agg_subcommunes='mean',
+				recalc_web=False, verbose=False):
 	"""
 	Determine historical Imax for every commune in Belgium
 
@@ -160,7 +168,7 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 				min_fiability=min_fiability, filter_floors=filter_floors,
 				include_other_felt=include_other_felt,
 				include_heavy_appliance=include_heavy_appliance,
-				remove_outliers=remove_outliers)
+				remove_outliers=remove_outliers, recalc=recalc_web)
 			eq_ids_web = eq_intensities.keys()
 			for id_earth in eq_ids_web:
 				I = eq_intensities[id_earth]
