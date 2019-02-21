@@ -31,9 +31,12 @@ else:
 	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
 try:
-	from mapping.seismo_gis.seismo_gis import SEISMOGIS_ROOT
+	from seismogis_root import SEISMOGIS_ROOT
 except ImportError:
-	SEISMOGIS_ROOT = ''
+	try:
+		from mapping.seismogis.seismo_gis import SEISMOGIS_ROOT
+	except ImportError:
+		SEISMOGIS_ROOT = ''
 
 
 ## Import submodules
