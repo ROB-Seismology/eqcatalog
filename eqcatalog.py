@@ -232,7 +232,7 @@ class EQCatalog:
 			instance of :class:`LocalEarthquake`
 		"""
 		idx = self.index(id)
-		if idx:
+		if idx is not None:
 			return self.__getitem__(idx)
 
 	def get_duplicate_idxs(self):
@@ -275,6 +275,21 @@ class EQCatalog:
 		remaining_idxs = set(all_idxs) - set(idxs)
 		remaining_idxs = np.array(sorted(remaining_idxs))
 		return self.__getitem__(remaining_idxs)
+
+	def remove_events_by_id(self, IDs):
+		"""
+		Return catalog with earthquakes with given IDs removed
+
+		:param IDs:
+			list of ints or strings, IDs of earthquakes to be removed
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		idxs = []
+		for ID in IDs:
+			idxs.append(self.index(ID))
+		return self.remove_events_by_index(idxs)
 
 	def get_union(self, other_catalog, name=None):
 		"""
@@ -3299,7 +3314,7 @@ class EQCatalog:
 			#bins_Dates = np.arange(start_date.year, end_date.year+bin_width, bin_width)
 			subcatalog = self.subselect(start_date=tf.to_year(start_date),
 										end_date=tf.to_year(end_date))
-			Dates = [eq.year for eq in subcatalog]
+			Dates = subcatalog.get_fractional_years()
 		elif bin_width_spec.lower()[:3] == "day":
 			bins_M0, bins_Dates = self.bin_M0_by_day(tf.as_np_date(start_date),
 						tf.as_np_date(end_date), bin_width, Mrelation=Mrelation)
