@@ -1243,7 +1243,7 @@ class EQCatalog:
 		else:
 			start_date = tf.as_np_datetime(start_date)
 		if isinstance(end_date, int):
-			end_date = tf.time_tuple_to_np_datetime(end_date, 12, 31)
+			end_date = tf.time_tuple_to_np_datetime(end_date, 12, 31, 23, 59, 59, 999999)
 		else:
 			end_date = tf.as_np_datetime(end_date)
 		## If start_date and end_date are the same,
@@ -1592,7 +1592,7 @@ class EQCatalog:
 		start_dates = completeness.min_dates[::-1]
 		for Mmin, Mmax, start_date in zip(min_mags, max_mags, start_dates):
 			catalog = self.subselect(Mmin=Mmin, Mmax=Mmax, start_date=start_date,
-									end_date=self.end_date)
+								end_date=self.end_date, include_right_edges=False)
 			completeness_catalogs.append(catalog)
 		return completeness_catalogs
 
