@@ -194,7 +194,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		start_date = tf.as_np_datetime(start_date)
 
 		if isinstance(end_date, int):
-			end_date = '%d-12-31' % end_date
+			end_date = '%d-12-31T23:59:59.999999' % end_date
 		elif end_date is None:
 			end_date = np.datetime64('now')
 		end_date = tf.as_np_datetime(end_date)
