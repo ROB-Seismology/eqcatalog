@@ -42,7 +42,7 @@ class Completeness:
 		if len(self.min_dates) > 1 and self.min_dates[0] > self.min_dates[1]:
 			self.min_dates = self.min_dates[::-1]
 			self.min_mags = self.min_mags[::-1]
-		if not np.all(np.diff(self.min_dates).astype('float') > 0):
+		if not np.all(np.diff(self.min_dates).astype('float') >= 0):
 			raise Exception("Completeness dates not in chronological order")
 		if not np.all(np.diff(self.min_mags) < 0):
 			raise Exception("Completeness magnitudes not monotonically "
