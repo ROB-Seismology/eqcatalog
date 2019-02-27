@@ -55,7 +55,7 @@ def construct_msg(eq):
 	msg += "ID %d\n" % eq.ID
 	msg += "ML %.1f\n" % eq.ML
 	msg += "%s\n" % eq.name
-	msg += "%d-%02d-%02d %02d:%02d:%02d\n" % (date.year, date.month, date.day, time.hour, time.minute, int(round(time.second)))
+	msg += "%s\n" % date
 	msg += "Lon: %.3f, Lat: %.3f\n" % (eq.lon, eq.lat)
 	msg += "Depth: %s\n" % eq.depth
 	try:
