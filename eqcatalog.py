@@ -486,7 +486,7 @@ class EQCatalog:
 		tab.add_column('Lat', lats, align='r', valign='m')
 		depths = remove_nan_values(self.get_depths())
 		tab.add_column('Z', depths, align='r', valign='m')
-		Mtypes = ('ML', 'MS', 'MW', 'mb')
+		Mtypes = self.get_Mtypes()
 		for Mtype in Mtypes:
 			mags = self.get_magnitudes(Mtype, Mrelation={})
 			if not np.isnan(mags).all():
@@ -497,7 +497,7 @@ class EQCatalog:
 			intensities = remove_nan_values(intensities)
 			tab.add_column('Imax', intensities, align='r', valign='m')
 		event_types = [eq.event_type for eq in self]
-		if len(set(event_types)) > 1:
+		if len(set(event_types)) > min(1, len(self)-1):
 			tab.add_column('Type', event_types, valign='m')
 
 		tab.padding_width = padding_width
@@ -4009,6 +4009,65 @@ class EQCatalog:
 				fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
 
 	## Export methods
+
+	def to_multi_point_data(self):
+		"""
+		Convert to layeredbasemap MultiPointData
+		"""
+		import mapping.layeredbasemap as lbm
+
+		lons = self.get_longitudes()
+		lats = self.get_latitudes()
+		z = [eq.depth for eq in self]
+
+		values = {}
+		values['ID'] = self.get_ids()
+		values['datetime'] = self.get_datetimes()
+
+		for Mtype in self.get_Mtypes():
+			values[Mtype] = self.get_magnitudes(Mtype=Mtype, Mrelation={})
+
+		names = [eq.name for eq in self]
+		if sum([len(name) for name in names]):
+			values['name'] = names
+
+		intensities = self.get_max_intensities()
+		if not ((intensities == 0).all() or np.isnan(intensities).all()):
+			values['intensity_max'] = intensities
+
+		for attrib in ['macro_radius', 'errh', 'errz', 'errt', 'errM']:
+			ar = np.array([getattr(eq, attrib) for eq in self])
+			if not ((ar == 0).all() or np.isnan(ar).all()):
+				values[attrib] = ar
+
+		for attrib in ['zone', 'agency', 'event_type']:
+			lst = [getattr(eq, attrib) for eq in self]
+			if len(set(lst)) > min(1, len(self)-1):
+				values[attrib] = lst
+
+		return lbm.MultiPointData(lons, lats, z=z, values=values)
+
+	def to_geojson(self):
+		"""
+		Convert to GeoJSON
+		"""
+		return self.to_multi_point_data().to_geojson(as_multi=False)
+
+	def export_gis(self, format, filespec, encoding='latin-1'):
+		"""
+		Export to GIS file
+
+		:param format:
+			str, OGR format specification (e.g., 'ESRI Shapefile', 'MEMORY')
+		:param out_filespec:
+			str, full path to output file, will also be used as layer name
+
+		:return:
+			instance of :class:`ogr.DataSource` if :param:`format`
+			== 'MEMORY', else None
+		"""
+		mpd = self.to_multi_point_data()
+		return mpd.export_gis(format, filespec, encoding=encoding)
 
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation="default"):
 		"""
