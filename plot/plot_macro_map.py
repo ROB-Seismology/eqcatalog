@@ -223,15 +223,16 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		if plot_info == 'intensity':
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
 										labels=["%d" % val for val in classes],
-										style_under='w')
+										style_under='w', style_over=cmap(1.))
 		elif plot_info == 'num_replies':
 			tfc = lbm.ThematicStyleRanges(classes, cmap, value_key=plot_info,
 										labels=["%d" % val for val in classes],
-										style_under='w', style_bad='w')
+										style_under='w', style_over=cmap(1.),
+										style_bad='w')
 	elif color_gradient == "continuous":
 		tfc = lbm.ThematicStyleGradient(classes, cmap, value_key=plot_info,
 								labels=["%d" % val for val in classes],
-								style_under='w')
+								style_under='w', style_over=cmap(1.))
 
 	colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d", title=cb_title,
 										spacing="uniform")
