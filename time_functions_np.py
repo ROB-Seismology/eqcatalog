@@ -267,9 +267,12 @@ def to_py_date(dt64):
 	assert is_np_datetime(dt64)
 
 	if np.isscalar(dt64):
-		return to_py_datetime(dt64).date()
+		py_dt = to_py_datetime(dt64)
+		return py_dt.date() if isinstance(py_dt, datetime.datetime) else py_dt
 	else:
-		return [to_py_datetime(item).date() for item in dt64]
+		py_dt = [to_py_datetime(item).date() for item in dt64]
+		py_dt = [item.date() if isinstance(item, datetime.datetime) else item]
+		return py_dt
 
 
 def to_year(dt):
