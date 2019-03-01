@@ -4010,9 +4010,13 @@ class EQCatalog:
 
 	## Export methods
 
-	def to_multi_point_data(self):
+	def to_multi_point_data(self, combine_datetime=True):
 		"""
 		Convert to layeredbasemap MultiPointData
+
+		:param combine_datetime:
+			bool, whether or not to combine date and time in one attribute
+			(default: True)
 		"""
 		import mapping.layeredbasemap as lbm
 
@@ -4020,9 +4024,19 @@ class EQCatalog:
 		lats = self.get_latitudes()
 		z = [eq.depth for eq in self]
 
-		values = {}
+		values = OrderedDict()
 		values['ID'] = self.get_ids()
-		values['datetime'] = self.get_datetimes()
+
+		if combine_datetime:
+			values['datetime'] = self.get_datetimes()
+		else:
+			values['date'] = [tf.to_py_date(eq.date) for eq in self]
+			## Convert times to strings to avoid problems with Shapefiles
+			values['time'] = [str(eq.time) for eq in self]
+
+		values['lon'] = self.get_longitudes()
+		values['lat'] = self.get_latitudes()
+		values['depth'] = self.get_depths()
 
 		for Mtype in self.get_Mtypes():
 			values[Mtype] = self.get_magnitudes(Mtype=Mtype, Mrelation={})
@@ -4033,11 +4047,15 @@ class EQCatalog:
 
 		intensities = self.get_max_intensities()
 		if not ((intensities == 0).all() or np.isnan(intensities).all()):
-			values['intensity_max'] = intensities
+			values['Imax'] = intensities
 
 		for attrib in ['macro_radius', 'errh', 'errz', 'errt', 'errM']:
 			ar = np.array([getattr(eq, attrib) for eq in self])
 			if not ((ar == 0).all() or np.isnan(ar).all()):
+				if attrib == 'macro_radius':
+					## Shorten attibute name to <= 10 characters
+					## to avoid problems with Shapefiles
+					attrib = 'Rmacro'
 				values[attrib] = ar
 
 		for attrib in ['zone', 'agency', 'event_type']:
@@ -4047,13 +4065,20 @@ class EQCatalog:
 
 		return lbm.MultiPointData(lons, lats, z=z, values=values)
 
-	def to_geojson(self):
+	def to_geojson(self, combine_datetime=True):
 		"""
 		Convert to GeoJSON
-		"""
-		return self.to_multi_point_data().to_geojson(as_multi=False)
 
-	def export_gis(self, format, filespec, encoding='latin-1'):
+		:param combine_datetime:
+			see :meth:`to_multi_point_data`
+
+		:return:
+			dict
+		"""
+		return self.to_multi_point_data(combine_datetime).to_geojson(as_multi=False)
+
+	def export_gis(self, format, filespec, encoding='latin-1',
+					combine_datetime=True):
 		"""
 		Export to GIS file
 
@@ -4061,12 +4086,21 @@ class EQCatalog:
 			str, OGR format specification (e.g., 'ESRI Shapefile', 'MEMORY')
 		:param out_filespec:
 			str, full path to output file, will also be used as layer name
+		:param encoding:
+			str, encoding to use for non-ASCII characters
+			(default: 'latin-1')
+		:param combine_datetime:
+			bool, whether or not to combine date and time in one attribute
+			(default: True)
 
 		:return:
 			instance of :class:`ogr.DataSource` if :param:`format`
 			== 'MEMORY', else None
 		"""
-		mpd = self.to_multi_point_data()
+		if format == 'ESRI Shapefile':
+			## Shapefiles do not support datetime fields
+			combine_datetime = False
+		mpd = self.to_multi_point_data(combine_datetime)
 		return mpd.export_gis(format, filespec, encoding=encoding)
 
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation="default"):
@@ -4594,7 +4628,6 @@ class EQCatalog:
 			Bool, whether or not to print additional information
 		"""
 		from scipy.misc import factorial
-		from .time_functions import time_delta_to_days
 
 		def poisson(n, t, tau):
 			## Probability of n events in period t
@@ -4610,13 +4643,13 @@ class EQCatalog:
 
 		num_events = len(catalog)
 		td = catalog.get_time_delta()
-		catalog_num_days = time_delta_to_days(td)
+		catalog_num_days = tf.time_delta_to_days(td)
 		num_intervals = np.ceil(catalog_num_days / interval)
 
 		## Real catalog distribution
 		## Compute interval index for each event
 		time_deltas = catalog.get_time_deltas()
-		time_delta_days = np.array([time_delta_to_days(td) for td in time_deltas])
+		time_delta_days = np.array([tf.time_delta_to_days(td) for td in time_deltas])
 		interval_indexes = np.floor(time_delta_days / interval)
 		## Compute number of events in each interval
 		num_events_per_interval, _ = np.histogram(interval_indexes, np.arange(num_intervals))
