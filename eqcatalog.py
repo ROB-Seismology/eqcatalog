@@ -4083,7 +4083,8 @@ class EQCatalog:
 		Export to GIS file
 
 		:param format:
-			str, OGR format specification (e.g., 'ESRI Shapefile', 'MEMORY')
+			str, OGR format specification (e.g., 'ESRI Shapefile',
+			'MapInfo File', 'GeoJSON', 'MEMORY', ...)
 		:param out_filespec:
 			str, full path to output file, will also be used as layer name
 		:param encoding:
