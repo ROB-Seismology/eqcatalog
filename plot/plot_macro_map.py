@@ -8,6 +8,8 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import os
+from collections import OrderedDict
+
 import numpy as np
 import matplotlib
 
@@ -17,8 +19,105 @@ GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB
 
 
 
-__all__ = ["plot_macroseismic_map", "plot_official_macroseismic_map",
-			"plot_web_macroseismic_map"]
+__all__ = ["get_macroseismic_geometries", "plot_macroseismic_map",
+			"plot_official_macroseismic_map", "plot_web_macroseismic_map"]
+
+
+
+def get_macroseismic_geometries(macro_recs, communes_as_points=False):
+	"""
+	Transform aggregated macroseismic information to layeredbasemap
+	geometries.
+
+	:param macro_recs:
+		list with instances of :class:`MacroseismicInfo`, representing
+		(aggregated) macroseismic information to plot
+	:param communes_as_points:
+		bool, whether to represent communes as points (True)
+		or polygons (False)
+		(default: False)
+
+	:return:
+		list with layeredbasemap geometries
+	"""
+	import mapping.layeredbasemap as lbm
+
+	if len(macro_recs) == 0:
+		return []
+
+	## Determine aggregation type from first record
+	aggregate_by = macro_recs[0].agg_type
+	if aggregate_by == 'commune':
+		aggregate_by = 'id_com'
+	elif aggregate_by == 'main commune':
+		aggregate_by = 'id_main'
+	elif not aggregate_by:
+		communes_as_points = True
+	elif aggregate_by[:4] == 'grid':
+		if '_' in aggregate_by:
+			_, grid_spacing = aggregate_by.split('_')
+			grid_spacing = float(grid_spacing)
+		else:
+			grid_spacing = 5
+		aggregate_by = 'grid'
+
+	## Construct attribute dictionary
+	values = OrderedDict()
+	attributes = ['id_earth', 'intensity', 'num_replies', 'agg_type', 'enq_type']
+	if aggregate_by == 'grid' or communes_as_points:
+		if aggregate_by in ('id_main', 'id_com'):
+			attributes += ['id_com']
+		attributes += ['lon', 'lat']
+		for attrib in attributes:
+			values[attrib] = [getattr(rec, attrib) for rec in macro_recs]
+	else:
+		join_key = "ID_ROB"
+		for attrib in attributes:
+			values[attrib] = {'key': join_key, 'values':
+						{rec.id_com: getattr(rec, attrib) for rec in macro_recs}}
+
+	## Select GIS file with commune polygons in function of aggregation type
+	#if communes_as_points:
+	#	gis_filename = "Bel_villages_points.TAB"
+	gis_filename = ""
+	if not communes_as_points:
+		if aggregate_by == 'id_main':
+			gis_filename = "Bel_villages_polygons.TAB"
+		elif aggregate_by == 'id_com':
+			gis_filename = "Bel_communes_avant_fusion.TAB"
+	if gis_filename:
+		gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
+		#gis_filespec = "http://seishaz.oma.be:8080/geoserver/rob/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=rob:bel_villages_polygons&outputFormat=application%2Fjson"
+
+	## Grid
+	if aggregate_by == 'grid':
+		import mapping.geotools.coordtrans as ct
+		X_left = np.array([rec.lon for rec in macro_recs])
+		Y_bottom = np.array([rec.lat for rec in macro_recs])
+		X_right = X_left + grid_spacing * 1000
+		Y_top = Y_bottom + grid_spacing * 1000
+		all_lons, all_lats = [], []
+		for i in range(len(macro_recs)):
+			X = [X_left[i], X_right[i], X_right[i], X_left[i], X_left[i]]
+			Y = [Y_bottom[i], Y_bottom[i], Y_top[i], Y_top[i], Y_bottom[i]]
+			lons, lats = ct.transform_array_coordinates(ct.LAMBERT1972, ct.WGS84, X, Y)
+			all_lons.append(lons)
+			all_lats.append(lats)
+		macro_geoms = lbm.MultiPolygonData(all_lons, all_lats, values=values)
+
+	## Points
+	elif communes_as_points:
+		lons = [rec.lon for rec in macro_recs]
+		lats = [rec.lat for rec in macro_recs]
+		macro_geoms = lbm.MultiPointData(lons, lats, values=values)
+
+	## Commune polygons
+	else:
+		gis_data = lbm.GisData(gis_filespec, joined_attributes=values)
+		_, _, polygon_data = gis_data.get_data()
+		macro_geoms = polygon_data
+
+	return macro_geoms
 
 
 def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
@@ -100,8 +199,8 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 		print("No macroseismic information provided! Nothing to plot.")
 		return
 
-	tot_num_replies = np.sum([rec.num_replies for rec in macro_recs])
 	if verbose:
+		tot_num_replies = np.sum([rec.num_replies for rec in macro_recs])
 		print("Found %d aggregates (%d replies) for event %s:"
 				% (len(macro_recs), tot_num_replies, id_earth))
 		intensities = [rec.I for rec in macro_recs]
@@ -111,102 +210,30 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 				print("  %s : %.2f (n=%d)" % (macro_recs[idx].id_com,
 							macro_recs[idx].I, macro_recs[idx].num_replies))
 
-	## Determine aggregation type from first record
+	plot_communes_as_points = False
+	if symbol_style:
+		plot_communes_as_points = True
 	aggregate_by = macro_recs[0].agg_type
-	if aggregate_by == 'commune':
-		aggregate_by = 'id_com'
-	elif aggregate_by == 'main commune':
-		aggregate_by = 'id_main'
-	elif not aggregate_by:
+	if aggregate_by is None:
 		symbol_style = symbol_style or lbm.PointStyle(shape='D', size=5)
-	elif aggregate_by[:4] == 'grid':
-		if '_' in aggregate_by:
-			_, grid_spacing = aggregate_by.split('_')
-			grid_spacing = float(grid_spacing)
-		else:
-			grid_spacing = 5
-		aggregate_by = 'grid'
+	elif aggregate_by == 'grid':
+		symbol_style = None
 
-	## Select GIS file with commune polygons in function of aggregation type
-	#if symbol_style:
-	#	gis_filename = "Bel_villages_points.TAB"
-	gis_filename = ""
-	if not symbol_style:
-		if aggregate_by == 'id_main':
-			gis_filename = "Bel_villages_polygons.TAB"
-		elif aggregate_by == 'id_com':
-			gis_filename = "Bel_communes_avant_fusion.TAB"
-	if gis_filename:
-		gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
-		#gis_filespec = "http://seishaz.oma.be:8080/geoserver/rob/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=rob:bel_villages_polygons&outputFormat=application%2Fjson"
+	if plot_info == 'intensity' and color_gradient[:4] == "disc":
+		## Round intensities
+		intensities = np.array([rec.I for rec in macro_recs])
+		intensities = getattr(np, int_conversion)(intensities).astype('int')
+		for r, rec in enumerate(macro_recs):
+			setattr(rec, plot_info, intensities[r])
 
+	layers = []
+
+	## Set up thematic style for macroseismic data
 	cmap_name = cmap
 	if cmap_name.lower() in ("usgs", "rob"):
 		cmap = lbm.cm.get_cmap("macroseismic", cmap_name)
 	else:
 		cmap = matplotlib.cm.get_cmap(cmap_name)
-
-	if plot_info == 'intensity':
-		intensities = np.array([rec.I for rec in macro_recs])
-		if color_gradient[:4] == "disc":
-			intensities = getattr(np, int_conversion)(intensities).astype('int')
-		## Store possibly rounded intensities in new 'intensity' attribute,
-		## keeping original 'I' attribute unmodified
-		for r, rec in enumerate(macro_recs):
-			setattr(rec, plot_info, intensities[r])
-
-
-	layers = []
-
-	## Commune/grid layer
-	if aggregate_by == 'grid':
-		import mapping.geotools.coordtrans as ct
-		symbol_style = None
-		X_left = np.array([rec.lon for rec in macro_recs])
-		Y_bottom = np.array([rec.lat for rec in macro_recs])
-		X_right = X_left + grid_spacing * 1000
-		Y_top = Y_bottom + grid_spacing * 1000
-		all_lons, all_lats = [], []
-		for i in range(len(macro_recs)):
-			X = [X_left[i], X_right[i], X_right[i], X_left[i], X_left[i]]
-			Y = [Y_bottom[i], Y_bottom[i], Y_top[i], Y_top[i], Y_bottom[i]]
-			lons, lats = ct.transform_array_coordinates(ct.LAMBERT1972, ct.WGS84, X, Y)
-			all_lons.append(lons)
-			all_lats.append(lats)
-		values = {}
-		values[plot_info] = [getattr(rec, plot_info) for rec in macro_recs]
-		if plot_info != 'num_replies':
-			values['num_replies'] = [rec.num_replies for rec in macro_recs]
-		commune_data = lbm.MultiPolygonData(all_lons, all_lats, values=values)
-
-	elif symbol_style:
-		lons = [rec.lon for rec in macro_recs]
-		lats = [rec.lat for rec in macro_recs]
-		values = {}
-		values[plot_info] = [getattr(rec, plot_info) for rec in macro_recs]
-		if plot_info != 'num_replies':
-			values['num_replies'] = [rec.num_replies for rec in macro_recs]
-		if len(lons):
-			commune_data = lbm.MultiPointData(lons, lats, values=values)
-		else:
-			commune_data = None
-	else:
-		key = "ID_ROB"
-		joined_attributes = {}
-		joined_attributes[plot_info] = {'key': key,
-			'values': {rec.id_com: getattr(rec, plot_info) for rec in macro_recs}}
-		if plot_info != 'num_replies':
-			joined_attributes['num_replies'] = {'key': key,
-				'values': {rec.id_com: rec.num_replies for rec in macro_recs}}
-		if verbose:
-			Imax = np.nanmax(joined_attributes[plot_info]['values'].values())
-			print("Max %s: %s" % (plot_info, Imax))
-
-		commune_data = lbm.GisData(gis_filespec, joined_attributes=joined_attributes)
-		#_, _, polygon_data = commune_data.get_data()
-		#print(len(polygon_data), len(polygon_data.values['intensity']))
-		#exit()
-
 
 	if plot_info == 'intensity':
 		classes = np.arange(1, cmap.N + 1)
@@ -250,13 +277,13 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 			#tfh = lbm.ThematicStyleRanges(num_replies, ['', '.....', '....', '...', '..', ''],
 			#								value_key="num_replies")
 			if color_gradient == "discontinuous":
-				#ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
-				#							value_key="num_replies")
-				ta = 1.
+				ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
+											value_key="num_replies")
+				#ta = 1.
 		polygon_style = lbm.PolygonStyle(fill_color=tfc, line_width=0.1,
 					fill_hatch=tfh, alpha=ta, thematic_legend_style=thematic_legend_style)
-		#commune_style = lbm.CompositeStyle(polygon_style=polygon_style)
-		commune_style = polygon_style
+		#macro_style = lbm.CompositeStyle(polygon_style=polygon_style)
+		macro_style = polygon_style
 		legend_label = {"polygons": ""}
 	else:
 		## Plot points
@@ -271,13 +298,16 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 			symbol_style.size = ts
 		symbol_style.fill_color = tfc
 		#symbol_style.thematic_legend_style = thematic_legend_style
-		#commune_style = lbm.CompositeStyle(point_style=symbol_style)
-		commune_style = symbol_style
+		#macro_style = lbm.CompositeStyle(point_style=symbol_style)
+		macro_style = symbol_style
 		legend_label = ""
 
-	if commune_data:
-		commune_layer = lbm.MapLayer(commune_data, commune_style, legend_label=legend_label)
-		layers.append(commune_layer)
+	## Macro layer
+	macro_geom_data = get_macroseismic_geometries(macro_recs,
+									communes_as_points=plot_communes_as_points)
+	if macro_geom_data:
+		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
+		layers.append(macro_layer)
 
 	## Province layer
 	data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_provinces.TAB"))
@@ -302,7 +332,6 @@ def plot_macroseismic_map(macro_recs, id_earth, region=(2, 7, 49.25, 51.75),
 				bins, counts = enq_ensemble.bincount(prop, [0,1,2])
 				ratios.append(counts)
 				#print rec.id_com, rec.num_replies, bins, counts
-				#print rec.id_com, rec.I, enq_ensemble.CII.mean()
 		#print enq_ensemble.CII
 		#print 3.40 * np.log(enq_ensemble.CWS) - 4.38
 
