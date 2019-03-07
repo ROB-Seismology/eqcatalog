@@ -2,25 +2,15 @@
 Determine max. intensity reported in all Belgian communes
 """
 
+from __future__ import absolute_import, division, print_function#, unicode_literals
+from builtins import int
+
+
 import numpy as np
 
 import eqcatalog.rob.seismodb as seismodb
 from eqcatalog.macrorecord import MacroseismicInfo
-
-
-def get_subcommunes(id_main):
-	"""
-	Return subcommune records for particular main commune
-
-	:param id_main:
-		int, main commune ID
-
-	:return:
-		list of dicts
-	"""
-	table_clause = 'communes'
-	where_clause = 'id_main = %d' %  id_main
-	return seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
+from eqcatalog.plot.plot_macro_map import MacroInfoCollection
 
 
 def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replies=3,
@@ -32,7 +22,7 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replie
 		dict mapping earthquake IDs to intensities
 	"""
 	if as_main_commune:
-		subcommunes = get_subcommunes(id_com)
+		subcommunes = seismodb.get_subcommunes(id_com)
 		if len(subcommunes) == 0:
 			raise Exception("Commune #%d is not a main commune" % id_com)
 		## Use zip_code for query, as it is likely more reliable than id_com
@@ -75,7 +65,7 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 		dict mapping earthquake IDs to lists of intensities
 	"""
 	if as_main_commune:
-		subcommunes = get_subcommunes(id_com)
+		subcommunes = seismodb.get_subcommunes(id_com)
 		if len(subcommunes) == 0:
 			raise Exception("Commune #%d is not a main commune" % id_com)
 		id_com_str = ','.join(['%d' % sc['id'] for sc in subcommunes])
@@ -150,7 +140,8 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 		where_clause += ' AND id = id_main'
 	comm_recs = seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
 
-	comm_macro_dict = {}
+	#comm_macro_dict = {}
+	macro_infos = []
 	for rec in comm_recs:
 		#if rec['id'] != 6:
 		#	continue
@@ -201,7 +192,8 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 			db_ids = []
 			macro_info = MacroseismicInfo(id_earth, id_com, Imax, agg_type,
 										enq_type, num_replies, lon, lat, db_ids)
-			comm_macro_dict[id_com] = macro_info
+			#comm_macro_dict[id_com] = macro_info
+			macro_infos.append(macro_info)
 
 			if verbose:
 				msg = '%d (%s): Iweb=%d (n=%d) - Ioff=%d (n=%d)'
@@ -209,7 +201,10 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 						Imax_official, len(eq_ids_official))
 				print(msg)
 
-	return comm_macro_dict
+		macro_info_coll = MacroInfoCollection(macro_infos, agg_type, enq_type)
+
+	#return comm_macro_dict
+	return macro_info_coll
 
 
 if __name__ == "__main__":
@@ -221,13 +216,13 @@ if __name__ == "__main__":
 	#print(get_eq_intensities_for_commune_web(6, as_main_commune=False, include_other_felt=False))
 	#exit()
 
-	#enq_type = 'official'
-	enq_type = 'online'
+	enq_type = 'official'
+	#enq_type = 'online'
 	by_main_commune = True
-	comm_macro_dict = get_Imax_by_commune(enq_type=enq_type, include_other_felt=False,
+	macro_info_coll = get_Imax_by_commune(enq_type=enq_type, include_other_felt=False,
 										by_main_commune=by_main_commune, verbose=False)
-	print(sum(macro.num_replies for macro in comm_macro_dict.values()))
-	print([macro.I for macro in comm_macro_dict.values()])
+	print(sum(macro.num_replies for macro in macro_info_coll))
+	print([macro.I for macro in macro_info_coll])
 	#for id_com in comm_macro_dict:
 	#	macro_info = comm_macro_dict[id_com]
 	#	print("%d: Imax=%d (n=%d)" % (id_com, macro_info.I, macro_info.num_replies))
@@ -242,10 +237,19 @@ if __name__ == "__main__":
 	else:
 		fig_filename = "Imax_by_commune_%s.PNG"
 	fig_filename %= enq_type
-	fig_filespec = os.path.join(fig_folder, fig_filename)
-	#fig_filespec = None
+	#fig_filespec = os.path.join(fig_folder, fig_filename)
+	fig_filespec = None
 
-	plot_macroseismic_map(comm_macro_dict.values(), '', region=region,
-					projection=projection, graticule_interval=graticule_interval,
+
+	macro_info_coll.plot_map(region=region, projection=projection,
+					graticule_interval=graticule_interval,
 					event_style=None, cmap="usgs", title=title,
 					fig_filespec=fig_filespec)
+
+	#print(macro_info_coll.to_geojson())
+
+	#gis_file = os.path.splitext(fig_filespec)[0] + ".TAB"
+	#macro_info_coll.export_gis('MapInfo File', gis_file)
+
+	#geotiff_file = os.path.splitext(fig_filespec)[0] + ".TIF"
+	#macro_info_coll.export_geotiff(geotiff_file)
