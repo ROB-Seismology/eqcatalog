@@ -954,7 +954,7 @@ class MacroseismicEnquiryEnsemble():
 
 		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet')
 
-		return macro_recs
+		return macro_info_coll
 
 	def aggregate_by_zip(self):
 		# TODO: can be removed
