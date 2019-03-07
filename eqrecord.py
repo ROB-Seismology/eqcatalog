@@ -357,7 +357,8 @@ class LocalEarthquake:
 				print(ID, second)
 				raise
 
-		## Default value for lon, lat, depth is 0, but could also be nan
+		# TODO: find a better solution than using or
+		# this should only be used when parameter is None, not if it is zero!
 		lon_key = column_map.get('lon', 'lon')
 		lon = float(rec.get(lon_key, null_value) or null_value)
 

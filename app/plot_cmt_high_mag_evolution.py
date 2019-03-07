@@ -12,13 +12,14 @@ import pylab
 import eqcatalog.harvard_cmt as cmt
 
 
-db_file = "D:\\seismo-gis\\collections\\Harvard_CMT\\SQLite\HarvardCMT.sqlite"
+db_file = "D:\\seismo-gis\\collections\\Harvard_CMT\\SQLite\\HarvardCMT.sqlite"
 catalog = cmt.HarvardCMTCatalog(db_file)
 
 Mmin_values = [7.0, 7.5, 8.0]
 colors = ['g', 'b', 'm', 'r']
 start_year, end_year = 1976, 2018
-region = (-180, 180, -40, 40)
+#region = (-180, 180, -40, 40)
+region = (-180, 180, -30, 10)
 
 for m, Mmin in enumerate(Mmin_values):
 	recs = catalog.get_records(start_date=start_year, end_date=end_year,

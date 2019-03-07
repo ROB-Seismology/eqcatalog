@@ -11,7 +11,7 @@ import eqcatalog.harvard_cmt as cmt
 from eqcatalog.time_functions import fractional_year
 
 
-db_file = "D:\\seismo-gis\\collections\\Harvard_CMT\\SQLite\HarvardCMT.sqlite"
+db_file = "D:\\seismo-gis\\collections\\Harvard_CMT\\SQLite\\HarvardCMT.sqlite"
 catalog = cmt.HarvardCMTCatalog(db_file)
 
 Mmax_values = [6.0, 7.0, 8.0, 9.5]

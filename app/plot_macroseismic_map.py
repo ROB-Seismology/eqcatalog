@@ -15,9 +15,11 @@ from eqcatalog.plot import plot_web_macroseismic_map, plot_official_macroseismic
 
 ## Earthquake to plot
 ## 1692
-id_earth = 89
+#id_earth = 89
 ## 1938 earthquake
 #id_earth = 509
+## 2002 Alsdorf
+id_earth = 1306
 ## Kinrooi 25/05/2018
 #id_earth = 6625
 
@@ -35,25 +37,26 @@ min_replies = 3
 #filter_floors = (-100, 900)
 filter_floors = (0, 4)
 min_fiability = 20
-recalc = True
+recalc = False
 
 ## How to aggregate
 ## No aggregation = plot at individual locations (if geocoded)
 #aggregate_by = None
 ## Aggregate by commune or main commune
-aggregate_by = 'commune'
-#aggregate_by = 'main commune'
+#aggregate_by = 'commune'
+aggregate_by = 'main commune'
 ## Aggregate by grid cell
 #aggregate_by = 'grid_5'
 
 ## Choose symbols/polygons for aggregation by commune or main commune
-symbol_style = lbm.PointStyle(shape='D', size=5)
-#symbol_style = None
+#symbol_style = lbm.PointStyle(shape='D', size=5)
+symbol_style = None
 
 ## Color options
-#color_gradient = "discrete"
-color_gradient = "continuous"
+color_gradient = "discrete"
+#color_gradient = "continuous"
 cmap = "rob"
+#cmap = "usgs"
 #cmap = "jet"
 
 ## Extras
@@ -86,7 +89,8 @@ plot_web_macroseismic_map(id_earth, region=region, projection=projection,
 
 plot_official_macroseismic_map(id_earth, region=region, projection=projection,
 				graticule_interval=graticule_interval, min_fiability=min_fiability,
-				min_or_max='mean', aggregate_by=aggregate_by, agg_function='average',
-				int_conversion='round',
-				symbol_style=symbol_style, cmap=cmap, color_gradient=color_gradient,
-				radii=radii, title=title, fig_filespec=fig_filespec)
+				min_or_max='min', aggregate_by=aggregate_by, agg_function='average',
+				int_conversion='round', symbol_style=symbol_style, cmap=cmap,
+				color_gradient=color_gradient, radii=radii, title=title,
+				fig_filespec=fig_filespec, verbose=True)
+
