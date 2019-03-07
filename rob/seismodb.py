@@ -42,7 +42,8 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_focal_mechanisms", "query_official_macro_catalog",
 			"query_web_macro_catalog", "query_web_macro_enquiries",
 			"get_num_macroseismic_enquiries", "query_stations",
-			"get_station_coordinates", "get_last_earthID", "zip2ID"]
+			"get_station_coordinates", "get_last_earthID", "zip2ID",
+			"get_subcommunes"]
 
 
 AGG_FUNC_DICT = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}
@@ -980,6 +981,21 @@ def zip2ID(zip_code):
 	query = 'SELECT id FROM communes WHERE code_p = %d' % zip_code
 	id_com = query_seismodb_table_generic(query)[0]['id']
 	return id_com
+
+
+def get_subcommunes(id_main):
+	"""
+	Return subcommune records for particular main commune
+
+	:param id_main:
+		int, main commune ID
+
+	:return:
+		list of dicts
+	"""
+	table_clause = 'communes'
+	where_clause = 'id_main = %d' %  id_main
+	return seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
 
 
 
