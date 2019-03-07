@@ -1,3 +1,4 @@
+# -*- coding: iso-Latin-1 -*-
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from builtins import int
@@ -11,8 +12,9 @@ except:
 	PY2 = False
 	basestring = str
 
+import os
+from collections import OrderedDict
 
-## Third-party modules
 import numpy as np
 
 import mapping.layeredbasemap as lbm
