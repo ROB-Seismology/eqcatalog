@@ -869,8 +869,10 @@ class MacroseismicEnquiryEnsemble():
 			(default: False)
 
 		:return:
-			list with instances of :class:`MacroseismicInfo`
+			instance of :class:`MacroInfoCollection`
 		"""
+		from .macro_info import MacroseismicInfo, MacroInfoCollection
+
 		ensemble = self[self.fiability >= min_fiability]
 		ensemble = ensemble.fix_all()
 		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
@@ -911,7 +913,7 @@ class MacroseismicEnquiryEnsemble():
 			print("Note: %d enquiries are not assigned to a commune"
 					% unassigned.num_replies)
 
-		macro_recs = []
+		macro_infos = []
 		for key in list(agg_ensemble_dict.keys()):
 			num_replies = agg_ensemble_dict[key].num_replies
 			if num_replies < min_replies:
@@ -946,9 +948,11 @@ class MacroseismicEnquiryEnsemble():
 			else:
 				print("Don't know how to compute %s" % agg_info)
 				exit()
-			rec = MacroseismicInfo(ensemble.id_earth, id_com, I, aggregate_by,
+			macro_info = MacroseismicInfo(ensemble.id_earth, id_com, I, aggregate_by,
 									'internet', num_replies, lon, lat, web_ids)
-			macro_recs.append(rec)
+			macro_infos.append(macro_info)
+
+		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet')
 
 		return macro_recs
 
