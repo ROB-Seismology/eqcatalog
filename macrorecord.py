@@ -22,7 +22,7 @@ import numpy as np
 
 
 __all__ = ["MacroseismicInfo", "MacroseismicEnquiryEnsemble",
-			"MacroseismicDataPoint", "get_roman_intensity"]
+			"get_roman_intensity"]
 
 
 ROMAN_INTENSITY_DICT = {0: '', 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI',
@@ -99,7 +99,7 @@ class MacroseismicInfo():
 		or 'all'
 	:param id_com:
 		int, ID of commune in ROB database
-	:param I:
+	:param intensity:
 		int or float, macroseismic intensity
 	:param agg_type:
 		str, type of aggregation, one of:
@@ -123,17 +123,21 @@ class MacroseismicInfo():
 	:param db_ids:
 		list of ints, IDs of database records represented in aggregate
 	"""
-	def __init__(self, id_earth, id_com, I, agg_type, enq_type, num_replies=1,
+	def __init__(self, id_earth, id_com, intensity, agg_type, enq_type, num_replies=1,
 				lon=0, lat=0, db_ids=[]):
 		self.id_earth = id_earth
 		self.id_com = id_com
-		self.I = I
+		self.intensity = intensity
 		self.agg_type = agg_type
 		self.enq_type = enq_type
 		self.num_replies = num_replies
 		self.lon = lon
 		self.lat = lat
 		self.db_ids = db_ids
+
+	@property
+	def I(self):
+		return self.intensity
 
 	def get_eq(self):
 		"""
