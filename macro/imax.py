@@ -8,9 +8,13 @@ from builtins import int
 
 import numpy as np
 
-import eqcatalog.rob.seismodb as seismodb
-from eqcatalog.macrorecord import MacroseismicInfo
-from eqcatalog.plot.plot_macro_map import MacroInfoCollection
+import ..rob.seismodb as seismodb
+from .macro_info import MacroseismicInfo, MacroInfoCollection
+
+
+__all__ = ["get_eq_intensities_for_commune_web",
+			"get_eq_intensities_for_commune_official",
+			"get_eq_intensities_for_commune"]
 
 
 def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replies=3,

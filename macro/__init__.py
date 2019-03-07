@@ -45,3 +45,10 @@ if not reloading:
 else:
 	reload(dyfi)
 from .dyfi import *
+
+## imax (no internal dependencies)
+if not reloading:
+	from . import imax
+else:
+	reload(imax)
+from .imax import *
