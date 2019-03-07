@@ -995,7 +995,7 @@ def get_subcommunes(id_main):
 	"""
 	table_clause = 'communes'
 	where_clause = 'id_main = %d' %  id_main
-	return seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
+	return query_seismodb_table(table_clause, where_clause=where_clause)
 
 
 
