@@ -537,9 +537,9 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 		File object, where to print errors
 
 	:return:
-		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
+		instance of :class:`MacroInfoCollection`
 	"""
-	from ..macrorecord import MacroseismicInfo
+	from ..macro.macro_info import MacroseismicInfo, MacroInfoCollection
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
@@ -623,7 +623,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 					group_clause=group_clause, verbose=verbose, errf=errf)
 
 	## Fetch records
-	macro_info = {}
+	macro_infos = []
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
 	for rec in macro_recs:
 		id_com = rec['id_com']
@@ -634,11 +634,14 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 			db_ids = [rec['id_db']]
 		else:
 			db_ids = list(map(int, rec['id_db'].split(',')))
-		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
-											'official', num_replies=num_replies,
-											lon=lon, lat=lat, db_ids=db_ids)
+		macro_info = MacroseismicInfo(id_earth, id_com, I, agg_type,
+									'official', num_replies=num_replies,
+									lon=lon, lat=lat, db_ids=db_ids)
+		macro_infos.append(macro_info)
 
-	return macro_info
+	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'official')
+
+	return macro_info_coll
 
 
 def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
@@ -680,9 +683,9 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 		File object, where to print errors
 
 	:return:
-		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
+		instance of :class:`MacroInfoCollection`
 	"""
-	from ..macrorecord import MacroseismicInfo
+	from ..macro.macro_info import MacroseismicInfo, MacroInfoCollection
 
 	## Construct SQL query
 	table_clause = ['web_analyse']
@@ -730,7 +733,7 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 		errf.write("Querying KSB-ORB web macroseismic catalog:\n")
 
 	## Fetch records
-	macro_info = {}
+	macro_infos = []
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					join_clause=join_clause, where_clause=where_clause,
@@ -741,11 +744,14 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 		lon, lat = rec['lon'], rec['lat']
 		num_replies = rec['num_replies']
 		web_ids = list(map(int, rec['id_web'].split(',')))
-		macro_info[id_com] = MacroseismicInfo(id_earth, id_com, I, agg_type,
-										'internet', num_replies=num_replies,
-										lon=lon, lat=lat, db_ids=web_ids)
+		macro_info = MacroseismicInfo(id_earth, id_com, I, agg_type,
+									'internet', num_replies=num_replies,
+									lon=lon, lat=lat, db_ids=web_ids)
+		macro_infos.append(macro_info)
 
-	return macro_info
+	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'internet')
+
+	return macro_info_coll
 
 
 def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
