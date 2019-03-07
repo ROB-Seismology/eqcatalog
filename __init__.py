@@ -86,13 +86,11 @@ if not reloading:
 else:
 	reload(rob)
 
-## macrorecord (no internal dependencies)
+## macro (dependends on rob)
 if not reloading:
-	from . import macrorecord
+	from . import macro
 else:
-	reload(macrorecord)
-from .macrorecord import (MacroseismicInfo, MacroseismicEnquiryEnsemble,
-						MacroseismicDataPoint, get_roman_intensity)
+	reload(macro)
 
 ## eqrecord (depends on time_functions, msc)
 if not reloading:
@@ -125,7 +123,7 @@ else:
 from .io import (read_named_catalog, read_catalog_sql, read_catalog_csv,
 				read_catalog_gis)
 
-## plot submodule (depends on macrorecord, rob)
+## plot submodule (depends on macro, rob)
 if not reloading:
 	from . import plot
 else:

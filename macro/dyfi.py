@@ -21,50 +21,7 @@ except:
 import numpy as np
 
 
-__all__ = ["MacroseismicInfo", "MacroseismicEnquiryEnsemble",
-			"get_roman_intensity"]
-
-
-ROMAN_INTENSITY_DICT = {0: '', 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI',
-						7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X', 11: 'XI', 12: 'XII'}
-
-def get_roman_intensity(intensities, include_fraction=True):
-	"""
-	Convert intensity values to Roman numerals
-
-	:param intensities:
-		float or float array, intensities
-	:param include_fraction:
-		bool, whether or not to represent fractions as multiples of 1/4
-		(default: True)
-
-	:return:
-		list of strings, Roman numerals
-	"""
-	scalar = False
-	if np.isscalar(intensities):
-		intensities = [intensities]
-		scalar = True
-	decimals = np.remainder(intensities, 1)
-	intensities = np.floor_divide(intensities, 1)
-	roman_intensities = []
-	for i in range(len(intensities)):
-		intensity, dec = intensities[i], decimals[i]
-		roman_intensity = ROMAN_INTENSITY_DICT[intensity]
-		if include_fraction and intensity:
-			if 0.125 <= dec < 0.375:
-				roman_intensity += ' 1/4'
-			elif 0.375 <= dec < 0.625:
-				roman_intensity += ' 1/2'
-			elif 0.625 <= dec:
-				roman_intensity += ' 3/4'
-		if PY2:
-			roman_intensity = roman_intensity.decode('ascii')
-		roman_intensities.append(roman_intensity)
-	if scalar:
-		return roman_intensities[0]
-	else:
-		return roman_intensities
+__all__ = ["MacroseismicEnquiryEnsemble", "DYFIEnsemble"]
 
 
 def strip_accents(txt):
@@ -86,91 +43,6 @@ def strip_accents(txt):
 
 class MacroseismicDataPoint:
 	pass
-
-
-class MacroseismicInfo():
-	"""
-	Container class to hold information of (aggregated) records retrieved
-	from the official or internet macroseismic enquiry database, and
-	used for plotting maps.
-
-	:param id_earth:
-		int, ID of earthquake in ROB catalog
-		or 'all'
-	:param id_com:
-		int, ID of commune in ROB database
-	:param intensity:
-		int or float, macroseismic intensity
-	:param agg_type:
-		str, type of aggregation, one of:
-		- 'id_com' or 'commune'
-		- 'id_main' or 'main commune'
-		- 'grid_X' (where X is grid spacing in km)
-		- None or ''
-	:param enq_type:
-		str, type of enquirey, one of:
-		- 'internet' or 'online'
-		- 'official'
-	:param num_replies:
-		int, number of replies in aggregate
-		(default: 1)
-	:param lon:
-		float, longitude or (if :param:`agg_type` = 'grid_X') easting
-		(default: 0)
-	:param lat:
-		float, latitude or (if :param:`agg_type` = 'grid_X') northing
-		(default: 0)
-	:param db_ids:
-		list of ints, IDs of database records represented in aggregate
-	"""
-	def __init__(self, id_earth, id_com, intensity, agg_type, enq_type, num_replies=1,
-				lon=0, lat=0, db_ids=[]):
-		self.id_earth = id_earth
-		self.id_com = id_com
-		self.intensity = intensity
-		self.agg_type = agg_type
-		self.enq_type = enq_type
-		self.num_replies = num_replies
-		self.lon = lon
-		self.lat = lat
-		self.db_ids = db_ids
-
-	@property
-	def I(self):
-		return self.intensity
-
-	def get_eq(self):
-		"""
-		Fetch earthquake from ROB database
-
-		:return:
-			instance of :class:`eqcatalog.LocalEarthquake`
-		"""
-		from .rob.seismodb import query_local_eq_catalog_by_id
-
-		if isinstance(self.id_earth, (int, str)):
-			[eq] = query_local_eq_catalog_by_id(self.id_earth)
-			return eq
-
-	def get_enquiries(self, min_fiability=20, verbose=False):
-		"""
-		Fetch macroseismic enquiry records from the database, based on
-		either db_ids or, if this is empty, id_earth
-
-		:param min_fiability:
-			int, minimum fiability (ignored if db_ids is not empty)
-		:param verbose:
-			bool, whether or not to print useful information
-		"""
-		from .rob.seismodb import query_web_macro_enquiries
-
-		if self.db_ids:
-			ensemble = query_web_macro_enquiries(web_ids=self.db_ids, verbose=verbose)
-		else:
-			ensemble = query_web_macro_enquiries(self.id_earth, id_com=self.id_com,
-								min_fiability=min_fiability, verbose=verbose)
-
-		return ensemble
 
 
 ## Disable no-member errors for MacroseismicEnquiryEnsemble
@@ -319,7 +191,7 @@ class MacroseismicEnquiryEnsemble():
 			instance of :class:`eqcatalog.LocalEarthquake`
 			or instance of :class:`eqcatalog.EQCatalog`
 		"""
-		from .rob.seismodb import query_local_eq_catalog_by_id
+		from ..rob.seismodb import query_local_eq_catalog_by_id
 
 		cat = query_local_eq_catalog_by_id(np.unique(self.get_eq_ids()))
 		if len(cat) == 1:
@@ -599,7 +471,7 @@ class MacroseismicEnquiryEnsemble():
 		:return:
 			dict, mapping comm_key values to database records (dicts)
 		"""
-		from .rob.seismodb import query_seismodb_table
+		from ..rob.seismodb import query_seismodb_table
 		from difflib import SequenceMatcher as SM
 
 		if comm_key in ("id_com", "id_main"):
@@ -843,7 +715,7 @@ class MacroseismicEnquiryEnsemble():
 			None, 'longitude' and 'latitude' values of :prop:`recs`
 			are created or modified in place
 		"""
-		from .rob.seismodb import query_seismodb_table
+		from ..rob.seismodb import query_seismodb_table
 
 		table_clause = ['web_location']
 		column_clause = ['*']
@@ -1713,7 +1585,7 @@ class MacroseismicEnquiryEnsemble():
 			(title, labels) tuple
 		"""
 		import os
-		from .io.parse_php_vars import parse_php_vars
+		from ..io.parse_php_vars import parse_php_vars
 
 		base_path = os.path.split(__file__)[0]
 		php_file = os.path.join(base_path, 'rob', 'webenq', 'const_inq%s.php' % lang.upper())
@@ -2141,3 +2013,6 @@ class MacroseismicEnquiryEnsemble():
 		idxs = np.where((self.damage[:, 0] == True)
 						& (np.sum(self.damage[:,1:], axis=1) > 0))[0]
 		return self.__getitem__(idxs)
+
+
+DYFIEnsemble = MacroseismicEnquiryEnsemble
