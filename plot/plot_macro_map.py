@@ -8,7 +8,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import os
-from collections import OrderedDict
 
 import numpy as np
 import matplotlib
@@ -303,6 +302,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	return map.plot(fig_filespec=("hold" if ax else fig_filespec), dpi=dpi)
 
 
+# TODO: add additional arguments
 def plot_official_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75),
 				projection="merc", graticule_interval=(1, 1), min_or_max='max',
 				aggregate_by="commune", agg_function="average", min_val=1,
@@ -370,17 +370,17 @@ def plot_official_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75),
 	## Retrieve macroseismic information from database
 	[eq] = query_local_eq_catalog_by_id(id_earth)
 
-	comm_rec_dict = eq.get_macroseismic_data_aggregated_official(min_or_max=min_or_max,
+	macro_info_coll = eq.get_macroseismic_data_aggregated_official(min_or_max=min_or_max,
 			min_val=min_val, group_by_main_village=group_by_main_village,
 			agg_function=agg_function, verbose=verbose)
 
-	for id_com, rec in comm_rec_dict.items():
-		if rec.lon is None:
-			print("Commune #%s has no location!" % id_com)
-			comm_rec_dict.pop(id_com)
-	macro_recs = comm_rec_dict.values()
+	for i in range(len(macro_info_coll)-1, -1, -1):
+		macro_info = macro_info_coll[i]
+		if macro_info.lon is None:
+			print("Commune #%s has no location!" % macro_info.id_com)
+			macro_info_coll.macro_infos.pop(i)
 
-	return plot_macroseismic_map(macro_recs, id_earth, region=region,
+	return plot_macroseismic_map(macro_info_coll, region=region,
 				projection=projection, graticule_interval=graticule_interval,
 				plot_info='intensity', int_conversion=int_conversion,
 				symbol_style=symbol_style, cmap=cmap, color_gradient=color_gradient,
@@ -474,7 +474,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 	dyfi_ensemble = eq.get_macroseismic_enquiries(min_fiability)
 
 	## Aggregate
-	macro_recs = dyfi_ensemble.get_aggregated_info(aggregate_by, min_replies,
+	macro_info_coll = dyfi_ensemble.get_aggregated_info(aggregate_by, min_replies,
 							agg_info=query_info, min_fiability=min_fiability,
 							filter_floors=filter_floors, recalc=recalc)
 	# TODO: remove
@@ -576,7 +576,7 @@ def plot_web_macroseismic_map(id_earth, region=(2, 7, 49.25, 51.75), projection=
 	"""
 
 	plot_info = 'num_replies' if query_info == 'num_replies' else 'intensity'
-	return plot_macroseismic_map(macro_recs, id_earth, region=region, projection=projection,
+	return plot_macroseismic_map(macro_info_coll,  region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion=int_conversion, symbol_style=symbol_style,
 				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
