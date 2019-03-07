@@ -793,7 +793,7 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 	:return:
 		instance of :class:`MacroseismicEnquiryEnsemble`
 	"""
-	from ..macrorecord import MacroseismicEnquiryEnsemble
+	from ..macro.dyfi import MacroseismicEnquiryEnsemble
 
 	table_clause = ['web_input']
 
