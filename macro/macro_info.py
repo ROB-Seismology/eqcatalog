@@ -91,7 +91,7 @@ class MacroseismicInfo():
 			[eq] = query_local_eq_catalog_by_id(self.id_earth)
 			return eq
 
-	def get_enquiries(self, min_fiability=20, verbose=False):
+	def get_web_enquiries(self, min_fiability=20, verbose=False):
 		"""
 		Fetch macroseismic enquiry records from the database, based on
 		either db_ids or, if this is empty, id_earth
@@ -100,8 +100,14 @@ class MacroseismicInfo():
 			int, minimum fiability (ignored if db_ids is not empty)
 		:param verbose:
 			bool, whether or not to print useful information
+
+		:return:
+			instance of :class:`eqcatalog.macro.MacroseismicEnquiryEnsemble`
 		"""
 		from ..rob.seismodb import query_web_macro_enquiries
+
+		if self.enq_type == 'official':
+			return
 
 		if self.db_ids:
 			ensemble = query_web_macro_enquiries(web_ids=self.db_ids, verbose=verbose)
@@ -153,11 +159,39 @@ class MacroInfoCollection():
 		else:
 			return sorted(id_earths)
 
-	def to_com_info_dict(self):
+	def to_commune_info_dict(self):
+		"""
+		Convert to dictionary mapping commune IDs to instances of
+		:class:`MacroseismicInfo`
+		"""
 		com_info_dict = {}
 		for rec in self:
 			com_info_dict[rec.id_com] = rec
 		return com_info_dict
+
+	def get_commune_ids(self):
+		"""
+		Get list of commune IDs
+		"""
+		return [rec.id_com for rec in self]
+
+	def get_commune_info(self, id_com):
+		"""
+		Get info corresponding to particular commune
+
+		:param id_com:
+			int, commune ID
+
+		:return:
+			instance of :class:`MacroseismicInfo`
+		"""
+		commune_ids = self.get_commune_ids()
+		try:
+			idx = commune_ids.index(id_com)
+		except:
+			return None
+		else:
+			return self.macro_infos[idx]
 
 	def get_geometries(self, communes_as_points=False):
 		"""
@@ -294,6 +328,11 @@ class MacroInfoCollection():
 				province_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
 				ax=None, copyright=u"© ROB", verbose=True):
+		"""
+		Plot macroseismic map
+
+		see :func:`eqcatalog.plot.plot_macro_map.plot_macroseismic_map`
+		"""
 		from ..plot.plot_macro_map import plot_macroseismic_map
 
 		return plot_macroseismic_map(self, region=region, projection=projection,
@@ -307,6 +346,9 @@ class MacroInfoCollection():
 	def export_geotiff(self, out_filespec, plot_info="intensity",
 				int_conversion="round", symbol_style=None, cmap="rob",
 				color_gradient="discontinuous", copyright="", dpi=120):
+		"""
+		Export to GeoTIFF map
+		"""
 		region = (2, 7, 49.25, 51.75)
 		projection = "tmerc"
 		graticule_interval = ()
