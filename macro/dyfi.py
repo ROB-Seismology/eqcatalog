@@ -1118,11 +1118,6 @@ class MacroseismicEnquiryEnsemble():
 		ensemble.set_prop_values('stand', '0', regenerate_arrays=False)
 		self._gen_arrays()
 
-		#not_felt_idxs = np.where(self.felt == 0)
-		#self.motion[not_felt_idxs] = 0
-		#self.reaction[not_felt_idxs] = 0
-		#self.stand[not_felt_idxs] = 0
-
 	def calc_felt_index(self, include_other_felt=True):
 		"""
 		Compute felt indexes for individual questionnaires
