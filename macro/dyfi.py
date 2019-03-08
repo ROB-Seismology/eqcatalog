@@ -41,10 +41,6 @@ def strip_accents(txt):
 	return "".join([c for c in nkfd_form if not unicodedata.combining(c)])
 
 
-class MacroseismicDataPoint:
-	pass
-
-
 ## Disable no-member errors for MacroseismicEnquiryEnsemble
 # pylint: disable=no-member
 
@@ -687,7 +683,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		comm_rec_dict = self.get_communes_from_db(comm_key=comm_key)
 		for rec in self.recs:
-			if not rec['quality'] or rec['quality'] <= max_quality:
+			if not rec['location_quality'] or rec['location_quality'] <= max_quality:
 				if comm_key in ("id_com", "id_main"):
 					key = rec[comm_key]
 				elif comm_key == "zip":
@@ -697,11 +693,11 @@ class MacroseismicEnquiryEnsemble():
 					rec['longitude'] = comm_rec['longitude']
 					rec['latitude'] = comm_rec['latitude']
 					# TODO: decide on location quality
-					rec['quality'] = {'id_com': 5,
+					rec['location_quality'] = {'id_com': 5,
 										'zip': 5,
 										'id_main': 4}[comm_key]
 				elif not keep_unmatched:
-					rec['longitude'] = rec['latitude'] = rec['quality'] = np.nan
+					rec['longitude'] = rec['latitude'] = rec['location_quality'] = np.nan
 
 	def set_locations_from_geolocation(self, keep_unmatched=True):
 		"""
@@ -730,9 +726,9 @@ class MacroseismicEnquiryEnsemble():
 			if db_rec:
 				rec['longitude'] = db_rec['longitude']
 				rec['latitude'] = db_rec['latitude']
-				rec['quality'] = db_rec['quality']
+				rec['location_quality'] = db_rec['quality']
 			elif not keep_unmatched:
-				rec['longitude'] = rec['latitude'] = rec['quality'] = np.nan
+				rec['longitude'] = rec['latitude'] = rec['location_quality'] = np.nan
 
 	def get_bad_zip_country_tuples(self):
 		zip_country_tuples = set(self.get_unique_zip_country_tuples())
@@ -837,6 +833,7 @@ class MacroseismicEnquiryEnsemble():
 
 		return bin_rec_dict
 
+	#TODO: include_other_felt, include_heavy_appliance, remove_outliers
 	def get_aggregated_info(self, aggregate_by='id_com', min_replies=3, agg_info="cii",
 							min_fiability=20.0, filter_floors=False, recalc=False):
 		"""
