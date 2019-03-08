@@ -507,7 +507,7 @@ def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 
 
 def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
-					group_by_main_village=False, agg_function="maximum",
+					group_by_main_village=False, agg_function="average",
 					min_fiability=20, verbose=False, errf=None):
 	"""
 	Query ROB "official" macroseismic catalog (= commune inquiries)
@@ -527,7 +527,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 	:param agg_function:
 		str, aggregation function to use if :param:`group_by_main_village`
 		is True, one of "minimum", "maximum" or "average"
-		(default: "maximum")
+		(default: "average")
 	:param min_fiability:
 		float, minimum fiability of enquiry
 		(default: 20.)
