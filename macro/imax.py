@@ -8,23 +8,66 @@ from builtins import int
 
 import numpy as np
 
-import ..rob.seismodb as seismodb
+from ..rob import seismodb
 from .macro_info import MacroseismicInfo, MacroInfoCollection
 
 
 __all__ = ["get_eq_intensities_for_commune_web",
 			"get_eq_intensities_for_commune_official",
-			"get_eq_intensities_for_commune"]
+			"get_imax_by_commune"]
 
 
-def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replies=3,
-				min_fiability=20, filter_floors=(0, 4), include_other_felt=True,
-				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
-				recalc=False):
+def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
+				min_replies=3, min_fiability=20, filter_floors=(0, 4),
+				include_other_felt=True, include_heavy_appliance=False,
+				remove_outliers=(2.5, 97.5), recalc=False):
 	"""
+	Get list of all internet intensities due to known earthquakes
+	for a given commune
+
+	:param id_com:
+		int, ID of commune in database
+	:param as_main_commune:
+		bool, whether or not to group subcommunes belonging to a
+		main commune
+		(default: False)
+	:param min_replies:
+		int, minimum number of replies
+		(default: 3)
+	:param min_fiability:
+		int, minimum fiability of enquiry
+		(default: 20)
+	:param filter_floors:
+		(min_floor, max_floor) tuple, floors outside this range
+		(basement floors and upper floors) are filtered out
+		(default: False)
+	:param include_other_felt:
+		bool, whether or not to include the replies to the question
+		"Did others nearby feel the earthquake ?"
+		if :param`recalc` is True
+		(default: False)
+	:param include_heavy_appliance:
+		bool, whether or not to take heavy_appliance into account
+		as well (not standard, but occurs with ROB forms)
+		if :param:`recalc` is True
+		(default: False)
+	:param remove_outliers:
+		(min_pct, max_pct) tuple, percentile range to use
+		if :param:`recalc` is False
+		(default: 2.5, 97.5)
+	:param recalc:
+		bool, whether to calculate aggregated intensity (True)
+		or mean intensity (False)
+		(default: False)
+
 	:return:
 		dict mapping earthquake IDs to intensities
+		(if :param:`as_main_commune` is False)
+		or to lists of intensities (if :param:`as_main_commune` is True)
 	"""
+	# TODO: include_other felt should be True, but is set to False due to bug in db
+	# TODO: use other name for recalc
+
 	if as_main_commune:
 		subcommunes = seismodb.get_subcommunes(id_com)
 		if len(subcommunes) == 0:
@@ -63,10 +106,29 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False, min_replie
 
 
 def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
-							min_or_max='mean', min_replies=3, min_fiability=20):
+							min_or_max='mean', min_fiability=20):
 	"""
+	Get list of all official intensities due to known earthquakes
+	for a given commune
+
+	:param id_com:
+		int, ID of commune in database
+	:param as_main_commune:
+		bool, whether or not to group subcommunes belonging to a
+		main commune
+		(default: False)
+	:param min_or_max:
+		str, one of 'min', 'mean' or 'max' to select between
+		intensity_min and intensity_max values in database
+		(default: 'mean')
+	:param min_fiability:
+		int, minimum fiability of enquiry
+		(default: 20)
+
 	:return:
-		dict mapping earthquake IDs to lists of intensities
+		dict mapping earthquake IDs to intensities
+		(if :param:`as_main_commune` is False)
+		or to lists of intensities (if :param:`as_main_commune` is True)
 	"""
 	if as_main_commune:
 		subcommunes = seismodb.get_subcommunes(id_com)
@@ -99,22 +161,27 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 	return eq_intensities
 
 
-# TODO: agg_subcommune_func
-def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
-				min_fiability=20, filter_floors=(0, 4), include_other_felt=True,
+def get_imax_by_commune(enq_type='all',
+				min_fiability=20,
+				min_or_max='mean',
+				recalc_web=False, min_replies=3,
+				filter_floors=(0, 4), include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
 				by_main_commune=False, agg_subcommunes='mean',
-				recalc_web=False, verbose=False):
+				verbose=False):
 	"""
 	Determine historical Imax for every commune in Belgium
 
 	:param enq_type:
 		str, one of "internet", "official", "all"
 		(default: 'all')
+	:param min_fiability:
+		int, minimum fiability of internet or official enquiry
+		(default: 20)
 	:param min_or_max:
 		see :func:`seismodb.query_official_macro_catalog`
+	:param recalc_web:
 	:param min_replies:
-	:param min_fiability:
 	:param filter_floors:
 	:param include_other_felt:
 	:param include_heavy_appliance:
@@ -133,7 +200,7 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 		(default: False)
 
 	:return:
-		dict mapping commune IDs to instances of :class:`MacroseismicInfo`
+		instance of :class:`MacroInfoCollection`
 	"""
 	agg_func = getattr(np, agg_subcommunes.lower())
 
@@ -144,7 +211,6 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 		where_clause += ' AND id = id_main'
 	comm_recs = seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
 
-	#comm_macro_dict = {}
 	macro_infos = []
 	for rec in comm_recs:
 		#if rec['id'] != 6:
@@ -178,7 +244,7 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 		if enq_type in ('all', 'official'):
 			eq_intensities = get_eq_intensities_for_commune_official(id_com,
 							as_main_commune=by_main_commune, min_or_max=min_or_max,
-							min_replies=min_replies, min_fiability=min_fiability)
+							min_fiability=min_fiability)
 			eq_ids_official = eq_intensities.keys()
 			for id_earth in eq_ids_official:
 				I = agg_func(eq_intensities[id_earth])
@@ -196,7 +262,6 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 			db_ids = []
 			macro_info = MacroseismicInfo(id_earth, id_com, Imax, agg_type,
 										enq_type, num_replies, lon, lat, db_ids)
-			#comm_macro_dict[id_com] = macro_info
 			macro_infos.append(macro_info)
 
 			if verbose:
@@ -207,53 +272,4 @@ def get_Imax_by_commune(enq_type='all', min_or_max='mean', min_replies=3,
 
 		macro_info_coll = MacroInfoCollection(macro_infos, agg_type, enq_type)
 
-	#return comm_macro_dict
 	return macro_info_coll
-
-
-if __name__ == "__main__":
-	import os
-	from eqcatalog.plot import plot_macroseismic_map
-
-	#print(get_eq_intensities_for_commune_official(6, min_or_max='min', as_main_commune=False))
-	#print(get_eq_intensities_for_commune_official(6, min_or_max='max', as_main_commune=False))
-	#print(get_eq_intensities_for_commune_web(6, as_main_commune=False, include_other_felt=False))
-	#exit()
-
-	enq_type = 'official'
-	#enq_type = 'online'
-	by_main_commune = True
-	macro_info_coll = get_Imax_by_commune(enq_type=enq_type, include_other_felt=False,
-										by_main_commune=by_main_commune, verbose=False)
-	print(sum(macro.num_replies for macro in macro_info_coll))
-	print([macro.I for macro in macro_info_coll])
-	#for id_com in comm_macro_dict:
-	#	macro_info = comm_macro_dict[id_com]
-	#	print("%d: Imax=%d (n=%d)" % (id_com, macro_info.I, macro_info.num_replies))
-
-	region = (2, 7, 49.25, 51.75)
-	projection = "merc"
-	graticule_interval = (2, 1)
-	title = "Maximum intensity by commune (%s)" % enq_type
-	fig_folder = "C:\\Temp"
-	if by_main_commune:
-		fig_filename = "Imax_by_main_commune_%s.PNG"
-	else:
-		fig_filename = "Imax_by_commune_%s.PNG"
-	fig_filename %= enq_type
-	#fig_filespec = os.path.join(fig_folder, fig_filename)
-	fig_filespec = None
-
-
-	macro_info_coll.plot_map(region=region, projection=projection,
-					graticule_interval=graticule_interval,
-					event_style=None, cmap="usgs", title=title,
-					fig_filespec=fig_filespec)
-
-	#print(macro_info_coll.to_geojson())
-
-	#gis_file = os.path.splitext(fig_filespec)[0] + ".TAB"
-	#macro_info_coll.export_gis('MapInfo File', gis_file)
-
-	#geotiff_file = os.path.splitext(fig_filespec)[0] + ".TIF"
-	#macro_info_coll.export_geotiff(geotiff_file)
