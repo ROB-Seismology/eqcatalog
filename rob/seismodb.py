@@ -579,36 +579,42 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 				'communes.longitude',
 				'communes.latitude']
 
+		## Replace intensity values of 13 with NULL
+		Imin_clause = 'IF (intensity_min < 13, intensity_min, NULL)'
+		Imax_clause = 'IF (intensity_max < 13, intensity_max, NULL)'
+
 		if group_by_main_village:
 			agg_function = AGG_FUNC_DICT.get(agg_function.lower(), "MAX")
-			if min_or_max == 'max':
-				intensity_col = '%s(intensity_max) as "Intensity"' % agg_function
-			elif min_or_max == 'min':
-				intensity_col = '%s(intensity_min) as "Intensity"' % agg_function
+			if min_or_max == 'min':
+				intensity_col = '%s(%s) AS "Intensity"'
+				intensity_col %= (agg_function, Imin_clause)
+			elif min_or_max == 'max':
+				intensity_col = '%s(%s) AS "Intensity"'
+				intensity_col %= (agg_function, Imax_clause)
 			elif min_or_max == 'mean':
-				intensity_col = ('%s((intensity_min + intensity_max) / 2.) '
-								'as "Intensity"' % agg_function)
+				intensity_col = '%s((%s + %s)/2.) AS "Intensity"'
+				intensity_col %= (agg_function, Imin_clause, Imax_clause)
 			column_clause.append(intensity_col)
 			group_clause = 'communes.id_main'
 			column_clause.append('GROUP_CONCAT(id_macro_detail SEPARATOR ",") AS id_db')
 		else:
-			if min_or_max == 'max':
-				intensity_col = 'intensity_max as "Intensity"'
-			elif min_or_max == 'min':
-				intensity_col = 'intensity_min as "Intensity"'
+			if min_or_max == 'min':
+				intensity_col = '%s AS "Intensity"' % Imin_clause
+			elif min_or_max == 'max':
+				intensity_col = '%s AS "Intensity"' % Imax_clause
 			elif min_or_max == 'mean':
-				intensity_col = ('(intensity_min + intensity_max)/2. '
-								'as "Intensity"')
+				intensity_col = '(%s + %s)/2. AS "Intensity"'
+				intensity_col %= (Imin_clause, Imax_clause)
 			column_clause.append(intensity_col)
 			group_clause = ""
-			column_clause.append('id_macro_detail as id_db')
+			column_clause.append('id_macro_detail AS id_db')
 
 		where_clause = 'macro_detail.id_earth = %d' % id_earth
 		where_clause += ' and macro_detail.fiability >= %d' % min_fiability
 
 		join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id')]
 		if group_by_main_village:
-			join_clause.append(('JOIN', 'communes as main_communes',
+			join_clause.append(('JOIN', 'communes AS main_communes',
 							'communes.id_main = main_communes.id'))
 
 		having_clause = 'Intensity >= %d' % min_val
@@ -669,9 +675,9 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 		bool, whether or not to aggregate the results by main village
 		(default: False)
 	:param filter_floors:
-			(min_floor, max_floor) tuple, floors outside this range
-			(basement floors and upper floors) are filtered out
-			(default: False)
+		(min_floor, max_floor) tuple, floors outside this range
+		(basement floors and upper floors) are filtered out
+		(default: False)
 	:param agg_function:
 		str, aggregation function to use, one of "minimum", "maximum" or
 		"average". If :param:`group_by_main_village` is False, aggregation
