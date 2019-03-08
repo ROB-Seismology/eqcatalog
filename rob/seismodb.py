@@ -520,7 +520,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 		(default: 'max')
 	:param min_val:
 		float, minimum intensity to return
-		(default: 1)
+		(default: 1, avoids getting NULL results)
 	:param group_by_main_village:
 		bool, whether or not to aggregate the results by main village
 		(default: False)
@@ -803,6 +803,10 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 
 	table_clause = ['web_input']
 
+	column_clause = ['web_input.*', 'web_analyse.*',
+					'web_location.longitude', 'web_location.latitude',
+					'web_location.quality AS location_quality']
+
 	join_clause = [('JOIN', 'web_analyse', 'web_input.id_web=web_analyse.id_web'),
 					('LEFT JOIN', 'web_location', 'web_input.id_web=web_location.id_web'
 								' AND web_location.quality >= %d' % min_location_quality)]
@@ -851,8 +855,9 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 		errf.write("Querying KSB-ORB web macroseismic enquiries:\n")
 
 	## Fetch records
-	recs = query_seismodb_table(table_clause, join_clause=join_clause,
-						where_clause=where_clause, verbose=verbose, errf=errf)
+	recs = query_seismodb_table(table_clause, column_clause=column_clause,
+						join_clause=join_clause, where_clause=where_clause,
+						verbose=verbose, errf=errf)
 
 	return MacroseismicEnquiryEnsemble(id_earth, recs)
 
