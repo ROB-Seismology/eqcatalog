@@ -210,8 +210,9 @@ class MacroseismicEnquiryEnsemble():
 		if not len(self.recs) or not prop in self.recs[0]:
 			return []
 		else:
+			# TODO: this fails if there is only 1 enquiry
 			first_non_None_value = next((rec[prop] for rec in self.recs
-										if rec[prop] is not None), None)
+										if rec[prop] is not None), "")
 			if isinstance(first_non_None_value, basestring):
 				none_val = u""
 			else:
@@ -507,12 +508,12 @@ class MacroseismicEnquiryEnsemble():
 				ensemble = self.subselect_by_property('country', [country])
 				zips = ensemble.get_prop_values('zip')
 				unique_zips = sorted(set(zips))
-				cities = [strip_accents(city).title()
-						for city in ensemble.get_prop_values('city')]
-				unique_zip_cities = set(zip(zips, cities))
-				#join_clause = [('RIGHT JOIN', 'communes', '%s.id = communes.id_main' % table_clause)]
-
 				if len(unique_zips):
+					cities = [strip_accents(city).title()
+							for city in ensemble.get_prop_values('city')]
+					unique_zip_cities = set(zip(zips, cities))
+					#join_clause = [('RIGHT JOIN', 'communes', '%s.id = communes.id_main' % table_clause)]
+
 					country_comm_rec_dict = {}
 					if country == "NL":
 						query_values = '|'.join(['%s' % ZIP for ZIP in unique_zips])
@@ -833,9 +834,11 @@ class MacroseismicEnquiryEnsemble():
 
 		return bin_rec_dict
 
-	#TODO: include_other_felt, include_heavy_appliance, remove_outliers
-	def get_aggregated_info(self, aggregate_by='id_com', min_replies=3, agg_info="cii",
-							min_fiability=20.0, filter_floors=False, recalc=False):
+	def get_aggregated_info(self, aggregate_by='id_com', min_replies=3,
+							min_fiability=20.0, filter_floors=False,
+							agg_info='cii', agg_method='mean', fix_records=True,
+							include_other_felt=True, include_heavy_appliance=False,
+							remove_outliers=(2.5, 97.5)):
 		"""
 		Get aggregated macroseismic information.
 
@@ -851,9 +854,6 @@ class MacroseismicEnquiryEnsemble():
 		:param min_replies:
 			int, minimum number of replies to use for aggregating
 			(default: 3)
-		:param agg_info:
-			str, info to aggregate, either 'cii', 'cdi' or 'num_replies'
-			(default: 'cii')
 		:param min_fiability:
 			int, minimum fiability of enquiries to include in aggregate
 			(default: 20)
@@ -861,17 +861,40 @@ class MacroseismicEnquiryEnsemble():
 			(lower_floor, upper_floor) tuple, floors outside this range
 			(basement floors and upper floors) are filtered out
 			(default: (0, 4))
-		:param recalc:
-			bool, whether or not to recalculate aggregated intensity
+		:param agg_info:
+			str, info to aggregate, either 'cii', 'cdi' or 'num_replies'
+			(default: 'cii')
+		:param agg_method:
+			str, how to aggregate individual enquiries,
+			either 'mean' (= ROB practice) or 'aggregated' (= DYFI practice)
+			(default: 'mean')
+		:param fix_records:
+			bool, whether or not to fix various issues (see :meth:`fix_all`)
+			(default: True)
+		:param include_other_felt:
+			bool, whether or not to take into acoount the replies to the
+			question "Did others nearby feel the earthquake ?"
+			(default: True)
+		:param include_heavy_appliance:
+			bool, whether or not to take heavy_appliance into account
+			as well (not standard, but occurs with ROB forms)
 			(default: False)
+		:param remove_outliers:
+			(min_pct, max_pct) tuple, percentile range to use.
+			Only applies if :param:`agg_method` = 'mean'
+			and if :param:`agg_info` = 'cii'
+			(default: 2.5, 97.5)
 
 		:return:
 			instance of :class:`MacroInfoCollection`
 		"""
 		from .macro_info import MacroseismicInfo, MacroInfoCollection
 
-		ensemble = self[self.fiability >= min_fiability]
-		ensemble = ensemble.fix_all()
+		ensemble = self
+		if fix_records:
+			ensemble.fix_all()
+
+		ensemble = ensemble[ensemble.fiability >= min_fiability]
 		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
 
 		if aggregate_by in ('id_com', 'id_main'):
@@ -928,18 +951,24 @@ class MacroseismicEnquiryEnsemble():
 			web_ids = agg_ensemble_dict[key].get_prop_values('id_web')
 
 			if agg_info == 'cii':
-				if recalc:
-					I = agg_ensemble_dict[key].calc_cii(filter_floors=False)
+				if agg_method == 'aggregated':
+					I = agg_ensemble_dict[key].calc_cii(filter_floors=False,
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance)
 				else:
 					I = agg_ensemble_dict[key].calc_mean_cii(filter_floors=False,
-								include_other_felt=False, remove_outliers=(0,100))
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance,
+								remove_outliers=remove_outliers)
 			elif agg_info == 'cdi':
-				if recalc:
-					I = agg_ensemble_dict[key].calc_cdi()
+				if agg_method == 'aggregated':
+					I = agg_ensemble_dict[key].calc_cdi(filter_floors=False,
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance)
 				else:
 					I = np.mean(agg_ensemble_dict[key].calc_cdi(aggregate=False,
-									filter_floors=False, include_other_felt=False,
-									include_heavy_appliance=True))
+								filter_floors=False, include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance))
 			elif agg_info == "num_replies":
 				I = 1
 			else:
@@ -993,6 +1022,7 @@ class MacroseismicEnquiryEnsemble():
 		- match unmatched commune IDs
 		- set main commune IDs
 		- remove duplicate records
+		- recompute fiabilities
 
 		:return:
 			instance of :class:`MacroseismicEnquiryEnsemble`
@@ -1003,6 +1033,8 @@ class MacroseismicEnquiryEnsemble():
 		ensemble.fix_commune_ids()
 		ensemble.set_main_commune_ids()
 		ensemble = ensemble.remove_duplicate_records()
+		ensemble.set_prop_values('fiability', ensemble.calc_fiability(include_other_felt=False,
+													include_heavy_appliance=True))
 		return ensemble
 
 	def fix_felt_is_none(self):
