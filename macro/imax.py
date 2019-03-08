@@ -19,8 +19,9 @@ __all__ = ["get_eq_intensities_for_commune_web",
 
 def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 				min_replies=3, min_fiability=20, filter_floors=(0, 4),
+				agg_method='mean', fix_records=True,
 				include_other_felt=True, include_heavy_appliance=False,
-				remove_outliers=(2.5, 97.5), recalc=False):
+				remove_outliers=(2.5, 97.5)):
 	"""
 	Get list of all internet intensities due to known earthquakes
 	for a given commune
@@ -41,24 +42,25 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 		(min_floor, max_floor) tuple, floors outside this range
 		(basement floors and upper floors) are filtered out
 		(default: False)
+	:param agg_method:
+		str, how to aggregate individual enquiries in a subcommune,
+		either 'mean' (= ROB practice) or 'aggregated' (= DYFI practice)
+		(default: 'mean')
+	:param fix_records:
+		bool, whether or not to fix various issues (see :meth:`fix_all`)
+		(default: True)
 	:param include_other_felt:
 		bool, whether or not to include the replies to the question
 		"Did others nearby feel the earthquake ?"
-		if :param`recalc` is True
 		(default: False)
 	:param include_heavy_appliance:
 		bool, whether or not to take heavy_appliance into account
 		as well (not standard, but occurs with ROB forms)
-		if :param:`recalc` is True
 		(default: False)
 	:param remove_outliers:
 		(min_pct, max_pct) tuple, percentile range to use
-		if :param:`recalc` is False
+		Only applies if :param:`agg_method` = 'aggregated'
 		(default: 2.5, 97.5)
-	:param recalc:
-		bool, whether to calculate aggregated intensity (True)
-		or mean intensity (False)
-		(default: False)
 
 	:return:
 		dict mapping earthquake IDs to intensities
@@ -66,7 +68,6 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 		or to lists of intensities (if :param:`as_main_commune` is True)
 	"""
 	# TODO: include_other felt should be True, but is set to False due to bug in db
-	# TODO: use other name for recalc
 
 	if as_main_commune:
 		subcommunes = seismodb.get_subcommunes(id_com)
@@ -82,6 +83,8 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 	eq_intensities = {}
 	dyfi = seismodb.query_web_macro_enquiries('ke', id_com=id_com,
 						zip_code=zip_code, min_fiability=min_fiability)
+	if fix_records:
+		dyfi = dyfi.fix_all()
 	if len(dyfi):
 		all_eq_ids = dyfi.get_eq_ids()
 		unique_eq_ids = np.unique(all_eq_ids)
@@ -90,8 +93,7 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 			if filter_floors:
 				eq_dyfi = eq_dyfi.filter_floors(*filter_floors)
 			if len(eq_dyfi) >= min_replies:
-				if recalc:
-					# TODO: fix_all
+				if agg_method == 'aggregated':
 					I = eq_dyfi.calc_cii(filter_floors=False,
 						include_other_felt=include_other_felt,
 						include_heavy_appliance=include_heavy_appliance)
@@ -164,8 +166,8 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 def get_imax_by_commune(enq_type='all',
 				min_fiability=20,
 				min_or_max='mean',
-				recalc_web=False, min_replies=3,
-				filter_floors=(0, 4), include_other_felt=True,
+				min_replies=3, filter_floors=(0, 4),
+				agg_method_web='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
 				by_main_commune=False, agg_subcommunes='mean',
 				verbose=False):
@@ -179,14 +181,15 @@ def get_imax_by_commune(enq_type='all',
 		int, minimum fiability of internet or official enquiry
 		(default: 20)
 	:param min_or_max:
-		see :func:`seismodb.query_official_macro_catalog`
-	:param recalc_web:
+		see :func:`get_eq_intensities_for_commune_official`
 	:param min_replies:
 	:param filter_floors:
+	:param agg_method_web:
+	:param fix_records:
 	:param include_other_felt:
 	:param include_heavy_appliance:
 	:param remove_outliers:
-		see :func:`seismodb.query_web_macro_enquiries`
+		see :func:`get_eq_intensities_for_commune_web`
 	:param by_main_commune:
 		bool, whether or not to aggregate communes by main commune
 		(default: False)
@@ -227,9 +230,10 @@ def get_imax_by_commune(enq_type='all',
 			eq_intensities = get_eq_intensities_for_commune_web(id_com,
 				as_main_commune=by_main_commune, min_replies=min_replies,
 				min_fiability=min_fiability, filter_floors=filter_floors,
+				agg_method=agg_method_web, fix_records=fix_records,
 				include_other_felt=include_other_felt,
 				include_heavy_appliance=include_heavy_appliance,
-				remove_outliers=remove_outliers, recalc=recalc_web)
+				remove_outliers=remove_outliers)
 			eq_ids_web = eq_intensities.keys()
 			for id_earth in eq_ids_web:
 				I = eq_intensities[id_earth]
