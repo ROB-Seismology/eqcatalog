@@ -1,4 +1,7 @@
 # -*- coding: iso-Latin-1 -*-
+"""
+Aggregated macroseismic information
+"""
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 from builtins import int
@@ -24,7 +27,8 @@ GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB
 #GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
 
 
-__all__ = ["MacroseismicInfo", "MacroInfoCollection"]
+__all__ = ["MacroseismicInfo", "MacroInfoCollection",
+			"get_aggregated_info_web", "get_aggregated_info_official"]
 
 
 class MacroseismicInfo():
@@ -369,3 +373,142 @@ class MacroInfoCollection():
 				radii=radii, plot_pie=plot_pie, title=title, fig_filespec=fig_filespec,
 				ax=ax, copyright=copyright, verbose=False)
 		map.export_geotiff(out_filespec, dpi=dpi)
+
+
+def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
+				min_fiability=20, filter_floors=(0, 4), aggregate_by="commune",
+				agg_method='mean', fix_records=True,
+				include_other_felt=True, include_heavy_appliance=False,
+				remove_outliers=(2.5, 97.5)):
+	"""
+	Obtain aggregated internet macroseismic information for given earthquake
+
+	:param id_earth:
+		int or str, ID of earthquake in ROB database
+	:param min_replies:
+		int, minimum number of replies to use for aggregating macroseismic data
+	:param query_info:
+		str, info to query from the database, either 'cii', 'cdi' or
+		'num_replies'
+		(default: 'cii')
+	:param min_fiability:
+		int, minimum fiability of enquiries to include in plot
+		(default: 20)
+	:param filter_floors:
+		(lower_floor, upper_floor) tuple, floors outside this range
+			(basement floors and upper floors) are filtered out
+			(default: (0, 4))
+	:param aggregate_by:
+		str, type of aggregation, specifying how macroseismic data should
+		be aggregated in the map, one of:
+		- 'id_com' or 'commune'
+		- 'id_main' or 'main commune'
+		- 'grid_X' (where X is grid spacing in km)
+		- None or '' (= no aggregation, i.e. all replies are
+		plotted individually (potentially on top of each other)
+		(default: 'commune')
+	:param agg_method:
+		str, how to aggregate individual enquiries,
+		either 'mean' (= ROB practice) or 'aggregated' (= DYFI practice)
+		(default: 'mean')
+	:param fix_records:
+		bool, whether or not to fix various issues (see :meth:`fix_all`)
+		(default: True)
+	:param include_other_felt:
+		bool, whether or not to take into acoount the replies to the
+		question "Did others nearby feel the earthquake ?"
+		(default: True)
+	:param include_heavy_appliance:
+		bool, whether or not to take heavy_appliance into account
+		as well (not standard, but occurs with ROB forms)
+		(default: False)
+	:param remove_outliers:
+		(min_pct, max_pct) tuple, percentile range to use.
+		Only applies if :param:`agg_method` = 'mean'
+		and if :param:`agg_info` = 'cii'
+		(default: 2.5, 97.5)
+
+	:return:
+		instance of :class:`MacroInfoCollection`
+	"""
+	from ..rob import query_local_eq_catalog_by_id, query_web_macro_enquiries
+
+	query_info = query_info.lower()
+	if query_info == 'num_replies':
+		min_replies = 1
+
+	if aggregate_by == 'commune':
+		aggregate_by = 'id_com'
+	elif aggregate_by == 'main commune':
+		aggregate_by = 'id_main'
+	elif not aggregate_by:
+		min_replies = 1
+
+	## Retrieve macroseismic information from database
+	[eq] = query_local_eq_catalog_by_id(id_earth)
+	dyfi_ensemble = eq.get_macroseismic_enquiries(min_fiability)
+
+	## Aggregate
+	macro_info_coll = dyfi_ensemble.get_aggregated_info(aggregate_by, min_replies,
+							agg_info=query_info, min_fiability=min_fiability,
+							filter_floors=filter_floors, agg_method=agg_method,
+							fix_records=fix_records, include_other_felt=include_other_felt,
+							include_heavy_appliance=include_heavy_appliance,
+							remove_outliers=remove_outliers)
+
+	return macro_info_coll
+
+
+def get_aggregated_info_official(id_earth, min_fiability=20, min_or_max='max',
+				aggregate_by="commune", agg_function="average", min_val=1):
+	"""
+	Obtain aggregated official macroseismic information for given earthquake
+
+	:param id_earth:
+		int or str, ID of earthquake in ROB database
+	:param min_fiability:
+		int, minimum fiability of macroseismic record
+		(default: 20)
+	:param min_or_max:
+		str, one of 'min', 'mean' or 'max' to select between
+		intensity_min and intensity_max values in database
+		(default: 'max')
+	:param aggregate_by:
+		str, type of aggregation, specifying how macroseismic data should
+		be aggregated in the map, one of:
+		- 'id_com' or 'commune'
+		- 'id_main' or 'main commune'
+		(default: 'commune')
+	:param agg_function:
+		str, aggregation function to use if :param:`aggregate_by`
+		is 'main commune', one of "minimum", "maximum" or "average"
+		(default: "average")
+	:param min_val:
+		float, minimum intensity to return
+		(default: 1, avoids getting NULL results)
+
+	:return:
+		instance of :class:`MacroInfoCollection`
+	"""
+	from ..rob import query_local_eq_catalog_by_id
+
+	if aggregate_by in ('main commune', 'id_main'):
+		group_by_main_village = True
+	else:
+		group_by_main_village = False
+
+	## Retrieve macroseismic information from database
+	[eq] = query_local_eq_catalog_by_id(id_earth)
+
+	macro_info_coll = eq.get_macroseismic_data_aggregated_official(min_or_max=min_or_max,
+			min_val=min_val, group_by_main_village=group_by_main_village,
+			agg_function=agg_function, min_fiability=min_fiability)
+
+	## Remove records without location
+	for i in range(len(macro_info_coll)-1, -1, -1):
+		macro_info = macro_info_coll[i]
+		if macro_info.lon is None:
+			print("Commune #%s has no location!" % macro_info.id_com)
+			macro_info_coll.macro_infos.pop(i)
+
+	return macro_info_coll
