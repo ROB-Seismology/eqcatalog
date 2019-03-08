@@ -269,7 +269,7 @@ class MacroseismicEnquiryEnsemble():
 			idxs = [i for i in range(len(values)) if not values[i] in prop_values]
 		return self.__getitem__(idxs)
 
-	def set_prop_values(self, prop, values):
+	def set_prop_values(self, prop, values, regenerate_arrays=True):
 		"""
 		Set values of individual enquiries for given property
 
@@ -277,13 +277,17 @@ class MacroseismicEnquiryEnsemble():
 			str, name of property
 		:values:
 			list or array, values of individual enquiries for given property
+		:param regenerate_arrays:
+			bool, whether or not to regenerate porperty arrays
+			(default: True)
 		"""
 		if not isinstance(values, (list, tuple, np.ndarray)):
 			values = [values] * len(self)
 		assert len(values) == len(self)
 		for r, rec in enumerate(self.recs):
 			rec[prop] = values[r]
-		self._gen_arrays()
+		if regenerate_arrays:
+			self._gen_arrays()
 
 	def subselect_by_distance(self, lon, lat, radius):
 		"""
@@ -1047,13 +1051,13 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		ensemble = self.subselect_by_property('felt', ['', np.nan])
 		## Slept through it --> not felt
-		ensemble[ensemble.asleep == 1].set_prop_values('felt', '0')
+		ensemble[ensemble.asleep == 1].set_prop_values('felt', '0', False)
 		## Awoken --> felt
-		ensemble[ensemble.asleep == 2].set_prop_values('felt', '1')
+		ensemble[ensemble.asleep == 2].set_prop_values('felt', '1', False)
 		## Awake and (difficult to stand or motion) --> felt
 		ensemble[(ensemble.asleep == 0) &
 				(ensemble.motion.filled(-1) > 0) &
-				(ensemble.stand.filled(-1) > 1)].set_prop_values('felt', '1')
+				(ensemble.stand.filled(-1) > 1)].set_prop_values('felt', '1', False)
 		self._gen_arrays()
 
 	def fix_not_felt(self):
@@ -1062,13 +1066,19 @@ class MacroseismicEnquiryEnsemble():
 		to avoid bias in the aggregated computation
 
 		:return:
-			None, 'motion', 'reaction' and 'stand' arrays of :prop:`recs`
+			None, 'motion', 'reaction' and 'stand' values of :prop:`recs`
 			are modified in place
 		"""
-		not_felt_idxs = np.where(self.felt == 0)
-		self.motion[not_felt_idxs] = 0
-		self.reaction[not_felt_idxs] = 0
-		self.stand[not_felt_idxs] = 0
+		ensemble = self.subselect_by_property('felt', [0])
+		ensemble.set_prop_values('motion', '0', regenerate_arrays=False)
+		ensemble.set_prop_values('reaction', '0', regenerate_arrays=False)
+		ensemble.set_prop_values('stand', '0', regenerate_arrays=False)
+		self._gen_arrays()
+
+		#not_felt_idxs = np.where(self.felt == 0)
+		#self.motion[not_felt_idxs] = 0
+		#self.reaction[not_felt_idxs] = 0
+		#self.stand[not_felt_idxs] = 0
 
 	def calc_felt_index(self, include_other_felt=True):
 		"""
