@@ -197,6 +197,29 @@ class MacroInfoCollection():
 		else:
 			return self.macro_infos[idx]
 
+	def get_region(self, percentile_width=100):
+		"""
+		Return geographic extent of collection
+
+		:param percentile_width:
+			float, difference between upper and lower percentile
+			(range 0 - 100) to include in calculation
+			(default: 100 = include all points)
+
+		:return:
+			(W, E, S, N) tuple
+		"""
+		dp = 100. - percentile_width
+		percentiles = [0 + dp/2., 100 - dp/2.]
+		lons, lats = [], []
+		if self.agg_type in ('id_com', 'commune', 'id_main', 'main commune', None):
+			for rec in self:
+				lons.extend([rec.lon] * rec.num_replies)
+				lats.extend([rec.lat] * rec.num_replies)
+			lonmin, lonmax = np.percentile(longitudes, percentiles)
+			latmin, latmax = np.percentile(latitudes, percentiles)
+			return (lonmin, lonmax, latmin, latmax)
+
 	def get_geometries(self, communes_as_points=False):
 		"""
 		Transform aggregated macroseismic information to layeredbasemap
