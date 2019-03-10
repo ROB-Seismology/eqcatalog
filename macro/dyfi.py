@@ -37,8 +37,11 @@ def strip_accents(txt):
 	import unicodedata
 	if isinstance(txt, bytes):
 		txt = txt.decode("latin1")
-	nkfd_form = unicodedata.normalize('NFKD', txt)
-	return "".join([c for c in nkfd_form if not unicodedata.combining(c)])
+	if isinstance(txt, basestring):
+		nkfd_form = unicodedata.normalize('NFKD', txt)
+		return "".join([c for c in nkfd_form if not unicodedata.combining(c)])
+	else:
+		return str(txt)
 
 
 ## Disable no-member errors for MacroseismicEnquiryEnsemble
@@ -255,7 +258,7 @@ class MacroseismicEnquiryEnsemble():
 		else:
 			# TODO: this fails if there is only 1 enquiry
 			first_non_None_value = next((rec[prop] for rec in self.recs
-										if rec[prop] is not None), "")
+										if rec[prop] is not None), None)
 			if isinstance(first_non_None_value, basestring):
 				none_val = u""
 			else:
@@ -346,6 +349,53 @@ class MacroseismicEnquiryEnsemble():
 		all_distances = self.calc_distances(lon, lat)
 		idxs = np.where(all_distances <= radius)[0]
 		return self.__getitem__(idxs)
+
+	def get_region(self, percentile_width=100):
+		"""
+		Return geographic extent of ensemble
+
+		:param percentile_width:
+			float, difference between upper and lower percentile
+			(range 0 - 100) to include in calculation
+			(default: 100 = include all points)
+
+		:return:
+			(W, E, S, N) tuple
+		"""
+		dp = 100. - percentile_width
+		percentiles = [0 + dp/2., 100 - dp/2.]
+		longitudes = self.get_longitudes()
+		longitudes = longitudes[np.isfinite(longitudes)]
+		latitudes = self.get_latitudes()
+		latitudes = latitudes[np.isfinite(latitudes)]
+		lonmin, lonmax = np.percentile(longitudes, percentiles)
+		latmin, latmax = np.percentile(latitudes, percentiles)
+		return (lonmin, lonmax, latmin, latmax)
+
+	def get_centroid(self):
+		"""
+		Determine geographic centre (mean longitude and latitude)
+
+		:return:
+			(lon, lat) tuple
+		"""
+		lon = np.nanmean(self.get_longitudes())
+		lat = np.nanmean(self.get_latitudes())
+		return (lon, lat)
+
+	def subselect_by_region(self, region):
+		"""
+		Select part of ensemble situated inside given geographic extent
+
+		:param region:
+			(W, E, S, N) tuple
+		"""
+		lonmin, lonmax, latmin, latmax = region
+		longitudes = self.get_longitudes()
+		latitudes = self.get_latitudes()
+		lon_idxs = (lonmin <= longitudes) & (longitudes <= lonmax)
+		lat_idxs = (latmin <= latitudes) & (latitudes <= latmax)
+		return self.__getitem__(lon_idxs & lat_idxs)
 
 	@property
 	def longitudes(self):
@@ -942,7 +992,8 @@ class MacroseismicEnquiryEnsemble():
 			ensemble.fix_all()
 
 		ensemble = ensemble[ensemble.fiability >= min_fiability]
-		ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
+		if filter_floors:
+			ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
 
 		if aggregate_by in ('id_com', 'id_main'):
 			comm_key = aggregate_by
