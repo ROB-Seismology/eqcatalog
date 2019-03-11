@@ -351,9 +351,9 @@ class MacroInfoCollection():
 
 	def plot_map(self, region=(2, 7, 49.25, 51.75), projection="merc",
 				graticule_interval=(1, 1), plot_info="intensity",
-				int_conversion="round", symbol_style=None,
+				int_conversion="round", symbol_style=None, thematic_num_replies=False,
 				cmap="rob", color_gradient="discontinuous", event_style="default",
-				province_style="default", colorbar_style="default",
+				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
 				ax=None, copyright=u"© ROB", verbose=True):
 		"""
@@ -366,9 +366,11 @@ class MacroInfoCollection():
 		return plot_macroseismic_map(self, region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion=int_conversion, symbol_style=symbol_style,
+				thematic_num_replies=thematic_num_replies,
 				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
-				province_style=province_style, colorbar_style=colorbar_style,
-				radii=radii, plot_pie=plot_pie, title=title, fig_filespec=fig_filespec,
+				admin_level=admin_level, admin_style=admin_style,
+				colorbar_style=colorbar_style, radii=radii, plot_pie=plot_pie,
+				title=title, fig_filespec=fig_filespec,
 				ax=ax, copyright=copyright, verbose=verbose)
 
 	def export_geotiff(self, out_filespec, plot_info="intensity",
