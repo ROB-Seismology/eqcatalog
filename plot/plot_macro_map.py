@@ -24,9 +24,9 @@ __all__ = ["plot_macroseismic_map"]
 
 def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				projection="merc", graticule_interval=(1, 1), plot_info="intensity",
-				int_conversion="round", symbol_style=None,
+				int_conversion="round", symbol_style=None, thematic_num_replies=False,
 				cmap="rob", color_gradient="discontinuous", event_style="default",
-				province_style="default", colorbar_style="default",
+				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
 				ax=None, copyright=u"© ROB", verbose=True):
 	"""
@@ -37,6 +37,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		(aggregated) macroseismic information to plot
 	:param region:
 		(lonmin, lonmax, latmin, latmax) tuple or str
+		If "auto", region will be determined automatically from 95th
+		percentile extent of :param:`macro_info_coll`
 		(default: (2, 7, 49.25, 51.75))
 	:param projection:
 		str, name of projection supported in layeredbasemap
@@ -56,6 +58,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		point style for macroseismic data. If None, data will be plotted
 		as commune polygons
 		(default: None)
+	:param thematic_num_replies:
+		bool, whether or not thematic style should be applied for
+		number of replies (symbol size for points, transparency for
+		polygons if  color gradient` is discontinuous)
+		(default: False)
 	:param cmap:
 		str, color map, either "rob" or "usgs" (for intensity)
 		or the name of a matplotlib colormap (for num_replies)
@@ -67,9 +74,16 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		instance of :class:`mapping.layeredbasemap.SymbolStyle`,
 		point style for earthquake epicenter
 		(default: "default")
-	:param province_style:
+	:param admin_level:
+		str, administrative level to plot over intensity map,
+		one of 'province', 'region' or 'country'
+		(default: 'province')
+	:param admin_style:
 		instance of :class:`mapping.layeredbasemap.LineStyle`,
-		line style for provinces
+		line style for administrative boundaries
+		(default: "default")
+	:param colorbar_style:
+		instance of :class:`mapping.layeredbasemap.ColorbarStyle`
 		(default: "default")
 	:param radii:
 		list of floats, raddii of circles (in km) to plot around
@@ -100,7 +114,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		or instance of :class:`LayeredBasemap` if :param:`ax` is not
 		None or if fig_filespec == 'hold'
 	"""
-	# TODO: country_style, region_style, commune_linestyle, etc.
+	# TODO: commune_linestyle, etc.
+	# TODO: or admin_style, admin_level (province, region, country)
 	import mapping.layeredbasemap as lbm
 
 	if len(macro_info_coll) == 0:
@@ -179,7 +194,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		## Plot polygons
 		ta = 1.
 		tfh = None
-		if plot_info != 'num_replies':
+		if plot_info != 'num_replies' and thematic_num_replies:
 			## Set transparency (or hatching) in function of number of replies
 			num_replies = [1, 3, 5, 10, 20, 50, 500]
 			#tfh = lbm.ThematicStyleRanges(num_replies, ['', '.....', '....', '...', '..', ''],
@@ -187,7 +202,6 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			if color_gradient == "discontinuous":
 				ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
 											value_key="num_replies")
-				#ta = 1.
 		polygon_style = lbm.PolygonStyle(fill_color=tfc, line_width=0.1,
 					fill_hatch=tfh, alpha=ta, thematic_legend_style=thematic_legend_style)
 		#macro_style = lbm.CompositeStyle(polygon_style=polygon_style)
@@ -196,7 +210,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	else:
 		## Plot points
 		## Symbol size in function of number of replies
-		if plot_info != 'num_replies':
+		if plot_info != 'num_replies' and thematic_num_replies:
 			num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
 			#num_replies = num_replies[num_replies >= min_replies]
 			symbol_size = symbol_style.size
@@ -216,13 +230,35 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
 
-	## Province layer
-	if province_style:
-		data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_provinces.TAB"))
-		polygon_style = lbm.PolygonStyle(line_width=1, fill_color='none')
-		gis_style = lbm.CompositeStyle(polygon_style=polygon_style)
-		province_layer = lbm.MapLayer(data, gis_style, legend_label={"polygons": ""})
-		layers.append(province_layer)
+		if region == "auto":
+			lonmin, lonmax, latmin, latmax = macro_info_coll.get_region(95)
+			dlon = lonmax - lonmin
+			dlat = latmax - latmin
+			lonmin -= (dlon * 0.1)
+			lonmax += (dlon * 0.1)
+			latmin -= (dlat * 0.1)
+			latmax += (dlat * 0.1)
+			region = (lonmin, lonmax, latmin, latmax)
+
+	## Admin layer
+	admin_data = None
+	if admin_level.lower() == 'province':
+		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_provinces.TAB"))
+	elif admin_level.lower() == 'region':
+		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_regions.TAB"))
+	elif admin_level.lower() == 'country':
+		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_border.TAB"))
+	elif admin_level.lower() == 'commune':
+		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_communes_avant_fusion.TAB"))
+	elif admin_level.lower() == 'main commune':
+		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_villages_polygons.TAB"))
+
+	if admin_data:
+		if admin_style == "default":
+			admin_style = lbm.PolygonStyle(line_width=1, fill_color='none')
+		#gis_style = lbm.CompositeStyle(polygon_style=admin_style)
+		admin_layer = lbm.MapLayer(admin_data, admin_style, legend_label={"polygons": ""})
+		layers.append(admin_layer)
 
 	## Pie charts
 	# TODO: legend
