@@ -186,7 +186,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	if isinstance(id_earth, (int, basestring)):
 		id_earth = [id_earth]
 
-	else:
+	if not id_earth:
 		## Do not impose start or end date if id_earth is given
 		if isinstance(start_date, int):
 			start_date = '%d-01-01' % start_date
