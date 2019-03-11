@@ -20,7 +20,6 @@ from collections import OrderedDict
 
 import numpy as np
 
-import mapping.layeredbasemap as lbm
 
 from ..rob import SEISMOGIS_ROOT
 GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB", "TAB")
@@ -216,8 +215,8 @@ class MacroInfoCollection():
 			for rec in self:
 				lons.extend([rec.lon] * rec.num_replies)
 				lats.extend([rec.lat] * rec.num_replies)
-			lonmin, lonmax = np.percentile(longitudes, percentiles)
-			latmin, latmax = np.percentile(latitudes, percentiles)
+			lonmin, lonmax = np.percentile(lons, percentiles)
+			latmin, latmax = np.percentile(lats, percentiles)
 			return (lonmin, lonmax, latmin, latmax)
 
 	def get_geometries(self, communes_as_points=False):
@@ -234,6 +233,8 @@ class MacroInfoCollection():
 			instance of :class:`lbm.MultiPolygonData`
 			or :class:`lbm.MultiPointData`
 		"""
+		import mapping.layeredbasemap as lbm
+
 		if len(self) == 0:
 			return []
 
