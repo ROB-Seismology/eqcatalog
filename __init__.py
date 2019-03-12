@@ -36,6 +36,13 @@ else:
 	reload(moment)
 from .moment import (moment_to_mag, mag_to_moment)
 
+## earthquake_types (no internal dependencies)
+if not reloading:
+	from . import earthquake_types
+else:
+	reload(earthquake_types)
+from .earthquake_types import *
+
 ## time_functions (no internal dependencies)
 if not reloading:
 	from . import time_functions_np as time_functions
