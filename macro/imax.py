@@ -67,8 +67,6 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 		(if :param:`as_main_commune` is False)
 		or to lists of intensities (if :param:`as_main_commune` is True)
 	"""
-	# TODO: include_other felt should be True, but is set to False due to bug in db
-
 	if as_main_commune:
 		subcommunes = seismodb.get_subcommunes(id_com)
 		if len(subcommunes) == 0:
@@ -83,11 +81,13 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 	eq_intensities = {}
 	dyfi = seismodb.query_web_macro_enquiries('ke', id_com=id_com,
 						zip_code=zip_code, min_fiability=min_fiability)
-	if fix_records:
+	if fix_records and len(dyfi):
 		dyfi = dyfi.fix_all()
 	if len(dyfi):
 		all_eq_ids = dyfi.get_eq_ids()
 		unique_eq_ids = np.unique(all_eq_ids)
+		## Only keep enquiries for earthquakes since 2002 Alsdorf earthquake
+		unique_eq_ids = unique_eq_ids[unique_eq_ids >= 1306]
 		for id_earth in unique_eq_ids:
 			eq_dyfi = dyfi[all_eq_ids == id_earth]
 			if filter_floors:
