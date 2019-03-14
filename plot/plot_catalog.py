@@ -22,7 +22,7 @@ MPL_FONT_SIZES = ['xx-small', 'x-small', 'small', 'medium',
 def plot_xy(datasets, xscaling='lin', yscaling='lin',
 			colors=[], linewidths=[], linestyles=[], labels=[],
 			markers=[], marker_sizes=[], marker_intervals=[],
-			marker_edge_colors=[], marker_fill_colors=[],
+			marker_edge_colors=[], marker_fill_colors=[], marker_edge_widths=[],
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', title='', grid=False,
 			label_font_size='medium', title_font_size='large',
@@ -61,6 +61,8 @@ def plot_xy(datasets, xscaling='lin', yscaling='lin',
 		marker_edge_colors = ['k']
 	if not marker_fill_colors:
 		marker_fill_colors = colors[:]
+	if not marker_edge_widths:
+		marker_edge_widths = [1]
 	if not labels:
 		labels = ['_nolegend_']
 
@@ -72,6 +74,7 @@ def plot_xy(datasets, xscaling='lin', yscaling='lin',
 	marker_intervals = cycle(marker_intervals)
 	marker_edge_colors = cycle(marker_edge_colors)
 	marker_fill_colors = cycle(marker_fill_colors)
+	marker_edge_widths = cycle(marker_edge_widths)
 	labels = cycle(labels)
 
 	if xscaling == 'lin':
@@ -94,11 +97,12 @@ def plot_xy(datasets, xscaling='lin', yscaling='lin',
 		marker_interval = marker_intervals.next()
 		marker_edge_color = marker_edge_colors.next()
 		marker_fill_color = marker_fill_colors.next()
+		marker_edge_width = marker_edge_widths.next()
 		label = labels.next()
 
 		plotfunc(x, y, marker, color=color, ls=linestyle, lw=linewidth,
 				ms=marker_size, mec=marker_edge_color, mfc=marker_fill_color,
-				markevery=marker_interval, label=label)
+				mew=marker_edge_width, markevery=marker_interval, label=label)
 
 	if grid:
 		ax.grid('on')
