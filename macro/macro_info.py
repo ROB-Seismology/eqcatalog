@@ -401,17 +401,36 @@ class MacroInfoCollection():
 				title=title, fig_filespec=fig_filespec,
 				ax=ax, copyright=copyright, verbose=verbose)
 
-	def export_geotiff(self, out_filespec, plot_info="intensity",
-				int_conversion="round", symbol_style=None, cmap="rob",
-				color_gradient="discontinuous", copyright="", dpi=120):
+	def export_geotiff(self, out_filespec, region=(2, 7, 49.25, 51.75),
+				projection="merc", plot_info="intensity", int_conversion="round",
+				symbol_style=None, thematic_num_replies=False, cmap="rob",
+				color_gradient="discontinuous", copyright="", dpi=120,
+				hide_border=True):
 		"""
 		Export to GeoTIFF map
+
+		:param out_filespec:
+			str, full path to output TIF file
+		:param region:
+		:param projection:
+		:param plot_info:
+		:param int_conversion:
+		:param symbol_style:
+		:param thematic_num_replies:
+		:param cmap:
+		:param color_gradient:
+		:param copyright:
+			see :func:`eqcatalog.plot.plot_macro_map.plot_macroseismic_map`
+		:param dpi:
+			int, image resolution in dots per inch
+			(default: 120)
+		:param hide_border:
+			bool, whether or not to hide map border
+			(default: True)
 		"""
-		region = (2, 7, 49.25, 51.75)
-		projection = "tmerc"
 		graticule_interval = ()
 		event_style = None
-		province_style = None
+		admin_level = ''
 		colorbar_style = None
 		radii = []
 		plot_pie = None
@@ -422,10 +441,14 @@ class MacroInfoCollection():
 		map = self.plot_map(region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion=int_conversion, symbol_style=symbol_style,
-				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
-				province_style=province_style, colorbar_style=colorbar_style,
+				thematic_num_replies=thematic_num_replies, cmap=cmap,
+				color_gradient=color_gradient, event_style=event_style,
+				admin_level=admin_level, colorbar_style=colorbar_style,
 				radii=radii, plot_pie=plot_pie, title=title, fig_filespec=fig_filespec,
 				ax=ax, copyright=copyright, verbose=False)
+		if hide_border:
+			map.border_style.line_color = 'w'
+			map.border_style.line_width = 0
 		map.export_geotiff(out_filespec, dpi=dpi)
 
 
