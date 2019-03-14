@@ -4135,13 +4135,19 @@ class EQCatalog:
 		:param csv_filespec:
 			String, full path specification of output csv file
 			(default: None, will write to standard output)
+		:param columns:
+			list of column names to export
+			(default: ['ID', 'date', 'time', 'lon', 'lat', 'depth',
+					'ML', 'MS', 'MW', 'intensity_max', 'macro_radius'])
 		:param Mtype:
 			Str, magnitude type, either 'ML', 'MS' or 'MW'.
-			If None, magnitudes will not be converted (default: None)
+			If None, magnitudes will not be converted
+			(default: None)
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
+			to magnitude type ("MW", "MS" or "ML")
+			(default: "default", will select the default relation for
+			the given Mtype)
 		"""
 		if csv_filespec == None:
 			f = sys.stdout
@@ -4165,7 +4171,7 @@ class EQCatalog:
 			'errh': '%.2f',
 			'errz': '%.2f',
 			'errM': '%.1f',
-			'intensity_max': '%d',
+			'intensity_max': '%s',
 			'macro_radius': '%s',
 			'zone': '%s',
 			'agency': '%s',
@@ -4182,7 +4188,8 @@ class EQCatalog:
 		for eq in self.eq_list:
 			output_line = ', '.join([column_format_dict.get(col, '%s')
 									for col in columns])
-			values = [getattr(eq, col) for col in columns]
+			## If 'col' is not an earthquake attribute, try getting it from magnitude dict
+			values = [getattr(eq, col, eq.mag.get(col)) for col in columns]
 			output_line %= tuple(values)
 			f.write(output_line + '\n')
 			"""
