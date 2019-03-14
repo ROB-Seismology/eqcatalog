@@ -978,7 +978,8 @@ class MacroseismicEnquiryEnsemble():
 			(default: 'cii')
 		:param agg_method:
 			str, how to aggregate individual enquiries,
-			either 'mean' (= ROB practice) or 'aggregated' (= DYFI practice)
+			either 'mean' (= ROB practice), 'aggregated' (= DYFI practice),
+			'mean-aggregated' or 'aggregated-mean'
 			(default: 'mean')
 		:param fix_records:
 			bool, whether or not to fix various issues (see :meth:`fix_all`)
@@ -1064,31 +1065,42 @@ class MacroseismicEnquiryEnsemble():
 			web_ids = agg_ensemble_dict[key].get_prop_values('id_web')
 
 			if agg_info == 'cii':
-				if agg_method == 'aggregated':
-					I = agg_ensemble_dict[key].calc_cii(filter_floors=False,
+				if 'aggregated' in agg_method:
+					Iagg = agg_ensemble_dict[key].calc_cii(filter_floors=False,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance)
-				else:
-					I = agg_ensemble_dict[key].calc_mean_cii(filter_floors=False,
+				if 'mean' in agg_method:
+					Imean = agg_ensemble_dict[key].calc_mean_cii(filter_floors=False,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
 								remove_outliers=remove_outliers)
 			elif agg_info == 'cdi':
-				if agg_method == 'aggregated':
-					I = agg_ensemble_dict[key].calc_cdi(filter_floors=False,
+				if 'aggregated' in agg_method:
+					Iagg = agg_ensemble_dict[key].calc_cdi(filter_floors=False,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance)
-				else:
-					I = np.mean(agg_ensemble_dict[key].calc_cdi(aggregate=False,
+				if 'mean' in agg_method:
+					Imean = np.mean(agg_ensemble_dict[key].calc_cdi(aggregate=False,
 								filter_floors=False, include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance))
+			residual = 0
+			if agg_info in ('cii', 'cdi'):
+				if agg_method in ('mean', 'mean-aggregated'):
+					I = Imean
+				elif agg_method in ('aggregated', 'aggregated-mean'):
+					I = Iagg
+				if agg_method == 'mean-aggregated':
+					residual = Imean - Iagg
+				elif agg_method == 'aggregated-mean':
+					residual = Iagg - Imean
 			elif agg_info == "num_replies":
 				I = 1
 			else:
 				print("Don't know how to compute %s" % agg_info)
 				exit()
 			macro_info = MacroseismicInfo(ensemble.id_earth, id_com, I, aggregate_by,
-									'internet', num_replies, lon, lat, web_ids)
+									'internet', num_replies, lon=lon, lat=lat,
+									residual=residual, db_ids=web_ids)
 			macro_infos.append(macro_info)
 
 		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet')
