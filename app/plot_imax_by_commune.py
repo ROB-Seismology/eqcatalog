@@ -13,11 +13,11 @@ from eqcatalog.plot import plot_macroseismic_map
 #print(macro.get_eq_intensities_for_commune_web(6, as_main_commune=False, include_other_felt=False))
 #exit()
 
-enq_type = 'official'
-#enq_type = 'online'
+#enq_type = 'official'
+enq_type = 'online'
 by_main_commune = True
-macro_info_coll = macro.get_imax_by_commune(enq_type=enq_type, include_other_felt=False,
-									by_main_commune=by_main_commune, verbose=False)
+macro_info_coll = macro.get_imax_by_commune(enq_type=enq_type, include_other_felt=True,
+									by_main_commune=by_main_commune, verbose=True)
 print(sum(macro.num_replies for macro in macro_info_coll))
 print([macro.I for macro in macro_info_coll])
 #for id_com in comm_macro_dict:
@@ -42,11 +42,3 @@ macro_info_coll.plot_map(region=region, projection=projection,
 				graticule_interval=graticule_interval,
 				event_style=None, cmap="usgs", title=title,
 				fig_filespec=fig_filespec)
-
-#print(macro_info_coll.to_geojson())
-
-#gis_file = os.path.splitext(fig_filespec)[0] + ".TAB"
-#macro_info_coll.export_gis('MapInfo File', gis_file)
-
-#geotiff_file = os.path.splitext(fig_filespec)[0] + ".TIF"
-#macro_info_coll.export_geotiff(geotiff_file)
