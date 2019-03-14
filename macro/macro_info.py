@@ -62,11 +62,15 @@ class MacroseismicInfo():
 	:param lat:
 		float, latitude or (if :param:`agg_type` = 'grid_X') northing
 		(default: 0)
+	:param residual:
+		float, residual between :param:`intensity` and another
+		intensity value
+		(default: 0)
 	:param db_ids:
 		list of ints, IDs of database records represented in aggregate
 	"""
 	def __init__(self, id_earth, id_com, intensity, agg_type, enq_type, num_replies=1,
-				lon=0, lat=0, db_ids=[]):
+				lon=0, lat=0, residual=0, db_ids=[]):
 		self.id_earth = id_earth
 		self.id_com = id_com
 		self.intensity = intensity
@@ -75,6 +79,7 @@ class MacroseismicInfo():
 		self.num_replies = num_replies
 		self.lon = lon
 		self.lat = lat
+		self.residual = residual
 		self.db_ids = db_ids
 
 	@property
@@ -153,6 +158,10 @@ class MacroInfoCollection():
 	@property
 	def intensities(self):
 		return np.array([rec.I for rec in self])
+
+	@property
+	def residuals(self):
+		return np.array([rec.residual for rec in self])
 
 	@property
 	def id_earth(self):
@@ -256,8 +265,11 @@ class MacroInfoCollection():
 
 		## Construct attribute dictionary
 		values = OrderedDict()
-		attributes = ['id_earth', 'intensity', 'num_replies', 'agg_type',
-					'enq_type']
+		attributes = ['id_earth', 'intensity', 'num_replies']
+		residuals = [rec.residual for rec in self]
+		if not np.allclose(residuals, 0):
+			attributes += ['residual']
+		attributes += ['agg_type', 'enq_type']
 		if aggregate_by == 'grid' or communes_as_points:
 			if aggregate_by in ('id_main', 'id_com'):
 				attributes += ['id_com']
