@@ -84,6 +84,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		(default: "default")
 	:param colorbar_style:
 		instance of :class:`mapping.layeredbasemap.ColorbarStyle`
+		or instance of :class:`mapping.layeredbasemap.LegendStyle`
 		(default: "default")
 	:param radii:
 		list of floats, raddii of circles (in km) to plot around
@@ -182,25 +183,30 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if color_gradient[:4] == "disc":
 		if plot_info == 'intensity':
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
-										labels=["%s" % val for val in classes],
+										#labels=["%s" % val for val in classes],
 										style_under='w', style_over=cmap(1.),
 										style_bad='w')
 		elif plot_info in ('num_replies', 'residual'):
 			tfc = lbm.ThematicStyleRanges(classes, cmap, value_key=plot_info,
-										labels=["%s" % val for val in classes],
+										#labels=["%s" % val for val in classes],
 										style_under='w', style_over=cmap(1.),
 										style_bad='w')
 	elif color_gradient == "continuous":
 		tfc = lbm.ThematicStyleGradient(classes, cmap, value_key=plot_info,
-								labels=["%s" % val for val in classes],
+								#labels=["%s" % val for val in classes],
 								style_under='w', style_over=cmap(1.),
 								style_bad='w')
 
 	if colorbar_style == "default":
 		colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d",
 										title=cb_title, spacing="uniform")
-	tfc.colorbar_style = colorbar_style
-	thematic_legend_style = lbm.LegendStyle(location=4)
+	thematic_legend_style = lbm.LegendStyle(title=cb_title, location=4)
+	if isinstance(colorbar_style, lbm.ColorbarStyle):
+		tfc.colorbar_style = colorbar_style
+		tfc.labels = tfc.gen_labels(as_ranges=False)
+	elif isinstance(colorbar_style, lbm.LegendStyle):
+		thematic_legend_style = colorbar_style
+		tfc.labels = tfc.gen_labels(as_ranges=True)
 
 	if not symbol_style:
 		## Plot polygons
