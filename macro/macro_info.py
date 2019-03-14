@@ -205,6 +205,22 @@ class MacroInfoCollection():
 		else:
 			return self.macro_infos[idx]
 
+	def calc_residual_intensity(self, other_macro_info):
+		"""
+		Compute residual intensity with respect to other collection
+		as self.intensities - other_macro_info.intensities
+
+		:param other_macro_info:
+			instance of :class:`MacroInfoCollection`
+		:return:
+			None, 'residual' attribute of instances of :class:`MacroseismicInfo`
+			in collection are modified in place
+		"""
+		for id_com in self.get_commune_ids():
+			mi = other_macro_info.get_commune_info(id_com)
+			if mi:
+				self.residual = self.I - mi.I
+
 	def get_region(self, percentile_width=100):
 		"""
 		Return geographic extent of collection
