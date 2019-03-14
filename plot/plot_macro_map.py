@@ -200,13 +200,16 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if colorbar_style == "default":
 		colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d",
 										title=cb_title, spacing="uniform")
-	thematic_legend_style = lbm.LegendStyle(title=cb_title, location=4)
 	if isinstance(colorbar_style, lbm.ColorbarStyle):
 		tfc.colorbar_style = colorbar_style
 		tfc.labels = tfc.gen_labels(as_ranges=False)
 	elif isinstance(colorbar_style, lbm.LegendStyle):
 		thematic_legend_style = colorbar_style
 		tfc.labels = tfc.gen_labels(as_ranges=True)
+	elif colorbar_style is None:
+		thematic_legend_style = None
+	else:
+		thematic_legend_style = lbm.LegendStyle(title=cb_title, location=4)
 
 	if not symbol_style:
 		## Plot polygons
