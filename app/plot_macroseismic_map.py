@@ -23,6 +23,7 @@ from eqcatalog.macro import get_aggregated_info_official, get_aggregated_info_we
 ## Kinrooi 25/05/2018
 id_earth = 6625
 
+
 ## Macroseismic paramerers
 enq_type = 'online'
 #enq_type = 'official'
@@ -37,6 +38,7 @@ min_replies = 3
 #filter_floors = (-100, 900)
 filter_floors = (0, 4)
 agg_method = 'mean'
+#agg_method = 'mean-aggregated'
 fix_records = True
 include_other_felt = True
 include_heavy_appliance = False
@@ -45,6 +47,7 @@ remove_outliers = (0, 100)
 ## Official enquiries
 min_or_max = 'mean'
 agg_function = 'average'
+
 
 ## How to aggregate
 ## No aggregation = plot at individual locations (if geocoded)
@@ -72,14 +75,16 @@ else:
 
 plot_info = 'intensity'
 #plot_info = 'num_replies'
+#plot_info = 'residual'
 
 
 ## Choose symbols/polygons for aggregation by commune or main commune
-symbol_style = lbm.PointStyle(shape='D', size=5)
-#symbol_style = None
+#symbol_style = lbm.PointStyle(shape='D', size=5)
+symbol_style = None
 
 ## Color options
-colorbar_style = "default"
+#colorbar_style = "default"
+colorbar_style = lbm.LegendStyle('Residual', location=4)
 color_gradient = "discrete"
 #color_gradient = "continuous"
 cmap = "rob"
@@ -112,22 +117,30 @@ fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
 #fig_filespec = os.path.join(out_folder, fig_filename)
 fig_filespec = None
 
+region = "auto"
 
-## Plot
 if macro_info:
-	region = "auto"
-	macro_info.plot_map(region=region, projection=projection,
-				graticule_interval=graticule_interval, plot_info=plot_info,
-				int_conversion='round', symbol_style=symbol_style,
-				thematic_num_replies=thematic_num_replies, cmap=cmap,
-				color_gradient=color_gradient, admin_level='province',
-				colorbar_style=colorbar_style, radii=radii, title=title,
-				fig_filespec=fig_filespec, verbose=True)
+	## Plot
+	#macro_info.plot_map(region=region, projection=projection,
+	#			graticule_interval=graticule_interval, plot_info=plot_info,
+	#			int_conversion='round', symbol_style=symbol_style,
+	#			thematic_num_replies=thematic_num_replies, cmap=cmap,
+	#			color_gradient=color_gradient, admin_level='province',
+	#			colorbar_style=colorbar_style, radii=radii, title=title,
+	#			fig_filespec=fig_filespec, verbose=True)
 
-	#print(macro_info_coll.to_geojson())
+	## Export to geojson
+	#print(macro_info.to_geojson())
 
+	## Export to vector GIS format
 	#gis_file = os.path.splitext(fig_filespec)[0] + ".TAB"
-	#macro_info_coll.export_gis('MapInfo File', gis_file)
+	#macro_info.export_gis('MapInfo File', gis_file)
 
+	## Export to GeoTiff
 	#geotiff_file = os.path.splitext(fig_filespec)[0] + ".TIF"
-	#macro_info_coll.export_geotiff(geotiff_file)
+	geotiff_file = "C:\\Temp\\macromap.TIF"
+	dpi = 300
+	macro_info.export_geotiff(geotiff_file, region=region, projection=projection,
+				plot_info=plot_info, int_conversion='round',
+				symbol_style=symbol_style, thematic_num_replies=thematic_num_replies,
+				cmap=cmap, color_gradient=color_gradient, dpi=dpi)
