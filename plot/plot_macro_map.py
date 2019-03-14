@@ -47,8 +47,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		(lon_spacing, lat_spacing) tuple
 		(default: (1, 1))
 	:param plot_info:
-		str, information that should be plotted, either 'intensity'
-		or 'num_replies'
+		str, information that should be plotted, either 'intensity',
+		'num_replies' or 'residual'
 		(default: 'intensity')
 	:param int_conversion:
 		str, "floor", "round" or "ceil"
@@ -115,7 +115,6 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		None or if fig_filespec == 'hold'
 	"""
 	# TODO: commune_linestyle, etc.
-	# TODO: or admin_style, admin_level (province, region, country)
 	import mapping.layeredbasemap as lbm
 
 	if len(macro_info_coll) == 0:
@@ -169,20 +168,33 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
 		cb_title = "Number of replies"
 
+	elif plot_info == 'residual':
+		max_residual = np.abs(macro_info_coll.residuals).max()
+		if max_residual <= 1.25:
+			classes = np.arange(-1.25, 1.3, 0.25)
+		elif max_residual <= 2.5:
+			classes = np.arange(-2.5, 2.6, 0.5)
+		else:
+			classes = np.arange(-4, 5, 1)
+		cb_title = "Residual Intensity"
+		cmap = matplotlib.cm.get_cmap('bwr')
+
 	if color_gradient[:4] == "disc":
 		if plot_info == 'intensity':
 			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
-										labels=["%d" % val for val in classes],
-										style_under='w', style_over=cmap(1.))
-		elif plot_info == 'num_replies':
+										labels=["%s" % val for val in classes],
+										style_under='w', style_over=cmap(1.),
+										style_bad='w')
+		elif plot_info in ('num_replies', 'residual'):
 			tfc = lbm.ThematicStyleRanges(classes, cmap, value_key=plot_info,
-										labels=["%d" % val for val in classes],
+										labels=["%s" % val for val in classes],
 										style_under='w', style_over=cmap(1.),
 										style_bad='w')
 	elif color_gradient == "continuous":
 		tfc = lbm.ThematicStyleGradient(classes, cmap, value_key=plot_info,
-								labels=["%d" % val for val in classes],
-								style_under='w', style_over=cmap(1.))
+								labels=["%s" % val for val in classes],
+								style_under='w', style_over=cmap(1.),
+								style_bad='w')
 
 	if colorbar_style == "default":
 		colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d",
