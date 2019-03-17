@@ -156,6 +156,14 @@ class MacroInfoCollection():
 		return self.macro_infos.__getitem__(item)
 
 	@property
+	def lons(self):
+		return np.array([rec.lon for rec in self])
+
+	@property
+	def lats(self):
+		return np.array([rec.lat for rec in self])
+
+	@property
 	def intensities(self):
 		return np.array([rec.I for rec in self])
 
@@ -450,6 +458,64 @@ class MacroInfoCollection():
 			map.border_style.line_color = 'w'
 			map.border_style.line_width = 0
 		map.export_geotiff(out_filespec, dpi=dpi)
+
+	def interpolate_grid(self, num_cells, extent=(None, None, None, None),
+						interpolation_method='cubic'):
+		"""
+		Interpolate intensity grid
+
+		:param num_cells:
+			Integer or tuple, number of grid cells in lon and lat direction
+		:param extent:
+			(lonmin, lonmax, latmin, latmax) tuple of floats
+			(default: (None, None, None, None)
+		:param interpolation_method:
+			Str, interpolation method supported by griddata (either
+			"linear", "nearest" or "cubic")
+			(default: "cubic")
+
+		:return:
+			instance of :class:`mapping.layeredbasemap.MeshGridData`
+		"""
+		from mapping.layeredbasemap import UnstructuredGrid
+
+		unstructured_grid = UnstructuredGrid(self.lons, self.lats, self.intensities,
+											unit='Intensity')
+		grid = unstructured_grid.to_mesh_grid_data(num_cells, extent=extent,
+									interpolation_method=interpolation_method)
+		return grid
+
+	def interpolate_isoseismals(self, intensity_levels=None,
+								interpolation_method='cubic', as_lines=True):
+		"""
+		Interpolate intensity contours
+
+		:param intensity_levels:
+			list of floats, intensity contour levels
+			(default: None, will auto-determine integer intensity
+			levels between minimum and maximum)
+		:param interpolation_method:
+			see :meth:`interpolate_grid`
+		:param as_lines:
+			bool, whether isoseismals should be returned as lines
+			(True) or polygonal areas (False)
+
+		:return:
+			list with instances of :class:`mapping.layeredbasemap.MultiLineData`
+		"""
+		if intensity_levels is None:
+			intensities = self.intensities
+			Imin = np.floor(intensities.min())
+			Imax = np.floor(intensities.max())
+			intensity_levels = np.arange(Imin, Imax)
+		grid_resolution = 200
+		grid = self.interpolate_grid(grid_resolution,
+									interpolation_method=interpolation_method)
+		if as_lines:
+			isoseismals = grid.extract_contour_lines(intensity_levels)
+		else:
+			isoseismals = grid.extract_contour_intervals(intensity_levels)
+		return isoseismals
 
 
 def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
