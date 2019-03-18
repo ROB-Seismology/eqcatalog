@@ -477,10 +477,10 @@ class MacroInfoCollection():
 		:return:
 			instance of :class:`mapping.layeredbasemap.MeshGridData`
 		"""
-		from mapping.layeredbasemap import UnstructuredGrid
+		from mapping.layeredbasemap import UnstructuredGridData
 
-		unstructured_grid = UnstructuredGrid(self.lons, self.lats, self.intensities,
-											unit='Intensity')
+		unstructured_grid = UnstructuredGriddata(self.lons, self.lats,
+											self.intensities, unit='Intensity')
 		grid = unstructured_grid.to_mesh_grid_data(num_cells, extent=extent,
 									interpolation_method=interpolation_method)
 		return grid
