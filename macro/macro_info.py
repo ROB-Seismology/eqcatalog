@@ -459,7 +459,7 @@ class MacroInfoCollection():
 			map.border_style.line_width = 0
 		map.export_geotiff(out_filespec, dpi=dpi)
 
-	def interpolate_grid(self, num_cells, extent=(None, None, None, None),
+	def interpolate_grid(self, num_cells, region=(None, None, None, None),
 						interpolation_method='cubic'):
 		"""
 		Interpolate intensity grid
@@ -479,9 +479,9 @@ class MacroInfoCollection():
 		"""
 		from mapping.layeredbasemap import UnstructuredGridData
 
-		unstructured_grid = UnstructuredGriddata(self.lons, self.lats,
+		unstructured_grid = UnstructuredGridData(self.lons, self.lats,
 											self.intensities, unit='Intensity')
-		grid = unstructured_grid.to_mesh_grid_data(num_cells, extent=extent,
+		grid = unstructured_grid.to_mesh_grid_data(num_cells, extent=region,
 									interpolation_method=interpolation_method)
 		return grid
 
