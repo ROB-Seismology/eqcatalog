@@ -24,7 +24,8 @@ __all__ = ["plot_macroseismic_map"]
 
 def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				projection="merc", graticule_interval=(1, 1), plot_info="intensity",
-				int_conversion="round", symbol_style=None, thematic_num_replies=False,
+				int_conversion="round", symbol_style=None, line_style="default",
+				thematic_num_replies=False,
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
@@ -58,6 +59,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		point style for macroseismic data. If None, data will be plotted
 		as commune polygons
 		(default: None)
+	:param line_style:
+		instance of :class:`mapping.layeredbasemap.LineStyle`,
+		line style for macroseismic data polygons or contour lines.
+		(default: "default").
 	:param thematic_num_replies:
 		bool, whether or not thematic style should be applied for
 		number of replies (symbol size for points, transparency for
@@ -133,6 +138,16 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				print("  %s : %.2f (n=%d)" % (macro_rec.id_com,
 							macro_rec.I, macro_rec.num_replies))
 
+	if region == "auto":
+		lonmin, lonmax, latmin, latmax = macro_info_coll.get_region(95)
+		dlon = lonmax - lonmin
+		dlat = latmax - latmin
+		lonmin -= (dlon * 0.1)
+		lonmax += (dlon * 0.1)
+		latmin -= (dlat * 0.1)
+		latmax += (dlat * 0.1)
+		region = (lonmin, lonmax, latmin, latmax)
+
 	plot_communes_as_points = False
 	if symbol_style:
 		plot_communes_as_points = True
@@ -148,6 +163,9 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		intensities = getattr(np, int_conversion)(intensities).astype('int')
 		for r, rec in enumerate(macro_info_coll):
 			setattr(rec, 'intensity', intensities[r])
+
+	if line_style == "default":
+		line_style = lbm.LineStyle(line_width=0.5, line_color='0.33')
 
 	layers = []
 
@@ -206,10 +224,26 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	elif isinstance(colorbar_style, lbm.LegendStyle):
 		thematic_legend_style = colorbar_style
 		tfc.labels = tfc.gen_labels(as_ranges=True)
-	elif colorbar_style is None:
+	if colorbar_style is None:
 		thematic_legend_style = None
 	else:
 		thematic_legend_style = lbm.LegendStyle(title=cb_title, location=4)
+
+	## Interpolate grid
+	grid_data = macro_info_coll.interpolate_grid(100, region=region,
+												interpolation_method='linear')
+	if cmap_name.lower() in ("usgs", "rob"):
+		norm = lbm.cm.get_norm("macroseismic", cmap_name)
+	else:
+		norm = None
+	# TODO: add colorbar_style if no other information is plotted
+	tcm = lbm.ThematicStyleColormap(cmap, norm=norm, colorbar_style=None)
+	Imin, Imax = macro_info_coll.Iminmax()
+	contour_levels = range(Imin, Imax + 1)
+	grid_style = lbm.GridStyle(tcm, color_gradient, contour_levels=contour_levels,
+								line_style=line_style)
+	grid_layer = lbm.MapLayer(grid_data, grid_style)
+	layers.append(grid_layer)
 
 	if not symbol_style:
 		## Plot polygons
@@ -223,9 +257,13 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			if color_gradient == "discontinuous":
 				ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
 											value_key="num_replies")
-		polygon_style = lbm.PolygonStyle(fill_color=tfc, line_width=0.1,
-					fill_hatch=tfh, alpha=ta, thematic_legend_style=thematic_legend_style)
-		#macro_style = lbm.CompositeStyle(polygon_style=polygon_style)
+		polygon_style = lbm.PolygonStyle(line_width=0, fill_color=tfc, fill_hatch=tfh,
+						alpha=ta, thematic_legend_style=thematic_legend_style)
+		if line_style:
+			polygon_style.line_pattern = line_style.line_pattern
+			polygon_style.line_width = line_style.line_width
+			polygon_style.line_color = line_style.line_color
+			polygon_style.dash_pattern = line_style.dash_pattern
 		macro_style = polygon_style
 		legend_label = {"polygons": ""}
 	else:
@@ -251,16 +289,6 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
 
-		if region == "auto":
-			lonmin, lonmax, latmin, latmax = macro_info_coll.get_region(95)
-			dlon = lonmax - lonmin
-			dlat = latmax - latmin
-			lonmin -= (dlon * 0.1)
-			lonmax += (dlon * 0.1)
-			latmin -= (dlat * 0.1)
-			latmax += (dlat * 0.1)
-			region = (lonmin, lonmax, latmin, latmax)
-
 	## Admin layer
 	admin_data = None
 	if admin_level.lower() == 'province':
@@ -276,7 +304,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	if admin_data:
 		if admin_style == "default":
-			admin_style = lbm.PolygonStyle(line_width=1, fill_color='none')
+			admin_style = lbm.PolygonStyle(line_width=1.5, fill_color='none')
 		#gis_style = lbm.CompositeStyle(polygon_style=admin_style)
 		admin_layer = lbm.MapLayer(admin_data, admin_style, legend_label={"polygons": ""})
 		layers.append(admin_layer)
