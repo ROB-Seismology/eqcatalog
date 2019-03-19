@@ -156,11 +156,11 @@ class MacroInfoCollection():
 		return self.macro_infos.__getitem__(item)
 
 	@property
-	def lons(self):
+	def longitudes(self):
 		return np.array([rec.lon for rec in self])
 
 	@property
-	def lats(self):
+	def latitudes(self):
 		return np.array([rec.lat for rec in self])
 
 	@property
@@ -178,6 +178,10 @@ class MacroInfoCollection():
 			return id_earths.pop()
 		else:
 			return sorted(id_earths)
+
+	def Iminmax(self):
+		intensities = self.intensities
+		return (np.nanmin(intensities), np.nanmax(intensities))
 
 	def to_commune_info_dict(self):
 		"""
@@ -337,8 +341,8 @@ class MacroInfoCollection():
 
 		## Points
 		elif communes_as_points:
-			lons = [rec.lon for rec in self]
-			lats = [rec.lat for rec in self]
+			lons = self.longitudes
+			lats = self.latitudes
 			macro_geoms = lbm.MultiPointData(lons, lats, values=values)
 
 		## Commune polygons
@@ -387,7 +391,8 @@ class MacroInfoCollection():
 
 	def plot_map(self, region=(2, 7, 49.25, 51.75), projection="merc",
 				graticule_interval=(1, 1), plot_info="intensity",
-				int_conversion="round", symbol_style=None, thematic_num_replies=False,
+				int_conversion="round", symbol_style=None, line_style="default",
+				thematic_num_replies=False,
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
@@ -402,7 +407,7 @@ class MacroInfoCollection():
 		return plot_macroseismic_map(self, region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion=int_conversion, symbol_style=symbol_style,
-				thematic_num_replies=thematic_num_replies,
+				line_style=line_style, thematic_num_replies=thematic_num_replies,
 				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
 				admin_level=admin_level, admin_style=admin_style,
 				colorbar_style=colorbar_style, radii=radii, plot_pie=plot_pie,
@@ -460,7 +465,7 @@ class MacroInfoCollection():
 		map.export_geotiff(out_filespec, dpi=dpi)
 
 	def interpolate_grid(self, num_cells, region=(None, None, None, None),
-						interpolation_method='cubic'):
+						prop='intensity', interpolation_method='cubic'):
 		"""
 		Interpolate intensity grid
 
@@ -469,6 +474,10 @@ class MacroInfoCollection():
 		:param extent:
 			(lonmin, lonmax, latmin, latmax) tuple of floats
 			(default: (None, None, None, None)
+		:param prop:
+			str, name of property to interpolate, either 'intensity',
+			'residual' or 'num_replies'
+			(default: 'intensity')
 		:param interpolation_method:
 			Str, interpolation method supported by griddata (either
 			"linear", "nearest" or "cubic")
@@ -479,8 +488,19 @@ class MacroInfoCollection():
 		"""
 		from mapping.layeredbasemap import UnstructuredGridData
 
-		unstructured_grid = UnstructuredGridData(self.lons, self.lats,
-											self.intensities, unit='Intensity')
+		if prop == 'intensity':
+			values = self.intensities
+			unit = 'Intensity'
+		elif prop == 'residual':
+			values = np.array([rec.residual for rec in self])
+			unit = 'Intensity difference'
+		elif prop == 'num_replies':
+			values = np.array([rec.num_replies for rec in self])
+			unit = ''
+		else:
+			print("Unknown property %s" % prop)
+		unstructured_grid = UnstructuredGridData(self.longitudes, self.latitudes,
+												values, unit=unit)
 		grid = unstructured_grid.to_mesh_grid_data(num_cells, extent=region,
 									interpolation_method=interpolation_method)
 		return grid
