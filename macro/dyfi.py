@@ -269,15 +269,24 @@ class MacroseismicEnquiryEnsemble():
 		if not len(self.recs) or not prop in self.recs[0]:
 			return []
 		else:
-			# TODO: this fails if there is only 1 enquiry
-			first_non_None_value = next((rec[prop] for rec in self.recs
-										if rec[prop] is not None), None)
-			if isinstance(first_non_None_value, basestring):
-				none_val = u""
-			elif first_non_None_value is None:
-				none_val = None
-			else:
+			if prop in ["longitude", "latitude", "CII", "CDI", "MI", "CWS",
+					"fiability", "situation", "building", "floor", "asleep",
+					"noise", "felt", "other_felt", "motion", "duration",
+					"reaction", "response", "stand", "furniture",
+					"heavy_appliance", "walls"]:
 				none_val = np.nan
+			elif prop in ["d_text", "sway", "creak", "shelf", "picture"]:
+				none_val = u""
+			else:
+				## Note that this may fail if there is only 1 enquiry
+				first_non_None_value = next((rec[prop] for rec in self.recs
+											if rec[prop] is not None), None)
+				if isinstance(first_non_None_value, basestring):
+					none_val = u""
+				elif first_non_None_value is None:
+					none_val = None
+				else:
+					none_val = np.nan
 			return [rec[prop] if rec[prop] is not None else none_val
 					for rec in self.recs]
 
@@ -379,9 +388,9 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		dp = 100. - percentile_width
 		percentiles = [0 + dp/2., 100 - dp/2.]
-		longitudes = self.get_longitudes()
+		longitudes = self.longitudes
 		longitudes = longitudes[np.isfinite(longitudes)]
-		latitudes = self.get_latitudes()
+		latitudes = self.latitudes
 		latitudes = latitudes[np.isfinite(latitudes)]
 		lonmin, lonmax = np.percentile(longitudes, percentiles)
 		latmin, latmax = np.percentile(latitudes, percentiles)
@@ -406,8 +415,8 @@ class MacroseismicEnquiryEnsemble():
 			(W, E, S, N) tuple
 		"""
 		lonmin, lonmax, latmin, latmax = region
-		longitudes = self.get_longitudes()
-		latitudes = self.get_latitudes()
+		longitudes = self.longitudes
+		latitudes = self.latitudes
 		lon_idxs = (lonmin <= longitudes) & (longitudes <= lonmax)
 		lat_idxs = (latmin <= latitudes) & (latitudes <= latmax)
 		return self.__getitem__(lon_idxs & lat_idxs)
