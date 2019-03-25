@@ -29,7 +29,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
-				ax=None, copyright=u"© ROB", verbose=True):
+				ax=None, copyright=u"© ROB", text_box={}, verbose=True):
 	"""
 	Plot macroseismic map for given earthquake
 
@@ -120,6 +120,9 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	:param copyright:
 		str, copyright label to plot in lower left corner of map
 		(default: u"© ROB")
+	:param text_box:
+		dict, containing text box parameters (pos, text and style)
+		(default: {})
 	:param verbose:
 		bool, whether or not to plot some useful information
 
@@ -423,6 +426,17 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	map = lbm.LayeredBasemap(layers, title, projection, region=region,
 				graticule_interval=graticule_interval, legend_style=legend_style,
 				graticule_style=graticule_style, ax=ax)
+
+	## Text box
+	if text_box:
+		pos = text_box.get('pos', (0, 0))
+		text = text_box.get('text', '')
+		text_style = text_box.get('style')
+		if not text_style:
+			text_style = lbm.TextStyle(font_size=10, horizontal_alignment='left',
+						vertical_alignment='bottom', multi_alignment='left',
+						background_color='w', border_color='k', border_pad=0.5)
+		map.draw_text_box(pos, text, text_style, zorder=1000)
 
 	if fig_filespec:
 		dpi = 300
