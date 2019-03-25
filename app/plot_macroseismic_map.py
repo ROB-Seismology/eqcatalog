@@ -8,6 +8,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 
 import os
+import numpy as np
 
 import mapping.layeredbasemap as lbm
 from eqcatalog.macro import get_aggregated_info_official, get_aggregated_info_web
@@ -53,10 +54,10 @@ agg_function = 'average'
 ## No aggregation = plot at individual locations (if geocoded)
 #aggregate_by = None
 ## Aggregate by commune or main commune
-aggregate_by = 'commune'
+#aggregate_by = 'commune'
 #aggregate_by = 'main commune'
 ## Aggregate by grid cell
-#aggregate_by = 'grid_5'
+aggregate_by = 'grid_5'
 
 
 if enq_type in ('internet', 'online'):
@@ -79,12 +80,24 @@ plot_info = 'intensity'
 
 
 ## Choose symbols/polygons for aggregation by commune or main commune
-#symbol_style = lbm.PointStyle(shape='D', size=5)
-symbol_style = None
+symbol_style = lbm.PointStyle(shape='D', size=5)
+#symbol_style = None
+
+line_style = "default"
+#line_style = None
+
+## Grid interpolation (only if aggregate_by is None or symbol_style is not None)
+interpolate_grid = {'num_cells': (100, 100),
+					'method': 'idw',
+					'params': {'max_dist': 5.}}
+#interpolate_grid = {}
+## resolution or cell size, interpolation method, max_distance
+## TODO: Need to set lon, lat when grid cells are used, add x, y and srs props
+
 
 ## Color options
-#colorbar_style = "default"
-colorbar_style = lbm.LegendStyle('Residual', location=4)
+colorbar_style = "default"
+#colorbar_style = lbm.LegendStyle('Residual', location=4)
 color_gradient = "discrete"
 #color_gradient = "continuous"
 cmap = "rob"
@@ -101,8 +114,8 @@ plot_pie = None
 
 
 ## Map parameters
-region = (2, 7, 49.25, 51.75)
-#region = (4.9, 6, 50.5, 51.5)
+#region = (2, 7, 49.25, 51.75)
+region = (4.9, 6, 50.5, 51.5)
 projection = "tmerc"
 graticule_interval = (2, 1)
 #graticule_interval = (0.5, 1)
@@ -117,17 +130,18 @@ fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
 #fig_filespec = os.path.join(out_folder, fig_filename)
 fig_filespec = None
 
-region = "auto"
+#region = "auto"
 
 if macro_info:
 	## Plot
-	#macro_info.plot_map(region=region, projection=projection,
-	#			graticule_interval=graticule_interval, plot_info=plot_info,
-	#			int_conversion='round', symbol_style=symbol_style,
-	#			thematic_num_replies=thematic_num_replies, cmap=cmap,
-	#			color_gradient=color_gradient, admin_level='province',
-	#			colorbar_style=colorbar_style, radii=radii, title=title,
-	#			fig_filespec=fig_filespec, verbose=True)
+	macro_info.plot_map(region=region, projection=projection,
+				graticule_interval=graticule_interval, plot_info=plot_info,
+				int_conversion='round', symbol_style=symbol_style,
+				line_style=line_style, thematic_num_replies=thematic_num_replies,
+				interpolate_grid=interpolate_grid, cmap=cmap,
+				color_gradient=color_gradient, admin_level='province',
+				colorbar_style=colorbar_style, radii=radii, title=title,
+				fig_filespec=fig_filespec, verbose=True)
 
 	## Export to geojson
 	#print(macro_info.to_geojson())
@@ -140,7 +154,7 @@ if macro_info:
 	#geotiff_file = os.path.splitext(fig_filespec)[0] + ".TIF"
 	geotiff_file = "C:\\Temp\\macromap.TIF"
 	dpi = 300
-	macro_info.export_geotiff(geotiff_file, region=region, projection=projection,
-				plot_info=plot_info, int_conversion='round',
-				symbol_style=symbol_style, thematic_num_replies=thematic_num_replies,
-				cmap=cmap, color_gradient=color_gradient, dpi=dpi)
+	#macro_info.export_geotiff(geotiff_file, region=region, projection=projection,
+	#			plot_info=plot_info, int_conversion='round',
+	#			symbol_style=symbol_style, thematic_num_replies=thematic_num_replies,
+	#			cmap=cmap, color_gradient=color_gradient, dpi=dpi)
