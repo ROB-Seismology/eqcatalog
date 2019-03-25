@@ -87,10 +87,10 @@ line_style = "default"
 #line_style = None
 
 ## Grid interpolation (only if aggregate_by is None or symbol_style is not None)
-interpolate_grid = {'num_cells': (100, 100),
-					'method': 'idw',
-					'params': {'max_dist': 5.}}
-#interpolate_grid = {}
+#interpolate_grid = {'num_cells': (100, 100),
+#					'method': 'idw',
+#					'params': {'max_dist': 5.}}
+interpolate_grid = {}
 ## resolution or cell size, interpolation method, max_distance
 ## TODO: Need to set lon, lat when grid cells are used, add x, y and srs props
 
@@ -98,8 +98,8 @@ interpolate_grid = {'num_cells': (100, 100),
 ## Color options
 colorbar_style = "default"
 #colorbar_style = lbm.LegendStyle('Residual', location=4)
-color_gradient = "discrete"
-#color_gradient = "continuous"
+#color_gradient = "discrete"
+color_gradient = "continuous"
 cmap = "rob"
 #cmap = "usgs"
 #cmap = "jet"
@@ -125,14 +125,23 @@ graticule_interval = (2, 1)
 #title = "Kinrooi 25/05/2018"
 title = ""
 
+
+## Copyright / text box
+copyright = ''
+text = "Aggregation by: %s\nAgg. method: %s"
+text %= (aggregate_by, agg_method)
+text_box = {'pos': 'bl', 'text': text}
+
+
 out_folder = "D:\\Earthquake Reports\\20180525\\plots"
 fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
 #fig_filespec = os.path.join(out_folder, fig_filename)
 fig_filespec = None
 
-#region = "auto"
 
 if macro_info:
+	#region = "auto"
+
 	## Plot
 	macro_info.plot_map(region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
@@ -141,7 +150,8 @@ if macro_info:
 				interpolate_grid=interpolate_grid, cmap=cmap,
 				color_gradient=color_gradient, admin_level='province',
 				colorbar_style=colorbar_style, radii=radii, title=title,
-				fig_filespec=fig_filespec, verbose=True)
+				fig_filespec=fig_filespec, copyright=copyright,
+				text_box=text_box, verbose=True)
 
 	## Export to geojson
 	#print(macro_info.to_geojson())
