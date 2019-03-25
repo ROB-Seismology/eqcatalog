@@ -57,10 +57,10 @@ class MacroseismicInfo():
 		int, number of replies in aggregate
 		(default: 1)
 	:param lon:
-		float, longitude or (if :param:`agg_type` = 'grid_X') easting
+		float, longitude
 		(default: 0)
 	:param lat:
-		float, latitude or (if :param:`agg_type` = 'grid_X') northing
+		float, latitude
 		(default: 0)
 	:param residual:
 		float, residual between :param:`intensity` and another
@@ -248,22 +248,21 @@ class MacroInfoCollection():
 		dp = 100. - percentile_width
 		percentiles = [0 + dp/2., 100 - dp/2.]
 		lons, lats = [], []
-		if self.agg_type in ('id_com', 'commune', 'id_main', 'main commune', None):
-			for rec in self:
-				lons.extend([rec.lon] * rec.num_replies)
-				lats.extend([rec.lat] * rec.num_replies)
-			lonmin, lonmax = np.percentile(lons, percentiles)
-			latmin, latmax = np.percentile(lats, percentiles)
-			return (lonmin, lonmax, latmin, latmax)
+		for rec in self:
+			lons.extend([rec.lon] * rec.num_replies)
+			lats.extend([rec.lat] * rec.num_replies)
+		lonmin, lonmax = np.percentile(lons, percentiles)
+		latmin, latmax = np.percentile(lats, percentiles)
+		return (lonmin, lonmax, latmin, latmax)
 
-	def get_geometries(self, communes_as_points=False):
+	def get_geometries(self, polygons_as_points=False):
 		"""
 		Transform aggregated macroseismic information to layeredbasemap
 		geometries.
 
-		:param communes_as_points:
-			bool, whether to represent communes as points (True)
-			or polygons (False)
+		:param polygons_as_points:
+			bool, whether to represent polygonal aggregates as points (True)
+			or as polygons (False)
 			(default: False)
 
 		:return:
@@ -282,13 +281,13 @@ class MacroInfoCollection():
 		elif aggregate_by == 'main commune':
 			aggregate_by = 'id_main'
 		elif not aggregate_by:
-			communes_as_points = True
+			polygons_as_points = True
 		elif aggregate_by[:4] == 'grid':
 			if '_' in aggregate_by:
 				_, grid_spacing = aggregate_by.split('_')
-				grid_spacing = float(grid_spacing)
+				grid_spacing = float(grid_spacing) * 1000
 			else:
-				grid_spacing = 5
+				grid_spacing = 5000.
 			aggregate_by = 'grid'
 
 		## Construct attribute dictionary
@@ -298,7 +297,7 @@ class MacroInfoCollection():
 		if not np.allclose(residuals, 0):
 			attributes += ['residual']
 		attributes += ['agg_type', 'enq_type']
-		if aggregate_by == 'grid' or communes_as_points:
+		if aggregate_by == 'grid' or polygons_as_points:
 			if aggregate_by in ('id_main', 'id_com'):
 				attributes += ['id_com']
 			attributes += ['lon', 'lat']
@@ -311,10 +310,10 @@ class MacroInfoCollection():
 							{rec.id_com: getattr(rec, attrib) for rec in self}}
 
 		## Select GIS file with commune polygons in function of aggregation type
-		#if communes_as_points:
+		#if polygons_as_points:
 		#	gis_filename = "Bel_villages_points.TAB"
 		gis_filename = ""
-		if not communes_as_points:
+		if not polygons_as_points:
 			if aggregate_by == 'id_main':
 				gis_filename = "Bel_villages_polygons.TAB"
 			elif aggregate_by == 'id_com':
@@ -325,22 +324,28 @@ class MacroInfoCollection():
 
 		## Grid
 		if aggregate_by == 'grid':
-			import mapping.geotools.coordtrans as ct
-			X_left = np.array([rec.lon for rec in self])
-			Y_bottom = np.array([rec.lat for rec in self])
-			X_right = X_left + grid_spacing * 1000
-			Y_top = Y_bottom + grid_spacing * 1000
-			all_lons, all_lats = [], []
-			for i in range(len(self)):
-				X = [X_left[i], X_right[i], X_right[i], X_left[i], X_left[i]]
-				Y = [Y_bottom[i], Y_bottom[i], Y_top[i], Y_top[i], Y_bottom[i]]
-				lons, lats = ct.transform_array_coordinates(ct.LAMBERT1972, ct.WGS84, X, Y)
-				all_lons.append(lons)
-				all_lats.append(lats)
-			macro_geoms = lbm.MultiPolygonData(all_lons, all_lats, values=values)
+			if polygons_as_points:
+				macro_geoms = lbm.MultiPointData(self.longitudes, self.latitudes,
+													values=values)
+			else:
+				import mapping.geotools.coordtrans as ct
+				X_center, Y_center = ct.transform_array_coordinates(ct.WGS84,
+									ct.LAMBERT1972, self.longitudes, self.latitudes)
+				X_left = X_center - grid_spacing / 2.
+				X_right = X_left + grid_spacing
+				Y_bottom = Y_center - grid_spacing / 2.
+				Y_top = Y_bottom + grid_spacing
+				all_lons, all_lats = [], []
+				for i in range(len(self)):
+					X = [X_left[i], X_right[i], X_right[i], X_left[i], X_left[i]]
+					Y = [Y_bottom[i], Y_bottom[i], Y_top[i], Y_top[i], Y_bottom[i]]
+					lons, lats = ct.transform_array_coordinates(ct.LAMBERT1972, ct.WGS84, X, Y)
+					all_lons.append(lons)
+					all_lats.append(lats)
+				macro_geoms = lbm.MultiPolygonData(all_lons, all_lats, values=values)
 
 		## Points
-		elif communes_as_points:
+		elif polygons_as_points:
 			lons = self.longitudes
 			lats = self.latitudes
 			macro_geoms = lbm.MultiPointData(lons, lats, values=values)
@@ -353,21 +358,21 @@ class MacroInfoCollection():
 
 		return macro_geoms
 
-	def to_geojson(self, communes_as_points=False):
+	def to_geojson(self, polygons_as_points=False):
 		"""
 		Convert to GeoJSON.
 
-		:param communes_as_points:
+		:param polygons_as_points:
 			see :meth:`get_geometries`
 
 		:return:
 			dict
 		"""
-		multi_data = self.get_geometries(communes_as_points=communes_as_points)
+		multi_data = self.get_geometries(polygons_as_points=polygons_as_points)
 		return multi_data.to_geojson()
 
 	def export_gis(self, format, filespec, encoding='latin-1',
-					communes_as_points=False):
+					polygons_as_points=False):
 		"""
 		Export to GIS file
 
@@ -379,14 +384,14 @@ class MacroInfoCollection():
 		:param encoding:
 			str, encoding to use for non-ASCII characters
 			(default: 'latin-1')
-		:param communes_as_points:
+		:param polygons_as_points:
 			see :meth:`get_geometries`
 
 		:return:
 			instance of :class:`ogr.DataSource` if :param:`format`
 			== 'MEMORY', else None
 		"""
-		multi_data = self.get_geometries(communes_as_points=communes_as_points)
+		multi_data = self.get_geometries(polygons_as_points=polygons_as_points)
 		return multi_data.export_gis(format, filespec, encoding=encoding)
 
 	def plot_map(self, region=(2, 7, 49.25, 51.75), projection="merc",
