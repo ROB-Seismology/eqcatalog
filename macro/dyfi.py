@@ -20,6 +20,9 @@ except:
 ## Third-party modules
 import numpy as np
 
+## ROB modules
+import mapping.geotools.coordtrans as ct
+
 
 __all__ = ["MacroseismicEnquiryEnsemble", "DYFIEnsemble"]
 
@@ -886,33 +889,39 @@ class MacroseismicEnquiryEnsemble():
 			comm_ensemble_dict[comm_key_val] = ensemble
 		return comm_ensemble_dict
 
-	def aggregate_by_grid(self, grid_spacing=5):
+	def aggregate_by_grid(self, grid_spacing=5, srs=ct.LAMBERT1972):
 		"""
 		Aggregate enquiries into rectangular grid cells
 
 		:param grid_spacing:
 			grid spacing (in km)
 			(default: 5)
+		:param srs:
+			osr spatial reference system
+			(default: ct.LAMBERT1972)
 
 		:return:
-			dict, mapping (x_left, y_bottom) tuples to instances of
+			dict, mapping (center_lon, center_lat) tuples to instances of
 			:class:`MacroseismicEnquiryEnsemble`
 		"""
 		grid_spacing *= 1000
-		import mapping.geotools.coordtrans as ct
 		lons = self.longitudes
 		lats = self.latitudes
 		mask = np.isnan(lons)
 		lons = np.ma.array(lons, mask=mask)
 		lats = np.ma.array(lats, mask=mask)
-		X, Y = ct.transform_array_coordinates(ct.WGS84, ct.LAMBERT1972, lons, lats)
+		X, Y = ct.transform_array_coordinates(ct.WGS84, srs, lons, lats)
 
 		bin_rec_dict = {}
 		for r, rec in enumerate(self.recs):
 			x, y = X[r], Y[r]
-			x_bin = np.floor(x / grid_spacing) * grid_spacing
-			y_bin = np.floor(y / grid_spacing) * grid_spacing
-			key = (x_bin, y_bin)
+			## Center X, Y
+			x_bin = np.floor(x / grid_spacing) * grid_spacing + grid_spacing/2.
+			y_bin = np.floor(y / grid_spacing) * grid_spacing + grid_spacing/2.
+			## Center longitude and latitude
+			[(lon_bin, lat_bin)] = ct.transform_coordinates(srs, ct.WGS84,
+															[(x_bin, y_bin)])
+			key = (lon_bin, lat_bin)
 			if not key in bin_rec_dict:
 				bin_rec_dict[key] = [rec]
 			else:
