@@ -392,7 +392,7 @@ class MacroInfoCollection():
 	def plot_map(self, region=(2, 7, 49.25, 51.75), projection="merc",
 				graticule_interval=(1, 1), plot_info="intensity",
 				int_conversion="round", symbol_style=None, line_style="default",
-				thematic_num_replies=False,
+				thematic_num_replies=False, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
@@ -408,7 +408,8 @@ class MacroInfoCollection():
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion=int_conversion, symbol_style=symbol_style,
 				line_style=line_style, thematic_num_replies=thematic_num_replies,
-				cmap=cmap, color_gradient=color_gradient, event_style=event_style,
+				interpolate_grid=interpolate_grid, cmap=cmap,
+				color_gradient=color_gradient, event_style=event_style,
 				admin_level=admin_level, admin_style=admin_style,
 				colorbar_style=colorbar_style, radii=radii, plot_pie=plot_pie,
 				title=title, fig_filespec=fig_filespec,
@@ -416,9 +417,9 @@ class MacroInfoCollection():
 
 	def export_geotiff(self, out_filespec, region=(2, 7, 49.25, 51.75),
 				projection="merc", plot_info="intensity", int_conversion="round",
-				symbol_style=None, thematic_num_replies=False, cmap="rob",
-				color_gradient="discontinuous", copyright="", dpi=120,
-				hide_border=True):
+				symbol_style=None, line_style="default", thematic_num_replies=False,
+				interpolate_grid={}, cmap="rob", color_gradient="discontinuous",
+				colorbar_style=None, copyright="", dpi=120, hide_border=True):
 		"""
 		Export to GeoTIFF map
 
@@ -429,9 +430,12 @@ class MacroInfoCollection():
 		:param plot_info:
 		:param int_conversion:
 		:param symbol_style:
+		:param line_style:
 		:param thematic_num_replies:
+		:param interpolate_grid:
 		:param cmap:
 		:param color_gradient:
+		:param colorbar_style:
 		:param copyright:
 			see :func:`eqcatalog.plot.plot_macro_map.plot_macroseismic_map`
 		:param dpi:
@@ -444,7 +448,6 @@ class MacroInfoCollection():
 		graticule_interval = ()
 		event_style = None
 		admin_level = ''
-		colorbar_style = None
 		radii = []
 		plot_pie = None
 		title = ""
@@ -454,7 +457,8 @@ class MacroInfoCollection():
 		map = self.plot_map(region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion=int_conversion, symbol_style=symbol_style,
-				thematic_num_replies=thematic_num_replies, cmap=cmap,
+				line_style=line_style, thematic_num_replies=thematic_num_replies,
+				interpolate_grid=interpolate_grid, cmap=cmap,
 				color_gradient=color_gradient, event_style=event_style,
 				admin_level=admin_level, colorbar_style=colorbar_style,
 				radii=radii, plot_pie=plot_pie, title=title, fig_filespec=fig_filespec,
@@ -465,7 +469,8 @@ class MacroInfoCollection():
 		map.export_geotiff(out_filespec, dpi=dpi)
 
 	def interpolate_grid(self, num_cells, region=(None, None, None, None),
-						prop='intensity', interpolation_method='cubic'):
+						prop='intensity', interpolation_method='cubic',
+						interpolation_params={}):
 		"""
 		Interpolate intensity grid
 
@@ -479,9 +484,13 @@ class MacroInfoCollection():
 			'residual' or 'num_replies'
 			(default: 'intensity')
 		:param interpolation_method:
-			Str, interpolation method supported by griddata (either
+			str, interpolation method supported by griddata (either
 			"linear", "nearest" or "cubic")
 			(default: "cubic")
+		:param interpolation_params:
+			dict, containing names and values of additional interpolation
+			parameters
+			(default: {})
 
 		:return:
 			instance of :class:`mapping.layeredbasemap.MeshGridData`
@@ -502,7 +511,8 @@ class MacroInfoCollection():
 		unstructured_grid = UnstructuredGridData(self.longitudes, self.latitudes,
 												values, unit=unit)
 		grid = unstructured_grid.to_mesh_grid_data(num_cells, extent=region,
-									interpolation_method=interpolation_method)
+									interpolation_method=interpolation_method,
+									**interpolation_params)
 		return grid
 
 	def interpolate_isoseismals(self, intensity_levels=None,
