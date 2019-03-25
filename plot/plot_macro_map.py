@@ -25,7 +25,7 @@ __all__ = ["plot_macroseismic_map"]
 def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				projection="merc", graticule_interval=(1, 1), plot_info="intensity",
 				int_conversion="round", symbol_style=None, line_style="default",
-				thematic_num_replies=False,
+				thematic_num_replies=False, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
@@ -52,7 +52,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		'num_replies' or 'residual'
 		(default: 'intensity')
 	:param int_conversion:
-		str, "floor", "round" or "ceil"
+		str, "floor", "round" or "ceil", how to convert intensities
+		to integers if :param:`color_gradient` == "discontinuous"
 		(default: "round", corresponding to the convention of Wald et al.)
 	:param symbol_style:
 		instance of :class:`mapping.layeredbasemap.SymbolStyle`,
@@ -68,6 +69,13 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		number of replies (symbol size for points, transparency for
 		polygons if  color gradient` is discontinuous)
 		(default: False)
+	:param interpolate_grid:
+		dict, containing interpolation parameters (resolution or cell size,
+		method, max_dist, and possibly method-dependent parameters)
+		Is only taken into account if:
+		- agg_type of :param:`macro_info_coll` is None
+		- symbol_style is not (None or '') if :param:`macro_info_coll` is None
+		(default: {})
 	:param cmap:
 		str, color map, either "rob" or "usgs" (for intensity)
 		or the name of a matplotlib colormap (for num_replies)
@@ -120,7 +128,6 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		or instance of :class:`LayeredBasemap` if :param:`ax` is not
 		None or if fig_filespec == 'hold'
 	"""
-	# TODO: commune_linestyle, etc.
 	import mapping.layeredbasemap as lbm
 
 	if len(macro_info_coll) == 0:
@@ -153,7 +160,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		plot_communes_as_points = True
 	aggregate_by = macro_info_coll.agg_type
 	if aggregate_by is None:
-		symbol_style = symbol_style or lbm.PointStyle(shape='D', size=5)
+		if not interpolate_grid:
+			symbol_style = symbol_style or lbm.PointStyle(shape='D', size=5)
 	elif aggregate_by == 'grid':
 		symbol_style = None
 
@@ -163,6 +171,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		intensities = getattr(np, int_conversion)(intensities).astype('int')
 		for r, rec in enumerate(macro_info_coll):
 			setattr(rec, 'intensity', intensities[r])
+
+	elif plot_info == 'residual' and aggregate_by is None:
+		print("Residuals are zero if data are not aggregated!")
+		return
 
 	if line_style == "default":
 		line_style = lbm.LineStyle(line_width=0.5, line_color='0.33')
@@ -177,14 +189,14 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		cmap = matplotlib.cm.get_cmap(cmap_name)
 
 	if plot_info == 'intensity':
-		classes = np.arange(1, cmap.N + 1)
+		classes = np.arange(1, min(cmap.N, 12) + 1, dtype='int')
 		enq_type = macro_info_coll.enq_type
 		cb_title = {'internet': "Community Internet Intensity",
 					'online': "Community Internet Intensity",
 					'official': "Macroseismic Intensity"}.get(enq_type,
 													"Macroseismic Intensity")
 	elif plot_info == 'num_replies':
-		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
+		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000], dtype='int')
 		cb_title = "Number of replies"
 
 	elif plot_info == 'residual':
@@ -215,9 +227,12 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 								style_under='w', style_over=cmap(1.),
 								style_bad='w')
 
+	## Color bar / thematic legend
 	if colorbar_style == "default":
 		colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d",
-										title=cb_title, spacing="uniform")
+							title=cb_title, spacing="uniform", extend='both')
+		if plot_info == "num_replies":
+			colorbar_style.extend = 'neither'
 	if isinstance(colorbar_style, lbm.ColorbarStyle):
 		tfc.colorbar_style = colorbar_style
 		tfc.labels = tfc.gen_labels(as_ranges=False)
@@ -230,20 +245,49 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		thematic_legend_style = lbm.LegendStyle(title=cb_title, location=4)
 
 	## Interpolate grid
-	grid_data = macro_info_coll.interpolate_grid(100, region=region,
-												interpolation_method='linear')
-	if cmap_name.lower() in ("usgs", "rob"):
-		norm = lbm.cm.get_norm("macroseismic", cmap_name)
+	if interpolate_grid and (aggregate_by is None or symbol_style):
+		num_cells = interpolate_grid.get('num_cells', 100)
+		interpol_method = interpolate_grid.get('method', 'idw')
+		interpol_params = interpolate_grid.get('params', {})
+		grid_data = macro_info_coll.interpolate_grid(num_cells, region=region,
+											prop=plot_info,
+											interpolation_method=interpol_method,
+											interpolation_params=interpol_params)
+		vmin, vmax = classes[0], classes[-1] + 1
+		#if cmap_name.lower() in ("usgs", "rob"):
+		#	vmax = {'rob': 8, 'usgs': 10}[cmap_name]
+		#else:
+		#	vmax = 13
+
+		if plot_info == 'intensity':
+			if color_gradient == 'continuous':
+				if cmap.N < 256:
+					cmap = matplotlib.colors.LinearSegmentedColormap(cmap.name,
+														cmap._segmentdata, N=256)
+			elif color_gradient[:4] == 'disc':
+				if cmap.N != (vmax - 1):
+					cmap = matplotlib.colors.LinearSegmentedColormap(cmap.name,
+														cmap._segmentdata, N=vmax-1)
+
+		tcm = lbm.ThematicStyleColormap(cmap, vmin=vmin, vmax=vmax, style_under='w',
+										style_bad='w', colorbar_style=None)
+		## Only add colorbar if no other information is plotted
+		if not symbol_style:
+			if color_gradient[:4] == 'disc':
+				colorbar_style.ticks = np.arange(0.5, vmax+1)
+				colorbar_style.tick_labels = range(1, vmax)
+			else:
+				colorbar_style.ticks = range(1, vmax)
+				vmax -= 1
+			tcm.colorbar_style = colorbar_style
+		Imin, Imax = macro_info_coll.Iminmax()
+		contour_levels = np.arange(Imin, Imax + 1)
+		grid_style = lbm.GridStyle(tcm, color_gradient, contour_levels=contour_levels,
+									line_style=line_style)
+		grid_layer = lbm.MapLayer(grid_data, grid_style)
+		layers.append(grid_layer)
 	else:
-		norm = None
-	# TODO: add colorbar_style if no other information is plotted
-	tcm = lbm.ThematicStyleColormap(cmap, norm=norm, colorbar_style=None)
-	Imin, Imax = macro_info_coll.Iminmax()
-	contour_levels = range(Imin, Imax + 1)
-	grid_style = lbm.GridStyle(tcm, color_gradient, contour_levels=contour_levels,
-								line_style=line_style)
-	grid_layer = lbm.MapLayer(grid_data, grid_style)
-	layers.append(grid_layer)
+		interpolate_grid = {}
 
 	if not symbol_style:
 		## Plot polygons
@@ -284,7 +328,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		legend_label = ""
 
 	## Macro layer
-	macro_geom_data = macro_info_coll.get_geometries(plot_communes_as_points)
+	if interpolate_grid and not symbol_style:
+		macro_geom_data = None
+	else:
+		macro_geom_data = macro_info_coll.get_geometries(plot_communes_as_points)
 	if macro_geom_data:
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
