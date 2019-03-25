@@ -155,15 +155,13 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		latmax += (dlat * 0.1)
 		region = (lonmin, lonmax, latmin, latmax)
 
-	plot_communes_as_points = False
+	plot_polygons_as_points = False
 	if symbol_style:
-		plot_communes_as_points = True
+		plot_polygons_as_points = True
 	aggregate_by = macro_info_coll.agg_type
 	if aggregate_by is None:
 		if not interpolate_grid:
 			symbol_style = symbol_style or lbm.PointStyle(shape='D', size=5)
-	elif aggregate_by == 'grid':
-		symbol_style = None
 
 	if plot_info == 'intensity' and color_gradient[:4] == "disc":
 		## Round intensities
@@ -331,7 +329,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if interpolate_grid and not symbol_style:
 		macro_geom_data = None
 	else:
-		macro_geom_data = macro_info_coll.get_geometries(plot_communes_as_points)
+		macro_geom_data = macro_info_coll.get_geometries(plot_polygons_as_points)
 	if macro_geom_data:
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
