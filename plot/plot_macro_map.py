@@ -29,7 +29,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
-				ax=None, copyright=u"© ROB", text_box={}, verbose=True):
+				ax=None, copyright=u"© ROB", text_box={}, dpi="default", verbose=True):
 	"""
 	Plot macroseismic map for given earthquake
 
@@ -123,6 +123,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	:param text_box:
 		dict, containing text box parameters (pos, text and style)
 		(default: {})
+	:param dpi:
+		int, resolution of output image
+		(default: "default" = 90 if :param:`fig_filespec` is None,
+		else 300)
 	:param verbose:
 		bool, whether or not to plot some useful information
 
@@ -423,9 +427,16 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		graticule_style = lbm.GraticuleStyle()
 	else:
 		graticule_style = None
+
+	if dpi == 'default':
+		if fig_filespec:
+			dpi = 300
+		else:
+			dpi = 90
+
 	map = lbm.LayeredBasemap(layers, title, projection, region=region,
 				graticule_interval=graticule_interval, legend_style=legend_style,
-				graticule_style=graticule_style, ax=ax)
+				graticule_style=graticule_style, dpi=dpi, ax=ax)
 
 	## Text box
 	if text_box:
@@ -438,8 +449,4 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 						background_color='w', border_color='k', border_pad=0.5)
 		map.draw_text_box(pos, text, text_style, zorder=1000)
 
-	if fig_filespec:
-		dpi = 300
-	else:
-		dpi = 90
 	return map.plot(fig_filespec=("hold" if ax else fig_filespec), dpi=dpi)
