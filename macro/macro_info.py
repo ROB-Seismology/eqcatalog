@@ -401,7 +401,8 @@ class MacroInfoCollection():
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
 				radii=[], plot_pie=None, title="", fig_filespec=None,
-				ax=None, copyright=u"© ROB", text_box={}, verbose=True):
+				ax=None, copyright=u"© ROB", text_box={}, dpi="default",
+				verbose=True):
 		"""
 		Plot macroseismic map
 
@@ -417,8 +418,9 @@ class MacroInfoCollection():
 				color_gradient=color_gradient, event_style=event_style,
 				admin_level=admin_level, admin_style=admin_style,
 				colorbar_style=colorbar_style, radii=radii, plot_pie=plot_pie,
-				title=title, fig_filespec=fig_filespec,
-				ax=ax, copyright=copyright, text_box=text_box, verbose=verbose)
+				title=title, fig_filespec=fig_filespec, ax=ax,
+				copyright=copyright, text_box=text_box, dpi=dpi,
+				verbose=verbose)
 
 	def export_geotiff(self, out_filespec, region=(2, 7, 49.25, 51.75),
 				projection="merc", plot_info="intensity", int_conversion="round",
