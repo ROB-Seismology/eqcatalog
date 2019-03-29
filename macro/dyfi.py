@@ -20,9 +20,6 @@ except:
 ## Third-party modules
 import numpy as np
 
-## ROB modules
-import mapping.geotools.coordtrans as ct
-
 
 __all__ = ["MacroseismicEnquiryEnsemble", "DYFIEnsemble"]
 
@@ -889,7 +886,7 @@ class MacroseismicEnquiryEnsemble():
 			comm_ensemble_dict[comm_key_val] = ensemble
 		return comm_ensemble_dict
 
-	def aggregate_by_grid(self, grid_spacing=5, srs=ct.LAMBERT1972):
+	def aggregate_by_grid(self, grid_spacing=5, srs='LAMBERT1972'):
 		"""
 		Aggregate enquiries into rectangular grid cells
 
@@ -897,13 +894,17 @@ class MacroseismicEnquiryEnsemble():
 			grid spacing (in km)
 			(default: 5)
 		:param srs:
-			osr spatial reference system
-			(default: ct.LAMBERT1972)
+			osr spatial reference system or str, name of known srs
+			(default: 'LAMBERT1972')
 
 		:return:
 			dict, mapping (center_lon, center_lat) tuples to instances of
 			:class:`MacroseismicEnquiryEnsemble`
 		"""
+		import mapping.geotools.coordtrans as ct
+
+		if isinstance(srs, str):
+			srs = getattr(ct, srs)
 		grid_spacing *= 1000
 		lons = self.longitudes
 		lats = self.latitudes
