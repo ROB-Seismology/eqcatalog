@@ -903,7 +903,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		import mapping.geotools.coordtrans as ct
 
-		if isinstance(srs, str):
+		if isinstance(srs, basestring):
 			srs = getattr(ct, srs)
 		grid_spacing *= 1000
 		lons = self.longitudes
