@@ -28,7 +28,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				thematic_num_replies=False, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				admin_level="province", admin_style="default", colorbar_style="default",
-				radii=[], plot_pie=None, title="", fig_filespec=None,
+				radii=[], plot_pie={}, title="", fig_filespec=None,
 				ax=None, copyright=u"© ROB", text_box={}, dpi="default", verbose=True):
 	"""
 	Plot macroseismic map for given earthquake
@@ -104,9 +104,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		epicenter
 		(default: [])
 	:param plot_pie:
-		str, name of property to plot as pie charts on the map,
-		only applies to internet macroseismic data
-		(default: None)
+		dict, containing parameters to plot pie charts
+		('prop', 'min_replies', 'size_scaling', ...)
+		'prop' (property to plot as pie charts on the map) is required.
+		Only applies to internet macroseismic data
+		(default: {})
 	:param title:
 		str, map title
 		(default: "")
@@ -226,7 +228,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 										#labels=["%s" % val for val in classes],
 										style_under='w', style_over=cmap(1.),
 										style_bad='w')
-	elif color_gradient == "continuous":
+	elif color_gradient[:4] == "cont":
 		tfc = lbm.ThematicStyleGradient(classes, cmap, value_key=plot_info,
 								#labels=["%s" % val for val in classes],
 								style_under='w', style_over=cmap(1.),
@@ -291,6 +293,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 									line_style=line_style)
 		grid_layer = lbm.MapLayer(grid_data, grid_style)
 		layers.append(grid_layer)
+
 	else:
 		interpolate_grid = {}
 
@@ -303,7 +306,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			num_replies = [1, 3, 5, 10, 20, 50, 500]
 			#tfh = lbm.ThematicStyleRanges(num_replies, ['', '.....', '....', '...', '..', ''],
 			#								value_key="num_replies")
-			if color_gradient == "discontinuous":
+			if color_gradient[:4] == "disc":
 				ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
 											value_key="num_replies")
 		polygon_style = lbm.PolygonStyle(line_width=0, fill_color=tfc, fill_hatch=tfh,
@@ -364,21 +367,20 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	## Pie charts
 	# TODO: legend
 	if plot_pie:
-		prop = "asleep"
+		prop = plot_pie['prop']
+		pie_min_replies = plot_pie.get('min_replies', 25)
+		size_scaling = plot_pie.get('size_scaling', 2)
 		lons, lats = [], []
 		ratios = []
 		sizes = []
 		for rec in macro_info_coll:
-			if rec.num_replies >= 25:
-				enq_ensemble = rec.get_enquiries()
+			if rec.num_replies >= pie_min_replies:
+				enq_ensemble = rec.get_web_enquiries()
 				lons.append(rec.lon)
 				lats.append(rec.lat)
-				sizes.append(np.sqrt(rec.num_replies)*2)
-				bins, counts = enq_ensemble.bincount(prop, [0,1,2])
+				sizes.append(np.sqrt(rec.num_replies) * size_scaling)
+				bins, counts = enq_ensemble.bincount(prop)
 				ratios.append(counts)
-				#print rec.id_com, rec.num_replies, bins, counts
-		#print enq_ensemble.CII
-		#print 3.40 * np.log(enq_ensemble.CWS) - 4.38
 
 		pie_data = lbm.PiechartData(lons, lats, ratios, sizes)
 		colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
