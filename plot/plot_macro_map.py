@@ -105,7 +105,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		(default: [])
 	:param plot_pie:
 		dict, containing parameters to plot pie charts
-		('prop', 'min_replies', 'size_scaling', ...)
+		('prop', 'min_replies', 'size_scaling', 'pie_style', ...)
 		'prop' (property to plot as pie charts on the map) is required.
 		Only applies to internet macroseismic data
 		(default: {})
@@ -370,6 +370,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		prop = plot_pie['prop']
 		pie_min_replies = plot_pie.get('min_replies', 25)
 		size_scaling = plot_pie.get('size_scaling', 2)
+		pie_style = plot_pie.get('pie_style')
 		lons, lats = [], []
 		ratios = []
 		sizes = []
@@ -383,8 +384,13 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				ratios.append(counts)
 
 		pie_data = lbm.PiechartData(lons, lats, ratios, sizes)
-		colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
-		pie_style = lbm.PiechartStyle(colors, start_angle=90, alpha=0.75)
+		if not pie_style:
+			colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
+			_, pie_labels = enq_ensemble.get_prop_title_and_labels(prop)
+			thematic_legend_style = lbm.LegendStyle(prop, location=2,
+										label_style=lbm.TextStyle(font_size=10))
+			pie_style = lbm.PiechartStyle(colors, pie_labels, start_angle=90,
+							alpha=0.75, thematic_legend_style=thematic_legend_style)
 		pie_layer = lbm.MapLayer(pie_data, pie_style)
 		layers.append(pie_layer)
 
