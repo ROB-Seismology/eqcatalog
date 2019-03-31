@@ -1751,7 +1751,8 @@ class MacroseismicEnquiryEnsemble():
 		counts, bin_edges = np.histogram(ar, bins=bin_edges)
 		return bin_edges, counts
 
-	def get_prop_title_and_labels(self, prop, lang='EN'):
+	@classmethod
+	def get_prop_title_and_labels(cls, prop, lang='EN'):
 		"""
 		Extract title and labels for given property from PHP enquiry
 		templates for different languages
