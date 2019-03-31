@@ -80,8 +80,8 @@ plot_info = 'intensity'
 
 
 ## Choose symbols/polygons for aggregation by commune or main commune
-symbol_style = lbm.PointStyle(shape='D', size=5)
-#symbol_style = None
+#symbol_style = lbm.PointStyle(shape='D', size=5)
+symbol_style = None
 
 line_style = "default"
 #line_style = None
@@ -109,8 +109,8 @@ thematic_num_replies = True
 ## Extras
 #radii = [10, 25, 50]
 radii = []
-#plot_pie = 'asleep'
-plot_pie = None
+plot_pie = dict(prop='asleep', min_replies=25, size_scaling=3)
+#plot_pie = {}
 
 
 ## Map parameters
@@ -128,8 +128,21 @@ title = ""
 
 ## Copyright / text box
 copyright = ''
-text = "Aggregation by: %s\nAgg. method: %s"
-text %= (aggregate_by, agg_method)
+text = "Aggregation by: %s" % aggregate_by
+if enq_type in ('internet', 'online'):
+	text += "\nAgg. method: %s" % agg_method
+	text += "\nMin. replies / fiability: %d / %d" % (min_replies, min_fiability)
+	text += "\nFilter floors: %s" % str(filter_floors)
+	text += "\nFix records: %s" % fix_records
+	text += "\nOther_felt / heavy appliance: %s / %s" % (include_other_felt,
+														include_heavy_appliance)
+	if agg_method[:4] == "mean":
+		text += "\nRemove outliers: %s" % str(remove_outliers)
+else:
+	text += "\nAgg. function: %s" % agg_function
+	text += "\nI%s" % min_or_max
+	text += "\nMin. fiability: %d" % min_fiability
+
 text_box = {'pos': 'bl', 'text': text}
 
 
@@ -149,8 +162,8 @@ if macro_info:
 				line_style=line_style, thematic_num_replies=thematic_num_replies,
 				interpolate_grid=interpolate_grid, cmap=cmap,
 				color_gradient=color_gradient, admin_level='province',
-				colorbar_style=colorbar_style, radii=radii, title=title,
-				fig_filespec=fig_filespec, copyright=copyright,
+				colorbar_style=colorbar_style, radii=radii, plot_pie=plot_pie,
+				title=title, fig_filespec=fig_filespec, copyright=copyright,
 				text_box=text_box, verbose=True)
 
 	## Export to geojson
