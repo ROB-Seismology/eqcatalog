@@ -46,7 +46,8 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"get_subcommunes"]
 
 
-AGG_FUNC_DICT = {"average": "AVG", "minimum": "MIN", "maximum": "MAX"}
+AGG_FUNC_DICT = {"average": "AVG", "mean": "AVG",
+				"minimum": "MIN", "maximum": "MAX"}
 
 
 def query_seismodb_table_generic(query, verbose=False, print_table=False, errf=None):
@@ -178,7 +179,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	:return:
 		instance of :class:`EQCatalog`
 	"""
-	from .eqrecord import ROBLocalEarthquake
+	from .eqrecord import (ROBLocalEarthquake, DEFAULT_MRELATIONS)
 	from ..eqcatalog import EQCatalog
 	from .. import time_functions_np as tf
 
@@ -353,7 +354,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 	name = "ROB Catalog %s - %s" % (start_date, end_date)
 	start_date, end_date = np.datetime64(start_date), np.datetime64(end_date)
-	return EQCatalog(eq_list, start_date, end_date, region=region, name=name)
+	return EQCatalog(eq_list, start_date, end_date, region=region, name=name,
+					default_Mrelations=DEFAULT_MRELATIONS)
 
 
 def query_local_eq_catalog_by_id(id_earth, verbose=False, errf=None):
@@ -507,7 +509,7 @@ def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 
 
 def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
-					group_by_main_village=False, agg_function="average",
+					group_by_main_village=False, agg_method="average",
 					min_fiability=20, verbose=False, errf=None):
 	"""
 	Query ROB "official" macroseismic catalog (= commune inquiries)
@@ -524,7 +526,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 	:param group_by_main_village:
 		bool, whether or not to aggregate the results by main village
 		(default: False)
-	:param agg_function:
+	:param agg_method:
 		str, aggregation function to use if :param:`group_by_main_village`
 		is True, one of "minimum", "maximum" or "average"
 		(default: "average")
@@ -584,7 +586,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 		Imax_clause = 'IF (intensity_max < 13, intensity_max, NULL)'
 
 		if group_by_main_village:
-			agg_function = AGG_FUNC_DICT.get(agg_function.lower(), "MAX")
+			agg_function = AGG_FUNC_DICT.get(agg_method.lower())
 			if min_or_max == 'min':
 				intensity_col = '%s(%s) AS "Intensity"'
 				intensity_col %= (agg_function, Imin_clause)
@@ -598,6 +600,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 			group_clause = 'communes.id_main'
 			column_clause.append('GROUP_CONCAT(id_macro_detail SEPARATOR ",") AS id_db')
 		else:
+			agg_method = None
 			if min_or_max == 'min':
 				intensity_col = '%s AS "Intensity"' % Imin_clause
 			elif min_or_max == 'max':
@@ -645,14 +648,17 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 									lon=lon, lat=lat, db_ids=db_ids)
 		macro_infos.append(macro_info)
 
-	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'official')
+	proc_info = dict(agg_method=agg_method, min_fiability=min_fiability,
+					min_or_max=min_or_max)
+	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'official',
+										proc_info=proc_info)
 
 	return macro_info_coll
 
 
 def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 					min_val=1, min_fiability=20.0, group_by_main_village=False,
-					filter_floors=False, agg_function="average", verbose=False,
+					filter_floors=False, agg_method="mean", verbose=False,
 					errf=None):
 	"""
 	Query ROB web macroseismic catalog (= online inquiries)
@@ -678,11 +684,11 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 		(min_floor, max_floor) tuple, floors outside this range
 		(basement floors and upper floors) are filtered out
 		(default: False)
-	:param agg_function:
+	:param agg_method:
 		str, aggregation function to use, one of "minimum", "maximum" or
-		"average". If :param:`group_by_main_village` is False, aggregation
-		applies to the enquiries within a given (sub)commune.
-		(default: "average")
+		"average"/"mean". If :param:`group_by_main_village` is False,
+		aggregation applies to the enquiries within a given (sub)commune
+		(default: "mean")
 	:param verbose:
 		Bool, if True the query string will be echoed to standard output
 	:param errf:
@@ -717,7 +723,9 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 
 	group_clause = "id_comm"
 
-	agg_function = AGG_FUNC_DICT.get(agg_function.lower(), "AVG")
+	if agg_method.lower() == "average":
+		agg_method = "mean"
+	agg_function = AGG_FUNC_DICT.get(agg_method.lower(), "AVG")
 	column_clause.append('%s(web_analyse.%s) as "Intensity"'
 						% (agg_function, query_info.upper()))
 
@@ -755,7 +763,11 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 									lon=lon, lat=lat, db_ids=web_ids)
 		macro_infos.append(macro_info)
 
-	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'internet')
+	proc_info = dict(min_replies=min_replies, min_fiability=min_fiability,
+					agg_method=agg_method, filter_floors=filter_floors)
+
+	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'internet',
+										proc_info=proc_info)
 
 	return macro_info_coll
 
