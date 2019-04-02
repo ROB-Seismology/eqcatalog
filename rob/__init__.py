@@ -61,7 +61,7 @@ if not reloading:
 	from . import eqrecord
 else:
 	reload(eqrecord)
-from .eqrecord import ROBLocalEarthquake
+from .eqrecord import *
 
 ## seismodb (depends on ..eqrecord, ..macrorecord, ..eqcatalog)
 if not reloading:
