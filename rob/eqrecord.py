@@ -4,7 +4,19 @@ ROB-specific extensions of eqrecord classes
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from collections import OrderedDict
+
 from ..eqrecord import LocalEarthquake
+
+
+__all__ = ["DEFAULT_MRELATIONS", "ROBLocalEarthquake"]
+
+
+DEFAULT_MRELATIONS = {
+	'ML': {},
+	'MS': {"ML": "Ambraseys1985"},
+	'MW': OrderedDict([("MS", "Geller1976"), ("ML", "Ahorner1983")])
+}
 
 
 class ROBLocalEarthquake(LocalEarthquake):
@@ -26,7 +38,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 
 	def get_macroseismic_data_aggregated_web(self, min_replies=3, query_info="cii",
 					min_val=1, min_fiability=20.0, group_by_main_village=False,
-					filter_floors=False, agg_function="", verbose=False):
+					filter_floors=False, agg_method="mean", verbose=False):
 		"""
 		Get online macroseismic information (possibly aggregated by
 		main commune) for this earthquake
@@ -50,11 +62,11 @@ class ROBLocalEarthquake(LocalEarthquake):
 				(min_floor, max_floor) tuple, floors outside this range
 				(basement floors and upper floors) are filtered out
 				(default: False)
-		:param agg_function:
+		:param agg_method:
 			str, aggregation function to use, one of "minimum", "maximum" or
-			"average". If :param:`group_by_main_village` is False, aggregation
-			applies to the enquiries within a given (sub)commune.
-			(default: "average")
+			"average"/"mean". If :param:`group_by_main_village` is False,
+			aggregation applies to the enquiries within a given (sub)commune.
+			(default: "mean")
 		:param verbose:
 			Bool, if True the query string will be echoed to standard output
 
@@ -65,10 +77,10 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return query_web_macro_catalog(self.ID, min_replies=min_replies,
 					query_info=query_info, min_val=min_val, min_fiability=min_fiability,
 					group_by_main_village=group_by_main_village, filter_floors=filter_floors,
-					agg_function=agg_function, verbose=verbose)
+					agg_method=agg_method, verbose=verbose)
 
 	def get_macroseismic_data_aggregated_official(self, min_or_max='max', min_val=1,
-			group_by_main_village=False, agg_function="maximum", min_fiability=20,
+			group_by_main_village=False, agg_method="mean", min_fiability=20,
 			verbose=False):
 		"""
 		Get official macroseismic information (possibly aggregated by
@@ -84,10 +96,10 @@ class ROBLocalEarthquake(LocalEarthquake):
 		:param group_by_main_village:
 			bool, whether or not to aggregate the results by main village
 			(default: False)
-		:param agg_function:
+		:param agg_method:
 			str, aggregation function to use if :param:`group_by_main_village`
-			is True, one of "minimum", "maximum" or "average"
-			(default: "maximum")
+			is True, one of "minimum", "maximum" or "average"/"mean"
+			(default: "average")
 		:param min_fiability:
 			float, minimum fiability of enquiry
 			(default: 20.)
@@ -99,7 +111,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		"""
 		from .seismodb import query_official_macro_catalog
 		return query_official_macro_catalog(self.ID, min_or_max=min_or_max, min_val=min_val,
-			group_by_main_village=group_by_main_village, agg_function=agg_function,
+			group_by_main_village=group_by_main_village, agg_method=agg_method,
 			min_fiability=min_fiability, verbose=verbose)
 
 	def get_macroseismic_enquiries(self, min_fiability=20, min_location_quality=6,
