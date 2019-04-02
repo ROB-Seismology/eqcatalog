@@ -587,7 +587,7 @@ class MacroInfoCollection():
 				cws_calculation = ('of=%s /ha=%s'
 					% (include_other_felt, include_heavy_appliance))
 			text += '\nCWS calculation: %s' % cws_calculation
-			if self.agg_method[:4] == "mean":
+			if self.proc_info['agg_method'][:4] == "mean":
 				text += ("\nRemove outliers: %s"
 					% str(self.proc_info['remove_outliers']))
 		else:
