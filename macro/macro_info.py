@@ -138,13 +138,17 @@ class MacroInfoCollection():
 		str, type of enquirey, one of:
 		- 'internet' or 'online'
 		- 'official'
+	:proc_info:
+		dict, containing processing parameters
+		(default: {})
 	"""
-	def __init__(self, macro_infos, agg_type, enq_type):
+	def __init__(self, macro_infos, agg_type, enq_type, proc_info={}):
 		self.macro_infos = macro_infos
 		self.agg_type = agg_type
 		if not enq_type:
 			enq_type = macro_infos[0].enq_type
 		self.enq_type = enq_type
+		self.proc_info = proc_info
 
 	def __len__(self):
 		return len(self.macro_infos)
@@ -554,6 +558,40 @@ class MacroInfoCollection():
 			isoseismals = grid.extract_contour_intervals(intensity_levels)
 		return isoseismals
 
+	def get_proc_info_text(self):
+		"""
+		Construct text summarizing processing parameters
+
+		:return:
+			str
+		"""
+		text = "Aggregation by: %s" % self.agg_type
+		text += "\nAgg. method: %s" % self.proc_info['agg_method']
+
+		if self.enq_type in ('internet', 'online'):
+			text += ("\nMin. replies / fiability: %d / %d"
+				% (self.proc_info['min_replies'], self.proc_info['min_fiability']))
+			text += "\nFilter floors: %s" % str(self.proc_info['filter_floors'])
+			text += "\nFix records: %s" % self.proc_info['fix_records']
+			include_other_felt = self.proc_info['include_other_felt']
+			include_heavy_appliance = self.proc_info['include_heavy_appliance']
+			if include_other_felt and not include_heavy_appliance:
+				cws_calculation = 'DYFI'
+			elif include_heavy_appliance and not include_other_felt:
+				cws_calculation = 'ROB'
+			else:
+				cws_calculation = ('of=%s /ha=%s'
+					% (include_other_felt, include_heavy_appliance))
+			text += 'CWS calculation: %s' % cws_calculation
+			if self.agg_type[:4] == "mean":
+				text += ("\nRemove outliers: %s"
+					% str(self.proc_info['remove_outliers']))
+		else:
+			text += "\nMin. fiability: %d" % self.proc_info['min_fiability']
+			text += "\nImin_or_max%s" % self.proc_info['min_or_max']
+
+		return text
+
 
 def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
 				min_fiability=20, filter_floors=(0, 4), aggregate_by="commune",
@@ -640,7 +678,7 @@ def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
 
 
 def get_aggregated_info_official(id_earth, min_fiability=20, min_or_max='max',
-				aggregate_by="commune", agg_function="average", min_val=1):
+				aggregate_by="commune", agg_method="average", min_val=1):
 	"""
 	Obtain aggregated official macroseismic information for given earthquake
 
@@ -659,9 +697,9 @@ def get_aggregated_info_official(id_earth, min_fiability=20, min_or_max='max',
 		- 'id_com' or 'commune'
 		- 'id_main' or 'main commune'
 		(default: 'commune')
-	:param agg_function:
+	:param agg_method:
 		str, aggregation function to use if :param:`aggregate_by`
-		is 'main commune', one of "minimum", "maximum" or "average"
+		is 'main commune', one of "minimum", "maximum" or "average"/"mean"
 		(default: "average")
 	:param min_val:
 		float, minimum intensity to return
@@ -682,7 +720,7 @@ def get_aggregated_info_official(id_earth, min_fiability=20, min_or_max='max',
 
 	macro_info_coll = eq.get_macroseismic_data_aggregated_official(min_or_max=min_or_max,
 			min_val=min_val, group_by_main_village=group_by_main_village,
-			agg_function=agg_function, min_fiability=min_fiability)
+			agg_method=agg_method, min_fiability=min_fiability)
 
 	## Remove records without location
 	for i in range(len(macro_info_coll)-1, -1, -1):
