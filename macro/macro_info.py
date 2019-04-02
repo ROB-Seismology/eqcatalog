@@ -183,6 +183,10 @@ class MacroInfoCollection():
 		else:
 			return sorted(id_earths)
 
+	@property
+	def num_replies(self):
+		return np.sum([rec.num_replies for rec in self])
+
 	def Iminmax(self):
 		intensities = self.intensities
 		return (np.nanmin(intensities), np.nanmax(intensities))
@@ -582,7 +586,7 @@ class MacroInfoCollection():
 			else:
 				cws_calculation = ('of=%s /ha=%s'
 					% (include_other_felt, include_heavy_appliance))
-			text += 'CWS calculation: %s' % cws_calculation
+			text += '\nCWS calculation: %s' % cws_calculation
 			if self.agg_type[:4] == "mean":
 				text += ("\nRemove outliers: %s"
 					% str(self.proc_info['remove_outliers']))
