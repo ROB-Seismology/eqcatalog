@@ -128,21 +128,7 @@ title = ""
 
 ## Copyright / text box
 copyright = ''
-text = "Aggregation by: %s" % aggregate_by
-if enq_type in ('internet', 'online'):
-	text += "\nAgg. method: %s" % agg_method
-	text += "\nMin. replies / fiability: %d / %d" % (min_replies, min_fiability)
-	text += "\nFilter floors: %s" % str(filter_floors)
-	text += "\nFix records: %s" % fix_records
-	text += "\nOther_felt / heavy appliance: %s / %s" % (include_other_felt,
-														include_heavy_appliance)
-	if agg_method[:4] == "mean":
-		text += "\nRemove outliers: %s" % str(remove_outliers)
-else:
-	text += "\nAgg. function: %s" % agg_function
-	text += "\nI%s" % min_or_max
-	text += "\nMin. fiability: %d" % min_fiability
-
+text = macro_info.get_proc_info_text()
 text_box = {'pos': 'bl', 'text': text}
 
 
