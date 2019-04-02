@@ -792,8 +792,8 @@ class MacroseismicEnquiryEnsemble():
 		:param comm_key:
 			see :meth:`get_communes_from_db`
 		:param keep_unmatched:
-			bool, whether or not to keep unmatched records untouched
-			(default: True)
+			bool, keep unmatched records untouched (True) or set to nan
+			(False)
 		:param max_quality:
 			int, maximum location quality, only overwrite location
 			if location quality is <= max_quality
@@ -821,17 +821,13 @@ class MacroseismicEnquiryEnsemble():
 				elif not keep_unmatched:
 					rec['longitude'] = rec['latitude'] = rec['location_quality'] = np.nan
 
-	def set_locations_from_geolocation(self, keep_unmatched=True):
+	def read_locations_from_db(self):
 		"""
-		Set location of all records from geolocation in database
-
-		:param keep_unmatched:
-			bool, whether or not to keep unmatched records untouched
-			(default: True)
+		Read locations for each record from the database
 
 		:return:
-			None, 'longitude' and 'latitude' values of :prop:`recs`
-			are created or modified in place
+			dict, mapping id_web to database records (with 'longitude',
+			'latitude' and 'quality' keys)
 		"""
 		from ..rob.seismodb import query_seismodb_table
 
@@ -843,6 +839,22 @@ class MacroseismicEnquiryEnsemble():
 		db_recs = query_seismodb_table(table_clause, column_clause,
 										where_clause=where_clause)
 		db_rec_dict = {rec['id_web']: rec for rec in db_recs}
+		return db_rec_dict
+
+	def set_locations_from_geolocation(self, keep_unmatched=True):
+		"""
+		Set location of all records from geolocation in database
+
+		:param keep_unmatched:
+			bool, keep unmatched records untouched (True) or set to nan
+			(False)
+			(default: True)
+
+		:return:
+			None, 'longitude' and 'latitude' values of :prop:`recs`
+			are created or modified in place
+		"""
+		db_rec_dict = self.read_locations_from_db()
 		for rec in self.recs:
 			db_rec = db_rec_dict.get('id_web')
 			if db_rec:
@@ -851,6 +863,52 @@ class MacroseismicEnquiryEnsemble():
 				rec['location_quality'] = db_rec['quality']
 			elif not keep_unmatched:
 				rec['longitude'] = rec['latitude'] = rec['location_quality'] = np.nan
+
+	def write_locations_to_db(self, user, passwd, min_quality=5, overwrite=False,
+							dry_run=False):
+		"""
+		Write locations to database
+
+		:param user:
+			str, name of user with write permission
+		:param passwd:
+			str, password for given user
+		:param min_quality:
+			int, minimum location quality to write to database
+			(default: 5)
+		:param overwrite:
+			bool, whether or not existing locations should be overwritten
+			(default: False)
+		:param dry_run:
+			bool, whether to actually write locations to database (False)
+			or just report how many records would be added/modified (True)
+			(default: False)
+		"""
+		import db.simpledb as simpledb
+		from seismodb_secrets import host, database
+		#from ..rob.seismodb import query_seismodb_table
+
+		db_rec_dict = self.read_locations_from_db()
+		recs_to_add, recs_to_modify = [], []
+		for rec in self.recs:
+			if rec.location_quality >= min_quality:
+				if rec['id_web'] in db_rec_dict:
+					if overwrite:
+						recs_to_modify.append(rec)
+				else:
+					recs_to_add.append(rec)
+
+		## Write to database
+		seismodb = simpledb.MySQLDB(database, host, user, passwd)
+		table_name = 'web_location'
+		if len(recs_to_add):
+			print("Adding %d new records" % len(recs_to_add))
+			if not dry_run:
+				seismodb.add_records(table_name, recs_to_add)
+		if len(recs_to_modify):
+			print("Updating %d existing records" % len(recs_to_modify))
+			if not dry_run:
+				seismodb.update_rows(table_name, recs_to_modify, 'id_web')
 
 	def get_bad_zip_country_tuples(self):
 		zip_country_tuples = set(self.get_unique_zip_country_tuples())
@@ -1022,6 +1080,10 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		from .macro_info import MacroseismicInfo, MacroInfoCollection
 
+		if agg_method[:3] in ('min', 'max'):
+			print("Warning: aggregation method %s not supported!" % agg_method)
+			return
+
 		ensemble = self
 		if fix_records:
 			ensemble.fix_all()
@@ -1122,7 +1184,14 @@ class MacroseismicEnquiryEnsemble():
 									residual=residual, db_ids=web_ids)
 			macro_infos.append(macro_info)
 
-		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet')
+		proc_info = dict(min_replies=min_replies, min_fiability=min_fiability,
+						filter_floors=filter_floors, agg_method=agg_method,
+						fix_records=fix_records, include_other_felt=include_other_felt,
+						include_heavy_appliance=include_heavy_appliance,
+						remove_outliers=remove_outliers)
+
+		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet',
+											proc_info=proc_info)
 
 		return macro_info_coll
 
