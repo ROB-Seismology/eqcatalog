@@ -35,13 +35,6 @@ __all__ = ["LocalEarthquake", "FocMecRecord"]
 # TODO: allow nan values instead of zeros
 
 
-default_Mrelations = {
-	'ML': {},
-	'MS': {"ML": "Ambraseys1985"},
-	'MW': OrderedDict([("MS", "Geller1976"), ("ML", "Ahorner1983")])
-}
-
-
 class LocalEarthquake:
 	"""
 	Class representing a local earthquake retrieved from the
@@ -83,7 +76,8 @@ class LocalEarthquake:
 		Int, maximum intensity
 		(default: None)
 	:param macro_radius:
-		Float, macroseismic radius (default: None)
+		Float, macroseismic radius
+		(default: None)
 	:param errh:
 		Float, uncertainty on epicentral location, in km
 		(default: 0)
@@ -503,7 +497,7 @@ class LocalEarthquake:
 
 		return LocalEarthquake(ID, date, time, lon, lat, depth, ML, MS, MW)
 
-	def to_HY4(self, Mtype='ML', Mrelation=None):
+	def to_HY4(self, Mtype='ML', Mrelation={}):
 		"""
 		Convert to HYPDAT structure used by SeismicEruption HY4 catalog format
 
@@ -511,8 +505,8 @@ class LocalEarthquake:
 			String, magnitude type: "MW", "MS" or "ML" (default: "ML")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
+			to magnitude type ("MW", "MS" or "ML")
+			(default: {})
 
 		:return:
 			instance of :class:`HYPDAT`
@@ -531,7 +525,7 @@ class LocalEarthquake:
 		return HYPDAT(latitude, longitude, year, month, day, minutes, tseconds,
 						depth, magnitude, 0, 0, 0)
 
-	def to_hypo71(self, Mtype='MW', Mrelation="default"):
+	def to_hypo71(self, Mtype='MW', Mrelation={}):
 		"""
 		Convert earthquake record to HYPO71-2000 format.
 
@@ -724,8 +718,8 @@ class LocalEarthquake:
 		if self.has_mag(Mtype):
 			return self.mag[Mtype]
 		else:
-			if Mrelation in (None, "default"):
-				Mrelation = default_Mrelations.get(Mtype, {})
+			#if Mrelation in (None, "default"):
+			#	Mrelation = default_Mrelations.get(Mtype, {})
 			return self.convert_mag(Mrelation)
 
 	def convert_mag(self, Mrelation):
@@ -750,17 +744,16 @@ class LocalEarthquake:
 		## If Mrelation is empty or none of the Mtype's match
 		return np.nan
 
-	def get_ML(self, Mrelation="default"):
+	def get_ML(self, Mrelation={}):
 		"""
 		Return ML
-		Not yet implemented!
 		"""
-		if Mrelation in (None, "default"):
-			Mrelation = default_Mrelations['ML']
+		#if Mrelation in (None, "default"):
+		#	Mrelation = default_Mrelations['ML']
 
 		return self.get_or_convert_mag('ML', Mrelation)
 
-	def get_MS(self, Mrelation="default"):
+	def get_MS(self, Mrelation={}):
 		"""
 		Return MS.
 		If MS is None or zero, calculate it using the specified
@@ -774,18 +767,18 @@ class LocalEarthquake:
 				- "Ambraseys1985"
 			- MW -> MS:
 				None
-			(default: {"ML": "Ambraseys1985"})
+			(default: {})
 
 		:return:
 			Float, surface-wave magnitude
 		"""
 		## Set default conversion relation
-		if Mrelation in (None, "default"):
-			Mrelation = default_Mrelations['MS']
+		#if Mrelation in (None, "default"):
+		#	Mrelation = default_Mrelations['MS']
 
 		return self.get_or_convert_mag('MS', Mrelation)
 
-	def get_MW(self, Mrelation="default"):
+	def get_MW(self, Mrelation={}):
 		"""
 		Return MW.
 		If MW is None or zero, calculate it using the specified
@@ -812,35 +805,35 @@ class LocalEarthquake:
 				- "ReamerHinzen2004L"
 				- "ReamerHinzen2004Q"
 
-			(default: {"MS": "Geller1976", "ML": "Ahorner1983"})
-			Note that MS -> MW relations take precedence over ML -> MW relations
+			Note that an ordered dictionary should be used if conversion
+			from a particular Mtype is preferred over another Mtype
 
 		:return:
 			Float, moment magnitude
 		"""
 		## Set default conversion relation
-		if Mrelation in (None, "default"):
-			Mrelation = default_Mrelations['MW']
+		#if Mrelation in (None, "default"):
+		#	Mrelation = default_Mrelations['MW']
 
 		return self.get_or_convert_mag('MW', Mrelation)
 
-	def get_M(self, Mtype, Mrelation="default"):
+	def get_M(self, Mtype, Mrelation={}):
 		"""
 		Wrapper for get_ML, get_MS, and get_MW functions
 
 		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MS")
+			String, magnitude type: "MW", "MS" or "ML"
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML") (default: None, will
-			select the default relation for the given Mtype)
+			to magnitude type ("MW", "MS" or "ML")
+			(default: {})
 
 		:return:
 			Float, magnitude
 		"""
 		return getattr(self, "get_"+Mtype)(Mrelation=Mrelation)
 
-	def get_M0(self, Mrelation="default"):
+	def get_M0(self, Mrelation={}):
 		"""
 		Compute seismic moment.
 		If MW is None or zero, it will be computed using the specified
