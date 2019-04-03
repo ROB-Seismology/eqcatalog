@@ -16,8 +16,10 @@ EARTHQUAKE_TYPES['NL'] = {
 	"uk": "Onbepaald",
 	"ke": "Aardbeving",
 	"se": "Vermoedelijke aardbeving",
-	"kr": "Instorting van gesteentemassa",
-	"sr": "Vermoedelijke instorting van gesteentemassa",
+	#"kr": "Instorting van gesteentemassa",
+	#"sr": "Vermoedelijke instorting van gesteentemassa",
+	"kr": "Autoklaas",
+	"sr": "Vermoedelijke autoklaas",
 	"ki": "Geïnduceerde gebeurtenis",
 	"si": "Vermoedelijke geïnduceerde gebeurtenis",
 	"km": "Mijnexplosie",
@@ -31,8 +33,8 @@ EARTHQUAKE_TYPES['NL'] = {
 	"sb": "Supersone knal",
 	"cb": "Gecontroleerde explosie",
 	"qb": "Explosie in groeve",
-	'scb': 'Vermoedelijke gecontroleerde explosie',
-	'sqb': 'Vermoedelijke explosie in groeve'}
+	'scb': "Vermoedelijke gecontroleerde explosie",
+	'sqb': "Vermoedelijke explosie in groeve"}
 
 EARTHQUAKE_TYPES['FR'] = {
 	"uk": "Inconnu",
@@ -53,8 +55,8 @@ EARTHQUAKE_TYPES['FR'] = {
 	"sb": "Bang supersonique",
 	"cb": "Explosion contrôlée",
 	"qb": "Tir de carrière",
-	'scb': 'Explosion contrôlée présumé',
-	'sqb': 'Tir de carrière présumé'}
+	'scb': "Explosion contrôlée présumé",
+	'sqb': "Tir de carrière présumé"}
 
 EARTHQUAKE_TYPES['EN'] = {
     "uk": "Unknown",
@@ -72,18 +74,18 @@ EARTHQUAKE_TYPES['EN'] = {
     "sn": "Suspected nuclear explosion",
     "ls": "Landslide",
     "ex": "Exercise",
-    'sb': 'Sonic Boom',
-    'cb': 'Controlled explosion',
-    'qb': 'Quarry blast',
-    'scb': 'Suspected controlled explosion',
-    'sqb': 'Suspected quarry blast'}
+    'sb': "Sonic Boom",
+    'cb': "Controlled explosion",
+    'qb': "Quarry blast",
+    'scb': "Suspected controlled explosion",
+    'sqb': "Suspected quarry blast"}
 
 EARTHQUAKE_TYPES['DE'] = {
     "uk": "Unbekannt",
     "ke": "Erdbeben",
     "se": "Vermutliches Erdbeben",
-    "kr": "Einbruch des Bodens",
-    "sr": "Vermutlicher Einbruch des Bodens",
+    "kr": "Gebirgsschlag",
+    "sr": "Vermutlicher Gebirgsschlag",
     "ki": "Induziertes Ereignis",
     "si": "Vermutliches induziertes Ereignis",
     "km": "Bergbauexplosion",
@@ -114,3 +116,20 @@ def get_earthquake_type(code, lang='EN'):
 		str
 	"""
 	return EARTHQUAKE_TYPES[lang.upper()].get(code, '')
+
+
+
+if __name__ == "__main__":
+	## Write translated earthquake type names to database
+	import db.simpledb as simpledb
+	from seismodb_secrets import (host, database, user_rw, passwd_rw)
+
+	seismodb = simpledb.MySQLDB(database, host, user_rw, passwd_rw)
+	table_name = 'earthquake_types'
+	id_col_name = 'code'
+
+	for lang in ['NL', 'FR', 'DE'][:1]:
+		col_name = 'name_%s' % lang.lower()
+		eq_type_dict = EARTHQUAKE_TYPES[lang]
+		codes, col_values = eq_type_dict.keys(), eq_type_dict.values()
+		seismodb.update_column(table_name, col_name, col_values, id_col_name, codes)
