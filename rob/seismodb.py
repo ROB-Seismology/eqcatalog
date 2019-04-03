@@ -512,7 +512,10 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 					group_by_main_village=False, agg_method="average",
 					min_fiability=20, verbose=False, errf=None):
 	"""
-	Query ROB "official" macroseismic catalog (= commune inquiries)
+	Query ROB "official" macroseismic catalog
+	This includes both "official" commune inquiries and historical
+	data. So far, there is only 1 record per commune for each
+	earthquake, but this may not be guaranteed in the future...
 
 	:param id_earth:
 		int, earthquake ID
