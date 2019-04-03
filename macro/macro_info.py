@@ -416,19 +416,11 @@ class MacroInfoCollection():
 
 		see :func:`eqcatalog.plot.plot_macro_map.plot_macroseismic_map`
 		"""
+		kwargs = locals().copy()
+		kwargs.pop('self')
 		from ..plot.plot_macro_map import plot_macroseismic_map
 
-		return plot_macroseismic_map(self, region=region, projection=projection,
-				graticule_interval=graticule_interval, plot_info=plot_info,
-				int_conversion=int_conversion, symbol_style=symbol_style,
-				line_style=line_style, thematic_num_replies=thematic_num_replies,
-				interpolate_grid=interpolate_grid, cmap=cmap,
-				color_gradient=color_gradient, event_style=event_style,
-				admin_level=admin_level, admin_style=admin_style,
-				colorbar_style=colorbar_style, radii=radii, plot_pie=plot_pie,
-				title=title, fig_filespec=fig_filespec, ax=ax,
-				copyright=copyright, text_box=text_box, dpi=dpi,
-				verbose=verbose)
+		return plot_macroseismic_map(self, **kwargs)
 
 	def export_geotiff(self, out_filespec, region=(2, 7, 49.25, 51.75),
 				projection="merc", plot_info="intensity", int_conversion="round",
