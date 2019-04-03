@@ -184,7 +184,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		return
 
 	if line_style == "default":
-		line_style = lbm.LineStyle(line_width=0.5, line_color='0.33')
+		line_style = lbm.LineStyle(line_width=0.3, line_color='0.33')
 
 	layers = []
 
@@ -243,13 +243,13 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if isinstance(colorbar_style, lbm.ColorbarStyle):
 		tfc.colorbar_style = colorbar_style
 		tfc.labels = tfc.gen_labels(as_ranges=False)
+		thematic_legend_style = None
+	elif colorbar_style is None:
+		thematic_legend_style = lbm.LegendStyle(title=cb_title, location=4)
 	elif isinstance(colorbar_style, lbm.LegendStyle):
 		thematic_legend_style = colorbar_style
 		tfc.labels = tfc.gen_labels(as_ranges=True)
-	if colorbar_style is None:
-		thematic_legend_style = None
-	else:
-		thematic_legend_style = lbm.LegendStyle(title=cb_title, location=4)
+		colorbar_style = None
 
 	## Interpolate grid
 	if interpolate_grid and (aggregate_by is None or symbol_style):
@@ -383,16 +383,17 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				bins, counts = enq_ensemble.bincount(prop)
 				ratios.append(counts)
 
-		pie_data = lbm.PiechartData(lons, lats, ratios, sizes)
-		if not pie_style:
-			colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
-			_, pie_labels = enq_ensemble.get_prop_title_and_labels(prop)
-			thematic_legend_style = lbm.LegendStyle(prop, location=2,
-										label_style=lbm.TextStyle(font_size=10))
-			pie_style = lbm.PiechartStyle(colors, pie_labels, start_angle=90,
-							alpha=0.75, thematic_legend_style=thematic_legend_style)
-		pie_layer = lbm.MapLayer(pie_data, pie_style)
-		layers.append(pie_layer)
+		if len(ratios):
+			pie_data = lbm.PiechartData(lons, lats, ratios, sizes)
+			if not pie_style:
+				colors = ['#ff9999','#66b3ff','#99ff99','#ffcc99']
+				_, pie_labels = enq_ensemble.get_prop_title_and_labels(prop)
+				thematic_legend_style = lbm.LegendStyle(prop, location=2,
+											label_style=lbm.TextStyle(font_size=10))
+				pie_style = lbm.PiechartStyle(colors, pie_labels, start_angle=90,
+								alpha=0.75, thematic_legend_style=thematic_legend_style)
+			pie_layer = lbm.MapLayer(pie_data, pie_style)
+			layers.append(pie_layer)
 
 	## Plot event
 	if event_style == "default":
