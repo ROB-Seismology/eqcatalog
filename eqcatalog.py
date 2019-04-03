@@ -430,7 +430,7 @@ class EQCatalog:
 		rows.append(["Depth range", "%.1f / %.1f km" % (depth_min, depth_max)])
 
 		for Mtype, count in self.get_Mtype_counts().items():
-			mags = self.get_magnitudes(Mtype=Mtype, ation={})
+			mags = self.get_magnitudes(Mtype=Mtype, Mrelation={})
 			mags = mags[np.isfinite(mags)]
 			if len(mags):
 				if mags.min() == 0:
