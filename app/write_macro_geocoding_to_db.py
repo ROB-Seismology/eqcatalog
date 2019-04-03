@@ -6,7 +6,7 @@ import os
 import csv
 
 import db.simpledb as simpledb
-from seismodb_secrets import (host, database, user, passwd)
+from seismodb_secrets import (host, database, user_rw, passwd_rw)
 
 from eqcatalog.rob.seismodb import query_seismodb_table
 
@@ -103,9 +103,7 @@ with open(csv_file) as csvf:
 
 
 ## Write to database
-user = 'kris'
-passwd = '***REMOVED***'
-seismodb = simpledb.MySQLDB(database, host, user, passwd)
+seismodb = simpledb.MySQLDB(database, host, user_rw, passwd_rw)
 table_name = 'web_location'
 if len(recs_to_add):
 	print("Adding %d new records" % len(recs_to_add))
