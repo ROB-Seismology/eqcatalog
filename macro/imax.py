@@ -194,8 +194,8 @@ def get_imax_by_commune(enq_type='all',
 		bool, whether or not to aggregate communes by main commune
 		(default: False)
 	:param agg_subcommunes:
-		str, name of numpy function for aggregation of subcommunes if
-		:param:`by_main_commune` is True.
+		str, name of numpy function for aggregation of historical
+		data into subcommunes if :param:`by_main_commune` is True
 		One of 'mean', 'minimum', 'maximum'
 		(default: 'mean')
 	:param verbose:
@@ -226,7 +226,7 @@ def get_imax_by_commune(enq_type='all',
 		Imax_web = 0
 		num_replies_web = 0
 		eq_ids_web = []
-		if enq_type in ('all', 'internet', 'online'):
+		if enq_type in ('all', 'internet', 'online', 'dyfi'):
 			eq_intensities = get_eq_intensities_for_commune_web(id_com,
 				as_main_commune=by_main_commune, min_replies=min_replies,
 				min_fiability=min_fiability, filter_floors=filter_floors,
@@ -274,6 +274,21 @@ def get_imax_by_commune(enq_type='all',
 						Imax_official, len(eq_ids_official))
 				print(msg)
 
-		macro_info_coll = MacroInfoCollection(macro_infos, agg_type, enq_type)
+		proc_info = dict(min_fiability=min_fiability)
+		if enq_type in ('all', 'internet', 'online', 'dyfi'):
+			proc_info['agg_method'] = agg_method_web
+			proc_info['min_replies'] = min_replies
+			proc_info['filter_floors'] = filter_floors
+			proc_info['fix_records'] = fix_records
+			proc_info['include_other_felt'] = include_other_felt
+			proc_info['include_heavy_appliance'] = include_heavy_appliance
+			proc_info['remove_outliers'] = remove_outliers
+		if enq_type in ('all', 'official'):
+			## Note that agg_method of DYFI data will be overwritten,
+			## but historical data are more important for this type of map
+			proc_info['agg_method'] = agg_func
+			proc_info['min_or_max'] = min_or_max
+		macro_info_coll = MacroInfoCollection(macro_infos, agg_type, enq_type,
+											proc_info=proc_info)
 
 	return macro_info_coll
