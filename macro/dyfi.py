@@ -864,7 +864,7 @@ class MacroseismicEnquiryEnsemble():
 			elif not keep_unmatched:
 				rec['longitude'] = rec['latitude'] = rec['location_quality'] = np.nan
 
-	def write_locations_to_db(self, user, passwd, min_quality=5, overwrite=False,
+	def write_locations_to_db(self, user, passwd, min_quality=6, overwrite=False,
 							dry_run=False):
 		"""
 		Write locations to database
@@ -875,7 +875,7 @@ class MacroseismicEnquiryEnsemble():
 			str, password for given user
 		:param min_quality:
 			int, minimum location quality to write to database
-			(default: 5)
+			(default: 6)
 		:param overwrite:
 			bool, whether or not existing locations should be overwritten
 			(default: False)
@@ -891,7 +891,7 @@ class MacroseismicEnquiryEnsemble():
 		db_rec_dict = self.read_locations_from_db()
 		recs_to_add, recs_to_modify = [], []
 		for rec in self.recs:
-			if rec.location_quality >= min_quality:
+			if rec['location_quality'] >= min_quality:
 				if rec['id_web'] in db_rec_dict:
 					if overwrite:
 						recs_to_modify.append(rec)
