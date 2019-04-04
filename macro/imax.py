@@ -14,8 +14,11 @@ from .macro_info import MacroseismicInfo, MacroInfoCollection
 
 __all__ = ["get_eq_intensities_for_commune_web",
 			"get_eq_intensities_for_commune_official",
+			"get_isoseismal_intensities_for_all_communes",
 			"get_imax_by_commune"]
 
+
+#TODO: count / plot number of exceedances of particular intensity
 
 def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 				min_replies=3, min_fiability=20, filter_floors=(0, 4),
@@ -163,6 +166,39 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 	return eq_intensities
 
 
+def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
+												as_points=True):
+	"""
+	Get intensities for all communes from available isoseismals
+
+	:param as_main_commune:
+		bool, whether or not to group subcommunes belonging to a
+		main commune
+		(default: False)
+	:param as_points:
+		bool, whether  points (True) or polygons (False) should
+		be used for testing whether communes are within a particular
+		isoseismal
+		(default: True)
+
+	:return:
+		dict, mapping commune IDs to dicts, in turn mapping
+		earthquake IDs to intensities
+	"""
+	from .isoseismal import (get_commune_intensities_from_isoseismals,
+							get_available_isoseismals)
+	commune_eq_intensities = {}
+	for eq_id in get_available_isoseismals():
+		comm_intensities = get_commune_intensities_from_isoseismals(eq_id,
+							main_communes=as_main_commune, as_points=as_points)
+		for id_com, I in comm_intensities.items():
+			if not id_com in commune_eq_intensities:
+				commune_eq_intensities[id_com] = {eq_id: I}
+			else:
+				commune_eq_intensities[id_com][eq_id] = I
+	return commune_eq_intensities
+
+
 def get_imax_by_commune(enq_type='all',
 				min_fiability=20,
 				min_or_max='mean',
@@ -175,7 +211,7 @@ def get_imax_by_commune(enq_type='all',
 	Determine historical Imax for every commune in Belgium
 
 	:param enq_type:
-		str, one of "internet", "official", "all"
+		str, one of "internet", "official", "isoseismal", "all"
 		(default: 'all')
 	:param min_fiability:
 		int, minimum fiability of internet or official enquiry
@@ -208,11 +244,11 @@ def get_imax_by_commune(enq_type='all',
 	agg_func = getattr(np, agg_subcommunes.lower())
 
 	## Fetch communes from database
-	table_clause = 'communes'
-	where_clause = 'country = "BE"'
-	if by_main_commune:
-		where_clause += ' AND id = id_main'
-	comm_recs = seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
+	comm_recs = seismodb.get_communes('BE', main_communes=by_main_commune)
+
+	if enq_type in ('isoseismal', 'all'):
+		comm_iso_intensities = get_isoseismal_intensities_for_all_communes(
+											by_main_commune, as_points=False)
 
 	macro_infos = []
 	for rec in comm_recs:
@@ -256,22 +292,37 @@ def get_imax_by_commune(enq_type='all',
 				if I > Imax_official and I < 13:
 					Imax_official = I
 
-		Imax = max(Imax_web, Imax_official)
+		## Isoseismals
+		Imax_isoseismal = 0
+		num_replies_isoseismal = 0
+		eq_ids_isoseismal = []
+		if enq_type == 'isoseismal':
+			eq_intensities = comm_iso_intensities.get(id_com, {})
+			eq_ids_isoseismal = eq_intensities.keys()
+			for id_earth in eq_ids_isoseismal:
+				I = eq_intensities[id_earth]
+				num_replies_isoseismal += 1
+				if I > Imax_isoseismal:
+					Imax_isoseismal = I
+
+		Imax = max(Imax_web, Imax_official, Imax_isoseismal)
 
 		## Construct MacroseismicInfo
 		if Imax > 0:
-			id_earth = {'web': sorted(eq_ids_web), 'official': sorted(eq_ids_official)}
+			id_earth = {'web': sorted(eq_ids_web), 'official': sorted(eq_ids_official),
+						'isoseismal': sorted(eq_ids_isoseismal)}
 			agg_type = 'id_main' if by_main_commune else 'id_com'
-			num_replies = num_replies_web + num_replies_official
+			num_replies = num_replies_web + num_replies_official + num_replies_isoseismal
 			db_ids = []
 			macro_info = MacroseismicInfo(id_earth, id_com, Imax, agg_type,
 										enq_type, num_replies, lon, lat, db_ids)
 			macro_infos.append(macro_info)
 
 			if verbose:
-				msg = '%d (%s): Iweb=%d (n=%d) - Ioff=%d (n=%d)'
+				msg = '%d (%s): Iweb=%d (n=%d) - Ioff=%d (n=%d) - Iiso=%d (n=%d)'
 				msg %= (id_com, name, Imax_web, len(eq_ids_web),
-						Imax_official, len(eq_ids_official))
+						Imax_official, len(eq_ids_official),
+						Imax_isoseismal, len(eq_ids_isoseismal))
 				print(msg)
 
 		proc_info = dict(min_fiability=min_fiability)
