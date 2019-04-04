@@ -1015,6 +1015,26 @@ def zip2ID(zip_code):
 	return id_com
 
 
+def get_communes(country='BE', main_communes=False):
+	"""
+	Fetch communes from database
+
+	:param country:
+		2-char string, country code
+		(default: 'BE')
+	:param main_communes:
+		bool, whether or not to get main communes only
+
+	:return:
+		list of dicts
+	"""
+	table_clause = 'communes'
+	where_clause = 'country = "%s"' % country
+	if main_communes:
+		where_clause += ' AND id = id_main'
+	return query_seismodb_table(table_clause, where_clause=where_clause)
+
+
 def get_subcommunes(id_main):
 	"""
 	Return subcommune records for particular main commune
