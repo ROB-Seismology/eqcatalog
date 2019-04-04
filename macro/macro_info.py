@@ -21,11 +21,6 @@ from collections import OrderedDict
 import numpy as np
 
 
-from ..rob import SEISMOGIS_ROOT
-GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB", "TAB")
-#GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
-
-
 __all__ = ["MacroseismicInfo", "MacroInfoCollection",
 			"get_aggregated_info_web", "get_aggregated_info_official"]
 
@@ -279,6 +274,8 @@ class MacroInfoCollection():
 		"""
 		import mapping.layeredbasemap as lbm
 
+		from ..rob.communes import get_communes_gis_file
+
 		if len(self) == 0:
 			return []
 
@@ -323,12 +320,11 @@ class MacroInfoCollection():
 		gis_filename = ""
 		if not polygons_as_points:
 			if aggregate_by == 'id_main':
-				gis_filename = "Bel_villages_polygons.TAB"
+				gis_filespec = get_communes_gis_file('BE', main_communes=True)
 			elif aggregate_by == 'id_com':
-				gis_filename = "Bel_communes_avant_fusion.TAB"
+				gis_filespec = get_communes_gis_file('BE', main_communes=False)
 		if gis_filename:
 			gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
-			#gis_filespec = "http://seishaz.oma.be:8080/geoserver/rob/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=rob:bel_villages_polygons&outputFormat=application%2Fjson"
 
 		## Grid
 		if aggregate_by == 'grid':
