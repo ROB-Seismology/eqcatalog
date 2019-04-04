@@ -52,3 +52,10 @@ if not reloading:
 else:
 	reload(imax)
 from .imax import *
+
+## isoseismal (no internal dependencies)
+if not reloading:
+	from . import isoseismal
+else:
+	reload(isoseismal)
+from .isoseismal import *
