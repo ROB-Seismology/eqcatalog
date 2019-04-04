@@ -69,3 +69,11 @@ if not reloading:
 else:
 	reload(seismodb)
 from .seismodb import *
+
+## communes (no internal dependencies)
+if not reloading:
+	from . import communes
+else:
+	reload(communes)
+from .communes import *
+
