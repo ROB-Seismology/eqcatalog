@@ -15,7 +15,13 @@ GIS_FOLDER = "D:\\GIS-data\\KSB-ORB\\HistoricalEQ"
 __all__ = []
 
 
-EQID_DICT = {89: '1692'}
+EQID_DICT = {89: '1692',
+			57: '1382',
+			63: '1449',
+			78: '1580',
+			125: '1756',
+			509: '1938',
+			987: '1992'}
 
 
 def get_eq_isoseismals_file(eq_id, filled=True):
