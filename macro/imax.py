@@ -12,16 +12,17 @@ from ..rob import seismodb
 from .macro_info import MacroseismicInfo, MacroInfoCollection
 
 
-__all__ = ["get_eq_intensities_for_commune_web",
+__all__ = ["get_eq_intensities_for_commune_online",
+			"get_eq_intensities_for_commune_traditional",
 			"get_eq_intensities_for_commune_official",
+			"get_eq_intensities_for_commune_historical",
+			"get_isoseismal_intensities_for_all_communes",
 			"get_isoseismal_intensities_for_all_communes",
 			"get_all_commune_intensities",
 			"get_imax_by_commune"]
 
 
-#TODO: count / plot number of exceedances of particular intensity
-
-def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
+def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 				min_replies=3, min_fiability=20, filter_floors=(0, 4),
 				agg_method='mean', fix_records=True,
 				include_other_felt=True, include_heavy_appliance=False,
@@ -81,7 +82,7 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 		zip_code = None
 
 	eq_intensities = {}
-	dyfi = seismodb.query_web_macro_enquiries('ke', id_com=id_com,
+	dyfi = seismodb.query_online_macro_enquiries('ke', id_com=id_com,
 						zip_code=zip_code, min_fiability=min_fiability)
 	if fix_records and len(dyfi):
 		dyfi = dyfi.fix_all()
@@ -109,14 +110,17 @@ def get_eq_intensities_for_commune_web(id_com, as_main_commune=False,
 	return eq_intensities
 
 
-def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
-							min_or_max='mean', min_fiability=20):
+def get_eq_intensities_for_commune_traditional(id_com, data_type='',
+					as_main_commune=False, min_or_max='mean', min_fiability=20):
 	"""
-	Get list of all official intensities due to known earthquakes
+	Get list of all traditional intensities due to known earthquakes
 	for a given commune
 
 	:param id_com:
 		int, ID of commune in database
+	:param data_type:
+		str, type of macroseismic data: '', 'official' or 'historical'
+		(default: '')
 	:param as_main_commune:
 		bool, whether or not to group subcommunes belonging to a
 		main commune
@@ -130,39 +134,50 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 		(default: 20)
 
 	:return:
-		dict mapping earthquake IDs to intensities
-		(if :param:`as_main_commune` is False)
-		or to lists of intensities (if :param:`as_main_commune` is True)
+		dict mapping earthquake IDs to lists of intensities
+		(1 or more depending on :param:`as_main_commune`)
 	"""
-	if as_main_commune:
-		subcommunes = seismodb.get_subcommunes(id_com)
-		if len(subcommunes) == 0:
-			raise Exception("Commune #%d is not a main commune" % id_com)
-		id_com_str = ','.join(['%d' % sc['id'] for sc in subcommunes])
-	else:
-		id_com_str = id_com
+	from ..rob.seismodb import query_traditional_macro_catalog
 
-	table_clause = 'macro_detail'
-	where_clause = 'id_com IN (%s) AND fiability >= %d'
-	where_clause %= (id_com_str, min_fiability)
-	macro_recs = seismodb.query_seismodb_table(table_clause, where_clause=where_clause)
+	macro_rec_dict = query_traditional_macro_catalog(id_earth=None, id_com=id_com,
+					data_type=data_type, group_by_main_commune=as_main_commune,
+					min_fiability=min_fiability)
+
 	eq_intensities = {}
-	for mrec in macro_recs:
-		id_earth = mrec['id_earth']
-		Imin, Imax = mrec['intensity_min'], mrec['intensity_max']
-		## Do not take into account Imin/Imax = 13 values
-		if Imin == 13:
-			continue
-		elif Imax == 13:
-			Imax = Imin
-
-		I = {'min': Imin, 'max': Imax, 'mean': np.mean([Imin, Imax])}[min_or_max]
-		if id_earth in eq_intensities:
-			eq_intensities[id_earth].append(I)
-		else:
-			eq_intensities[id_earth] = [I]
+	for id_earth, macro_recs in macro_rec_dict.items():
+		for mrec in macro_recs:
+			Imin, Imax = mrec['Imin'], mrec['Imax']
+			I = {'min': Imin, 'max': Imax, 'mean': np.nanmean([Imin, Imax])}[min_or_max]
+			## Discard nan values
+			if not np.isnan(I):
+				if id_earth in eq_intensities:
+					eq_intensities[id_earth].append(I)
+				else:
+					eq_intensities[id_earth] = [I]
 
 	return eq_intensities
+
+
+def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
+										min_or_max='mean', min_fiability=20):
+	"""
+	Get list of all official intensities due to known earthquakes
+	for a given commune
+	This is a wrapper for :func:`get_eq_intensities_for_commune_traditional`
+	"""
+	kwargs = locals().copy()
+	get_eq_intensities_for_commune_traditional(data_type='official', **kwargs)
+
+
+def get_eq_intensities_for_commune_historical(id_com, as_main_commune=False,
+										min_or_max='mean', min_fiability=20):
+	"""
+	Get list of all official intensities due to known earthquakes
+	for a given commune
+	This is a wrapper for :func:`get_eq_intensities_for_commune_traditional`
+	"""
+	kwargs = locals().copy()
+	get_eq_intensities_for_commune_traditional(data_type='historical', **kwargs)
 
 
 def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
@@ -198,44 +213,45 @@ def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
 	return commune_eq_intensities
 
 
-def parse_enq_type(enq_type):
+def _parse_data_type(data_type):
 	"""
-	Parse enquiry type specification
+	Parse macroseismic data type specification
 
-	:param enq_type:
+	:param data_type:
 		list or str
 
 	:return:
 		list
 	"""
-	if isinstance(enq_type, list):
-		enq_types = enq_type
-	elif isinstance(enq_type, str):
-		if enq_type == 'all':
-			enq_types = ['internet', 'official', 'isoseismal']
+	if isinstance(data_type, list):
+		data_types = data_type
+	elif isinstance(data_type, str):
+		if data_type == 'all':
+			data_types = ['internet', 'traditional', 'isoseismal']
 		else:
-			enq_types = enq_type.split('+')
-		for e in range(len(enq_types)):
-			if enq_types[e] in ('online', 'dyfi', 'web'):
-				enq_types[e] = 'internet'
+			data_types = data_type.split('+')
+		for e in range(len(data_types)):
+			if data_types[e] in ('online', 'dyfi', 'web'):
+				data_types[e] = 'internet'
 
-	return enq_types
+	return data_types
 
 
-def get_all_commune_intensities(enq_type='all',
+def get_all_commune_intensities(data_type='all',
 				min_fiability=20,
 				min_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
-				agg_method_web='mean', fix_records=True, include_other_felt=True,
+				agg_method_online='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
 				by_main_commune=False, agg_subcommunes='mean',
 				verbose=False):
 	"""
 	Get intensities in all communes by all earthquakes
 
-	:param enq_type:
-		str, one of "internet", "official", "isoseismal",
+	:param data_type:
+		str, one of "internet", "traditional", "official", "isoseismal",
 		"internet+official", "official+isoseismal" or "all"
+		or list of strings
 		(default: 'all')
 	:param min_fiability:
 		int, minimum fiability of internet or official enquiry
@@ -244,19 +260,19 @@ def get_all_commune_intensities(enq_type='all',
 		see :func:`get_eq_intensities_for_commune_official`
 	:param min_replies:
 	:param filter_floors:
-	:param agg_method_web:
+	:param agg_method_online:
 	:param fix_records:
 	:param include_other_felt:
 	:param include_heavy_appliance:
 	:param remove_outliers:
-		see :func:`get_eq_intensities_for_commune_web`
+		see :func:`get_eq_intensities_for_commune_online`
 	:param by_main_commune:
 		bool, whether or not to aggregate communes by main commune
 		(default: False)
 	:param agg_subcommunes:
-		str, name of numpy function for aggregation of historical
+		str, name of numpy function for aggregation of traditional
 		data into subcommunes if :param:`by_main_commune` is True
-		One of 'mean', 'minimum', 'maximum'
+		One of 'mean', 'median', 'min(imum)', 'max(imum)'
 		(default: 'mean')
 	:param verbose:
 		bool, whether or not to print progress information
@@ -266,17 +282,24 @@ def get_all_commune_intensities(enq_type='all',
 		dict, mapping commune IDs to dicts, in turn mapping
 		earthquake IDs to intensities
 	"""
-	agg_func = getattr(np, agg_subcommunes.lower())
+	## Select aggregation function for commune aggregation
+	if agg_subcommunes == 'average':
+		agg_function = 'mean'
+	elif agg_subcommunes in ('minimum', 'maximum'):
+		agg_function = agg_subcommunes[:3]
+	else:
+		agg_function = agg_subcommunes
+	agg_func = getattr(np, agg_function.lower())
 
 	## Fetch communes from database
 	comm_recs = seismodb.get_communes('BE', main_communes=by_main_commune)
 
-	enq_types = parse_enq_type(enq_type)
+	data_types = _parse_data_type(data_type)
 
-	if 'isoseismal' in enq_types:
+	if 'isoseismal' in data_types:
 		comm_iso_intensities = get_isoseismal_intensities_for_all_communes(
 											by_main_commune, as_points=False)
-		#if 'official' in enq_types:
+		#if 'official' in data_types:
 		#	comm_iso_intensities.pop(509)
 		#	comm_iso_intensities.pop(987)
 
@@ -286,26 +309,37 @@ def get_all_commune_intensities(enq_type='all',
 		commune_eq_intensities[id_com] = {}
 
 		## Isoseismals
-		if 'isoseismal' in enq_types:
+		if 'isoseismal' in data_types:
 			eq_intensities = comm_iso_intensities.get(id_com, {})
 			commune_eq_intensities[id_com] = eq_intensities
 
 		## Official / Historical macroseismic information
-		if 'official' in enq_types:
-			eq_intensities = get_eq_intensities_for_commune_official(id_com,
-							as_main_commune=by_main_commune, min_or_max=min_or_max,
-							min_fiability=min_fiability)
+		data_type = None
+		if 'traditional' in data_types:
+			data_type = ''
+		elif 'historical' in data_types and 'official' in data_types:
+			data_type = ''
+		elif 'historical' in data_types:
+			data_type = 'historical'
+		elif 'official' in data_types:
+			data_type = 'official'
+		if data_type is not None:
+			eq_intensities = get_eq_intensities_for_commune_traditional(id_com,
+							data_type=data_type, as_main_commune=by_main_commune,
+							min_or_max=min_or_max, min_fiability=min_fiability)
 			for id_earth in eq_intensities.keys():
 				I = agg_func(eq_intensities[id_earth])
 				## Isoseismal intensities will be overwritten
+				# TODO: decide if this should always be the case
+				# or only for 'official' enquiries from 1938 onwards!
 				commune_eq_intensities[id_com][id_earth] = I
 
 		## Online enquiries
-		if 'internet' in enq_types:
-			eq_intensities = get_eq_intensities_for_commune_web(id_com,
+		if 'internet' in data_types:
+			eq_intensities = get_eq_intensities_for_commune_online(id_com,
 				as_main_commune=by_main_commune, min_replies=min_replies,
 				min_fiability=min_fiability, filter_floors=filter_floors,
-				agg_method=agg_method_web, fix_records=fix_records,
+				agg_method=agg_method_online, fix_records=fix_records,
 				include_other_felt=include_other_felt,
 				include_heavy_appliance=include_heavy_appliance,
 				remove_outliers=remove_outliers)
@@ -319,21 +353,26 @@ def get_all_commune_intensities(enq_type='all',
 	return commune_eq_intensities
 
 
-def get_imax_by_commune(enq_type='all',
+def get_imax_by_commune(data_type='all',
+				count_exceedances=None,
 				min_fiability=20,
 				min_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
-				agg_method_web='mean', fix_records=True, include_other_felt=True,
+				agg_method_online='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
 				by_main_commune=False, agg_subcommunes='mean',
 				verbose=False):
 	"""
 	Determine historical Imax for every commune in Belgium
 
-	:param enq_type:
+	:param data_type:
 		str, one of "internet", "official", "isoseismal",
-		"internet+official", "official+isoseismal" or "all"
+		any combination of these, separated by '+', "all",
+		or list of strings
 		(default: 'all')
+	:param count_exceedances:
+		float or 'Imax', intensity value to count exceedances for
+		(default: None)
 	:param min_fiability:
 		int, minimum fiability of internet or official enquiry
 		(default: 20)
@@ -341,17 +380,17 @@ def get_imax_by_commune(enq_type='all',
 		see :func:`get_eq_intensities_for_commune_official`
 	:param min_replies:
 	:param filter_floors:
-	:param agg_method_web:
+	:param agg_method_online:
 	:param fix_records:
 	:param include_other_felt:
 	:param include_heavy_appliance:
 	:param remove_outliers:
-		see :func:`get_eq_intensities_for_commune_web`
+		see :func:`get_eq_intensities_for_commune_online`
 	:param by_main_commune:
 		bool, whether or not to aggregate communes by main commune
 		(default: False)
 	:param agg_subcommunes:
-		str, name of numpy function for aggregation of historical
+		str, name of numpy function for aggregation of official
 		data into subcommunes if :param:`by_main_commune` is True
 		One of 'mean', 'minimum', 'maximum'
 		(default: 'mean')
@@ -360,16 +399,20 @@ def get_imax_by_commune(enq_type='all',
 		(default: False)
 
 	:return:
-		instance of :class:`MacroInfoCollection`
+		instance of :class:`MacroInfoCollection`,
+		with the 'num_replies' property corresponding to the number
+		of earthquakes for which an intensity was reported
+		or the number of earthquakes that exceeded a particular intensity
+		(if :param:`count_exceedances` is True)
 	"""
 	## Fetch communes from database
 	comm_recs = seismodb.get_communes('BE', main_communes=by_main_commune)
 
 	## Fetch all intensities
-	commune_eq_intensities = get_all_commune_intensities(enq_type=enq_type,
+	commune_eq_intensities = get_all_commune_intensities(data_type=data_type,
 				min_fiability=min_fiability, min_or_max=min_or_max,
 				min_replies=min_replies, filter_floors=filter_floors,
-				agg_method_web=agg_method_web, fix_records=fix_records,
+				agg_method_online=agg_method_online, fix_records=fix_records,
 				include_other_felt=include_other_felt,
 				include_heavy_appliance=include_heavy_appliance,
 				remove_outliers=remove_outliers, by_main_commune=by_main_commune,
@@ -377,8 +420,8 @@ def get_imax_by_commune(enq_type='all',
 
 	agg_func = getattr(np, agg_subcommunes.lower())
 
-	enq_types = parse_enq_type(enq_type)
-	enq_type = '+'.join(enq_types)
+	data_types = _parse_data_type(data_type)
+	data_type = '+'.join(data_types)
 
 	macro_infos = []
 	for rec in comm_recs:
@@ -386,12 +429,19 @@ def get_imax_by_commune(enq_type='all',
 		lon, lat = rec['longitude'], rec['latitude']
 		name = rec['name']
 
-		eq_ids = commune_eq_intensities[id_com].keys()
-		intensities = commune_eq_intensities[id_com].values()
+		eq_ids = np.array(commune_eq_intensities[id_com].keys())
+		intensities = np.array(commune_eq_intensities[id_com].values())
 
 		num_replies = len(eq_ids)
 		if num_replies:
-			Imax = np.max(intensities)
+			Imax = intensities.max()
+			if count_exceedances:
+				if count_exceedances == 'Imax':
+					Imin = Imax
+				else:
+					Imin = count_exceedances
+				eq_ids = eq_ids[intensities >= Imin]
+				num_replies = len(eq_ids)
 		else:
 			Imax = 0
 
@@ -401,7 +451,7 @@ def get_imax_by_commune(enq_type='all',
 			agg_type = 'id_main' if by_main_commune else 'id_com'
 			db_ids = []
 			macro_info = MacroseismicInfo(id_earth, id_com, Imax, agg_type,
-										enq_type, num_replies, lon, lat, db_ids)
+										data_type, num_replies, lon, lat, db_ids)
 			macro_infos.append(macro_info)
 
 			if verbose:
@@ -409,36 +459,41 @@ def get_imax_by_commune(enq_type='all',
 				msg %= (id_com, name, Imax, num_replies)
 				print(msg)
 
-		proc_info = dict(min_fiability=min_fiability)
-		if 'internet' in enq_types:
-			proc_info['agg_method'] = agg_method_web
-			proc_info['min_replies'] = min_replies
-			proc_info['filter_floors'] = filter_floors
-			proc_info['fix_records'] = fix_records
-			proc_info['include_other_felt'] = include_other_felt
-			proc_info['include_heavy_appliance'] = include_heavy_appliance
-			proc_info['remove_outliers'] = remove_outliers
-		if 'official' in enq_types:
-			## Note that agg_method of DYFI data will be overwritten,
-			## but historical data are more important for this type of map
-			proc_info['agg_method'] = agg_func
-			proc_info['min_or_max'] = min_or_max
-		macro_info_coll = MacroInfoCollection(macro_infos, agg_type, enq_type,
-											proc_info=proc_info)
+			proc_info = dict(min_fiability=min_fiability)
+			if 'internet' in data_types:
+				proc_info['agg_method'] = agg_method_online
+				proc_info['min_replies'] = min_replies
+				proc_info['filter_floors'] = filter_floors
+				proc_info['fix_records'] = fix_records
+				proc_info['include_other_felt'] = include_other_felt
+				proc_info['include_heavy_appliance'] = include_heavy_appliance
+				proc_info['remove_outliers'] = remove_outliers
+			if ('traditional' in data_types or 'official' in data_types
+				or 'historical' in data_types):
+				## Note that agg_method of DYFI data will be overwritten,
+				## but historical data are more important for this type of map
+				proc_info['agg_method'] = agg_func
+				proc_info['min_or_max'] = min_or_max
+			macro_info_coll = MacroInfoCollection(macro_infos, agg_type, data_type,
+												proc_info=proc_info)
 
 	return macro_info_coll
 
 
-def get_num_exceedances_by_commune(Imin, enq_type='all',
+def get_num_exceedances_by_commune(Imin, data_type='all',
 				min_fiability=20,
 				min_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
-				agg_method_web='mean', fix_records=True, include_other_felt=True,
+				agg_method_online='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
 				by_main_commune=False, agg_subcommunes='mean',
 				verbose=False):
 	"""
 	Determine number of exceedances of a particular intensity level
 	in every commune in Belgium
+
+	:param Imin:
+		float, intensity value
+		or str ('Imax')
 	"""
 	pass
