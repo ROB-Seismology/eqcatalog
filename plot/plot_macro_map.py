@@ -197,10 +197,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	if plot_info == 'intensity':
 		classes = np.arange(1, min(cmap.N, 12) + 1, dtype='int')
-		enq_type = macro_info_coll.enq_type
+		data_type = macro_info_coll.data_type
 		cb_title = {'internet': "Community Internet Intensity",
 					'online': "Community Internet Intensity",
-					'official': "Macroseismic Intensity"}.get(enq_type,
+					'traditional': "Macroseismic Intensity"}.get(data_type,
 													"Macroseismic Intensity")
 	elif plot_info == 'num_replies':
 		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000], dtype='int')
@@ -376,7 +376,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		sizes = []
 		for rec in macro_info_coll:
 			if rec.num_replies >= pie_min_replies:
-				enq_ensemble = rec.get_web_enquiries()
+				enq_ensemble = rec.get_online_enquiries()
 				lons.append(rec.lon)
 				lats.append(rec.lat)
 				sizes.append(np.sqrt(rec.num_replies) * size_scaling)
