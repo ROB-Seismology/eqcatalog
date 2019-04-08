@@ -22,14 +22,17 @@ import numpy as np
 
 
 __all__ = ["MacroseismicInfo", "MacroInfoCollection",
-			"get_aggregated_info_web", "get_aggregated_info_official"]
+			"aggregate_online_macro_info",
+			"aggregate_traditional_macro_info",
+			"aggregate_official_macro_info",
+			"aggregate_historical_macro_info"]
 
 
 class MacroseismicInfo():
 	"""
 	Container class to hold information of (aggregated) records retrieved
-	from the official or internet macroseismic enquiry database, and
-	used for plotting maps.
+	from the historical, official or internet macroseismic enquiry database,
+	and used for plotting maps.
 
 	:param id_earth:
 		int, ID of earthquake in ROB catalog
@@ -44,10 +47,13 @@ class MacroseismicInfo():
 		- 'id_main' or 'main commune'
 		- 'grid_X' (where X is grid spacing in km)
 		- None or ''
-	:param enq_type:
-		str, type of enquirey, one of:
-		- 'internet' or 'online'
+	:param data_type:
+		str, type of enquiry, one of:
+		- 'internet', 'online' or 'dyfi'
+		- 'traditional'
+		- 'historical'
 		- 'official'
+		- 'isoseismal'
 	:param num_replies:
 		int, number of replies in aggregate
 		(default: 1)
@@ -64,13 +70,13 @@ class MacroseismicInfo():
 	:param db_ids:
 		list of ints, IDs of database records represented in aggregate
 	"""
-	def __init__(self, id_earth, id_com, intensity, agg_type, enq_type, num_replies=1,
+	def __init__(self, id_earth, id_com, intensity, agg_type, data_type, num_replies=1,
 				lon=0, lat=0, residual=0, db_ids=[]):
 		self.id_earth = id_earth
 		self.id_com = id_com
 		self.intensity = intensity
 		self.agg_type = agg_type
-		self.enq_type = enq_type
+		self.data_type = data_type
 		self.num_replies = num_replies
 		self.lon = lon
 		self.lat = lat
@@ -94,7 +100,7 @@ class MacroseismicInfo():
 			[eq] = query_local_eq_catalog_by_id(self.id_earth)
 			return eq
 
-	def get_web_enquiries(self, min_fiability=20, verbose=False):
+	def get_online_enquiries(self, min_fiability=20, verbose=False):
 		"""
 		Fetch macroseismic enquiry records from the database, based on
 		either db_ids or, if this is empty, id_earth
@@ -107,15 +113,16 @@ class MacroseismicInfo():
 		:return:
 			instance of :class:`eqcatalog.macro.MacroseismicEnquiryEnsemble`
 		"""
-		from ..rob.seismodb import query_web_macro_enquiries
+		from ..rob.seismodb import query_online_macro_catalog
 
-		if self.enq_type == 'official':
+		if self.data_type in ('traditional', 'official', 'historical',
+							'isoseismal'):
 			return
 
 		if self.db_ids:
-			ensemble = query_web_macro_enquiries(web_ids=self.db_ids, verbose=verbose)
+			ensemble = query_online_macro_catalog(web_ids=self.db_ids, verbose=verbose)
 		else:
-			ensemble = query_web_macro_enquiries(self.id_earth, id_com=self.id_com,
+			ensemble = query_online_macro_catalog(self.id_earth, id_com=self.id_com,
 								min_fiability=min_fiability, verbose=verbose)
 
 		return ensemble
@@ -129,20 +136,23 @@ class MacroInfoCollection():
 		list with instances of :class:`MacroseismicInfo`
 	:param agg_type:
 		str, aggregation type
-	:param enq_type:
-		str, type of enquirey, one of:
-		- 'internet' or 'online'
+	:param data_type:
+		str, type of enquiry, one of:
+		- 'internet', 'online' or 'dyfi'
+		- 'traditional'
+		- 'historical'
 		- 'official'
+		- 'isoseismal'
 	:proc_info:
 		dict, containing processing parameters
 		(default: {})
 	"""
-	def __init__(self, macro_infos, agg_type, enq_type, proc_info={}):
+	def __init__(self, macro_infos, agg_type, data_type, proc_info={}):
 		self.macro_infos = macro_infos
 		self.agg_type = agg_type
-		if not enq_type:
-			enq_type = macro_infos[0].enq_type
-		self.enq_type = enq_type
+		if not data_type and len(macro_infos):
+			data_type = macro_infos[0].data_type
+		self.data_type = data_type
 		self.proc_info = proc_info
 
 	def __len__(self):
@@ -231,10 +241,13 @@ class MacroInfoCollection():
 			None, 'residual' attribute of instances of :class:`MacroseismicInfo`
 			in collection are modified in place
 		"""
-		for id_com in self.get_commune_ids():
+		for i in range(len(self)):
+			self.macro_infos[i].residual = 0.
+			id_com = self.macro_infos[i].id_com
+			I = self.macro_infos[i].intensity
 			mi = other_macro_info.get_commune_info(id_com)
 			if mi:
-				self.residual = self.I - mi.I
+				self.macro_infos[i].residual = I - mi.I
 
 	def get_region(self, percentile_width=100):
 		"""
@@ -301,7 +314,7 @@ class MacroInfoCollection():
 		residuals = [rec.residual for rec in self]
 		if not np.allclose(residuals, 0):
 			attributes += ['residual']
-		attributes += ['agg_type', 'enq_type']
+		attributes += ['agg_type', 'data_type']
 		if aggregate_by == 'grid' or polygons_as_points:
 			if aggregate_by in ('id_main', 'id_com'):
 				attributes += ['id_com']
@@ -558,9 +571,9 @@ class MacroInfoCollection():
 			str
 		"""
 		text = "Aggregation by: %s" % self.agg_type
-		text += "\nAgg. method: %s" % self.proc_info['agg_method']
+		text += "\nAgg. method: %s" % self.proc_info.get('agg_method')
 
-		if self.enq_type in ('internet', 'online'):
+		if self.data_type in ('internet', 'online', 'dyfi'):
 			text += ("\nMin. replies / fiability: %d / %d"
 				% (self.proc_info['min_replies'], self.proc_info['min_fiability']))
 			text += "\nFilter floors: %s" % str(self.proc_info['filter_floors'])
@@ -578,18 +591,18 @@ class MacroInfoCollection():
 			if self.proc_info['agg_method'][:4] == "mean":
 				text += ("\nRemove outliers: %s"
 					% str(self.proc_info['remove_outliers']))
-		else:
+		elif self.data_type in ('traditional', 'official', 'historical'):
 			text += "\nMin. fiability: %d" % self.proc_info['min_fiability']
 			text += "\nImin_or_max%s" % self.proc_info['min_or_max']
 
 		return text
 
 
-def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
+def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
 				min_fiability=20, filter_floors=(0, 4), aggregate_by="commune",
 				agg_method='mean', fix_records=True,
 				include_other_felt=True, include_heavy_appliance=False,
-				remove_outliers=(2.5, 97.5)):
+				remove_outliers=(2.5, 97.5), verbose=False):
 	"""
 	Obtain aggregated internet macroseismic information for given earthquake
 
@@ -637,11 +650,13 @@ def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
 		Only applies if :param:`agg_method` = 'mean'
 		and if :param:`agg_info` = 'cii'
 		(default: 2.5, 97.5)
+	:param verbose:
+		bool, if True the query string will be echoed to standard output
 
 	:return:
 		instance of :class:`MacroInfoCollection`
 	"""
-	from ..rob import query_local_eq_catalog_by_id, query_web_macro_enquiries
+	from ..rob import query_local_eq_catalog_by_id
 
 	query_info = query_info.lower()
 	if query_info == 'num_replies':
@@ -655,8 +670,8 @@ def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
 		min_replies = 1
 
 	## Retrieve macroseismic information from database
-	[eq] = query_local_eq_catalog_by_id(id_earth)
-	dyfi_ensemble = eq.get_macroseismic_enquiries(min_fiability)
+	[eq] = query_local_eq_catalog_by_id(id_earth, verbose=verbose)
+	dyfi_ensemble = eq.get_online_macro_enquiries(min_fiability, verbose=verbose)
 
 	## Aggregate
 	macro_info_coll = dyfi_ensemble.get_aggregated_info(aggregate_by, min_replies,
@@ -669,13 +684,38 @@ def get_aggregated_info_web(id_earth, min_replies=3, query_info="cii",
 	return macro_info_coll
 
 
-def get_aggregated_info_official(id_earth, min_fiability=20, min_or_max='max',
-				aggregate_by="commune", agg_method="average", min_val=1):
+def _get_aggregated_intensity(macro_recs, min_or_max, agg_function):
 	"""
-	Obtain aggregated official macroseismic information for given earthquake
+	:param agg_function:
+		str, aggregation function, one of 'min', 'max', 'mean', 'median'
+	"""
+	if min_or_max == 'min':
+		intensities = np.array([rec['Imin'] for rec in macro_recs])
+	elif min_or_max == 'max':
+		intensities = np.array([rec['Imax'] for rec in macro_recs])
+	elif min_or_max == 'mean':
+		intensities = np.array([np.mean([rec['Imin'], rec['Imax']])
+								for rec in macro_recs])
+
+	agg_func = getattr(np, 'nan'+agg_function)
+	return agg_func(intensities)
+
+
+def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fiability=20,
+				min_or_max='max', aggregate_by="commune", agg_method="mean",
+				verbose=False):
+	"""
+	Obtain aggregated traditional macroseismic information for given earthquake
 
 	:param id_earth:
 		int or str, ID of earthquake in ROB database
+	:param id_com:
+		int, commune ID
+		or list of ints
+		(default: None)
+	:param data_type:
+		str, type of macroseismic data: '', 'official' or 'historical'
+		(default: '')
 	:param min_fiability:
 		int, minimum fiability of macroseismic record
 		(default: 20)
@@ -691,34 +731,96 @@ def get_aggregated_info_official(id_earth, min_fiability=20, min_or_max='max',
 		(default: 'commune')
 	:param agg_method:
 		str, aggregation function to use if :param:`aggregate_by`
-		is 'main commune', one of "minimum", "maximum" or "average"/"mean"
-		(default: "average")
-	:param min_val:
-		float, minimum intensity to return
-		(default: 1, avoids getting NULL results)
+		is 'main commune', one of "min(imum)", "max(imum)", "median'
+		or "average"/"mean"
+		(default: "mean")
 
 	:return:
 		instance of :class:`MacroInfoCollection`
 	"""
-	from ..rob import query_local_eq_catalog_by_id
+	from ..rob.seismodb import (query_traditional_macro_catalog,
+								query_seismodb_table_generic)
 
 	if aggregate_by in ('main commune', 'id_main'):
-		group_by_main_village = True
+		group_by_main_commune = True
 	else:
-		group_by_main_village = False
+		group_by_main_commune = False
 
 	## Retrieve macroseismic information from database
-	[eq] = query_local_eq_catalog_by_id(id_earth)
+	#macro_info_coll = query_traditional_macro_catalog(id_earth, data_type=data_type,
+	#		min_or_max=min_or_max, group_by_main_commune=group_by_main_commune,
+	#		agg_method=agg_method, min_fiability=min_fiability, verbose=verbose)
+	macro_rec_dict = query_traditional_macro_catalog(id_earth, id_com=id_com,
+			data_type=data_type, group_by_main_commune=group_by_main_commune,
+			min_fiability=min_fiability, verbose=verbose)
 
-	macro_info_coll = eq.get_macroseismic_data_aggregated_official(min_or_max=min_or_max,
-			min_val=min_val, group_by_main_village=group_by_main_village,
-			agg_method=agg_method, min_fiability=min_fiability)
+	if agg_method == 'average':
+		agg_function = 'mean'
+	elif agg_method in ('minimum', 'maximum'):
+		agg_function = agg_method[:3]
+	else:
+		agg_function = agg_method
 
-	## Remove records without location
-	for i in range(len(macro_info_coll)-1, -1, -1):
-		macro_info = macro_info_coll[i]
-		if macro_info.lon is None:
-			print("Commune #%s has no location!" % macro_info.id_com)
-			macro_info_coll.macro_infos.pop(i)
+	macro_infos = []
+	if data_type == '':
+		data_type = 'traditional'
+	for id_com, macro_recs in macro_rec_dict.items():
+		num_replies = len(macro_recs)
+		I = _get_aggregated_intensity(macro_recs, min_or_max, agg_function)
+		db_ids = [rec['id_macro_detail'] for rec in macro_recs]
+		lon, lat = None, None
+		for rec in macro_recs:
+			if rec['id_com'] == id_com:
+				lon, lat = rec['longitude'], rec['latitude']
+
+		## If main commune is not included, fetch location from communes table
+		if lon is None:
+			sql = 'SELECT * FROM communes where id = %d' % id_com
+			comm_recs = query_seismodb_table_generic(sql, verbose=verbose)
+			if len(comm_recs) == 1:
+				lon, lat = comm_recs[0]['longitude'], comm_recs[0]['latitude']
+
+		## Remove records without location
+		if lon is None:
+			print("Commune #%s has no location!" % id_com)
+			continue
+
+		macro_info = MacroseismicInfo(id_earth, id_com, I, aggregate_by,
+									data_type, num_replies=num_replies,
+									lon=lon, lat=lat, db_ids=db_ids)
+		macro_infos.append(macro_info)
+
+	#for i in range(len(macro_info_coll)-1, -1, -1):
+	#	macro_info = macro_info_coll[i]
+	#	if macro_info.lon is None:
+	#		print("Commune #%s has no location!" % macro_info.id_com)
+	#		macro_info_coll.macro_infos.pop(i)
+
+	# TODO: aggregate by grid?
+
+	proc_info = dict(agg_method=agg_method, min_fiability=min_fiability,
+					min_or_max=min_or_max)
+	macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, data_type,
+										proc_info=proc_info)
 
 	return macro_info_coll
+
+
+def aggregate_official_macro_info(id_earth, id_com=None, min_fiability=20,
+				min_or_max='max', aggregate_by="commune", agg_method="mean"):
+	"""
+	Obtain aggregated official macroseismic information for given earthquake
+	This is a wrapper for :func:`aggregate_traditional_macro_info`
+	"""
+	kwargs = locals().copy()
+	return aggregate_official_macro_info(data_type='official', **kwargs)
+
+
+def aggregate_historical_macro_info(id_earth, id_com=None, min_fiability=20,
+				min_or_max='max', aggregate_by="commune", agg_method="mean"):
+	"""
+	Obtain aggregated historical macroseismic information for given earthquake
+	This is a wrapper for :func:`aggregate_traditional_macro_info`
+	"""
+	kwargs = locals().copy()
+	return aggregate_official_macro_info(data_type='historical', **kwargs)
