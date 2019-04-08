@@ -39,11 +39,16 @@ from db.simpledb import (build_sql_query, query_mysql_db_generic)
 
 __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_local_eq_catalog", "query_local_eq_catalog_by_id",
-			"query_focal_mechanisms", "query_official_macro_catalog",
-			"query_web_macro_catalog", "query_web_macro_enquiries",
-			"get_num_macroseismic_enquiries", "query_stations",
-			"get_station_coordinates", "get_last_earthID", "zip2ID",
-			"get_subcommunes"]
+			"get_last_earthID", "query_focal_mechanisms",
+			"query_online_macro_catalog", "query_traditional_macro_catalog",
+			"query_official_macro_catalog", "query_historical_macro_catalog",
+			"query_traditional_macro_catalog_aggregated",
+			"query_official_macro_catalog_aggregated",
+			"query_historical_macro_catalog_aggregated",
+			"query_online_macro_catalog_aggregated",
+			"get_num_online_macro_enquiries",
+			"query_stations", "get_station_coordinates",
+			"zip2ID", "get_communes", "get_subcommunes"]
 
 
 AGG_FUNC_DICT = {"average": "AVG", "mean": "AVG",
@@ -508,29 +513,178 @@ def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 	return focmec_list
 
 
-def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
-					group_by_main_village=False, agg_method="average",
-					min_fiability=20, verbose=False, errf=None):
+def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
+					group_by_main_commune=False, min_fiability=20,
+					verbose=False, errf=None):
 	"""
-	Query ROB "official" macroseismic catalog
-	This includes both "official" commune inquiries and historical
-	data. So far, there is only 1 record per commune for each
-	earthquake, but this may not be guaranteed in the future...
+	Query ROB traditional macroseismic catalog
+	This includes both "official" communal inquiries and historical
+	data.
+	Currently, this catalog contains only 1 record per commune
+	for each earthquake. Consequently, official and historical data
+	are mutually exclusive.
 
 	:param id_earth:
 		int, earthquake ID
+	:param id_com:
+		int, commune ID
+		or list of ints
+		(default: None)
+		Note that :param:`id_earth` must not be None if :param:`id_com`
+		is a list or None
+	:param data_type:
+		str, type of macroseismic data: '', 'official' or 'historical'
+		(default: '')
+	:param group_by_main_commune:
+		bool, whether or not to group the results by main village
+		(default: False)
+	:param min_fiability:
+		float, minimum fiability of enquiry
+		(default: 20.)
+	:param verbose:
+		Bool, if True the query string will be echoed to standard output
+	:param errf:
+		File object, where to print errors
+
+	:return:
+		dict, mapping commune IDs (if :param:`id_earth` is not None) or
+		earthquake IDs (if :param:`id_earth` is None) to lists of
+		database records (1 or more depending on :param:`group_by_main_commune`)
+	"""
+	assert not (id_earth is None and
+				(id_com is None or isinstance(id_com, (list, np.ndarray))))
+
+	## Construct SQL query
+	table_clause = ['macro_detail']
+
+	column_clause = [
+		'id_macro_detail',
+		'macro_detail.id_earth',
+		'fiability',
+		'comment',
+		'macro_detail.id_com',
+		'communes.id_main',
+		'communes.longitude',
+		'communes.latitude']
+
+	if data_type == 'official':
+		column_clause += [
+			'macro_official_inquires.id_macro_off',
+			'macro_official_inquires.id_source',
+			'macro_official_inquires.source']
+
+	## Replace intensity values of 13 with NULL
+	Imin_clause = 'IF (intensity_min < 13, intensity_min, NULL) AS "Imin"'
+	column_clause.append(Imin_clause)
+	Imax_clause = 'IF (intensity_max < 13, intensity_max, NULL) AS "Imax"'
+	column_clause.append(Imax_clause)
+
+	where_clause = 'macro_detail.fiability >= %d' % min_fiability
+	if id_earth is not None:
+		where_clause += ' AND macro_detail.id_earth = %d' % id_earth
+	if id_com is not None:
+		if group_by_main_commune:
+			where_clause += ' AND communes.id_main'
+		else:
+			where_clause += ' AND macro_detail.id_com'
+		if isinstance(id_com, int):
+			where_clause += ' = %d' % id_com
+		elif isinstance(id_com, (list, np.ndarray)):
+			id_com_str = ','.join(['%s' % id for id in id_com])
+			where_clause += ' IN (%s)' % id_com_str
+	if data_type == 'historical':
+		where_clause += (' AND CONCAT(id_earth, id_com) NOT IN'
+						' (SELECT CONCAT(id_earth, id_com)'
+						' FROM macro_official_inquires)')
+
+	join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id')]
+	if data_type == 'official':
+		join_clause.append(('RIGHT JOIN', 'macro_official_inquires',
+			'macro_detail.id_com = macro_official_inquires.id_com'
+			' AND macro_detail.id_earth = macro_official_inquires.id_earth'))
+
+	if errf !=None:
+		errf.write("Querying KSB-ORB traditional macroseismic catalog:\n")
+
+	## Fetch records
+	macro_recs = query_seismodb_table(table_clause, column_clause=column_clause,
+				join_clause=join_clause, where_clause=where_clause,
+				verbose=verbose, errf=errf)
+
+	## Construct result dictionary
+	macro_rec_dict = {}
+	for rec in macro_recs:
+		## Convert None Imin/Imax values to np.nan
+		rec['Imin'] = rec['Imin'] or np.nan
+		rec['Imax'] = rec['Imax'] or np.nan
+
+		if id_earth is not None:
+			if group_by_main_commune:
+				key = rec['id_main']
+			else:
+				key = rec['id_com']
+		else:
+			key = rec['id_earth']
+
+		if not key in macro_rec_dict:
+			macro_rec_dict[key] = [rec]
+		else:
+			macro_rec_dict[key].append(rec)
+
+	return macro_rec_dict
+
+
+def query_official_macro_catalog(id_earth, id_com=None, group_by_main_commune=False,
+								min_fiability=20, verbose=False, errf=None):
+	"""
+	Query ROB catalog of official communal macroseismic enquiries
+	This is a wrapper for :func:`query_traditional_macro_catalog`
+	"""
+	kwargs = locals().copy()
+	return query_traditional_macro_catalog(data_type='official', **kwargs)
+
+
+def query_historical_macro_catalog(id_earth, id_com=None, group_by_main_commune=False,
+								min_fiability=20, verbose=False, errf=None):
+	"""
+	Query ROB catalog of historical macroseismic data
+	This is a wrapper for :func:`query_traditional_macro_catalog`
+	"""
+	kwargs = locals().copy()
+	return query_traditional_macro_catalog(data_type='historical', **kwargs)
+
+
+def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type='',
+					min_or_max='max', group_by_main_commune=False, agg_method="average",
+					min_fiability=20, verbose=False, errf=None):
+	"""
+	Query ROB traditional macroseismic catalog
+	This includes both "official" communal inquiries and historical
+	data.
+	Currently, this catalog contains only 1 record per commune
+	for each earthquake. Consequently, official and historical data
+	are mutually exclusive.
+
+	:param id_earth:
+		int, earthquake ID
+	:param id_com:
+		int, commune ID
+		or list of ints
+		(default: None)
+		Note that :param:`id_earth` must not be None if :param:`id_com`
+		is a list or None
+	:param data_type:
+		str, type of macroseismic data: '', 'official' or 'historical'
+		(default: '')
 	:param min_or_max:
 		str, one of 'min', 'mean' or 'max' to select between
 		intensity_min and intensity_max values in database
 		(default: 'max')
-	:param min_val:
-		float, minimum intensity to return
-		(default: 1, avoids getting NULL results)
-	:param group_by_main_village:
+	:param group_by_main_commune:
 		bool, whether or not to aggregate the results by main village
 		(default: False)
 	:param agg_method:
-		str, aggregation function to use if :param:`group_by_main_village`
+		str, aggregation function to use if :param:`group_by_main_commune`
 		is True, one of "minimum", "maximum" or "average"
 		(default: "average")
 	:param min_fiability:
@@ -545,6 +699,9 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 		instance of :class:`MacroInfoCollection`
 	"""
 	from ..macro.macro_info import MacroseismicInfo, MacroInfoCollection
+
+	assert not (id_earth is None and
+				(id_com is None or isinstance(id_com, (list, np.ndarray))))
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
@@ -572,7 +729,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 		## Construct SQL query
 		table_clause = ['macro_detail']
 
-		if group_by_main_village:
+		if group_by_main_commune:
 			column_clause = [
 				'communes.id_main AS id_com',
 				'main_communes.longitude',
@@ -588,7 +745,7 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 		Imin_clause = 'IF (intensity_min < 13, intensity_min, NULL)'
 		Imax_clause = 'IF (intensity_max < 13, intensity_max, NULL)'
 
-		if group_by_main_village:
+		if group_by_main_commune:
 			agg_function = AGG_FUNC_DICT.get(agg_method.lower())
 			if min_or_max == 'min':
 				intensity_col = '%s(%s) AS "Intensity"'
@@ -615,28 +772,46 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 			group_clause = ""
 			column_clause.append('id_macro_detail AS id_db')
 
-		where_clause = 'macro_detail.id_earth = %d' % id_earth
-		where_clause += ' and macro_detail.fiability >= %d' % min_fiability
+		where_clause = 'macro_detail.fiability >= %d' % min_fiability
+		if id_earth is not None:
+			where_clause += ' AND macro_detail.id_earth = %d' % id_earth
+		if id_com is not None:
+			if group_by_main_commune:
+				where_clause += ' AND communes.id_main'
+			else:
+				where_clause += ' AND macro_detail.id_com'
+			if isinstance(id_com, int):
+				where_clause += ' = %d' % id_com
+			elif isinstance(id_com, (list, np.ndarray)):
+				id_com_str = ','.join(['%s' % id for id in id_com])
+				where_clause += ' IN (%s)' % id_com_str
+		if data_type == 'historical':
+			where_clause += (' AND CONCAT(id_earth, id_com) NOT IN'
+							' (SELECT CONCAT(id_earth, id_com)'
+							' FROM macro_official_inquires)')
 
 		join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id')]
-		if group_by_main_village:
+		if data_type == 'official':
+			join_clause.append(('RIGHT JOIN', 'macro_official_inquires',
+				'macro_detail.id_com = macro_official_inquires.id_com'
+				' AND macro_detail.id_earth = macro_official_inquires.id_earth'))
+		if group_by_main_commune:
 			join_clause.append(('JOIN', 'communes AS main_communes',
 							'communes.id_main = main_communes.id'))
 
-		having_clause = 'Intensity >= %d' % min_val
-		order_clause = ''
+		#having_clause = 'Intensity >= %d' % min_val
 
 		if errf !=None:
-			errf.write("Querying KSB-ORB official macroseismic catalog:\n")
+			errf.write("Querying KSB-ORB traditional macroseismic catalog:\n")
 
 		macro_recs = query_seismodb_table(table_clause, column_clause=column_clause,
 					join_clause=join_clause, where_clause=where_clause,
-					having_clause=having_clause, order_clause=order_clause,
+					#having_clause=having_clause, order_clause=order_clause,
 					group_clause=group_clause, verbose=verbose, errf=errf)
 
 	## Fetch records
 	macro_infos = []
-	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
+	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_commune]
 	for rec in macro_recs:
 		id_com = rec['id_com']
 		I = float(rec['Intensity'])
@@ -646,25 +821,51 @@ def query_official_macro_catalog(id_earth, min_or_max='max', min_val=1,
 			db_ids = [rec['id_db']]
 		else:
 			db_ids = list(map(int, rec['id_db'].split(',')))
+		if data_type == '':
+			enq_type = 'traditional'
+		else:
+			enq_type = data_type
 		macro_info = MacroseismicInfo(id_earth, id_com, I, agg_type,
-									'official', num_replies=num_replies,
+									enq_type, num_replies=num_replies,
 									lon=lon, lat=lat, db_ids=db_ids)
 		macro_infos.append(macro_info)
 
 	proc_info = dict(agg_method=agg_method, min_fiability=min_fiability,
 					min_or_max=min_or_max)
-	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'official',
+	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, enq_type,
 										proc_info=proc_info)
 
 	return macro_info_coll
 
 
-def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
-					min_val=1, min_fiability=20.0, group_by_main_village=False,
+def query_official_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='max',
+					group_by_main_commune=False, agg_method="average",
+					min_fiability=20, verbose=False, errf=None):
+	"""
+	Query ROB catalog of official communal macroseismic enquiries
+	This is a wrapper for :func:`query_traditional_macro_catalog`
+	"""
+	kwargs = locals().copy()
+	return query_traditional_macro_catalog_aggregated(data_type='official', **kwargs)
+
+
+def query_historical_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='max',
+					group_by_main_commune=False, agg_method="average",
+					min_fiability=20, verbose=False, errf=None):
+	"""
+	Query ROB catalog of historical macroseismic data
+	This is a wrapper for :func:`query_traditional_macro_catalog`
+	"""
+	kwargs = locals().copy()
+	return query_traditional_macro_catalog_aggregated(data_type='historical', **kwargs)
+
+
+def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="cii",
+					min_val=1, min_fiability=20.0, group_by_main_commune=False,
 					filter_floors=False, agg_method="mean", verbose=False,
 					errf=None):
 	"""
-	Query ROB web macroseismic catalog (= online inquiries)
+	Query ROB internet macroseismic catalog (= online inquiries)
 
 	:param id_earth:
 		int, earthquake ID
@@ -680,7 +881,7 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 	:param min_fiability:
 		float, minimum fiability of enquiry
 		(default: 20.)
-	:param group_by_main_village:
+	:param group_by_main_commune:
 		bool, whether or not to aggregate the results by main village
 		(default: False)
 	:param filter_floors:
@@ -689,7 +890,7 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 		(default: False)
 	:param agg_method:
 		str, aggregation function to use, one of "minimum", "maximum" or
-		"average"/"mean". If :param:`group_by_main_village` is False,
+		"average"/"mean". If :param:`group_by_main_commune` is False,
 		aggregation applies to the enquiries within a given (sub)commune
 		(default: "mean")
 	:param verbose:
@@ -713,7 +914,7 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 					'web_analyse.id_com = 0 AND web_input.zip = comm2.code_p '
 					'AND web_input.country = comm2.country AND comm2.id = comm2.id_main')]
 
-	if group_by_main_village:
+	if group_by_main_commune:
 		column_clause = ['COALESCE(comm1.id_main, comm2.id_main) AS id_comm']
 	else:
 		column_clause = ['COALESCE(comm1.id, comm2.id) AS id_comm']
@@ -751,7 +952,7 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 
 	## Fetch records
 	macro_infos = []
-	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_village]
+	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_commune]
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					join_clause=join_clause, where_clause=where_clause,
 					having_clause=having_clause, order_clause=order_clause,
@@ -775,7 +976,7 @@ def query_web_macro_catalog(id_earth, min_replies=3, query_info="cii",
 	return macro_info_coll
 
 
-def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
+def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 						min_fiability=20, min_location_quality=6,
 						web_ids=[], verbose=False, errf=None):
 	"""
@@ -877,7 +1078,7 @@ def query_web_macro_enquiries(id_earth=None, id_com=None, zip_code=None,
 	return MacroseismicEnquiryEnsemble(id_earth, recs)
 
 
-def get_num_macroseismic_enquiries(id_earth, min_fiability=20):
+def get_num_online_macro_enquiries(id_earth, min_fiability=20):
 	"""
 	Count number of macroseismic enquiries for a particular event.
 
