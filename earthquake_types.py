@@ -132,4 +132,4 @@ if __name__ == "__main__":
 		col_name = 'name_%s' % lang.lower()
 		eq_type_dict = EARTHQUAKE_TYPES[lang]
 		codes, col_values = eq_type_dict.keys(), eq_type_dict.values()
-		seismodb.update_column(table_name, col_name, col_values, id_col_name, codes)
+		#seismodb.update_column(table_name, col_name, col_values, id_col_name, codes)
