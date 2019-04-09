@@ -1024,7 +1024,7 @@ class MacroseismicEnquiryEnsemble():
 		return bin_rec_dict
 
 	def get_aggregated_info(self, aggregate_by='id_com', min_replies=3,
-							min_fiability=20.0, filter_floors=False,
+							min_fiability=80, filter_floors=False,
 							agg_info='cii', agg_method='mean', fix_records=True,
 							include_other_felt=True, include_heavy_appliance=False,
 							remove_outliers=(2.5, 97.5)):
