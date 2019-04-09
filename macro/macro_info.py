@@ -100,7 +100,7 @@ class MacroseismicInfo():
 			[eq] = query_local_eq_catalog_by_id(self.id_earth)
 			return eq
 
-	def get_online_enquiries(self, min_fiability=20, verbose=False):
+	def get_online_enquiries(self, min_fiability=80, verbose=False):
 		"""
 		Fetch macroseismic enquiry records from the database, based on
 		either db_ids or, if this is empty, id_earth
@@ -599,7 +599,7 @@ class MacroInfoCollection():
 
 
 def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
-				min_fiability=20, filter_floors=(0, 4), aggregate_by="commune",
+				min_fiability=80, filter_floors=(0, 4), aggregate_by="commune",
 				agg_method='mean', fix_records=True,
 				include_other_felt=True, include_heavy_appliance=False,
 				remove_outliers=(2.5, 97.5), verbose=False):
@@ -701,7 +701,7 @@ def _get_aggregated_intensity(macro_recs, min_or_max, agg_function):
 	return agg_func(intensities)
 
 
-def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fiability=20,
+def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fiability=80,
 				min_or_max='max', aggregate_by="commune", agg_method="mean",
 				verbose=False):
 	"""
@@ -806,7 +806,7 @@ def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fi
 	return macro_info_coll
 
 
-def aggregate_official_macro_info(id_earth, id_com=None, min_fiability=20,
+def aggregate_official_macro_info(id_earth, id_com=None, min_fiability=80,
 				min_or_max='max', aggregate_by="commune", agg_method="mean"):
 	"""
 	Obtain aggregated official macroseismic information for given earthquake
@@ -816,7 +816,7 @@ def aggregate_official_macro_info(id_earth, id_com=None, min_fiability=20,
 	return aggregate_official_macro_info(data_type='official', **kwargs)
 
 
-def aggregate_historical_macro_info(id_earth, id_com=None, min_fiability=20,
+def aggregate_historical_macro_info(id_earth, id_com=None, min_fiability=80,
 				min_or_max='max', aggregate_by="commune", agg_method="mean"):
 	"""
 	Obtain aggregated historical macroseismic information for given earthquake
