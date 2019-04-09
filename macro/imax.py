@@ -23,7 +23,7 @@ __all__ = ["get_eq_intensities_for_commune_online",
 
 
 def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
-				min_replies=3, min_fiability=20, filter_floors=(0, 4),
+				min_replies=3, min_fiability=80, filter_floors=(0, 4),
 				agg_method='mean', fix_records=True,
 				include_other_felt=True, include_heavy_appliance=False,
 				remove_outliers=(2.5, 97.5)):
@@ -111,7 +111,7 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 
 
 def get_eq_intensities_for_commune_traditional(id_com, data_type='',
-					as_main_commune=False, min_or_max='mean', min_fiability=20):
+					as_main_commune=False, min_or_max='mean', min_fiability=80):
 	"""
 	Get list of all traditional intensities due to known earthquakes
 	for a given commune
@@ -159,7 +159,7 @@ def get_eq_intensities_for_commune_traditional(id_com, data_type='',
 
 
 def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
-										min_or_max='mean', min_fiability=20):
+										min_or_max='mean', min_fiability=80):
 	"""
 	Get list of all official intensities due to known earthquakes
 	for a given commune
@@ -170,7 +170,7 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 
 
 def get_eq_intensities_for_commune_historical(id_com, as_main_commune=False,
-										min_or_max='mean', min_fiability=20):
+										min_or_max='mean', min_fiability=80):
 	"""
 	Get list of all official intensities due to known earthquakes
 	for a given commune
@@ -238,7 +238,7 @@ def _parse_data_type(data_type):
 
 
 def get_all_commune_intensities(data_type='all',
-				min_fiability=20,
+				min_fiability=80,
 				min_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
@@ -355,7 +355,7 @@ def get_all_commune_intensities(data_type='all',
 
 def get_imax_by_commune(data_type='all',
 				count_exceedances=None,
-				min_fiability=20,
+				min_fiability=80,
 				min_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
@@ -481,7 +481,7 @@ def get_imax_by_commune(data_type='all',
 
 
 def get_num_exceedances_by_commune(Imin, data_type='all',
-				min_fiability=20,
+				min_fiability=80,
 				min_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
