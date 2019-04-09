@@ -42,11 +42,11 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 		(default: 3)
 	:param min_fiability:
 		int, minimum fiability of enquiry
-		(default: 20)
+		(default: 80)
 	:param filter_floors:
 		(min_floor, max_floor) tuple, floors outside this range
 		(basement floors and upper floors) are filtered out
-		(default: False)
+		(default: (0, 4))
 	:param agg_method:
 		str, how to aggregate individual enquiries in a subcommune,
 		either 'mean' (= ROB practice) or 'aggregated' (= DYFI practice)
@@ -131,7 +131,7 @@ def get_eq_intensities_for_commune_traditional(id_com, data_type='',
 		(default: 'mean')
 	:param min_fiability:
 		int, minimum fiability of enquiry
-		(default: 20)
+		(default: 80)
 
 	:return:
 		dict mapping earthquake IDs to lists of intensities
@@ -255,7 +255,7 @@ def get_all_commune_intensities(data_type='all',
 		(default: 'all')
 	:param min_fiability:
 		int, minimum fiability of internet or official enquiry
-		(default: 20)
+		(default: 80)
 	:param min_or_max:
 		see :func:`get_eq_intensities_for_commune_official`
 	:param min_replies:
@@ -375,7 +375,7 @@ def get_imax_by_commune(data_type='all',
 		(default: None)
 	:param min_fiability:
 		int, minimum fiability of internet or official enquiry
-		(default: 20)
+		(default: 80)
 	:param min_or_max:
 		see :func:`get_eq_intensities_for_commune_official`
 	:param min_replies:
