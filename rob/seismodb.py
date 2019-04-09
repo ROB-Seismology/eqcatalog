@@ -47,6 +47,9 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_historical_macro_catalog_aggregated",
 			"query_online_macro_catalog_aggregated",
 			"get_num_online_macro_enquiries",
+			"get_num_official_enquiries",
+			"get_earthquakes_with_official_enquiries",
+			"get_earthquakes_with_online_enquiries",
 			"query_stations", "get_station_coordinates",
 			"zip2ID", "get_communes", "get_subcommunes"]
 
@@ -1078,7 +1081,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 
 def get_num_online_macro_enquiries(id_earth, min_fiability=80):
 	"""
-	Count number of macroseismic enquiries for a particular event.
+	Count number of online macroseismic enquiries for a particular event.
 
 	:param id_earth:
 		int or list of ints, ID(s) of event in ROB catalog
@@ -1110,6 +1113,68 @@ def get_num_online_macro_enquiries(id_earth, min_fiability=80):
 								where_clause=where_clause, group_clause=group_clause)
 	num_enquiries = [rec['num_enquiries'] for rec in db_recs]
 	return num_enquiries
+
+
+def get_num_official_enquiries(id_earth):
+	"""
+	Count number of official macroseismic enquiries for a particular
+	earthquake
+
+	:param id_earth:
+		int or list of ints, ID(s) of event in ROB catalog
+
+	:return:
+		list of ints, number of enquiries for each earthquake
+	"""
+	## Convert input arguments, if necessary
+	if isinstance(id_earth, (int, basestring)):
+		id_earth = [id_earth]
+
+	table_clause = 'macro_official_inquires'
+	column_clause = ['Count(*) as num_enquiries']
+	where_clause = 'id_earth in (%s)'
+	where_clause %= ",".join([str(item) for item in id_earth])
+	group_clause = 'id_earth'
+
+
+	db_recs = query_seismodb_table(table_clause, column_clause,
+								where_clause=where_clause, group_clause=group_clause)
+	num_enquiries = [rec['num_enquiries'] for rec in db_recs]
+	return num_enquiries
+
+
+def get_earthquakes_with_official_enquiries():
+	"""
+	Create catalog of earthquakes that have official enquiries
+	associated with them.
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	table_clause = 'macro_official_inquires'
+	column_clause = 'id_earth'
+	group_clause = 'id_earth'
+	db_recs = query_seismodb_table(table_clause, column_clause,
+									group_clause=group_clause)
+	eq_ids = [rec['id_earth'] for rec in db_recs]
+	return query_local_eq_catalog_by_id(eq_ids)
+
+
+def get_earthquakes_with_online_enquiries():
+	"""
+	Create catalog of earthquakes that have online enquiries
+	associated with them.
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	table_clause = 'web_analyse'
+	column_clause = 'id_earth'
+	group_clause = 'id_earth'
+	db_recs = query_seismodb_table(table_clause, column_clause,
+									group_clause=group_clause)
+	eq_ids = [rec['id_earth'] for rec in db_recs]
+	return query_local_eq_catalog_by_id(eq_ids)
 
 
 def query_stations(network='UCC', activity_date_time=None, verbose=False):
