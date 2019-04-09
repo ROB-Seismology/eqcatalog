@@ -616,7 +616,7 @@ def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
 		(default: 'cii')
 	:param min_fiability:
 		int, minimum fiability of enquiries to include in plot
-		(default: 20)
+		(default: 80)
 	:param filter_floors:
 		(lower_floor, upper_floor) tuple, floors outside this range
 			(basement floors and upper floors) are filtered out
@@ -718,7 +718,7 @@ def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fi
 		(default: '')
 	:param min_fiability:
 		int, minimum fiability of macroseismic record
-		(default: 20)
+		(default: 80)
 	:param min_or_max:
 		str, one of 'min', 'mean' or 'max' to select between
 		intensity_min and intensity_max values in database
