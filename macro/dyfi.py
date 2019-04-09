@@ -1045,7 +1045,7 @@ class MacroseismicEnquiryEnsemble():
 			(default: 3)
 		:param min_fiability:
 			int, minimum fiability of enquiries to include in aggregate
-			(default: 20)
+			(default: 80)
 		:param filter_floors:
 			(lower_floor, upper_floor) tuple, floors outside this range
 			(basement floors and upper floors) are filtered out
