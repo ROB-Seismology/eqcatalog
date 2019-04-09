@@ -37,7 +37,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return hash
 
 	def get_aggregated_online_macro_info(self, min_replies=3, query_info="cii",
-					min_fiability=80.0, filter_floors=(0,4),
+					min_fiability=80, filter_floors=(0,4),
 					aggregate_by='commune', agg_method="mean", fix_records=True,
 					include_other_felt=True, include_heavy_appliance=False,
 					remove_outliers=(2.5, 97.5), verbose=False):
@@ -53,7 +53,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			(default: "cii")
 		:param min_fiability:
 			float, minimum fiability of enquiry
-			(default: 20.)
+			(default: 80)
 		:param filter_floors:
 				(min_floor, max_floor) tuple, floors outside this range
 				(basement floors and upper floors) are filtered out
