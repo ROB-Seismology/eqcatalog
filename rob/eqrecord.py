@@ -123,7 +123,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			(default: 'max')
 		:param min_fiability:
 			float, minimum fiability of enquiry
-			(default: 20.)
+			(default: 80)
 		:param aggregate_by:
 			str, type of aggregation, specifying how macroseismic data should
 			be aggregated in the map, one of:
@@ -190,7 +190,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			(default: False)
 		:param min_fiability:
 			float, minimum fiability of enquiry
-			(default: 20.)
+			(default: 80)
 		:param verbose:
 			Bool, if True the query string will be echoed to standard output
 		:param errf:
@@ -256,7 +256,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 
 		:param min_fiability:
 			float, minimum fiability of enquiry
-			(default: 20.)
+			(default: 80)
 		:param min_location_quality:
 			int, minimum quality of location to read from web_location table
 			(default: 6)
@@ -279,7 +279,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 
 		:param min_fiability:
 			float, minimum fiability of enquiries
-			(default: 20)
+			(default: 80)
 
 		:return:
 			int, number of enquiries
