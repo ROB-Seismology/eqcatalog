@@ -51,6 +51,7 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"zip2ID", "get_communes", "get_subcommunes"]
 
 
+# Note: median is not supported by MySQL
 AGG_FUNC_DICT = {"average": "AVG", "mean": "AVG",
 				"minimum": "MIN", "maximum": "MAX"}
 
@@ -514,7 +515,7 @@ def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 
 
 def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
-					group_by_main_commune=False, min_fiability=20,
+					group_by_main_commune=False, min_fiability=80,
 					verbose=False, errf=None):
 	"""
 	Query ROB traditional macroseismic catalog
@@ -635,7 +636,7 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 
 
 def query_official_macro_catalog(id_earth, id_com=None, group_by_main_commune=False,
-								min_fiability=20, verbose=False, errf=None):
+								min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB catalog of official communal macroseismic enquiries
 	This is a wrapper for :func:`query_traditional_macro_catalog`
@@ -645,7 +646,7 @@ def query_official_macro_catalog(id_earth, id_com=None, group_by_main_commune=Fa
 
 
 def query_historical_macro_catalog(id_earth, id_com=None, group_by_main_commune=False,
-								min_fiability=20, verbose=False, errf=None):
+								min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB catalog of historical macroseismic data
 	This is a wrapper for :func:`query_traditional_macro_catalog`
@@ -655,8 +656,8 @@ def query_historical_macro_catalog(id_earth, id_com=None, group_by_main_commune=
 
 
 def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type='',
-					min_or_max='max', group_by_main_commune=False, agg_method="average",
-					min_fiability=20, verbose=False, errf=None):
+					min_or_max='max', group_by_main_commune=False, agg_method="mean",
+					min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB traditional macroseismic catalog
 	This includes both "official" communal inquiries and historical
@@ -839,8 +840,8 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 
 
 def query_official_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='max',
-					group_by_main_commune=False, agg_method="average",
-					min_fiability=20, verbose=False, errf=None):
+					group_by_main_commune=False, agg_method="mean",
+					min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB catalog of official communal macroseismic enquiries
 	This is a wrapper for :func:`query_traditional_macro_catalog`
@@ -850,8 +851,8 @@ def query_official_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='m
 
 
 def query_historical_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='max',
-					group_by_main_commune=False, agg_method="average",
-					min_fiability=20, verbose=False, errf=None):
+					group_by_main_commune=False, agg_method="mean",
+					min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB catalog of historical macroseismic data
 	This is a wrapper for :func:`query_traditional_macro_catalog`
@@ -861,7 +862,7 @@ def query_historical_macro_catalog_aggregated(id_earth, id_com=None, min_or_max=
 
 
 def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="cii",
-					min_val=1, min_fiability=20.0, group_by_main_commune=False,
+					min_fiability=80.0, group_by_main_commune=False,
 					filter_floors=False, agg_method="mean", verbose=False,
 					errf=None):
 	"""
@@ -875,9 +876,6 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 	:param query_info:
 		str, either "cii", "cdi" or "mi"
 		(default: "cii")
-	:param min_val:
-		float, minimum intensity to return
-		(default: 1)
 	:param min_fiability:
 		float, minimum fiability of enquiry
 		(default: 20.)
@@ -941,8 +939,8 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 		where_clause += ' OR web_input.floor BETWEEN %d AND %d)' % filter_floors
 
 	having_clause = 'num_replies >= %d' % min_replies
-	if query_info.lower() in ("cii", "cdi", "mi"):
-		having_clause += ' and Intensity >= %d' % min_val
+	#if query_info.lower() in ("cii", "cdi", "mi"):
+	#	having_clause += ' and Intensity >= %d' % min_val
 
 	## Not really useful, as we return a dict...
 	order_clause = 'num_replies DESC'
@@ -955,7 +953,7 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_commune]
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					join_clause=join_clause, where_clause=where_clause,
-					having_clause=having_clause, order_clause=order_clause,
+					#having_clause=having_clause, order_clause=order_clause,
 					group_clause=group_clause, verbose=verbose, errf=errf):
 		id_com = rec['id_comm']
 		I = rec['Intensity']
@@ -977,7 +975,7 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 
 
 def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
-						min_fiability=20, min_location_quality=6,
+						min_fiability=80, min_location_quality=6,
 						web_ids=[], verbose=False, errf=None):
 	"""
 	Query internet enquiries.
@@ -1078,7 +1076,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 	return MacroseismicEnquiryEnsemble(id_earth, recs)
 
 
-def get_num_online_macro_enquiries(id_earth, min_fiability=20):
+def get_num_online_macro_enquiries(id_earth, min_fiability=80):
 	"""
 	Count number of macroseismic enquiries for a particular event.
 
