@@ -275,7 +275,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 
 	def get_num_online_macro_enquiries(self, min_fiability=80):
 		"""
-		Count number of online macroseismic enquiries for a particular event.
+		Count number of online macroseismic enquiries for this earthquake
 
 		:param min_fiability:
 			float, minimum fiability of enquiries
@@ -286,6 +286,17 @@ class ROBLocalEarthquake(LocalEarthquake):
 		"""
 		from .seismodb import get_num_online_macro_enquiries
 		[num_enquiries] = get_num_online_macro_enquiries([self.ID], min_fiability)
+		return num_enquiries
+
+	def get_num_official_macro_enquiries(self):
+		"""
+		Count number of official macroseismic enquiries  for this earthquake
+
+		:return:
+			int, number of enquiries
+		"""
+		from .seismodb import get_num_official_enquiries
+		[num_enquiries] = get_num_official_enquiries([self.ID])
 		return num_enquiries
 
 	def get_Imax_online(self, min_replies=3, min_fiability=80.0, filter_floors=(0,4),
