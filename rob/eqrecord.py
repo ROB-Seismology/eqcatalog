@@ -37,7 +37,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return hash
 
 	def get_aggregated_online_macro_info(self, min_replies=3, query_info="cii",
-					min_fiability=20.0, filter_floors=(0,4),
+					min_fiability=80.0, filter_floors=(0,4),
 					aggregate_by='commune', agg_method="mean", fix_records=True,
 					include_other_felt=True, include_heavy_appliance=False,
 					remove_outliers=(2.5, 97.5), verbose=False):
@@ -104,7 +104,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return aggregate_online_macro_info(self.ID, **kwargs)
 
 	def get_aggregated_traditional_macro_info(self, id_com=None, data_type='',
-			min_or_max='max', min_fiability=20, aggregate_by="commune",
+			min_or_max='max', min_fiability=80, aggregate_by="commune",
 			agg_method="mean", verbose=False):
 		"""
 		Get traditional (historical / official) macroseismic information
@@ -149,7 +149,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return aggregate_traditional_macro_info(self.ID, **kwargs)
 
 	def get_aggregated_official_macro_info(self, id_com=None, min_or_max='max',
-			group_by_main_commune=False, agg_method="mean", min_fiability=20,
+			group_by_main_commune=False, agg_method="mean", min_fiability=80,
 			verbose=False):
 		"""
 		Get official macroseismic information (possibly aggregated by
@@ -161,7 +161,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return self.get_aggregated_traditional_macro_info(data_type='official', **kwargs)
 
 	def get_aggregated_historical_macro_info(self, id_com=None, min_or_max='max',
-			group_by_main_commune=False, agg_method="mean", min_fiability=20,
+			group_by_main_commune=False, agg_method="mean", min_fiability=80,
 			verbose=False):
 		"""
 		Get historical macroseismic information (possibly aggregated by
@@ -173,7 +173,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return self.get_aggregated_traditional_macro_info(data_type='historical', **kwargs)
 
 	def get_traditional_macroseismic_info(self, id_com=None, data_type='',
-					group_by_main_commune=False, min_fiability=20,
+					group_by_main_commune=False, min_fiability=80,
 					verbose=False, errf=None):
 		"""
 		Get traditional macroseismic information for this earthquake
@@ -207,7 +207,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return query_traditional_macro_catalog(self.ID, **kwargs)
 
 	def get_official_macroseismic_info(self, id_com=None,
-					group_by_main_commune=False, min_fiability=20,
+					group_by_main_commune=False, min_fiability=80,
 					verbose=False, errf=None):
 		"""
 		Get official macroseismic information for this earthquake
@@ -218,7 +218,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return self.get_traditional_macroseismic_info(data_type='official', **kwargs)
 
 	def get_historical_macroseismic_info(self, id_com=None,
-					group_by_main_commune=False, min_fiability=20,
+					group_by_main_commune=False, min_fiability=80,
 					verbose=False, errf=None):
 		"""
 		Get historical macroseismic information for this earthquake
@@ -249,7 +249,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return get_commune_intensities_from_isoseismals(self.ID,
 						main_communes=group_by_main_commune, as_points=as_points)
 
-	def get_online_macro_enquiries(self, min_fiability=20, min_location_quality=6,
+	def get_online_macro_enquiries(self, min_fiability=80, min_location_quality=6,
 									verbose=False):
 		"""
 		Get all online macroseismic enquiries for this earthquake
@@ -273,7 +273,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 										verbose=verbose)
 		return ensemble
 
-	def get_num_online_macro_enquiries(self, min_fiability=20):
+	def get_num_online_macro_enquiries(self, min_fiability=80):
 		"""
 		Count number of online macroseismic enquiries for a particular event.
 
@@ -288,7 +288,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		[num_enquiries] = get_num_online_macro_enquiries([self.ID], min_fiability)
 		return num_enquiries
 
-	def get_Imax_online(self, min_replies=3, min_fiability=20.0, filter_floors=(0,4),
+	def get_Imax_online(self, min_replies=3, min_fiability=80.0, filter_floors=(0,4),
 					aggregate_by='commune', agg_method="mean", fix_records=True,
 					include_other_felt=True, include_heavy_appliance=False,
 					remove_outliers=(2.5, 97.5), verbose=False):
@@ -335,7 +335,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return Imax
 
 	def get_Imax_traditional(self, data_type='', min_or_max='max',
-			min_fiability=20, aggregate_by="commune", agg_method="mean",
+			min_fiability=80, aggregate_by="commune", agg_method="mean",
 			verbose=False):
 		"""
 		Report maximum traditional intensity in any commune for this earthquake.
@@ -360,7 +360,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			Imax = 0
 		return Imax
 
-	def get_Imax_official(self, min_or_max='max', min_fiability=20,
+	def get_Imax_official(self, min_or_max='max', min_fiability=80,
 				aggregate_by="commune", agg_method="mean", verbose=False):
 		"""
 		Report maximum official intensity in any commune for this earthquake.
@@ -370,7 +370,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		kwargs.pop('self')
 		return self.get_Imax_traditional(data_type='official', **kwargs)
 
-	def get_Imax_historical(self, min_or_max='max', min_fiability=20,
+	def get_Imax_historical(self, min_or_max='max', min_fiability=80,
 				aggregate_by="commune", agg_method="mean", verbose=False):
 		"""
 		Report maximum historical intensity in any commune for this earthquake.
@@ -393,7 +393,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		else:
 			return 0
 
-	def get_Imax(self, min_fiability=20,
+	def get_Imax(self, min_fiability=80,
 				min_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
