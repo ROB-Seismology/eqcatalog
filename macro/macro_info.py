@@ -781,7 +781,7 @@ def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fi
 				lon, lat = comm_recs[0]['longitude'], comm_recs[0]['latitude']
 
 		## Remove records without location
-		if lon is None:
+		if lon is None and verbose:
 			print("Commune #%s has no location!" % id_com)
 			continue
 
