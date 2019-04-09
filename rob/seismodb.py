@@ -541,7 +541,7 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 		(default: False)
 	:param min_fiability:
 		float, minimum fiability of enquiry
-		(default: 20.)
+		(default: 80)
 	:param verbose:
 		Bool, if True the query string will be echoed to standard output
 	:param errf:
@@ -690,7 +690,7 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 		(default: "average")
 	:param min_fiability:
 		float, minimum fiability of enquiry
-		(default: 20.)
+		(default: 80)
 	:param verbose:
 		Bool, if True the query string will be echoed to standard output
 	:param errf:
@@ -862,8 +862,8 @@ def query_historical_macro_catalog_aggregated(id_earth, id_com=None, min_or_max=
 
 
 def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="cii",
-					min_fiability=80.0, group_by_main_commune=False,
-					filter_floors=False, agg_method="mean", verbose=False,
+					min_fiability=80, group_by_main_commune=False,
+					filter_floors=(0, 4), agg_method="mean", verbose=False,
 					errf=None):
 	"""
 	Query ROB internet macroseismic catalog (= online inquiries)
@@ -878,14 +878,14 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 		(default: "cii")
 	:param min_fiability:
 		float, minimum fiability of enquiry
-		(default: 20.)
+		(default: 80)
 	:param group_by_main_commune:
 		bool, whether or not to aggregate the results by main village
 		(default: False)
 	:param filter_floors:
 		(min_floor, max_floor) tuple, floors outside this range
 		(basement floors and upper floors) are filtered out
-		(default: False)
+		(default: (0, 4))
 	:param agg_method:
 		str, aggregation function to use, one of "minimum", "maximum" or
 		"average"/"mean". If :param:`group_by_main_commune` is False,
@@ -996,7 +996,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 		(default: None)
 	:param min_fiability:
 		float, minimum fiability of enquiry
-		(default: 20.)
+		(default: 80)
 	:param min_location_quality:
 		int, minimum quality of location to read from web_location table
 		(default: 6)
@@ -1084,7 +1084,7 @@ def get_num_online_macro_enquiries(id_earth, min_fiability=80):
 		int or list of ints, ID(s) of event in ROB catalog
 	:param min_fiability:
 		float, minimum fiability of enquiries
-		(default: 20)
+		(default: 80)
 
 	:return:
 		list of ints, number of enquiries for each earthquake
