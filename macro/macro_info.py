@@ -593,7 +593,7 @@ class MacroInfoCollection():
 					% str(self.proc_info['remove_outliers']))
 		elif self.data_type in ('traditional', 'official', 'historical'):
 			text += "\nMin. fiability: %d" % self.proc_info['min_fiability']
-			text += "\nImin_or_max%s" % self.proc_info['min_or_max']
+			text += "\nImin_or_max: %s" % self.proc_info['min_or_max']
 
 		return text
 
@@ -774,7 +774,7 @@ def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fi
 				lon, lat = rec['longitude'], rec['latitude']
 
 		## If main commune is not included, fetch location from communes table
-		if lon is None:
+		if lon is None and id_com is not None:
 			sql = 'SELECT * FROM communes where id = %d' % id_com
 			comm_recs = query_seismodb_table_generic(sql, verbose=verbose)
 			if len(comm_recs) == 1:
