@@ -82,7 +82,7 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 		zip_code = None
 
 	eq_intensities = {}
-	dyfi = seismodb.query_online_macro_enquiries('ke', id_com=id_com,
+	dyfi = seismodb.query_online_macro_catalog('ke', id_com=id_com,
 						zip_code=zip_code, min_fiability=min_fiability)
 	if fix_records and len(dyfi):
 		dyfi = dyfi.fix_all()
