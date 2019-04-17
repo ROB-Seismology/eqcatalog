@@ -11,7 +11,8 @@ import os
 import numpy as np
 
 import mapping.layeredbasemap as lbm
-from eqcatalog.macro import get_aggregated_info_official, get_aggregated_info_web
+from eqcatalog.macro import (aggregate_traditional_macro_info,
+						aggregate_online_macro_info, get_isoseismal_macro_info)
 
 
 ## Earthquake to plot
@@ -20,14 +21,15 @@ from eqcatalog.macro import get_aggregated_info_official, get_aggregated_info_we
 ## 1938 earthquake
 #id_earth = 509
 ## 2002 Alsdorf
-#id_earth = 1306
+id_earth = 1306
 ## Kinrooi 25/05/2018
-id_earth = 6625
+#id_earth = 6625
 
 
 ## Macroseismic paramerers
-enq_type = 'online'
-#enq_type = 'official'
+#enq_type = 'online'
+enq_type = 'official'
+#enq_type = 'isoseismal'
 
 ## Common
 min_fiability = 80
@@ -36,18 +38,20 @@ min_fiability = 80
 query_info = "cii"
 #query_info = "num_replies"
 min_replies = 3
-#filter_floors = (-100, 900)
-filter_floors = (0, 4)
-agg_method = 'mean'
-#agg_method = 'mean-aggregated'
+filter_floors = None
+#filter_floors = (0, 4)
+agg_method_online = 'mean'
+#agg_method_online = 'aggregated'
+#agg_method_online = 'mean-aggregated'
 fix_records = True
 include_other_felt = True
 include_heavy_appliance = False
 remove_outliers = (0, 100)
+#remove_outliers = (5, 95)
 
-## Official enquiries
-min_or_max = 'mean'
-agg_function = 'average'
+## Official/historical enquiries
+min_or_max = 'max'
+agg_subcommunes = 'mean'
 
 
 ## How to aggregate
@@ -55,23 +59,31 @@ agg_function = 'average'
 #aggregate_by = None
 ## Aggregate by commune or main commune
 #aggregate_by = 'commune'
-#aggregate_by = 'main commune'
+aggregate_by = 'main commune'
 ## Aggregate by grid cell
-aggregate_by = 'grid_5'
+#aggregate_by = 'grid_5'
 
 
-if enq_type in ('internet', 'online'):
-	macro_info = get_aggregated_info_web(id_earth, min_replies=min_replies,
+if enq_type in ('internet', 'online', 'dyfi'):
+	macro_info = aggregate_online_macro_info(id_earth, min_replies=min_replies,
 				query_info=query_info, min_fiability=min_fiability,
 				filter_floors=filter_floors, aggregate_by=aggregate_by,
-				agg_method=agg_method, fix_records=fix_records,
+				agg_method=agg_method_online, fix_records=fix_records,
 				include_other_felt=include_other_felt,
 				include_heavy_appliance=include_heavy_appliance,
 				remove_outliers=remove_outliers)
+elif enq_type == 'isoseismal' and 'commune' in aggregate_by:
+	main_communes = {'main commune': True, 'commune': False}[aggregate_by]
+	macro_info = get_isoseismal_macro_info(id_earth, main_communes=main_communes,
+											as_points=True)
 else:
-	macro_info = get_aggregated_info_official(id_earth, min_fiability=min_fiability,
-				min_or_max=min_or_max, aggregate_by=aggregate_by,
-				agg_function=agg_function, min_val=1)
+	if enq_type == 'traditional':
+		data_type = ''
+	else:
+		data_type = enq_type
+	macro_info = aggregate_traditional_macro_info(id_earth, data_type=data_type,
+				min_fiability=min_fiability, min_or_max=min_or_max,
+				aggregate_by=aggregate_by, agg_method=agg_subcommunes)
 
 
 plot_info = 'intensity'
@@ -80,7 +92,7 @@ plot_info = 'intensity'
 
 
 ## Choose symbols/polygons for aggregation by commune or main commune
-#symbol_style = lbm.PointStyle(shape='D', size=5)
+#symbol_style = lbm.PointStyle(shape='D', size=4)
 symbol_style = None
 
 line_style = "default"
@@ -97,25 +109,25 @@ interpolate_grid = {}
 
 ## Color options
 colorbar_style = "default"
-#colorbar_style = lbm.LegendStyle('Residual', location=4)
-#color_gradient = "discrete"
-color_gradient = "continuous"
+#colorbar_style = lbm.LegendStyle('Intensity', location=4)
+color_gradient = "discrete"
+#color_gradient = "continuous"
 cmap = "rob"
 #cmap = "usgs"
 #cmap = "jet"
 
-thematic_num_replies = True
+thematic_num_replies = False
 
 ## Extras
 #radii = [10, 25, 50]
 radii = []
-plot_pie = dict(prop='asleep', min_replies=25, size_scaling=3)
-#plot_pie = {}
+#plot_pie = dict(prop='asleep', min_replies=25, size_scaling=2, legend_location=3)
+plot_pie = {}
 
 
 ## Map parameters
-#region = (2, 7, 49.25, 51.75)
-region = (4.9, 6, 50.5, 51.5)
+region = (2, 7, 49.25, 51.75)
+#region = (4.9, 6, 50.5, 51.5)
 projection = "tmerc"
 graticule_interval = (2, 1)
 #graticule_interval = (0.5, 1)
@@ -130,18 +142,27 @@ title = ""
 copyright = ''
 text = macro_info.get_proc_info_text()
 text_box = {'pos': 'bl', 'text': text}
+#text_box = {}
 
 
-out_folder = "D:\\Earthquake Reports\\20180525\\plots"
-fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
-#fig_filespec = os.path.join(out_folder, fig_filename)
-fig_filespec = None
+#out_folder = "D:\\Earthquake Reports\\20180525\\plots"
+out_folder = "E:\\Home\\_kris\\Meetings\\2019 - Afdelingsvergadering"
+#fig_filename = "Kinrooi_grid_agg_cii_filter_floors_disc.PNG"
+#fig_filename = "Kinrooi_dyfi_mean_agg=%s_pie.PNG" % aggregate_by
+fig_filename = "2002_%s_agg=%s_minormax=%s_aggfunc=%s.PNG" % (enq_type, aggregate_by, min_or_max, agg_subcommunes)
+fig_filespec = os.path.join(out_folder, fig_filename)
+#fig_filespec = None
 
 
 if macro_info:
 	#region = "auto"
 
 	## Plot
+	#dpi = "default"
+	if fig_filespec:
+		dpi = 200
+	else:
+		dpi = 90
 	macro_info.plot_map(region=region, projection=projection,
 				graticule_interval=graticule_interval, plot_info=plot_info,
 				int_conversion='round', symbol_style=symbol_style,
@@ -150,7 +171,7 @@ if macro_info:
 				color_gradient=color_gradient, admin_level='province',
 				colorbar_style=colorbar_style, radii=radii, plot_pie=plot_pie,
 				title=title, fig_filespec=fig_filespec, copyright=copyright,
-				text_box=text_box, verbose=True)
+				text_box=text_box, dpi=dpi, verbose=True)
 
 	## Export to geojson
 	#print(macro_info.to_geojson())
