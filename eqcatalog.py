@@ -1062,7 +1062,10 @@ class EQCatalog:
 		"""
 		depths = self.get_depths()
 		depths = depths[np.isfinite(depths)]
-		return (depths.min(), depths.max())
+		if len(depths):
+			return (depths.min(), depths.max())
+		else:
+			return (np.nan, np.nan)
 
 	def lon_minmax(self):
 		"""
@@ -1070,7 +1073,10 @@ class EQCatalog:
 		"""
 		longitudes = self.get_longitudes()
 		longitudes = longitudes[np.isfinite(longitudes)]
-		return (longitudes.min(), longitudes.max())
+		if len(longitudes):
+			return (longitudes.min(), longitudes.max())
+		else:
+			return (np.nan, np.nan)
 
 	def lat_minmax(self):
 		"""
@@ -1078,7 +1084,10 @@ class EQCatalog:
 		"""
 		latitudes = self.get_latitudes()
 		latitudes = latitudes[np.isfinite(latitudes)]
-		return (latitudes.min(), latitudes.max())
+		if len(latitudes):
+			return (latitudes.min(), latitudes.max())
+		else:
+			return (np.nan, np.nan)
 
 	def get_region(self):
 		"""
