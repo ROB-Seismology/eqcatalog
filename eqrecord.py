@@ -429,13 +429,13 @@ class LocalEarthquake:
 		errM = float(rec.get(errM_key, null_value) or null_value)
 
 		zone_key = column_map.get('zone', 'zone')
-		zone = rec.get(zone_key, "")
+		zone = str(rec.get(zone_key, zone_key if not zone_key == 'zone' else ""))
 
 		agency_key = column_map.get('agency', 'agency')
-		agency = rec.get(agency_key, agency_key if not agency_key == 'agency' else "")
+		agency = str(rec.get(agency_key, agency_key if not agency_key == 'agency' else ""))
 
 		event_type_key = column_map.get('event_type', 'event_type')
-		event_type = rec.get(event_type_key, 'ke')
+		event_type = str(rec.get(event_type_key, event_type_key if not event_type_key == 'event_type' else 'ke'))
 
 		return cls(ID, date, time, lon, lat, depth, mag, name=name,
 						intensity_max=intensity_max, macro_radius=macro_radius,
