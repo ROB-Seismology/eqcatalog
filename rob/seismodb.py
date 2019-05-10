@@ -1177,6 +1177,61 @@ def get_earthquakes_with_online_enquiries():
 	return query_local_eq_catalog_by_id(eq_ids)
 
 
+def query_historical_texts(id_earth, id_com, include_doubtful=False, verbose=False):
+	"""
+	Query historical database for texts corresponding to paritucular
+	earthquake and commune
+
+	:param id_earth:
+		int, earthquake ID
+	:param id_com:
+		int, commune ID
+	:param include_doubtful:
+		bool, whether or not to include doubtful records
+	:param verbose:
+		bool, whether or not to print SQL query
+
+	:return:
+		list of dicts
+	"""
+	table_clause = 'historical_text'
+
+	column_clause = ['id_commune AS id_com',
+					'id_earth',
+					'historical_text.id_text',
+					'historical_text.id_source',
+					'historical_text.id_historian',
+					'historical_tp.doubtful',
+					'historical_text.origin',
+					'historical_text.text',
+					'historical_text.translation',
+					'historical_text.remark',
+					'historical_place.id_place',
+					'historical_place.name',
+					'historical_source.name',
+					'historical_source.date',
+					'historical_source.edition',
+					'historical_source.redaction_place',
+					'historical_source.remark',
+					'id_bibliography']
+
+	join_clause = [('LEFT JOIN', 'historical_tp',
+					'historical_text.id_text=historical_tp.id_text'),
+					('JOIN', 'historical_place',
+					'historical_tp.id_place=historical_place.id_place'),
+					('JOIN', 'historical_source',
+					'historical_text.id_source = historical_source.id_source')]
+
+	where_clause = 'id_earth = %d AND id_commune = %d'
+	where_clause %= (id_earth, id_com)
+	if not include_doubtful:
+		where_clause += ' AND doubtful = 0'
+
+	return query_seismodb_table(table_clause, column_clause=column_clause,
+								join_clause=join_clause, where_clause=where_clause,
+								verbose=verbose)
+
+
 def query_stations(network='UCC', activity_date_time=None, verbose=False):
 	"""
 	Query the ROB station database
