@@ -81,7 +81,7 @@ def read_isoseismals(id_earth, filled=True):
 
 
 def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
-											as_points=True):
+											min_or_max='mean', as_points=True):
 	"""
 	Assign intensities to communes based on isoseismals
 
@@ -90,6 +90,10 @@ def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
 	:param main_communes:
 		bool, whether or not to use main communes
 		(default: False)
+	:param min_or_max:
+		str, one of 'min', 'mean' or 'max' to select between
+		Imin and Imax contour values
+		(default: 'mean')
 	:param as_points:
 		bool, whether  points (True) or polygons (False) should
 		be used for testing whether communes are within a particular
@@ -113,7 +117,13 @@ def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
 		pt_data = lbm.MultiPointData(lons, lats)
 
 		for isoseismal in isoseismals:
-			intensity = isoseismal.value['Intensity']
+			Imin, Imax = isoseismal.value['Imin'], isoseismal.value['Imax']
+			if min_or_max[:3] == 'min':
+				intensity = Imin
+			elif min_or_max[:3] == 'max':
+				intensity = Imax
+			elif min_or_max == 'mean':
+				intensity = (Imin + Imax) / 2.
 			is_inside = isoseismal.contains(pt_data)
 			for i in range(len(is_inside)):
 				if is_inside[i]:
@@ -134,7 +144,8 @@ def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
 	return id_com_intensity_dict
 
 
-def get_isoseismal_macro_info(id_earth, main_communes=False, as_points=True):
+def get_isoseismal_macro_info(id_earth, main_communes=False, min_or_max='mean',
+								as_points=True):
 	"""
 	Similar to :func:`get_commune_intensities_from_isoseismals`,
 	but return instance of :class:`MacroInfoCollection`
@@ -142,7 +153,8 @@ def get_isoseismal_macro_info(id_earth, main_communes=False, as_points=True):
 	from .macro_info import MacroseismicInfo, MacroInfoCollection
 
 	id_com_intensity_dict = get_commune_intensities_from_isoseismals(id_earth,
-								main_communes=main_communes, as_points=as_points)
+								main_communes=main_communes, min_or_max=min_or_max,
+								as_points=as_points)
 
 	comm_recs = seismodb.get_communes('BE', main_communes=main_communes)
 	lons = [rec['longitude'] for rec in comm_recs]
