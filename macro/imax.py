@@ -17,7 +17,6 @@ __all__ = ["get_eq_intensities_for_commune_online",
 			"get_eq_intensities_for_commune_official",
 			"get_eq_intensities_for_commune_historical",
 			"get_isoseismal_intensities_for_all_communes",
-			"get_isoseismal_intensities_for_all_communes",
 			"get_all_commune_intensities",
 			"get_imax_by_commune"]
 
@@ -181,7 +180,7 @@ def get_eq_intensities_for_commune_historical(id_com, as_main_commune=False,
 
 
 def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
-												as_points=True):
+											min_or_max='mean', as_points=True):
 	"""
 	Get intensities for all communes from available isoseismals
 
@@ -189,6 +188,10 @@ def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
 		bool, whether or not to group subcommunes belonging to a
 		main commune
 		(default: False)
+	:param min_or_max:
+		str, one of 'min', 'mean' or 'max' to select between
+		Imin and Imax contour values
+		(default: 'mean')
 	:param as_points:
 		bool, whether  points (True) or polygons (False) should
 		be used for testing whether communes are within a particular
@@ -204,7 +207,8 @@ def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
 	commune_eq_intensities = {}
 	for eq_id in get_available_isoseismals():
 		comm_intensities = get_commune_intensities_from_isoseismals(eq_id,
-							main_communes=as_main_commune, as_points=as_points)
+							main_communes=as_main_commune, min_or_max=min_or_max,
+							as_points=as_points)
 		for id_com, I in comm_intensities.items():
 			if not id_com in commune_eq_intensities:
 				commune_eq_intensities[id_com] = {eq_id: I}
@@ -298,7 +302,7 @@ def get_all_commune_intensities(data_type='all',
 
 	if 'isoseismal' in data_types:
 		comm_iso_intensities = get_isoseismal_intensities_for_all_communes(
-											by_main_commune, as_points=False)
+						by_main_commune, min_or_max=min_or_max, as_points=False)
 		#if 'official' in data_types:
 		#	comm_iso_intensities.pop(509)
 		#	comm_iso_intensities.pop(987)
@@ -344,11 +348,13 @@ def get_all_commune_intensities(data_type='all',
 				include_heavy_appliance=include_heavy_appliance,
 				remove_outliers=remove_outliers)
 			for id_earth in eq_intensities.keys():
-				I = eq_intensities[id_earth]
-				## If there is already an intensity value for this
-				## earthquake and commune, take the maximum
-				I = max(I, commune_eq_intensities[id_com].get(id_earth, 0))
-				commune_eq_intensities[id_com][id_earth] = I
+				## Only consider earthquakes since Alsdorf 2002
+				if id_earth >= 1306:
+					I = eq_intensities[id_earth]
+					## If there is already an intensity value for this
+					## earthquake and commune, take the maximum
+					I = max(I, commune_eq_intensities[id_com].get(id_earth, 0))
+					commune_eq_intensities[id_com][id_earth] = I
 
 	return commune_eq_intensities
 
@@ -496,4 +502,4 @@ def get_num_exceedances_by_commune(Imin, data_type='all',
 		float, intensity value
 		or str ('Imax')
 	"""
-	pass
+	raise NotImplementedError
