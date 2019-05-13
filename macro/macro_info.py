@@ -127,6 +127,18 @@ class MacroseismicInfo():
 
 		return ensemble
 
+	def get_historical_texts(self, verbose=False):
+		"""
+		Fetch historical texts corresponding to :prop:`id_earth`
+		and :prop:`id_com` from database
+
+		:return:
+			list of dicts
+		"""
+		from ..rob.seismodb import query_historical_texts
+
+		return query_historical_texts(self.id_earth, self.id_com)
+
 
 class MacroInfoCollection():
 	"""
@@ -571,7 +583,10 @@ class MacroInfoCollection():
 			str
 		"""
 		text = "Aggregation by: %s" % self.agg_type
-		text += "\nAgg. method: %s" % self.proc_info.get('agg_method')
+		if self.agg_type or self.data_type != 'isoseismal'
+			or (self.data_type in ('traditional', 'historical', 'official')
+			and self.agg_type in ('id_main', 'main commune')):
+			text += "\nAgg. method: %s" % self.proc_info.get('agg_method')
 
 		if self.data_type in ('internet', 'online', 'dyfi'):
 			text += ("\nMin. replies / fiability: %d / %d"
