@@ -583,9 +583,9 @@ class MacroInfoCollection():
 			str
 		"""
 		text = "Aggregation by: %s" % self.agg_type
-		if self.agg_type or self.data_type != 'isoseismal'
+		if (self.agg_type or self.data_type != 'isoseismal'
 			or (self.data_type in ('traditional', 'historical', 'official')
-			and self.agg_type in ('id_main', 'main commune')):
+			and self.agg_type in ('id_main', 'main commune'))):
 			text += "\nAgg. method: %s" % self.proc_info.get('agg_method')
 
 		if self.data_type in ('internet', 'online', 'dyfi'):
