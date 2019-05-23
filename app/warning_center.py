@@ -595,7 +595,7 @@ class WarningCriterion():
 			instance of :class:`eqcatalog.EQCatalog`, filtered catalog
 		"""
 		## Filter minimum magnitude
-		subcatalog = catalog.subselect(Mmin=self.Mmin)
+		subcatalog = catalog.subselect(Mmin=self.Mmin, Mtype='ML')
 		## Filter event type
 		if self.event_type != 'all':
 			event_types = self.event_type.split(',')
