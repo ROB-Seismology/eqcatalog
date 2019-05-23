@@ -1151,7 +1151,7 @@ if __name__ == "__main__":
 		if not args.clients:
 			print("Use --clients option to specify client IDs to send warning to")
 		else:
-			warcen.send_manual_warning(args.id_earth, args.clients, dry_run=args.dry_run)
+			warcen.send_manual_warning(args.id_earth[0], args.clients, dry_run=args.dry_run)
 	elif args.dry_run:
 		warcen.poll_catalog(verbose=args.verbose, dry_run=True)
 	if warcen:
