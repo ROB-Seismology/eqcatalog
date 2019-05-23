@@ -342,7 +342,7 @@ class WarningCenter():
 				client.send_manual_warning(id_earth, dry_run=dry_run)
 
 	@classmethod
-	def compose_message(cls, eq, lang, msg_type):
+	def compose_message(cls, eq, lang, msg_type, revision=False):
 		"""
 		Compose warning message
 
@@ -352,6 +352,9 @@ class WarningCenter():
 			str, language, one of 'EN', 'NL' or 'FR'
 		:param msg_type:
 			str, message type, 'sms' or 'email'
+		:param revision:
+			bool, whether or not message is a revision
+			(default: False)
 
 		:return:
 			str, message
@@ -360,7 +363,10 @@ class WarningCenter():
 
 		lang = lang.upper()
 
-		msg = "%s\n\n" % MSG_FIELDS['title'][lang]
+		if revision:
+			msg = "%s\n\n" % MSG_FIELDS['title_revision'][lang]
+		else:
+			msg = "%s\n\n" % MSG_FIELDS['title'][lang]
 
 		msg += "ML: %.1f\n" % eq.ML
 
@@ -860,6 +866,19 @@ class WarningClient():
 		rec = dict(id_client=self.id, id_earth=id_earth, time_sent=time_sent)
 		self.warcen.db.add_records(table_name, [rec])
 
+	def is_event_sent(self, id_earth):
+		"""
+		Check if warning message has been sent for given event
+
+		:param id_earth:
+			int, event ID in ROB catalog
+
+		:return:
+			bool
+		"""
+		flagged_event = FlaggedEvent(self.warcen, 0, id_earth, 0, 0)
+		return flagged_event.is_message_sent(self.id)
+
 	def get_num_sent_messages(self, start_date=None, end_date=None):
 		"""
 		Determine number of messages sent to this client
@@ -885,47 +904,55 @@ class WarningClient():
 		num_sent_messages = list(db_recs)[0]['num_sent_messages']
 		return num_sent_messages
 
-	def send_warning(self, eq, dry_run=True):
+	def send_warning(self, eq, revision=False, dry_run=True):
 		"""
 		Send warning to client for given event
 
 		:param eq:
 			instance of :class:`eqcatalog.LocalEarthquake`
+		:param revision:
+			bool, whether or not message is a revision
+			(default: False)
 		:param dry_run:
 			bool, whether or not to actually send (True) or just print (False)
 			the warning message
 			(default: True)
 		"""
 		if self.email:
-			self.send_email(eq, dry_run=dry_run)
+			self.send_email(eq, revision=revision, dry_run=dry_run)
 		if self.phone:
-			self.send_sms(eq, dry_run=dry_run)
+			self.send_sms(eq, revision=revision, dry_run=dry_run)
 
 		if not dry_run:
 			self.mark_event_as_sent(eq.ID)
 
-	def send_email(self, eq, dry_run=True):
+	def send_email(self, eq, revision=False, dry_run=True):
 		"""
 		Send email warning to client for given event
 
 		:param eq:
+		:param revision:
 		:param dry_run:
 			see :meth:`send_warning`
 		"""
-		msg = self.warcen.compose_message(eq, self.lang, 'email')
-		subject = MSG_FIELDS['subject'][self.lang.upper()]
+		msg = self.warcen.compose_message(eq, self.lang, 'email', revision=revision)
+		if revision:
+			subject = MSG_FIELDS['subject_revision'][self.lang.upper()]
+		else:
+			subject = MSG_FIELDS['subject'][self.lang.upper()]
 		self.warcen.send_email(self, msg, subject, dry_run=dry_run)
 
-	def send_sms(self, eq, dry_run=True):
+	def send_sms(self, eq, revision=False, dry_run=True):
 		"""
 		Send SMS warning to client for given event
 
 		:param eq:
+		:param revision:
 		:param dry_run:
 			see :meth:`send_warning`
 		"""
 		from eqcatalog.macro.dyfi import strip_accents
-		msg = self.warcen.compose_message(eq, self.lang, 'sms')
+		msg = self.warcen.compose_message(eq, self.lang, 'sms', revision=revision)
 		msg = strip_accents(msg)
 		self.warcen.send_sms(self, msg, dry_run=dry_run)
 
@@ -942,10 +969,14 @@ class WarningClient():
 		"""
 		[eq] = eqcatalog.rob.query_local_eq_catalog_by_id(id_earth)
 		if eq:
+			if self.is_event_sent(id_earth):
+				revision = True
+			else:
+				revision = False
 			if self.email:
-				self.send_email(eq, dry_run=dry_run)
+				self.send_email(eq, revision=revision, dry_run=dry_run)
 			if self.phone:
-				self.send_sms(eq, dry_run=dry_run)
+				self.send_sms(eq, revision=revision, dry_run=dry_run)
 
 			if not dry_run:
 				self.mark_event_as_sent(eq.ID)
@@ -1035,9 +1066,15 @@ MSG_FIELDS = {
 	'title': {'EN': 'New seismic event',
 				'NL': 'Nieuwe seismische gebeurtenis',
 				'FR': 'Nouvel évènement'},
+	'title_revision': {'EN': 'Revision of seismic event',
+						'NL': 'Gereviseerde seismische gebeurtenis',
+						'FR': 'Evènement révisé'},
 	'subject': {'FR': "Nouvel évènement enregistré par le réseau sismique belge",
 			'NL': "Nieuwe gebeurtenis geregistreerd door Belgisch seismisch netwerk",
 			'EN': "New event recorded by Belgian seismic network"},
+	'subject_revision': {'EN': "Revision of event recorded by Belgian seismic network",
+			'NL': "Herevaluatie van gebeurtenis geregistreerd door Belgisch seismisch netwerk",
+			'FR': "Révision d'événement enregistrée par le réseau sismique belge"},
 	'url': {'EN': "en/seismology/earthquakes-in-belgium",
 				'NL': "nl/seismologie/aardbevingen-in-belgie",
 				'FR': "fr/seismologie/tremblements-de-terre-en-belgique"},
