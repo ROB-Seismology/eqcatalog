@@ -863,8 +863,13 @@ class WarningClient():
 		"""
 		table_name = 'warcen_messages'
 		time_sent = datetime.datetime.utcnow()
-		rec = dict(id_client=self.id, id_earth=id_earth, time_sent=time_sent)
-		self.warcen.db.add_records(table_name, [rec])
+		if not self.is_event_sent(id_earth):
+			rec = dict(id_client=self.id, id_earth=id_earth, time_sent=time_sent)
+			self.warcen.db.add_records(table_name, [rec])
+		else:
+			col_dict = dict(time_sent=time_sent)
+			where_clause = 'id_client = %d AND id_earth = %d'
+			self.warcen.db.update_row(table_name, col_dict, where_clause)
 
 	def is_event_sent(self, id_earth):
 		"""
