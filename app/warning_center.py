@@ -281,7 +281,7 @@ class WarningCenter():
 
 		## Check if there are events in catalog that need to be flagged
 		if len(catalog):
-			#num_dyfi = eqcatalog.rob.get_num_macroseismic_enquiries(catalog.get_ids())
+			#num_dyfi = eqcatalog.rob.get_num_online_macro_enquiries(catalog.get_ids())
 			for criterion in warning_criteria:
 				subcatalog = criterion.filter_catalog(catalog)
 				#max_delay = criterion.get_max_delay()
@@ -391,7 +391,7 @@ class WarningCenter():
 		msg += "Lon: %.3f%c, Lat: %.3f%c\n" % (abs(eq.lon), EW, abs(eq.lat), NS)
 		msg += "%s: %.0f km\n" % (MSG_FIELDS['depth'][lang], eq.depth)
 
-		num_macro = eq.get_num_macroseismic_enquiries()
+		num_macro = eq.get_num_online_macro_enquiries()
 		if num_macro:
 			msg += "%s: %d\n" % (MSG_FIELDS['num_dyfi'][lang], num_macro)
 
