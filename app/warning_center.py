@@ -869,6 +869,7 @@ class WarningClient():
 		else:
 			col_dict = dict(time_sent=time_sent)
 			where_clause = 'id_client = %d AND id_earth = %d'
+			where_clause %= (self.id, id_earth)
 			self.warcen.db.update_row(table_name, col_dict, where_clause)
 
 	def is_event_sent(self, id_earth):
