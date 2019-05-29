@@ -446,3 +446,20 @@ class ROBLocalEarthquake(LocalEarthquake):
 			return query_focal_mechanisms(id_earth=self.ID, verbose=verbose)[0]
 		except IndexError:
 			return None
+
+	def get_phase_picks(self, station_code=None, verbose=False):
+		"""
+		Get phase picks for this earthquake
+
+		:param station_code:
+			str, station code
+			(default: None)
+		:param verbose:
+			bool, if True the query string will be echoed to standard output
+			(default: False)
+
+		:return:
+			generator object, yielding a dictionary for each record
+		"""
+		from .seismodb import query_phase_picks
+		return query_phase_picks(self.ID, station_code=station_code, verbose=verbose)
