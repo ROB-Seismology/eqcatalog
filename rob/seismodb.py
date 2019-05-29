@@ -45,12 +45,14 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_traditional_macro_catalog_aggregated",
 			"query_official_macro_catalog_aggregated",
 			"query_historical_macro_catalog_aggregated",
+			"query_historical_texts",
 			"query_online_macro_catalog_aggregated",
 			"get_num_online_macro_enquiries",
 			"get_num_official_enquiries",
 			"get_earthquakes_with_official_enquiries",
 			"get_earthquakes_with_online_enquiries",
 			"query_stations", "get_station_coordinates",
+			"query_phase_picks",
 			"zip2ID", "get_communes", "get_subcommunes"]
 
 
@@ -1244,6 +1246,7 @@ def query_stations(network='UCC', activity_date_time=None, verbose=False):
 		(default: None)
 	:param verbose:
 		bool, if True the query string will be echoed to standard output
+		(default: False)
 
 	:return:
 		generator object, yielding a dictionary for each record
@@ -1307,6 +1310,40 @@ def get_station_coordinates(station_codes):
 	lons = [recs[code]['longitude'] for code in station_codes]
 	lats = [recs[code]['latitude'] for code in station_codes]
 	return (lons, lats)
+
+
+def query_phase_picks(id_earth, station_code=None, verbose=False):
+	"""
+	Query phase picks from database
+
+	:param id_earth:
+		int or str, earthquake ID
+	:param station_code:
+		str, station code
+		(default: None)
+	:param verbose:
+		bool, if True the query string will be echoed to standard output
+		(default: False)
+
+	:return:
+		generator object, yielding a dictionary for each record
+	"""
+	table_clause = "mesure_t"
+	where_clause = "id_earth = %s" % id_earth
+	if station_code:
+		station_code, code_sup = station_code[:3], station_code[3:]
+		where_clause += ' AND stations_network.code = "%s"' % station_code
+		if code_sup:
+			where_clause += ' AND stations_network.code_sup = "%s"' % code_sup
+	join_clause = [('LEFT JOIN', 'mesure_a',
+					'mesure_t.id_mesure_t = mesure_a.id_mesure_t'),
+					('LEFT JOIN', 'lookup_phase',
+					'mesure_t.id_phase = lookup_phase.id_phase'),
+					('LEFT JOIN', 'stations_network',
+					'mesure_t.id_eq = stations_network.id_station')]
+
+	return query_seismodb_table(table_clause, where_clause=where_clause,
+								join_clause=join_clause, verbose=verbose)
 
 
 def get_last_earthID():
