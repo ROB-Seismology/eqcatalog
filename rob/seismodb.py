@@ -1290,26 +1290,57 @@ def query_stations(network='UCC', activity_date_time=None, verbose=False):
 				where_clause=where_clause, verbose=verbose)
 
 
-def get_station_coordinates(station_codes):
+def get_station_coordinates(station_codes, include_z=False, verbose=False):
 	"""
 	Quick and dirty extraction of station coordinates from database
 
 	:param station_codes:
-		list of strings, station codes (note that these are place codes,
-		not instrument codes)
+		str or list of strings, station code(s) (either 3 or 4 characters)
+	:param verbose:
+		bool, if True the query string will be echoed to standard output
+		(default: False)
 
 	:return:
-		(lons, lats) tuple
+		(lons, lats, [altitudes]) tuple or
+		(lon, lat, [altitude]) tuple if :param:`station_codes` is not a list
+		- lon, lat: geographic coordinates in degrees
+		- altitude: altitude in m
 	"""
-	table_clause = "station_place"
-	where_clause = 'code in (%s)'
-	where_clause %= ','.join(['"%s"' % code for code in station_codes])
-	recs = query_seismodb_table(table_clause, where_clause=where_clause)
+	is_list = True
+	if not isinstance(station_codes, list):
+		station_codes = [station_codes]
+		is_list = False
+
+	table_clause = "stations_network"
+	code_lengths = set([len(code) for code in station_codes])
+	if 4 in code_lengths:
+		column_clause = ["CONCAT(code, code_sup) AS station_code"]
+	else:
+		column_clause = ["code AS station_code"]
+	column_clause += ["longitude", "latitude"]
+	if include_z:
+		column_clause.append("altitude")
+	having_clause = 'station_code in (%s)'
+	having_clause %= ','.join(['"%s"' % code for code in station_codes])
+	recs = query_seismodb_table(table_clause, column_clause=column_clause,
+								having_clause=having_clause, verbose=verbose)
+
 	## Note that order may not be preserved in query result
-	recs = {rec['code']: rec for rec in recs}
+	recs = {rec['station_code']: rec for rec in recs}
 	lons = [recs[code]['longitude'] for code in station_codes]
 	lats = [recs[code]['latitude'] for code in station_codes]
-	return (lons, lats)
+	if include_z:
+		altitudes = [recs[code]['altitude'] for code in station_codes]
+	if is_list:
+		if include_z:
+			return (lons, lats, altitudes)
+		else:
+			return (lons, lats)
+	else:
+		if include_z:
+			return (lons[0], lats[0], altitudes[0])
+		else:
+			return (lons[0], lats[0])
 
 
 def query_phase_picks(id_earth, station_code=None, verbose=False):
@@ -1319,7 +1350,7 @@ def query_phase_picks(id_earth, station_code=None, verbose=False):
 	:param id_earth:
 		int or str, earthquake ID
 	:param station_code:
-		str, station code
+		str, 3- or 4-character station code
 		(default: None)
 	:param verbose:
 		bool, if True the query string will be echoed to standard output
@@ -1330,6 +1361,11 @@ def query_phase_picks(id_earth, station_code=None, verbose=False):
 	"""
 	table_clause = "mesure_t"
 	where_clause = "id_earth = %s" % id_earth
+	column_clause = ["CONCAT(stations_network.code, stations_network.code_sup) AS station_code"]
+	column_clause += ['mesure_t.id_mesure_t', 'id_earth', 'comp', 'movement',
+					'TIMESTAMP(date, time) AS datetime', 'hund',
+					'include_in_loc', 'periode', 'amplitude', 'distance',
+					'magnitude', 'mag_type', 'lookup_phase.name']
 	if station_code:
 		station_code, code_sup = station_code[:3], station_code[3:]
 		where_clause += ' AND stations_network.code = "%s"' % station_code
@@ -1342,8 +1378,9 @@ def query_phase_picks(id_earth, station_code=None, verbose=False):
 					('LEFT JOIN', 'stations_network',
 					'mesure_t.id_eq = stations_network.id_station')]
 
-	return query_seismodb_table(table_clause, where_clause=where_clause,
-								join_clause=join_clause, verbose=verbose)
+	return query_seismodb_table(table_clause, column_clause=column_clause,
+								where_clause=where_clause, join_clause=join_clause,
+								verbose=verbose)
 
 
 def get_last_earthID():
