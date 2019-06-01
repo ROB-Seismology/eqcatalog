@@ -459,7 +459,57 @@ class ROBLocalEarthquake(LocalEarthquake):
 			(default: False)
 
 		:return:
-			generator object, yielding a dictionary for each record
+			dict, mapping station codes to dicts, mapping phase names
+			to PhasePick objects
+			or dict, mapping phase names to PhasePick objects
+			if :param:`station_code` is not None
 		"""
+		import datetime
 		from .seismodb import query_phase_picks
-		return query_phase_picks(self.ID, station_code=station_code, verbose=verbose)
+		from robspy.phase_pick import PhasePick
+
+		recs = query_phase_picks(self.ID, station_code=station_code, verbose=verbose)
+		picks = {}
+		for rec in recs:
+			phase_name = rec['name']
+			dt = rec['datetime'] + datetime.timedelta(microseconds=rec['hund'] * 1E+4)
+			component = rec['comp'] if rec['comp'] != 'V' else 'Z'
+			pick = PhasePick(phase_name, dt, self.ID, rec['station_code'],
+							component, rec['movement'], rec['id_mesure_t'],
+							rec['include_in_loc'], rec['amplitude'],
+							rec['periode'], rec['magnitude'], rec['mag_type'],
+							rec['distance'])
+			if not rec['station_code'] in picks:
+				picks[rec['station_code']] = {}
+			picks[rec['station_code']][rec['name']] = pick
+
+		if station_code:
+			return picks[station_code]
+		else:
+			return picks
+
+	def get_theoretical_phase_arrivals(self, station_code, velocity_model="iasp91"):
+		"""
+		:param station_code:
+			str, 3- or 4-character code of seismic station
+		:param velocity_model:
+			str, name of velocity model understood by obspy.taup,
+			e.g., "iasp91", "ak135"
+			(default: "iasp91")
+
+		:return:
+			dict, mapping phase names to obspy Arrival objects
+		"""
+		import mapping.geotools.geodetic as geodetic
+		from obspy.taup import TauPyModel
+		from .seismodb import get_station_coordinates
+
+		stat_lon, stat_lat, stat_alt = get_station_coordinates(station_code, include_z=True)
+		dist_deg = geodetic.spherical_distance(self.lon, self.lat, stat_lon, stat_lat)
+		## Station depth must not be negative
+		stat_depth = max(0, -stat_alt / 1000.)
+
+		m = TauPyModel(model="ak135")
+		arrivals = m.get_travel_times(distance_in_degree=dist_deg,
+			source_depth_in_km=self.depth, receiver_depth_in_km=stat_depth)
+		return {arr.name: arr for arr in arrivals}
