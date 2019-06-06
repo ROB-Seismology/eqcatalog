@@ -91,6 +91,9 @@ def as_np_datetime(dt, unit='s'):
 		return np.datetime64(dt, unit)
 	elif isinstance(dt, list):
 		return np.array(dt, dtype='M8[%s]' % unit)
+	elif hasattr(dt, 'datetime'):
+		## Support obspy.UTCDateTime without actually importing it
+		return np.datetime64(dt.datetime, unit)
 
 
 def as_np_timedelta(td):
