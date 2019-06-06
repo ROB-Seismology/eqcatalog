@@ -52,7 +52,7 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"get_earthquakes_with_official_enquiries",
 			"get_earthquakes_with_online_enquiries",
 			"query_stations", "get_station_coordinates",
-			"query_phase_picks",
+			"get_station_catalog", "query_phase_picks",
 			"zip2ID", "get_communes", "get_subcommunes"]
 
 
@@ -1341,6 +1341,35 @@ def get_station_coordinates(station_codes, include_z=False, verbose=False):
 			return (lons[0], lats[0], altitudes[0])
 		else:
 			return (lons[0], lats[0])
+
+
+def get_station_catalog(station_code, verbose=False):
+	"""
+	Fetch catalog of earthquakes that have been measured using a
+	particular station
+
+	:param station_code:
+		str, 3- or 4-character station code
+		(default: None)
+	:param verbose:
+		bool, if True the query string will be echoed to standard output
+		(default: False)
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	table_clause = 'mesure_t'
+	column_clause = 'id_earth'
+	join_clause = [('LEFT JOIN', 'stations_network',
+					'mesure_t.id_eq = stations_network.id_station')]
+	where_clause = 'CONCAT(code, code_sup) = "%s"' % station_code
+	recs = query_seismodb_table(table_clause, column_clause=column_clause,
+							where_clause=where_clause, join_clause=join_clause,
+							verbose=verbose)
+	eq_ids = [r['id_earth'] for r in recs]
+	catalog = query_local_eq_catalog_by_id(eq_ids, verbose=verbose)
+	catalog.name = 'Catalog measured at station %s' % station_code
+	return catalog
 
 
 def query_phase_picks(id_earth, station_code=None, verbose=False):
