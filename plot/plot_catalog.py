@@ -77,16 +77,16 @@ def plot_xy(datasets, xscaling='lin', yscaling='lin',
 	marker_edge_widths = cycle(marker_edge_widths)
 	labels = cycle(labels)
 
-	if xscaling == 'lin':
-		if yscaling == 'lin':
-			plotfunc = getattr(ax, 'plot')
-		elif yscaling == 'log':
-			plotfunc = getattr(ax, 'semilogy')
-	elif xscaling == 'log':
-		if yscaling == 'lin':
-			plotfunc = getattr(ax, 'semilogx')
-		elif yscaling == 'log':
-			plotfunc = getattr(ax, 'loglog')
+	#if xscaling == 'lin':
+	#	if yscaling == 'lin':
+	#		plotfunc = getattr(ax, 'plot')
+	#	elif yscaling == 'log':
+	#		plotfunc = getattr(ax, 'semilogy')
+	#elif xscaling == 'log':
+	#	if yscaling == 'lin':
+	#		plotfunc = getattr(ax, 'semilogx')
+	#	elif yscaling == 'log':
+	#		plotfunc = getattr(ax, 'loglog')
 
 	for (x, y) in datasets:
 		color = colors.next()
@@ -100,7 +100,7 @@ def plot_xy(datasets, xscaling='lin', yscaling='lin',
 		marker_edge_width = marker_edge_widths.next()
 		label = labels.next()
 
-		plotfunc(x, y, marker, color=color, ls=linestyle, lw=linewidth,
+		ax.plot(x, y, marker, color=color, ls=linestyle, lw=linewidth,
 				ms=marker_size, mec=marker_edge_color, mfc=marker_fill_color,
 				mew=marker_edge_width, markevery=marker_interval, label=label)
 
@@ -113,6 +113,11 @@ def plot_xy(datasets, xscaling='lin', yscaling='lin',
 	ax.set_xlabel(xlabel, fontsize=title_font_size)
 	ax.set_ylabel(ylabel, fontsize=title_font_size)
 	ax.set_title(title, fontsize=title_font_size)
+
+	xscaling = {'lin': 'linear', 'log': 'log'}[xscaling]
+	ax.set_xscale(xscaling)
+	yscaling = {'lin': 'linear', 'log': 'log'}[yscaling]
+	ax.set_yscale(yscaling)
 
 	_xmin, _xmax = ax.get_xlim()
 	xmin = xmin or _xmin
