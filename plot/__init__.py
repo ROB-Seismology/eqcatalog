@@ -24,6 +24,19 @@ else:
 
 ## Import submodules
 
+## plot_generic
+if not reloading:
+  from . import plot_generic
+else:
+  reload(plot_generic)
+
+## plot_catalog (depends on plot_generic)
+if not reloading:
+  from . import plot_catalog
+else:
+  reload(plot_catalog)
+from .plot_catalog import *
+
 ## plot_macro_map
 if not reloading:
 	from . import plot_macro_map
