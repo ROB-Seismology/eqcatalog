@@ -33,6 +33,12 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return super(ROBLocalEarthquake, self).get_MS(Mrelation)
 	get_MS.__doc__ = LocalEarthquake.get_MS.__doc__
 
+	def get_or_convert_mag(self, Mtype, Mrelation='default'):
+		if Mrelation == 'default':
+			Mrelation = DEFAULT_MRELATIONS.get(Mtype, {})
+		return super(ROBLocalEarthquake, self).get_or_convert_mag(Mtype, Mrelation)
+	get_or_convert_mag.__doc__ = LocalEarthquake.get_or_convert_mag.__doc__
+
 	def get_rob_hash(self):
 		"""
 		Generate hash from earthquake ID as used on ROB website
