@@ -35,7 +35,7 @@ __all__ = ["LocalEarthquake", "FocMecRecord"]
 # TODO: allow nan values instead of zeros
 
 
-class LocalEarthquake:
+class LocalEarthquake(object):
 	"""
 	Class representing a local earthquake retrieved from the
 	earthquakes database table.

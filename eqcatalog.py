@@ -62,7 +62,7 @@ from . import time_functions_np as tf
 
 # TODO: re-implement interface with (Hazard) Modelers' Toolkit
 
-class EQCatalog:
+class EQCatalog(object):
 	"""
 	Class defining a collection of local earthquakes.
 
@@ -934,7 +934,7 @@ class EQCatalog:
 		"""
 		Return array with seismic moments for all earthquakes in catalog.
 
-		:param Mrelation":
+		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
@@ -5935,7 +5935,16 @@ def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge
 #	else:
 #		pylab.show()
 
-def plot_catalogs_magnitude_time(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=50, Mtype="MW", Mrelation={}, start_year=None, Mrange=(None, None), completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, tick_unit=None, tick_freq=None, tick_by=None, tick_form=None, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300, ax=None):
+def plot_catalogs_magnitude_time(catalogs, symbols=['o'], edge_colors=[], fill_colors=['None'],
+								edge_widths=[1], labels=[], symbol_size=50,
+								Mtype="MW", Mrelation={}, start_year=None,
+								Mrange=(None, None), completeness=None,
+								completeness_color="r", vlines=False, grid=True,
+								plot_date=False, major_tick_interval=None,
+								minor_tick_interval=1, tick_unit=None,
+								tick_freq=None, tick_by=None, tick_form=None,
+								title=None, lang="en", legend_location=0,
+								fig_filespec=None, fig_width=0, dpi=300, ax=None):
 	"""
 	:param catalogs:
 		List containing instances of :class:`EQCatalog`

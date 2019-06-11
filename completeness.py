@@ -11,7 +11,7 @@ from . import time_functions_np as tf
 
 
 
-class Completeness:
+class Completeness(object):
 	"""
 	Class defining completeness of earthquake catalog.
 
