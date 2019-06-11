@@ -15,14 +15,58 @@ import datetime
 
 import pylab
 import matplotlib
-import matplotlib.dates as mdates
-from matplotlib.ticker import MultipleLocator, MaxNLocator, NullLocator
+import matplotlib.ticker
+import matplotlib.dates as mpl_dates
 from matplotlib.font_manager import FontProperties
 
 
 MPL_FONT_SIZES = ['xx-small', 'x-small', 'small', 'medium',
 				'large', 'x-large', 'xx-large']
 
+MPL_INTERVAL_DICT = {'Y': 0, 'M': 1, 'W': 2, 'D': 3, 'h': 4, 'm': 5, 's': 6}
+
+MPL_DATE_LOCATOR_DICT = {'Y': mpl_dates.YearLocator,
+						'M': mpl_dates.MonthLocator,
+						'd': mpl_dates.WeekdayLocator,
+						'D': mpl_dates.DayLocator,
+						'h': mpl_dates.HourLocator,
+						'm': mpl_dates.MinuteLocator,
+						's': mpl_dates.SecondLocator}
+
+
+def _create_date_locator(tick_interval):
+	"""
+	Create matplotlib date locator from tick interval specification
+
+	:param tick_interval:
+		- 0 (= no ticks)
+		- None (= automatic ticks)
+		- string XXY, with XX interval and Y time unit:
+			'Y', 'M', 'D', 'd', 'h', 'm', 's'
+			(year|month|day|weekday|hour|minute|second)
+
+	:return:
+		matplotlib date locator object
+	"""
+	if tick_interval == 0:
+			date_loc = matplotlib.ticker.NullLocator()
+	elif tick_interval is None:
+		date_loc = mpl_dates.AutoDateLocator(interval_multiples=True)
+	else:
+		if isinstance(tick_interval, basestring):
+			val, tick_unit = int(tick_interval[:-1]), tick_interval[-1:]
+		else:
+			val = tick_interval
+			tick_unit = 'Y'
+		#tu_key = MPL_INTERVAL_DICT[tick_unit]
+		#for key in range(tu_key):
+		#	date_loc.intervald[key] = []
+		#date_loc.intervald[tu_key] = [val]
+		loc_kwargs = {}
+		loc_kwargs[{'Y': 'base'}.get(tick_unit, 'interval')] = val
+		date_loc = MPL_DATE_LOCATOR_DICT[tick_unit](**loc_kwargs)
+
+	return date_loc
 
 def plot_xy(datasets,
 			colors=[], fill_colors=[], linewidths=[1], linestyles=['-'], labels=[],
@@ -31,8 +75,8 @@ def plot_xy(datasets,
 			xscaling='lin', yscaling='lin',
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
-			xticks=None, xticklabels=None, xtick_interval=None,
-			yticks=None, yticklabels=None, ytick_interval=None,
+			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 			tick_label_fontsize='medium',
 			title='', title_fontsize='large',
 			legend_location=0, legend_fontsize='medium',
@@ -42,7 +86,7 @@ def plot_xy(datasets,
 	Generic function to plot (X, Y) data sets (lines, symbols and/or polygons)
 
 	:param datasets:
-		list with (x, y) array tuples
+		list with (x, y) array tuples (either values or datetimes)
 	:param colors:
 		list of line colors to cycle over for each dataset
 		(default: [], will use default colors for :param:`style_sheet`)
@@ -83,15 +127,23 @@ def plot_xy(datasets,
 		(default: 'lin')
 	:param xmin:
 		float, start value for X axis
+		Note that, if X values of :param:`datasets` are datetimes,
+		this should be datetime also
 		(default: None, let matplotlib decide)
 	:param xmax:
 		float, end value for X axis
+		Note that, if X values of :param:`datasets` are datetimes,
+		this should be datetime also
 		(default: None, let matplotlib decide)
 	:param ymin:
 		float, start value for Y axis
+		Note that, if Y values of :param:`datasets` are datetimes,
+		this should be datetime also
 		(default: None, let matplotlib decide)
 	:param ymax:
 		float, end value for Y axis
+		Note that, if Y values of :param:`datasets` are datetimes,
+		this should be datetime also
 		(default: None, let matplotlib decide)
 	:param xlabel:
 		str, label for X axis
@@ -104,20 +156,44 @@ def plot_xy(datasets,
 		(default: 'large')
 	:param xticks:
 		list or array, X axis tick positions
+		Note that, if X values of :param:`datasets` are datetimes,
+		these should be datetimes also
 		(default: None, let matplotlib decide)
 	:param xticklabels:
-		list of labels corresponding to X axis ticks
+		X axis tick labels, either:
+		- None (= automatic labels)
+		- list of labels corresponding to :param:`xticks`
+		- matplotlib Formatter object
+		- format string (for dates or scalars)
+		- '' or [] (= no tick labels)
 		(default: None, let matplotlib decide)
 	:param xtick_interval:
-
+		X axis tick interval specification
+		single value (major ticks only) or tuple (major/minor ticks) of:
+		- matplotlib Locator object
+		- None (= automatic ticks)
+		- 0 (= no ticks)
+		- int (= integer tick interval)
+		- str (= tick interval for dates, where last char is in YMDdhms
+			(year|month|day|weekday|hour|minute|second)
+		(default: None)
+	:param xtick_rotation:
+		float, rotation angle for X axis tick labels
+		(default: 0)
 	:param yticks:
 		list or array, Y axis tick positions
+		Note that, if Y values of :param:`datasets` are datetimes,
+		these should be datetimes also
 		(default: None, let matplotlib decide)
 	:param yticklabels:
-		list of labels corresponding to Y axis ticks
-		(default: None, let matplotlib decide)
+		Y axis tick labels
+		See :param:`xticklabels` for options
 	:param ytick_interval:
-
+		Y axis tick interval specification
+		see :param:`xtick_interval` for options
+	:param ytick_rotation:
+		float, rotation angle for Y axis tick labels
+		(default: 0)
 	:param tick_label_fontsize:
 		int or str, font size to use for axis tick labels
 		(default: 'medium')
@@ -238,6 +314,7 @@ def plot_xy(datasets,
 	#		plotfunc = getattr(ax, 'loglog')
 
 	for (x, y) in datasets:
+		assert len(x) == len(y)
 		color = colors.next()
 		fill_color = fill_colors.next()
 		linewidth = linewidths.next()
@@ -251,9 +328,16 @@ def plot_xy(datasets,
 		label = labels.next()
 
 		if isinstance(x[0], datetime.datetime):
-			x = pylab.date2num(x)
+			## Doesn't seem to be necessary
+			#x = pylab.date2num(x)
+			x_is_date = True
+		else:
+			x_is_date = False
 		if isinstance(y[0], datetime.datetime):
-			y = pylab.date2num(y)
+			#y = pylab.date2num(y)
+			y_is_date = True
+		else:
+			y_is_date = False
 
 		if fill_color:
 			ax.fill(x, y, facecolor=fill_color, edgecolor=color, lw=linewidth,
@@ -295,58 +379,112 @@ def plot_xy(datasets,
 	## Ticks and tick labels
 	if xticks is not None:
 		ax.set_xticks(xticks)
-	if xticklabels:
-		ax.set_xticklabels(xticklabels)
-	if xtick_interval is not None:
+	elif xtick_interval is not None:
 		if isinstance(xtick_interval, tuple) and len(xtick_interval) == 2:
 			major_tick_interval, minor_tick_interval = xtick_interval
 		else:
 			major_tick_interval, minor_tick_interval = xtick_interval, None
+
 		if isinstance(major_tick_interval, matplotlib.ticker.Locator):
 			major_loc = major_tick_interval
-		#elif isinstance(major_tick_interval, basestring):
-		#	major_loc =
-		#major_loc = {0: NullLocator,
-		#			'year': mdates.YearLocator,
-		#			'month': mdates.MonthLocator,
-		#			'weekday': mdates.WeekdayLocator,
-		#			'day': mdates.DayLocator,
-		#			'hour': mdates.HourLocator,
-		#			'minute': mdates.MinuteLocator}.get(major_tick_interval)
-
+		elif x_is_date:
+			major_loc = _create_date_locator(major_tick_interval)
 		elif major_tick_interval:
-			major_loc = MultipleLocator(major_tick_interval)
+			major_loc = matplotlib.ticker.MultipleLocator(major_tick_interval)
+		elif major_tick_interval is None:
+			major_loc = matplotlib.ticker.AutoLocator()
 		else:
-			major_loc = NullLocator
+			major_loc = matplotlib.ticker.NullLocator()
 		ax.xaxis.set_major_locator(major_loc)
-		if isinstance(major_loc, mdates.DateLocator):
-			ax.xaxis.set_major_formatter(mdates.AutoDateFormatter(locator=major_loc))
+		if isinstance(major_loc, mpl_dates.DateLocator):
+			ax.xaxis.set_major_formatter(mpl_dates.AutoDateFormatter(locator=major_loc))
+
 		if isinstance(minor_tick_interval, matplotlib.ticker.Locator):
 			minor_loc = minor_tick_interval
+		elif x_is_date:
+			minor_loc = _create_date_locator(minor_tick_interval)
 		elif minor_tick_interval:
-			minor_loc = MultipleLocator(minor_tick_interval)
+			minor_loc = matplotlib.ticker.MultipleLocator(minor_tick_interval)
+		elif minor_tick_interval is None:
+			minor_loc = matplotlib.ticker.AutoLocator()
+		else:
+			minor_loc = matplotlib.ticker.NullLocator()
 		ax.xaxis.set_minor_locator(minor_loc)
+		## Note: no formatter for minor ticks, as we don't print them
+
+	if isinstance(xticklabels, matplotlib.ticker.Formatter):
+		ax.xaxis.set_major_formatter(xticklabels)
+	elif isinstance(xticklabels, basestring):
+		if xticklabels == '':
+			major_formatter = matplotlib.ticker.NullFormatter()
+		elif x_is_date:
+			major_formatter = mpl_dates.DateFormatter(xticklabels)
+		else:
+			major_formatter = matplotlib.ticker.FormatStrFormatter(xticklabels)
+		ax.xaxis.set_major_formatter(major_formatter)
+	elif xticklabels is not None:
+		ax.set_xticklabels(xticklabels)
 
 	if yticks is not None:
 		ax.set_yticks(yticks)
-	if yticklabels:
-		ax.set_yticklabels(yticklabels)
 	if ytick_interval is not None:
 		if isinstance(ytick_interval, tuple) and len(ytick_interval) == 2:
 			major_tick_interval, minor_tick_interval = ytick_interval
 		else:
 			major_tick_interval, minor_tick_interval = ytick_interval, None
-		if major_tick_interval:
-			major_loc = MultipleLocator(major_tick_interval)
+
+		if isinstance(major_tick_interval, matplotlib.ticker.Locator):
+			major_loc = major_tick_interval
+		elif y_is_date:
+			major_loc = _create_date_locator(major_tick_interval)
+		elif major_tick_interval:
+			major_loc = matplotlib.ticker.MultipleLocator(major_tick_interval)
+		elif major_tick_interval is None:
+			major_loc = matplotlib.ticker.AutoLocator()
 		else:
-			major_loc = NullLocator
+			major_loc = matplotlib.ticker.NullLocator()
 		ax.yaxis.set_major_locator(major_loc)
-		if minor_tick_interval:
-			minor_loc = MultipleLocator(minor_tick_interval)
-			ax.yaxis.set_minor_locator(minor_loc)
+		if isinstance(major_loc, mpl_dates.DateLocator):
+			ax.yaxis.set_major_formatter(mpl_dates.AutoDateFormatter(locator=major_loc))
+
+		if isinstance(minor_tick_interval, matplotlib.ticker.Locator):
+			minor_loc = minor_tick_interval
+		elif y_is_date:
+			minor_loc = _create_date_locator(minor_tick_interval)
+		elif minor_tick_interval:
+			minor_loc = matplotlib.ticker.MultipleLocator(minor_tick_interval)
+		elif minor_tick_interval is None:
+			minor_loc = matplotlib.ticker.AutoMinorLocator()
+		else:
+			minor_loc = matplotlib.ticker.NullLocator()
+		ax.yaxis.set_minor_locator(minor_loc)
+		## Note: no formatter for minor ticks, as we don't print them
+
+	if isinstance(yticklabels, matplotlib.ticker.Formatter):
+		ax.yaxis.set_major_formatter(yticklabels)
+	elif isinstance(yticklabels, basestring):
+		if yticklabels == '':
+			major_formatter = matplotlib.ticker.NullFormatter()
+		elif y_is_date:
+			major_formatter = mpl_dates.DateFormatter(yticklabels)
+		else:
+			major_formatter = matplotlib.ticker.FormatStrFormatter(yticklabels)
+		ax.yaxis.set_major_formatter(major_formatter)
+	elif yticklabels is not None:
+		ax.set_yticklabels(yticklabels)
 
 	for label in ax.get_xticklabels() + ax.get_yticklabels():
 		label.set_size(tick_label_fontsize)
+
+	if xtick_rotation:
+		for label in ax.get_xticklabels():
+			label.set_horizontalalignment('right')
+			label.set_rotation(xtick_rotation)
+
+	if ytick_rotation:
+		for label in ax.get_yticklabels():
+			label.set_horizontalalignment('right')
+			label.set_rotation(ytick_rotation)
 
 	## Grid
 	if xgrid:
