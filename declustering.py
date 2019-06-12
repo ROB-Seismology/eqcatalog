@@ -105,7 +105,7 @@ class Uhrhammer1986Window(DeclusteringWindow):
 
 class Gruenthal2009Window(DeclusteringWindow):
 	"""
-	Class implementing Gruenthal (1985) declustering window
+	Class implementing Gruenthal (2009) declustering window
 	"""
 	name = "Gruenthal2009"
 
@@ -250,7 +250,7 @@ class Cluster():
 	:param ID:
 		int or str, ID of cluster
 	:param Mrelation:
-			dict specifying how to convert cluster magnitudes to MW
+		dict specifying how to convert cluster magnitudes to MW
 	"""
 	def __init__(self, eq_list, ID, Mrelation):
 		self.eq_list = eq_list
@@ -353,7 +353,7 @@ class Cluster():
 			(default: "centroid")
 
 		:return:
-			array containing distance (in km) with respect to centroid
+			array containing distance (in km) with respect to reference
 		"""
 		if reference == "centroid":
 			eq = self.get_equivalent_event()
@@ -698,6 +698,19 @@ class Cluster():
 
 
 class DeclusteringResult():
+	"""
+	Class representing full declustering result
+
+	:param catalog:
+		instance of :class:`EQCatalog`, original, undeclustered catalog
+	:param dc_idxs:
+		1-D int array, containing cluster index for each earthquake
+		in :param:`catalog`,
+		clusters are numbered starting from 0,
+		-1 indicates earthquake does not belong to a cluster
+	:param Mrelation:
+		dict specifying how to convert catalog magnitudes to MW
+	"""
 	# TODO: set names of returned catalogs
 	def __init__(self, catalog, dc_idxs, Mrelation):
 		self.catalog = catalog
@@ -871,7 +884,7 @@ class DeclusteringResult():
 class DeclusteringMethod():
 	"""
 	Class implementing a declustering method, which splits earthquakes in
-	dependant and independant ones.
+	dependent and independent ones.
 	"""
 
 	__metaclass__ = abc.ABCMeta
@@ -922,7 +935,7 @@ class WindowMethod(DeclusteringMethod):
 		Determine if catalog events are in time window of main event
 
 		:param main_event:
-			instance of :class:`EQCatalog`
+			instance of :class:`LocalEarthquake`
 		:param main_mag:
 			float, magnitude of main event
 		:param catalog:
@@ -999,7 +1012,7 @@ class WindowMethod(DeclusteringMethod):
 		It is not necessary that the main event is in the catalog.
 
 		:param main_event:
-			instance of :class:`EQCatalog`
+			instance of :class:`LocalEarthquake`
 		:param catalog:
 			instance of :class:`EQCatalog` (or :class:`Cluster`)
 		:param dc_window:
@@ -1323,7 +1336,7 @@ class ClusterMethod(DeclusteringMethod):
 		Determine if catalog events are in time window of main event
 
 		:param main_event:
-			instance of :class:`EQCatalog`
+			instance of :class:`LocalEarthquake`
 		:param main_mag:
 			float, magnitude of main event
 		:param catalog:
@@ -1545,7 +1558,8 @@ class ClusterMethod(DeclusteringMethod):
 		:return:
 			instance of :class:`EQCatalog`, declustered catalog
 		"""
-		## Create array storing declustering status
+		## Create array storing declustering status,
+		## True means mainshock or unclustered, False means dependent
 		dc_idxs = np.ones(len(catalog), dtype='bool')
 
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
@@ -1558,11 +1572,13 @@ class ClusterMethod(DeclusteringMethod):
 				is_clustered = not dc_idxs[i]
 				## Find aftershocks of event i in catalog
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
-				## Mark afterschocks as clustered in declustering index
+				## Mark smaller afterschocks as clustered in declustering index
+				## Larger aftershocks are not yet marked, as one of them will
+				## turn out to be the mainshock
 				dc_idxs[in_window & (magnitudes <= main_mag)] = False
 				## Set event i as unclustered, except if it is a foreshock
-				## If it is an aftershock of a higher magnitude, this will
-				## be overwritten
+				## If it turns out to be an aftershock of a higher magnitude,
+				## this will be overwritten later
 				#if (np.sum(in_window) == 1)
 				if not(magnitudes[in_window][1:] > main_mag).any():
 					## No larger magnitude in window, hence no foreshock...
