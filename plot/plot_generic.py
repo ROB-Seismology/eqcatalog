@@ -353,17 +353,99 @@ def plot_xy(datasets,
 			#ax.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label,
 			#	marker=symbol, facecolors=fill_color, linewidth=edge_width)
 
-	## Axis labels
-	if xlabel:
-		ax.set_xlabel(xlabel, fontsize=ax_label_fontsize)
-	if ylabel:
-		ax.set_ylabel(ylabel, fontsize=ax_label_fontsize)
+	## Frame
+	plot_ax_frame(ax, xscaling=xscaling, yscaling=yscaling,
+				x_is_date=x_is_date, y_is_date=y_is_date,
+				xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
+				xlabel=xlabel, ylabel=ylabel, ax_label_fontsize=ax_label_fontsize,
+				xticks=xticks, xticklabels=xticklabels,
+				xtick_interval=xtick_interval, xtick_rotation=xtick_rotation,
+				yticks=yticks, yticklabels=yticklabels,
+				ytick_interval=ytick_interval, ytick_rotation=ytick_rotation,
+				tick_label_fontsize=tick_label_fontsize,
+				title=title, title_fontsize=title_fontsize,
+				xgrid=xgrid, ygrid=ygrid)
 
+	## Legend
+	legend_fontsize = legend_fontsize or tick_label_fontsize
+	legend_font = FontProperties(size=legend_fontsize)
+	## Avoid warning if there are no labeled curves
+	if len(unique_labels.difference(set(['_nolegend_']))):
+		ax.legend(loc=legend_location, prop=legend_font)
+
+	## Output
+	if fig_filespec == "wait":
+		return ax
+	elif fig_filespec:
+		pylab.savefig(fig_filespec, dpi=dpi)
+		pylab.clf()
+	else:
+		pylab.show()
+		return ax
+
+	## Restore default style if we get here
+	pylab.style.use('default')
+
+
+def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
+				xscaling='lin', yscaling='lin',
+				xmin=None, xmax=None, ymin=None, ymax=None,
+				xlabel='', ylabel='', ax_label_fontsize='large',
+				xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+				tick_label_fontsize='medium',
+				title='', title_fontsize='large',
+				xgrid=0, ygrid=0):
+	"""
+	Plot ax frame
+
+	:param ax:
+		matplotlib Axes instance, in which frame will be drawn
+	:param x_is_date:
+		bool, whether or not X axis contains datetimes
+		(default: False)
+	:para y_is_date:
+		bool, whether or not Y axis contains datetimes
+		(default: False)
+
+	:param xscaling:
+	:param yscaling:
+	:param xmin:
+	:param xmax:
+	:param ymin:
+	:param ymax:
+	:param xlabel:
+	:param ylabel:
+	:param ax_label_fontsize:
+	:param xticks:
+	:param xticklabels:
+	:param xtick_interval:
+	:param xtick_rotation:
+	:param yticks:
+	:param yticklabels:
+	:param ytick_interval:
+	:param ytick_rotation:
+	:param tick_label_fontsize:
+	:param title:
+	:param title_fontsize:
+	:param xgrid:
+	:param ygrid:
+		see :func:`plot_xy`
+
+	:return:
+		None
+	"""
 	## Axis scaling
 	xscaling = {'lin': 'linear', 'log': 'log'}[xscaling]
 	ax.set_xscale(xscaling)
 	yscaling = {'lin': 'linear', 'log': 'log'}[yscaling]
 	ax.set_yscale(yscaling)
+
+	## Axis labels
+	if xlabel:
+		ax.set_xlabel(xlabel, fontsize=ax_label_fontsize)
+	if ylabel:
+		ax.set_ylabel(ylabel, fontsize=ax_label_fontsize)
 
 	## Axis limits
 	_xmin, _xmax = ax.get_xlim()
@@ -376,7 +458,7 @@ def plot_xy(datasets,
 	ymax = ymax or _ymax
 	ax.set_ylim(ymin, ymax)
 
-	## Ticks and tick labels
+	## X ticks
 	if xticks is not None:
 		ax.set_xticks(xticks)
 	elif xtick_interval is not None:
@@ -412,6 +494,7 @@ def plot_xy(datasets,
 		ax.xaxis.set_minor_locator(minor_loc)
 		## Note: no formatter for minor ticks, as we don't print them
 
+	## X ticklabels
 	if isinstance(xticklabels, matplotlib.ticker.Formatter):
 		ax.xaxis.set_major_formatter(xticklabels)
 	elif isinstance(xticklabels, basestring):
@@ -425,6 +508,7 @@ def plot_xy(datasets,
 	elif xticklabels is not None:
 		ax.set_xticklabels(xticklabels)
 
+	## Y ticks
 	if yticks is not None:
 		ax.set_yticks(yticks)
 	if ytick_interval is not None:
@@ -460,6 +544,7 @@ def plot_xy(datasets,
 		ax.yaxis.set_minor_locator(minor_loc)
 		## Note: no formatter for minor ticks, as we don't print them
 
+	## Y tick labels
 	if isinstance(yticklabels, matplotlib.ticker.Formatter):
 		ax.yaxis.set_major_formatter(yticklabels)
 	elif isinstance(yticklabels, basestring):
@@ -473,6 +558,7 @@ def plot_xy(datasets,
 	elif yticklabels is not None:
 		ax.set_yticklabels(yticklabels)
 
+	## Tick label size and rotation
 	for label in ax.get_xticklabels() + ax.get_yticklabels():
 		label.set_size(tick_label_fontsize)
 
@@ -494,26 +580,6 @@ def plot_xy(datasets,
 		which = {1: 'major', 2: 'minor', 3: 'both'}[ygrid]
 		ax.grid(True, which=which, axis='y')
 
-	## Legend and title
-	legend_fontsize = legend_fontsize or tick_label_fontsize
-	legend_font = FontProperties(size=legend_fontsize)
-	## Avoid warning if there are no labeled curves
-	if len(unique_labels.difference(set(['_nolegend_']))):
-		ax.legend(loc=legend_location, prop=legend_font)
+	## Title
 	if title:
 		ax.set_title(title, fontsize=title_fontsize)
-
-	if fig_filespec == "wait":
-		return ax
-	elif fig_filespec:
-		#default_figsize = pylab.rcParams['figure.figsize']
-		#if fig_width:
-		#	fig_width /= 2.54
-		#	dpi = dpi * (fig_width / default_figsize[0])
-		pylab.savefig(fig_filespec, dpi=dpi)
-		pylab.clf()
-	else:
-		pylab.show()
-		return ax
-
-	pylab.style.use('default')
