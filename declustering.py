@@ -251,11 +251,16 @@ class Cluster():
 		int or str, ID of cluster
 	:param Mrelation:
 		dict specifying how to convert cluster magnitudes to MW
+	:param distance_metric:
+		str, metric used to compute inter-event distances,
+		either "hypocentral" or "epicentral"
+		(default: "hypocentral")
 	"""
-	def __init__(self, eq_list, ID, Mrelation):
+	def __init__(self, eq_list, ID, Mrelation, distance_metric="hypocentral"):
 		self.eq_list = eq_list
 		self.ID = ID
 		self.Mrelation = Mrelation
+		self.distance_metric = distance_metric
 
 	def __len__(self):
 		return len(self.eq_list)
@@ -425,7 +430,8 @@ class Cluster():
 			instance of :class:`Cluster`
 		"""
 		mags, order = self.argsort_mag()
-		return Cluster(self.__getitem__(order), self.ID, self.Mrelation)
+		return Cluster(self.__getitem__(order), self.ID, self.Mrelation,
+						self.distance_metric)
 
 	def argsort_datetime(self):
 		"""
@@ -447,7 +453,8 @@ class Cluster():
 			instance of :class:`Cluster`
 		"""
 		datetimes, order = self.argsort_datetime()
-		return Cluster(self.__getitem__(order), self.ID, self.Mrelation)
+		return Cluster(self.__getitem__(order), self.ID, self.Mrelation,
+						self.distance_metric)
 
 	def get_mainshock_idx(self, rank=0):
 		"""
@@ -677,9 +684,12 @@ class Cluster():
 		mags = self.get_magnitudes()
 		distance_limits = dc_window.get_dist_window(mags)
 		lons, lats = self.get_longitudes(), self.get_latitudes()
-		depths = self.get_depths()
-		hypo_distances = eq.hypocentral_distance((lons, lats, depths))
-		return (hypo_distances <= distance_limits)
+		if self.distance_metric == "hypocentral":
+			depths = self.get_depths()
+			distances = eq.hypocentral_distance((lons, lats, depths))
+		else:
+			distances = eq.epicentral_distance((lons, lats))
+		return (distances <= distance_limits)
 
 	def is_in_window(self, eq, dc_window):
 		"""
@@ -710,12 +720,16 @@ class DeclusteringResult():
 		-1 indicates earthquake does not belong to a cluster
 	:param Mrelation:
 		dict specifying how to convert catalog magnitudes to MW
+	:param distance_metric:
+		str, metric that was used to compute inter-event distances,
+		either "hypocentral" or "epicentral"
 	"""
 	# TODO: set names of returned catalogs
-	def __init__(self, catalog, dc_idxs, Mrelation):
+	def __init__(self, catalog, dc_idxs, Mrelation, distance_metric):
 		self.catalog = catalog
 		self.dc_idxs = dc_idxs
 		self.Mrelation = Mrelation
+		self.distance_metric = distance_metric
 
 	def print_info(self):
 		print("Number of clusters identified: %d" % self.get_num_clusters())
@@ -793,7 +807,7 @@ class DeclusteringResult():
 		clusters = []
 		for cluster_id in self.get_cluster_ids():
 			eq_list = (self.catalog[self.dc_idxs == cluster_id]).eq_list
-			cluster = Cluster(eq_list, cluster_id, self.Mrelation)
+			cluster = Cluster(eq_list, cluster_id, self.Mrelation, self.distance_metric)
 			clusters.append(cluster)
 		return clusters
 
@@ -1203,7 +1217,7 @@ class WindowMethod(DeclusteringMethod):
 			print(dc_idxs)
 		"""
 
-		return DeclusteringResult(catalog, dc_idxs, Mrelation)
+		return DeclusteringResult(catalog, dc_idxs, Mrelation, self.distance_metric)
 
 	def decluster_catalog(self, catalog, dc_window, Mrelation):
 		"""
@@ -1326,7 +1340,7 @@ class ClusterMethod(DeclusteringMethod):
 	:param distance_metric:
 		str, metric used to compute inter-event distances,
 		either "hypocentral" or "epicentral"
-		(default: "hypocentral"
+		(default: "hypocentral")
 	"""
 	def __init__(self, distance_metric="hypocentral"):
 		self.distance_metric = distance_metric
@@ -1418,27 +1432,17 @@ class ClusterMethod(DeclusteringMethod):
 		order = np.argsort(time_deltas)
 		is_later = time_deltas > np.timedelta64(0, 's')
 
-		## Don't look beyond next earthquake with same or higher magnitude
-		is_larger = magnitudes >= main_mag
-		try:
-			next_larger_idx = order[(is_later) & (is_larger)][0]
-		except IndexError:
-			next_larger_idx = order[-1]
-		look_ahead_td = time_deltas[next_larger_idx]
-		is_before_next_larger = time_deltas <= look_ahead_td
-
-		later_and_before_next_larger = order[is_later & is_before_next_larger]
-		later_and_in_window = order[is_later & in_window & is_before_next_larger]
-
-		later_and_before_next_larger_cat = catalog[later_and_before_next_larger]
+		later_and_in_window = order[is_later & in_window]
 		aftershock_list = catalog[later_and_in_window].eq_list
 		after_aftershock_list = []
-		for eq in aftershock_list:
-			after_aftershocks = self._find_aftershocks(eq, later_and_before_next_larger_cat,
-													dc_window, Mrelation)
-			for aas in after_aftershocks:
-				if not (aas in aftershock_list or aas in after_aftershock_list):
-					after_aftershock_list.append(aas)
+		for eq, idx in zip(aftershock_list, later_and_in_window):
+			remaining_catalog = catalog[idx+1:]
+			if len(remaining_catalog):
+				after_aftershocks = self._find_aftershocks(eq, remaining_catalog,
+														dc_window, Mrelation)
+				for aas in after_aftershocks:
+					if not (aas in aftershock_list or aas in after_aftershock_list):
+						after_aftershock_list.append(aas)
 
 		return aftershock_list + after_aftershock_list
 
@@ -1490,7 +1494,7 @@ class ClusterMethod(DeclusteringMethod):
 
 		for i, eqi in enumerate(catalog):
 			## Create temporary cluster with 1 event
-			clust = Cluster([eqi], -1, Mrelation)
+			clust = Cluster([eqi], -1, Mrelation, self.distance_metric)
 
 			## Keep getting jth events until we are out of cluster's time window
 			for j in range(i+1, len(catalog)):
@@ -1502,6 +1506,7 @@ class ClusterMethod(DeclusteringMethod):
 				eqj = catalog[j]
 				end_dt = clust.get_combined_time_window(dc_window)[1]
 				if eqj.datetime > end_dt:
+					## Out of time window, proceed to next event i
 					break
 				else:
 					if clust.is_in_window(eqj, dc_window):
@@ -1540,13 +1545,16 @@ class ClusterMethod(DeclusteringMethod):
 						## Set clust back to cluster eqi belongs to
 						clust = clusters[k]
 
-		return DeclusteringResult(catalog, dc_idxs, Mrelation)
+		return DeclusteringResult(catalog, dc_idxs, Mrelation, self.distance_metric)
 
 	def decluster_catalog(self, catalog, dc_window, Mrelation):
 		"""
 		Decluster catalog quickly, without identifying individual clusters.
 		This implementation catches aftershocks of aftershocks,
-		and hopefully also foreshocks!
+		but fails to catch foreshocks if the mainshock is not in the direct
+		space/time window...
+
+		Left here for illustrative purposes.
 
 		:param catalog:
 			instance of :class:`EQCatalog`
@@ -1558,6 +1566,8 @@ class ClusterMethod(DeclusteringMethod):
 		:return:
 			instance of :class:`EQCatalog`, declustered catalog
 		"""
+		print("Warning: this method doesn't work correctly.")
+		print("Use analyze_clusters method instead!")
 		## Create array storing declustering status,
 		## True means mainshock or unclustered, False means dependent
 		dc_idxs = np.ones(len(catalog), dtype='bool')
@@ -1575,13 +1585,19 @@ class ClusterMethod(DeclusteringMethod):
 				## Mark smaller afterschocks as clustered in declustering index
 				## Larger aftershocks are not yet marked, as one of them will
 				## turn out to be the mainshock
+				## Note that if there is more than 1 larger aftershock, they are
+				## guaranteed to be in each other's window, given that they are
+				## in the window of a smaller event
 				dc_idxs[in_window & (magnitudes <= main_mag)] = False
 				## Set event i as unclustered, except if it is a foreshock
 				## If it turns out to be an aftershock of a higher magnitude,
 				## this will be overwritten later
 				#if (np.sum(in_window) == 1)
-				if not(magnitudes[in_window][1:] > main_mag).any():
+				if not(magnitudes[in_window] > main_mag).any():
 					## No larger magnitude in window, hence no foreshock...
+					## Note: this fails if the mainshock is not in the
+					## window of this event, but in the window of an aftershock
+					## of this event...
 					## Set as independent, except if marked as clustered before
 					if not is_clustered:
 						dc_idxs[i] = True
@@ -1818,7 +1834,8 @@ class ReasenbergMethod(DeclusteringMethod):
 						if dc_idxs[i] == dc_idxs[j] == -1:
 							## Initialize new cluster
 							ncl = len(clusters)
-							cluster = Cluster([eqi, eqj], ncl, Mrelation)
+							cluster = Cluster([eqi, eqj], ncl, Mrelation,
+												self.distance_metric)
 							clusters.append(cluster)
 							dc_idxs[i] = dc_idxs[j] = ncl
 							if verbose:
@@ -1848,7 +1865,8 @@ class ReasenbergMethod(DeclusteringMethod):
 					## Assuming catalog is sorted by time
 					break
 
-		return DeclusteringResult(catalog, dc_idxs, Mrelation)
+		return DeclusteringResult(catalog, dc_idxs, Mrelation,
+								distance_metric="hypocentral")
 
 	def decluster_catalog(self, catalog, Mrelation, dc_window=Reasenberg1985Window(),
 				tau_min=2880., tau_max=14400., rfact=10, dsigma=30, rmax=30,
@@ -1901,13 +1919,13 @@ def get_window_by_name(window_name):
 	return get_available_windows()[window_name]()
 
 
-def plot_declustering_windows(fig_filespec=None, dpi=300):
+def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 	"""
 	Plot time and distance windows of available declustering windows
 	"""
 	import matplotlib.pyplot as plt
-	from matplotlib.ticker import MultipleLocator
 	from .time_functions_np import fractional_time_delta
+	from .plot import plot_xy
 	#from .moment import calc_rupture_radius
 
 	dc_windows = get_available_windows()
@@ -1918,39 +1936,42 @@ def plot_declustering_windows(fig_filespec=None, dpi=300):
 	fig = plt.figure()
 	ax1 = fig.add_subplot(121)
 	ax2 = fig.add_subplot(122)
-	#lines = []
-	#labels = []
+
+	tlines, dlines = [], []
+	labels = []
 	for dc_window_name, dc_window in dc_windows.items():
-		print(dc_window_name)
-		dc_window = dc_window()
-		tw = fractional_time_delta(dc_window.get_time_window(mags), 'D')
-		dw = dc_window.get_dist_window(mags)
-		l = ax1.plot(mags, tw, linewidth=2, label=dc_window_name)
-		ax2.plot(mags, dw, linewidth=2, label='_nolegend_')
-		#lines += l
-		#labels.append(dc_window_name)
-	#ax2.plot(mags, calc_rupture_radius(mags) * 2, linewidth=2)
-	ax1.yaxis.set_major_locator(MultipleLocator(100.))
-	ax1.yaxis.set_minor_locator(MultipleLocator(50.))
-	ax1.xaxis.set_major_locator(MultipleLocator(1.0))
-	ax1.xaxis.set_minor_locator(MultipleLocator(0.5))
-	ax2.yaxis.set_major_locator(MultipleLocator(10.))
-	ax2.yaxis.set_minor_locator(MultipleLocator(5.))
-	ax2.xaxis.set_major_locator(MultipleLocator(1.0))
-	ax2.xaxis.set_minor_locator(MultipleLocator(0.5))
-	ax1.set_ylim(0, 1500)
-	ax2.set_ylim(0, 150)
-	ax1.grid(which='both')
-	ax2.grid(which='both')
-	ax1.set_xlabel('Magnitude ($M_W$)')
-	ax2.set_xlabel('Magnitude ($M_W$)')
-	ax1.set_ylabel('Time (days)')
-	ax2.set_ylabel('Distance (km)')
-	ax1.set_title('Time window')
-	ax2.set_title('Distance window')
+		if dc_window_name != 'Reasenberg1985':
+			dc_window = dc_window()
+			tw = fractional_time_delta(dc_window.get_time_window(mags), 'D')
+			tlines.append((mags, tw))
+			dw = dc_window.get_dist_window(mags)
+			dlines.append((mags, dw))
+			labels.append(dc_window_name)
+
+	xlabel ='Magnitude ($M_W$)'
+	xgrid = ygrid = 1
+	xtick_interval = (1.0, 0.5)
+
+	## Plot time windows
+	ylabel = 'Time (days)'
+	ytick_interval = (250, 50)
+	ymax = 1500
+	title = 'Time window'
+	legend_location = 2
+	plot_xy(tlines, labels=labels, linewidths=[2], xlabel=xlabel, ylabel=ylabel,
+			ytick_interval=ytick_interval, ymax=ymax, xgrid=xgrid, ygrid=ygrid,
+			title=title, ax=ax1, legend_location=legend_location, **kwargs)
+
+	## Plot space windows
+	ylabel = 'Distance (km)'
+	ytick_interval = (25, 5)
+	ymax = 150
+	title = 'Distance window'
+	plot_xy(tlines, linewidths=[2], xlabel=xlabel, ylabel=ylabel, ytick_interval=ytick_interval,
+			ymax=ymax, xgrid=xgrid, ygrid=ygrid, title=title, ax=ax2, **kwargs)
+
 	fig.subplots_adjust(wspace=0.5)
 	#fig.legend(lines, labels, 9, bbox_to_anchor=(0.50,0.95), ncol=2, prop={'size': 12})
-	ax1.legend(loc=2)
 	#plt.tight_layout(pad=0.25, w_pad=1.0)
 
 	if fig_filespec:
@@ -1958,3 +1979,62 @@ def plot_declustering_windows(fig_filespec=None, dpi=300):
 		plt.clf()
 	else:
 		plt.show()
+
+
+def generate_linked_cluster(dc_window, Mrange=(1, 6), num_events=50):
+	"""
+	Generate a synthetic cluster where each earthquake (apart from the
+	first one) is in the space/time window of the previous one.
+	Note that this does not at all resemble a natural earthquake
+	cluster! This is only useful to test the performance of the
+	linked_window declustering method
+
+	:param dc_window:
+		instance of :class:`DeclusteringWindow`, the window definition
+		used to generate the cluster
+	:param Mrange:
+		(min_mag, max_mag) tuple of floats, magnitude range of cluster
+		(default: (1, 6))
+	:param num_events:
+		int, the number of earthquakes the cluster should consist of
+		(default: 50)
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
+	from mapping.geotools.geodetic import spherical_point_at
+	from .eqrecord import LocalEarthquake
+	from .eqcatalog import EQCatalog
+	from .time_functions_np import (to_py_date, to_py_time)
+
+	mags = np.random.random(num_events)
+	min_mag, max_mag = Mrange
+	mags = min_mag + mags * (max_mag - min_mag)
+	max_distances = dc_window.get_dist_window(mags[:-1])
+	max_time_deltas = dc_window.get_time_window(mags[:-1])
+	distances = np.random.random(num_events-1) * max_distances * 1000
+	time_deltas = np.random.random(num_events-1) * max_time_deltas
+	azimuths = np.random.random(num_events-1) * 360
+
+	## First earthquake in sequence
+	start_dt = np.datetime64('now')
+	start_date, start_time = to_py_date(start_dt), to_py_time(start_dt)
+	start_lon, start_lat = 0, 0
+	depth = 0
+	eq0 = LocalEarthquake(0, start_date, start_time, start_lon, start_lat,
+						depth, {'MW': mags[0]}, intensity_max=np.nan)
+	eq_list = [eq0]
+
+	## Linked aftershocks
+	for i in range(num_events-1):
+		foreshock = eq_list[-1]
+		mag = mags[i+1]
+		time_delta = time_deltas[i]
+		dist, azimuth = distances[i], azimuths[i]
+		lon, lat = spherical_point_at(foreshock.lon, foreshock.lat, dist, azimuth)
+		dt = foreshock.datetime + np.timedelta64(time_delta, 's')
+		eq = LocalEarthquake(i+1, to_py_date(dt), to_py_time(dt), lon, lat, depth,
+							{'MW': mag}, intensity_max=np.nan)
+		eq_list.append(eq)
+
+	return EQCatalog(eq_list, name='Synthetic cluster (%s window)' % dc_window.name)
