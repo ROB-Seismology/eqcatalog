@@ -68,6 +68,7 @@ def _create_date_locator(tick_interval):
 
 	return date_loc
 
+
 def plot_xy(datasets,
 			colors=[], fill_colors=[], linewidths=[1], linestyles=['-'], labels=[],
 			markers=[], marker_sizes=[6], marker_intervals=[],
@@ -77,7 +78,7 @@ def plot_xy(datasets,
 			xlabel='', ylabel='', ax_label_fontsize='large',
 			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
-			tick_label_fontsize='medium',
+			tick_label_fontsize='medium', tick_params={},
 			title='', title_fontsize='large',
 			legend_location=0, legend_fontsize='medium',
 			xgrid=0, ygrid=0, style_sheet='classic',
@@ -197,6 +198,10 @@ def plot_xy(datasets,
 	:param tick_label_fontsize:
 		int or str, font size to use for axis tick labels
 		(default: 'medium')
+	:param tick_params:
+		dict, containing keyword arguments for :func:`ax.tick_params`,
+		that will be applied to both the X and Y axes
+		(default: {})
 	:param title:
 		str, plot title
 		(default: '')
@@ -393,7 +398,7 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 				xlabel='', ylabel='', ax_label_fontsize='large',
 				xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
 				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
-				tick_label_fontsize='medium',
+				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
 				xgrid=0, ygrid=0):
 	"""
@@ -426,6 +431,7 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	:param ytick_interval:
 	:param ytick_rotation:
 	:param tick_label_fontsize:
+	:param tick_params:
 	:param title:
 	:param title_fontsize:
 	:param xgrid:
@@ -571,6 +577,10 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		for label in ax.get_yticklabels():
 			label.set_horizontalalignment('right')
 			label.set_rotation(ytick_rotation)
+
+	## Tick aspect
+	if tick_params:
+		ax.tick_params(axis='both', **tick_params)
 
 	## Grid
 	if xgrid:
