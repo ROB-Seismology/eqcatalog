@@ -3,6 +3,7 @@ Generic plot functions based on matplotlib
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
+from builtins import int
 
 try:
 	## Python 2
@@ -13,11 +14,15 @@ except:
 
 import datetime
 
+import numpy as np
 import pylab
 import matplotlib
 import matplotlib.ticker
 import matplotlib.dates as mpl_dates
 from matplotlib.font_manager import FontProperties
+
+
+__all__ = ['plot_xy', 'plot_density', 'plot_histogram', 'plot_ax_frame']
 
 
 MPL_FONT_SIZES = ['xx-small', 'x-small', 'small', 'medium',
@@ -80,8 +85,8 @@ def plot_xy(datasets,
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 			tick_label_fontsize='medium', tick_params={},
 			title='', title_fontsize='large',
-			legend_location=0, legend_fontsize='medium',
 			xgrid=0, ygrid=0, style_sheet='classic',
+			legend_location=0, legend_fontsize='medium',
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Generic function to plot (X, Y) data sets (lines, symbols and/or polygons)
@@ -122,9 +127,11 @@ def plot_xy(datasets,
 		(default: [1])
 	:param xscaling:
 		str, scaling to use for X axis ('lin' or 'log')
+		Prepend '-' to invert orientation of X axis
 		(default: 'lin')
 	:param yscaling:
 		str, scaling to use for Y axis ('lin' or 'log')
+		Prepend '-' to invert orientation of Y axis
 		(default: 'lin')
 	:param xmin:
 		float, start value for X axis
@@ -208,6 +215,16 @@ def plot_xy(datasets,
 	:param title_fontsize:
 		str, font size to use for plot title
 		(default: 'large')
+	:param xgrid:
+		int, 0/1/2/3 = draw no/major/minor/major+minor X grid lines
+		(default: 0)
+	:param ygrid:
+		int, 0/1/2/3 = draw no/major/minor/major+minor Y grid lines
+		(default: 0)
+	:param style_sheet:
+		str, matplotlib style sheet to apply to plot
+		See matplotlib.style.available for availabel style sheets
+		(default: 'classic')
 	:param legend_location:
 		int or str, location of legend (matplotlib location code):
 			"best" 	0
@@ -226,16 +243,6 @@ def plot_xy(datasets,
 		int or str, font size to use for legend labels
 		If not specified, will use the value of :param:`tick_label_fontsize`
 		(default: 'medium')
-	:param xgrid:
-		int, 0/1/2/3 = draw no/major/minor/major+minor X grid lines
-		(default: 0)
-	:param ygrid:
-		int, 0/1/2/3 = draw no/major/minor/major+minor Y grid lines
-		(default: 0)
-	:param style_sheet:
-		str, matplotlib style sheet to apply to plot
-		See matplotlib.style.available for availabel style sheets
-		(default: 'classic')
 	:param fig_filespec:
 		str, full path to output file
 		If None, will plot on screen
@@ -258,6 +265,15 @@ def plot_xy(datasets,
 		matplotlib Axes instance if :param:`fig_filespec` is set to
 		'wait', else None
 	"""
+	frame_args = {key: val for (key, val) in locals().items()
+				if not key in ['datasets', 'colors', 'fill_colors', 'linewidths',
+							'linestyles', 'labels', 'markers', 'marker_sizes',
+							'marker_intervals', 'marker_edge_colors',
+							'marker_fill_colors', 'marker_edge_widths',
+							'legend_location', 'legend_fontsize',
+							'style_sheet', 'fig_filespec', 'figsize', 'dpi',
+							'ax']}
+
 	from itertools import cycle
 
 	pylab.style.use(style_sheet)
@@ -359,17 +375,249 @@ def plot_xy(datasets,
 			#	marker=symbol, facecolors=fill_color, linewidth=edge_width)
 
 	## Frame
-	plot_ax_frame(ax, xscaling=xscaling, yscaling=yscaling,
-				x_is_date=x_is_date, y_is_date=y_is_date,
-				xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax,
-				xlabel=xlabel, ylabel=ylabel, ax_label_fontsize=ax_label_fontsize,
-				xticks=xticks, xticklabels=xticklabels,
-				xtick_interval=xtick_interval, xtick_rotation=xtick_rotation,
-				yticks=yticks, yticklabels=yticklabels,
-				ytick_interval=ytick_interval, ytick_rotation=ytick_rotation,
-				tick_label_fontsize=tick_label_fontsize,
-				title=title, title_fontsize=title_fontsize,
-				xgrid=xgrid, ygrid=ygrid)
+	plot_ax_frame(ax, **frame_args)
+
+	## Legend
+	legend_fontsize = legend_fontsize or tick_label_fontsize
+	legend_font = FontProperties(size=legend_fontsize)
+	## Avoid warning if there are no labeled curves
+	if len(unique_labels.difference(set(['_nolegend_']))):
+		ax.legend(loc=legend_location, prop=legend_font)
+
+	## Output
+	if fig_filespec == "wait":
+		return ax
+	elif fig_filespec:
+		pylab.savefig(fig_filespec, dpi=dpi)
+		pylab.clf()
+	else:
+		pylab.show()
+		return ax
+
+	## Restore default style if we get here
+	pylab.style.use('default')
+
+
+def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=None,
+			bins=None, cmap='plasma', cbar_args={}, cbar_label='N',
+			xscaling='lin', yscaling='lin',
+			xmin=None, xmax=None, ymin=None, ymax=None,
+			xlabel='', ylabel='', ax_label_fontsize='large',
+			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+			tick_label_fontsize='medium', tick_params={},
+			xgrid=0, ygrid=0, style_sheet='classic',
+			title='', title_fontsize='large',
+			fig_filespec=None, figsize=None, dpi=300, ax=None):
+	"""
+	Plot XY data as density (number of data points per grid cell)
+
+	:param x:
+		1-D array, X data
+	:param y:
+		1-D array, Y data
+	:param grid_size:
+		int or (int, int) tuple, the number of grid cells in the X/Y
+		direction
+	:param density_type:
+		str, type of density plot: 'hist2d', 'hexbin' or 'kde'
+		(default: 'hist2d')
+	:param min_cnt:
+		int, minimum density to plot
+		(default: None)
+	:param max_cnt:
+		int, maximum density to plot
+		(default: None)
+	:param bins:
+		None, 'log' or list or array with bin edges, density bins
+		(default: None)
+	:param cmap:
+		str or matplotlib Colormap object, colormap
+		(default: 'plasma')
+	:param cbar_args:
+		dict, arguments to pass to :func:`matplotlib.colorbar`
+	:param cbar_label:
+		str, colorbar label
+		(default: 'N')
+
+	See :func:`plot_xy` for additional keyword arguments
+	"""
+	frame_args = {key: val for (key, val) in locals().items()
+				if not key in ['x', 'y', 'grid_size', 'density_type',
+							'min_cnt', 'max_cnt', 'cmap', 'bins', 'cbar_args',
+							'cbar_label', 'style_sheet', 'fig_filespec',
+							'figsize', 'dpi', 'ax']}
+
+	pylab.style.use(style_sheet)
+
+	if ax is None:
+		#ax = pylab.axes()
+		fig, ax = pylab.subplots(figsize=figsize)
+	else:
+		fig_filespec = "wait"
+
+	## Density plot
+	if isinstance(grid_size, int):
+		grid_size = (grid_size, grid_size)
+
+	if cmap is None:
+		cmap = pylab.rcParams['image.cmap']
+	if not isinstance(cmap, matplotlib.colors.Colormap):
+		cmap = pylab.cm.get_cmap(cmap)
+	cmap.set_bad((1,1,1,0))
+	cmap.set_under((1,1,1,0))
+
+	nan_idxs = np.isnan(x) | np.isnan(y)
+	x, y = x[~nan_idxs], y[~nan_idxs]
+
+	_xmin = xmin if xmin is not None else x.min()
+	_xmax = xmax if xmax is not None else x.max()
+	_ymin = ymin if ymin is not None else y.min()
+	_ymax = ymax if ymax is not None else y.max()
+
+	if density_type == 'hist2d':
+		range = [[_xmin, _xmax], [_ymin, _ymax]]
+		if bins is None:
+			#norm = None
+			norm = matplotlib.colors.Normalize(vmin=min_cnt, vmax=max_cnt)
+		elif bins == 'log':
+			norm = matplotlib.colors.LogNorm()
+		else:
+			from mapping.layeredbasemap.cm.norm import PiecewiseLinearNorm
+			norm = PiecewiseLinearNorm(bins)
+		_, _, _, sm = ax.hist2d(x, y, bins=grid_size, range=range, cmap=cmap,
+								cmin=min_cnt, cmax=max_cnt, norm=norm)
+
+	elif density_type == 'hexbin':
+		extent = (_xmin, _xmax, _ymin, _ymax)
+		sm = ax.hexbin(x, y, gridsize=grid_size, cmap=cmap, bins=bins,
+						mincnt=min_cnt, extent=extent)
+
+	elif density_type == 'kde':
+		from scipy.stats import kde
+		k = kde.gaussian_kde([x, y])
+		xi, yi = np.mgrid[_xmin: _xmax: grid_size[0]*1j, _ymin: _ymax: grid_size[1]*1j]
+		zi = k(np.vstack([xi.flatten(), yi.flatten()]))
+		## Un-normalize density
+		zi *= (float(len(x)) / np.sum(zi))
+		extent = (_xmin, _xmax, _ymin, _ymax)
+		if bins is None:
+			#norm = None
+			norm = matplotlib.colors.Normalize(vmin=min_cnt, vmax=max_cnt)
+		elif bins == 'log':
+			norm = matplotlib.colors.LogNorm()
+		else:
+			from mapping.layeredbasemap.cm.norm import PiecewiseLinearNorm
+			norm = PiecewiseLinearNorm(bins)
+		sm = ax.pcolormesh(xi, yi, zi.reshape(xi.shape), cmap=cmap, norm=norm)
+		ax.axis(extent)
+
+	## Frame
+	plot_ax_frame(ax, **frame_args)
+
+	## Colorbar
+	cbar = pylab.colorbar(sm, ax=ax, **cbar_args)
+	cbar.set_label(cbar_label)
+
+	## Output
+	if fig_filespec == "wait":
+		return ax
+	elif fig_filespec:
+		pylab.savefig(fig_filespec, dpi=dpi)
+		pylab.clf()
+	else:
+		pylab.show()
+		return ax
+
+	## Restore default style if we get here
+	pylab.style.use('default')
+
+
+def plot_histogram(datasets, bins, data_is_binned=False,
+				histogram_type='bar', cumulative=False, stacked=True, normed=False,
+				orientation='vertical', align='mid', bar_width=None, baseline=None,
+				colors=[], labels=[],
+				line_color='k', line_width=0.5,
+				xscaling='lin', yscaling='lin',
+				xmin=None, xmax=None, ymin=None, ymax=None,
+				xlabel='', ylabel='', ax_label_fontsize='large',
+				xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+				tick_label_fontsize='medium', tick_params={},
+				title='', title_fontsize='large',
+				xgrid=0, ygrid=0, style_sheet='classic',
+				legend_location=0, legend_fontsize='medium',
+				fig_filespec=None, figsize=None, dpi=300, ax=None):
+	"""
+	Plot histograms
+
+	:param datasets:
+		list of 1-D arrays
+	:param bins:
+		int (number of bins) or list or array (bin edges)
+	:param data_is_binned:
+		bool, whether or not data in :param:`datasets` is already binned
+		Note that, if this is True, :param:`bins` must correspond to
+		the bin edges!
+		(default: False)
+	"""
+	frame_args = {key: val for (key, val) in locals().items()
+				if not key in ['datasets', 'bins', 'data_is_binned', 'histogram_type',
+							'cumulative', 'stacked', 'normed', 'orientation',
+							'align', 'bar_width', 'baseline', 'colors', 'labels',
+							'line_color', 'line_width',
+							'legend_location', 'legend_fontsize',
+							'style_sheet', 'fig_filespec', 'figsize', 'dpi',
+							'ax']}
+
+	from itertools import cycle
+
+	pylab.style.use(style_sheet)
+
+	if ax is None:
+		fig, ax = pylab.subplots(figsize=figsize)
+	else:
+		fig_filespec = "wait"
+
+	## markers, colors, linewidhts, linestyles, labels, etc.
+	if not colors:
+		#colors = 'bgrcmyk'
+		colors = pylab.rcParams['axes.prop_cycle'].by_key()['color']
+	if not labels:
+		labels = ['%d' % i for i in range(len(datasets))]
+	unique_labels = set(labels)
+
+	colors = cycle(colors)
+	labels = cycle(labels)
+
+	colors = [colors.next() for i in range(len(datasets))]
+	labels = [labels.next() for i in range(len(datasets))]
+
+	## Histogram
+	if orientation == 'vertical' and 'log' in yscaling:
+		log = True
+	elif orientation == 'horizontal' and 'log' in xscaling:
+		log = True
+	else:
+		log = False
+
+	if data_is_binned:
+		#The weights are the y-values of the input binned data
+		weights = datasets
+		#The dataset values are the bin centres
+		bins = np.asarray(bins)
+		datasets = [((bins[1:] + bins[:-1]) / 2.) for i in range(len(datasets))]
+	else:
+		weights = None
+
+	ax.hist(datasets, bins, normed=normed, cumulative=cumulative,
+			histtype=histogram_type, align=align, orientation=orientation,
+			rwidth=bar_width, color=colors, label=labels, stacked=stacked,
+			edgecolor=line_color, linewidth=line_width, bottom=baseline,
+			log=log, weights=weights)
+
+	## Frame
+	plot_ax_frame(ax, **frame_args)
 
 	## Legend
 	legend_fontsize = legend_fontsize or tick_label_fontsize
@@ -442,8 +690,14 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		None
 	"""
 	## Axis scaling
+	if xscaling[0] == '-':
+		xscaling = xscaling[1:]
+		ax.invert_xaxis()
 	xscaling = {'lin': 'linear', 'log': 'log'}[xscaling]
 	ax.set_xscale(xscaling)
+	if yscaling[0] == '-':
+		yscaling = yscaling[1:]
+		ax.invert_yaxis()
 	yscaling = {'lin': 'linear', 'log': 'log'}[yscaling]
 	ax.set_yscale(yscaling)
 
