@@ -1735,8 +1735,6 @@ class EQCatalog(object):
 		else:
 			return dc
 
-		# TODO: implement get_dependent_events, get_foreshocks, get_aftershocks
-		# methods in LocalEarthquake class
 
 	## Various binning methods
 
@@ -1753,7 +1751,7 @@ class EQCatalog(object):
 		:param end_datetime:
 			str or instance of :class:`datetime.date` or :class:`datetime.datetime`
 			or :class:`np.datetime64`, end date and time (right edge of last bin)
-		:param time_detla:
+		:param time_delta:
 			instance of :class:`datetime.timedelta` or :class:`np.timedelta64`,
 			time interval
 			Note that datetimes and time_delta must have compatible base time units!
@@ -1796,7 +1794,7 @@ class EQCatalog(object):
 
 		:param start_datetime:
 		:param end_datetime:
-		:param time_detla:
+		:param time_delta:
 		:param Mmin:
 		:param Mmax:
 		:param Mtype:
@@ -2064,7 +2062,8 @@ class EQCatalog(object):
 		max_depth_error=None,
 		Mmin=None, Mmax=None,
 		Mtype="MW", Mrelation={},
-		start_date=None, end_date=None):
+		start_date=None, end_date=None,
+		include_right_edge=False):
 		"""
 		Bin earthquakes into depth bins
 
@@ -2101,6 +2100,9 @@ class EQCatalog(object):
 			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
 			upper year or date to bin
 			(default: None)
+		:param include_right_edge:
+			bool, whether or not right edge should be included in depth bins
+			(default: False)
 
 		:return:
 			tuple (bins_N, bins_depth)
@@ -2116,7 +2118,9 @@ class EQCatalog(object):
 			depths = np.nan_to_num(self.get_depths())
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, _ = np.histogram(depths, bins_depth)
-		return bins_N, bins_depth[:-1]
+		if not include_right_edge:
+			bins_depth = bins_depth[:-1]
+		return bins_N, bins_depth
 
 	def bin_M0_by_depth(self,
 		min_depth=0, max_depth=30, bin_width=2,
@@ -2164,6 +2168,7 @@ class EQCatalog(object):
 		Mmin, Mmax, dM=0.2,
 		Mtype="MW", Mrelation={},
 		completeness=None,
+		include_right_edge=False,
 		verbose=True):
 		"""
 		Bin all earthquake magnitudes in catalog according to specified
@@ -2184,6 +2189,9 @@ class EQCatalog(object):
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of
 			completeness and corresponding minimum magnitudes (default: None)
+		:param include_right_edge:
+			bool, whether or not right edge should be included in magnitude bins
+			(default: False)
 		:param verbose:
 			Bool, whether or not to print additional information
 
@@ -2214,7 +2222,8 @@ class EQCatalog(object):
 
 		## Compute number of earthquakes per magnitude bin
 		bins_N, bins_Mag = np.histogram(Mags, bins_Mag)
-		bins_Mag = bins_Mag[:-1]
+		if not include_right_edge:
+			bins_Mag = bins_Mag[:-1]
 
 		return bins_N, bins_Mag
 
@@ -3154,53 +3163,55 @@ class EQCatalog(object):
 			pylab.show()
 
 	## Various plots
-
-	def plot_Mhistogram(self, Mmin, Mmax, dM=0.5, completeness=None, Mtype="MW",
-		Mrelation={}, color="b", title=None, fig_filespec=None, verbose=False):
+	def plot_mag_histogram(self,
+							Mmin, Mmax, dM=0.5,
+							Mtype='MW', Mrelation={}, completeness=None,
+							color=None, label='',
+							**kwargs):
 		"""
-		Plot magnitude histogram of earthquakes in collection.
+		Plot magnitude histogram of earthquake catalog
+
 		:param Mmin:
-			Float, minimum magnitude to bin
+			float, minimum magnitude to bin
 		:param Mmax:
-			Float, maximum magnitude to bin
+			float, maximum magnitude to bin
 		:param dM:
-			Float, magnitude interval
-		:param completeness:
-			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: None)
+			float, magnitude binning interval
+			(default: 0.5)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			str, magnitude type: "ML", "MS" or "MW" (default: "MW")
 		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML")
+			{str: str} ordered dict, mapping magnitude type ("MW", "MS" or "ML")
+			to name of magnitude conversion relation for :param:`Mtype`
 			(default: {})
-		:param color:
-			matplotlib color specification (default: "b")
-		:param title:
-			String, plot title (None = default title, "" = no title)
+		:param completeness:
+			instance of :class:`Completeness` containing initial years of
+			completeness and corresponding minimum magnitudes
 			(default: None)
-		:param fig_filespec:
-			String, full path of image to be saved.
-			If None (default), histogram is displayed on screen.
-		"""
-		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, completeness=completeness,
-								Mtype=Mtype, Mrelation=Mrelation, verbose=verbose)
-		pylab.bar(bins_Mag, bins_N, width=dM, color=color)
-		pylab.xlabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
-		pylab.ylabel("Number of events", fontsize="x-large")
-		ax = pylab.gca()
-		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('large')
-		if title is None:
-			num_events = pylab.add.reduce(bins_N)
-			title = "%s (%d events)" % (self.name, num_events)
-		pylab.title(title, fontsize="large")
+		:param color:
+			matplotlib color specification
+			(default: None, use default color)
+		:param label:
+			str, label to use for histogram
+			(default: '')
 
-		if fig_filespec:
-			pylab.savefig(fig_filespec)
-			pylab.clf()
-		else:
-			pylab.show()
+		See :func:`plot.plot_generic.plot_histogram` for additional
+		keyword arguments
+		"""
+		from .plot.plot_generic import plot_histogram
+
+		bins_N, bins_mag = self.bin_by_mag(Mmin, Mmax, dM, completeness=completeness,
+											Mtype=Mtype, Mrelation=Mrelation,
+											include_right_edge=Trueverbose=False)
+
+		kwargs['colors'] = [color] if color else None
+		kwargs['labels'] = [label] if label else None
+
+		kwargs['xlabel'] = kwargs.get('xlabel', "Magnitude ($M_%s$)" % Mtype[1])
+		kwargs['ylabel'] = kwargs.get('ylabel', "Number of events")
+		kwargs['title'] = kwargs.get('title', "%s (%d events)" % (self.name, np.sum(bins_N)))
+
+		return plot_histogram([bins_N], bins_mag, data_is_binned=True, **kwargs)
 
 	def plot_CumulativeYearHistogram(self,
 		start_year, end_year, dYear,
@@ -3237,7 +3248,7 @@ class EQCatalog(object):
 			Int, year of completeness where arrow should be plotted
 			(default: None)
 		:param regression_range:
-			List, range of years where regression should be computed adn plotted
+			List, range of years where regression should be computed and plotted
 			(default: [])
 		:param lang:
 			String, language of plot labels (default: "en")
@@ -3294,6 +3305,39 @@ class EQCatalog(object):
 		#xmin, xmax, ymin, ymax = pylab.axis()
 		pylab.axis((start_year, end_year, 0, ymax))
 		pylab.show()
+
+	def plot_cumulated_moment(self, start_date=None, end_date=None,
+						rel_time_unit=None, Mrelation={}, M0max=None,
+						**kwargs):
+		"""
+		Plot cumulated seismic moment versus time.
+
+		:param start_date:
+			datetime spec, datetime where to start the plot
+			(default: None)
+		:param end_date:
+			datetime spec, datetime where to end the plot
+			(default: None)
+		:param rel_time_unit:
+			str, relative time unit ('Y', 'W', 'D', 'h', 'm' or 's')
+			(default: None = plot absolute time)
+		:param Mrelation:
+			OrderedDict or str, magnitude relations to use for conversion
+			to seismic moment
+			(default: {})
+		:param M0max:
+			float, maximum moment value in Y axis
+			(default: None)
+
+		See :func:`eqcatalog.plot.plot_generic.plot_xy` for additional
+		keyword arguments
+		"""
+		kwargs.update(locals())
+		kwargs.pop('self')
+		kwargs.pop('kwargs')
+
+		from .plot import plot_cumulated_moment
+		return plot_cumulated_moment([self], ** kwargs)
 
 	def plot_CumulatedM0(self,
 		start_date=None, end_date=None, bin_width=10, bin_width_spec="years",
@@ -3529,129 +3573,106 @@ class EQCatalog(object):
 		else:
 			pylab.show()
 
-	def plot_time_magnitude(self, Mtype="MW", Mrelation={}, lang="en"):
+	def plot_time_magnitude(self, Mtype="MW", Mrelation={}, rel_time_unit=None,
+						Mrange=(None, None), start_date=None, end_date=None,
+						marker='o', marker_size=8, edge_color=None, fill_color=None,
+						edge_width=0.5, label=None,
+						completeness=None, completeness_color='r',
+						lang='en', **kwargs):
+		"""
+		Plot time (X) versus magnitude (Y)
+
+		:param Mtype:
+			str, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
+		:param Mrelation:
+			{str: str} ordered dict, mapping magnitude type ("MW", "MS" or "ML")
+			to name of magnitude conversion relation
+			(default: {})
+		:param rel_time_unit:
+			str, relative time unit ('Y', 'W', 'D', 'h', 'm' or 's')
+			(default: None = plot absolute time)
+		:param Mrange:
+			(min_mag, max_mag) tuple of floats, magnitude range in Y axis
+			(default: (None, None))
+		:param start_date:
+			datetime spec, start date in X axis:
+			- int (year)
+			- str (timestamp)
+			- datetime.datetime
+			- np.datetime64
+			(default: None = auto-determine from catalog)
+		:param end_date:
+			datetme spec, end date in X axis:
+			see :param:`start_date` for options
+			(default: None = auto-determine from catalog)
+		:param marker:
+			char, marker symbol
+			(default: 'o')
+		:param marker_size:
+			marker size
+			(default: 8)
+		:param edge_width:
+			float, marker edge width
+			(default: 0.5)
+		:param edge_color:
+			marker edge color
+			(default: None, will use default color for :param:`style_sheet`)
+		:param fill_color:
+			marker fill color
+			(default: None, will not apply fill color)
+		:param label:
+			label for catalog
+			(default: '', will not plot label
+		:param completeness:
+			instance of :class:`eqcatalog.Completeness`,
+			catalog completeness to draw as a line over the catalog events
+			(default: None)
+		:param completeness_color:
+			str, color to plot completeness line
+			(default: 'r')
+		:param lang:
+			String, language of plot labels (default: "en")
+
+		See :func:`eqcatalog.plot.plot_generic.plot_xy` for additional
+		keyword arguments
+		"""
+		kwargs.update(locals())
+		kwargs.pop('self')
+		kwargs.pop('kwargs')
+		kwargs['markers'] = [marker] if marker is not None else None
+		kwargs.pop('marker')
+		kwargs['marker_sizes'] = [marker_size] if marker_size is not None else None
+		kwargs.pop('marker_size')
+		kwargs['colors'] = [edge_color] if edge_color is not None else None
+		kwargs.pop('edge_color')
+		kwargs['fill_colors'] = [fill_color] if fill_color is not None else None
+		kwargs.pop('fill_color')
+		kwargs['edge_widths'] = [edge_width] if edge_width is not None else None
+		kwargs.pop('edge_width')
+		kwargs['labels'] = [label] if label is not None else None
+		kwargs.pop('label')
+		kwargs['x_is_time'] = kwargs.get('x_is_time', True)
+
+		from .plot import plot_time_magnitude
+		return plot_time_magnitude([self], **kwargs)
+
+	def plot_magnitude_time(self, Mtype="MW", Mrelation={}, rel_time_unit=None,
+						Mrange=(None, None), start_date=None, end_date=None,
+						marker='o', marker_size=8, edge_color=None, fill_color=None,
+						label=None,
+						completeness=None, completeness_color='r',
+						lang='en', **kwargs):
 		"""
 		Plot magnitude versus time
 
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML")
-			(default: {})
-		:param lang:
-			String, language of plot labels (default: "en")
+		Identical to :meth:`plot_time_magnitude`, but with axes swapped
 		"""
-		magnitudes = self.get_magnitudes(Mtype, Mrelation)
-		years = self.get_fractional_years()
-		pylab.plot(magnitudes, years, '+')
-		pylab.xlabel("Magnitude (%s)" % Mtype)
-		pylab.ylabel({"en": "Time (years)", "nl": "Tijd (jaar)"}[lang])
-		pylab.grid(True)
-		pylab.show()
-
-	def plot_magnitude_time(self,
-		symbol='o', edge_color='k', fill_color=None, label=None, symbol_size=50,
-		Mtype="MW", Mrelation={}, Mrange=(None, None),
-		overlay_catalog=None,
-		completeness=None, completeness_color="r",
-		vlines=False, grid=True,
-		plot_date=False, major_tick_interval=None, minor_tick_interval=1,
-		title=None, lang="en", legend_location=0,
-		fig_filespec=None, fig_width=0, dpi=300, ax=None):
-		"""
-		Plot time versus magnitude
-
-		:param symbol:
-			matplotlib marker specification, earthquake marker symbol
-			(default: 'o')
-		:param edge_color:
-			matplotlib color specification, earthquake marker edge color
-			(default: 'r')
-		:param fill_color:
-			matplotlib color specification, earthquake marker fill color
-			(default: None)
-		:param label:
-			String, legend label for earthquake epicenters
-			(default: None)
-		:param symbol_size:
-			Int or Float, symbol size in points (default: 50)
-		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
-		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML")
-			(default: {})
-		:param Mrange:
-			tuple of floats representing minimum and maximu magnitude in y axis
-			(default: None, None)
-		:param overlay_catalog:
-			class:`EQCatalog` instance, second catalog to overlay on plot,
-			e.g., a declustered catalog (default: None)
-		:param completeness:
-			class:`Completeness` instance, plot completeness (default: None)
-		:param completeness_color:
-			Str, color to plot completeness line (default: "r")
-		:param vlines:
-			List of years or datetime objects (or both), years/dates to plot as
-			vertical lines (default: False)
-		:param grid:
-			Boolean, plot grid (default: False)
-		:param plot_date:
-			Boolean, whether or not to plot time axis as dates instead of
-			fractional years (default: False)
-		:param major_tick_interval:
-			Int, interval in years for major ticks (default: None). If none, a
-			maximum number of ticks at nice locations will be used.
-		:param minor_tick_interval:
-			Int, interval in years for minor ticks (default: 1)
-		:param lang:
-			String, language of plot labels (default: "en")
-		:param title:
-			String, plot title (default: None)
-		:param legend_location:
-			String or Int: location of legend (matplotlib location code):
-				"best" 	0
-				"upper right" 	1
-				"upper left" 	2
-				"lower left" 	3
-				"lower right" 	4
-				"right" 		5
-				"center left" 	6
-				"center right" 	7
-				"lower center" 	8
-				"upper center" 	9
-				"center" 		10
-			(default: 0)
-		:param fig_filespec:
-			String, full path of image to be saved.
-			If None (default), map is displayed on screen.
-		:param fig_width:
-			Float, figure width in cm, used to recompute :param:`dpi` with
-			respect to default figure width (default: 0)
-		:param dpi:
-			Int, image resolution in dots per inch (default: 300)
-		:param ax:
-			matplotlib Axes instance
-			(default: None)
-		"""
-		# TODO: check plot_dates, style parameters and labels from decluster names
-		catalogs = [self]
-		edge_colors=[edge_color]
-		if overlay_catalog:
-			catalogs.append(overlay_catalog)
-			if edge_color == 'k':
-				edge_colors.append('r')
-			else:
-				edge_colors.append('k')
-		plot_catalogs_magnitude_time(catalogs, symbols=[symbol], edge_colors=edge_colors,
-				fill_colors=[fill_color], labels=[label], symbol_size=symbol_size,
-				Mtype=Mtype, Mrelation=Mrelation, Mrange=Mrange, completeness=completeness,
-				completeness_color=completeness_color, vlines=vlines, grid=grid,
-				plot_date=plot_date, major_tick_interval=major_tick_interval,
-				minor_tick_interval=minor_tick_interval, title=title, lang=lang,
-				legend_location=legend_location, fig_filespec=fig_filespec,
-				fig_width=fig_width, dpi=dpi, ax=ax)
+		kwargs.update(locals())
+		kwargs.pop('self')
+		kwargs.pop('kwargs')
+		kwargs['x_is_time'] = kwargs.get('x_is_time', False)
+		return self.plot_time_magnitude(**kwargs)
 
 	def plot_HourHistogram(self,
 		Mmin=None, Mmax=None,
@@ -3810,7 +3831,7 @@ class EQCatalog(object):
 			ax.barh(bins_depth, bins_n, height=bin_width, left=left, color=color, label=label)
 			left += bins_n
 
-		xmin, xmax = ax.xlim()
+		xmin, xmax = ax.get_xlim()
 		ax.axis((xmin, xmax, min_depth, max_depth))
 		ax.set_ylabel("Depth (km)", fontsize='x-large')
 		xlabel = "Number of events"
@@ -3933,106 +3954,86 @@ class EQCatalog(object):
 			pylab.show()
 
 	def plot_map(self,
-		symbol='o', edge_color='r', fill_color=None, edge_width=1,
-		label="Epicenters",
-		symbol_size=9, symbol_size_inc=4,
 		Mtype="MW", Mrelation={},
-		region=None, projection="merc", resolution="i", dlon=1., dlat=1.,
-		source_model=None,
-		sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_colname="ShortName",
-		title=None, legend_location=0,
-		fig_filespec=None, fig_width=0, dpi=300):
+		label=None, catalog_style=None,
+		marker='o', edge_color=None, fill_color=None, edge_width=0.5,
+		marker_size=9, mag_size_inc=4,
+		coastline_style={}, country_style={}, river_style=None, continent_style=None,
+		source_model=None, sm_label_colname="ShortName",
+		sm_style={"line_color": 'k', "line_pattern": '-', "line_width": 2},
+		sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
+		circles=[], circle_styles=[],
+		projection="merc", region=None, origin=(None, None),
+		graticule_interval=(1., 1.), graticule_style={"annot_axes": "SE"},
+		resolution="i",
+		title=None, legend_style={}, border_style={},
+		fig_filespec=None, fig_width=0, dpi=None):
 		"""
 		Plot map of catalog
 
-		:param symbol:
-			matplotlib marker specification, earthquake marker symbol
-			(default: 'o')
-		:param edge_color:
-			matplotlib color specification, earthquake marker edge color
-			(default: 'r')
-		:param edge_width:
-			earthquake marker edge width (default: 1)
-		:param fill_color:
-			matplotlib color specification, earthquake marker fill color
-			(default: None)
-		:param label:
-			String, legend label for earthquake epicenters
-			(default: "Epicenters")
-		:param symbol_size:
-			Int or Float, symbol size in points (default: 9)
-		:param symbol_size_inc:
-			Int or Float, symbol size increment per magnitude relative to M=3
-			(default: 4)
 		:param Mtype:
 			String, magnitude type for magnitude scaling (default: "MW")
 		:param Mrelation:
-			{str: str} dict, mapping name of magnitude conversion relation
-			to magnitude type ("MW", "MS" or "ML")
+			{str: str} ordered dict, mapping magnitude type ("MW", "MS" or "ML")
+			to name of magnitude conversion relation for :param:`Mtype`
 			(default: {})
-		:param region:
-			(w, e, s, n) tuple specifying rectangular region to plot in
-			geographic coordinates (default: None)
-		:param projection:
-			String, map projection. See Basemap documentation
-			(default: "merc")
-		:param resolution:
-			String, map resolution (coastlines and country borders):
-			'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
-			(default: 'i')
-		:param dlon:
-			Float, meridian interval in degrees (default: 1.)
-		:param dlat:
-			Float, parallel interval in degrees (default: 1.)
-		:param source_model:
-			String, name of source model to overlay on the plot
-			or full path to GIS file containing source model
+		:param label:
+			String, legend label for earthquake epicenters
+			(default: "Epicenters")
+		:param catalog_style:
+			instance of :class:`PointStyle` or dict with subset of
+			PointStyle attributes as keys.
 			(default: None)
-		:param sm_color:
-			matplotlib color specification to plot source model
-			(default: 'k')
-		:param sm_line_style:
-			String, line style to plot source model (default: '-')
-		:param sm_line_width:
-			Int, line width to plot source model (default: 2)
-		:param sm_label_colname:
-			Str, column name of GIS table to use as label (default: "ShortName")
-		:param title:
-			String, plot title (default: None)
-		:param legend_location:
-			String or Int: location of legend (matplotlib location code):
-				"best" 	0
-				"upper right" 	1
-				"upper left" 	2
-				"lower left" 	3
-				"lower right" 	4
-				"right" 	5
-				"center left" 	6
-				"center right" 	7
-				"lower center" 	8
-				"upper center" 	9
-				"center" 	10
-			(default: 0)
-		:param fig_filespec:
-			String, full path of image to be saved.
-			If None (default), map is displayed on screen.
-		:param fig_width:
-			Float, figure width in cm, used to recompute :param:`dpi` with
-			respect to default figure width (default: 0)
-		:param dpi:
-			Int, image resolution in dots per inch (default: 300)
+		:param marker:
+			matplotlib marker specification, earthquake marker symbol,
+			overriding style given by :param:`catalog_style`
+			(default: 'o')
+		:param edge_color:
+			matplotlib color specification, earthquake marker edge color,
+			overriding style given by :param:`catalog_style`
+			(default: None)
+		:param edge_width:
+			earthquake marker edge width,
+			overriding style given by :param:`catalog_style`
+			(default: 0.5)
+		:param fill_color:
+			matplotlib color specification, earthquake marker fill color,
+			overriding style given by :param:`catalog_style`
+			(default: None)
+		:param marker_size:
+			int or float, base (M=3) marker size in points,
+			overriding style given by :param:`catalog_style`
+			(default: 9)
+		:param mag_size_inc:
+			int or float, symbol size increment per magnitude relative to M=3
+			(default: 4)
+
+		See :func:`plot_catalog.plot_map` for remaining keyword arguments
 		"""
 		if title is None:
 			title = self.name
 
-		plot_catalogs_map([self], symbols=[symbol], edge_colors=[edge_color],
-				fill_colors=[fill_color], edge_widths=[edge_width], labels=[label],
-				symbol_size=symbol_size, symbol_size_inc=symbol_size_inc,
-				Mtype=Mtype, Mrelation=Mrelation, region=region, projection=projection,
-				resolution=resolution, dlon=dlon, dlat=dlat, source_model=source_model,
-				sm_color=sm_color, sm_line_style=sm_line_style, sm_line_width=sm_line_width,
-				sm_label_colname=sm_label_colname, title=title, legend_location=legend_location,
-				fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+		kwargs = locals().copy()
+
+		kwargs.pop('self')
+		kwargs.pop('kwargs', None)
+		kwargs['catalog_styles'] = [catalog_style] if catalog_style is not None else None
+		kwargs.pop('catalog_style')
+		kwargs['symbols'] = [marker] if marker is not None else None
+		kwargs.pop('marker')
+		kwargs['edge_colors'] = [edge_color] if edge_color is not None else None
+		kwargs.pop('edge_color')
+		kwargs['fill_colors'] = [fill_color] if fill_color is not None else None
+		kwargs.pop('fill_color')
+		kwargs['edge_widths'] = [edge_width] if edge_width is not None else None
+		kwargs.pop('edge_width')
+		kwargs['symbol_sizes'] = [marker_size] if marker_size is not None else None
+		kwargs.pop('marker_size')
+		kwargs['labels'] = [label] if label is not None else None
+		kwargs.pop('label')
+
+		from .plot import plot_map
+		return plot_map([self], **kwargs)
 
 	## Export methods
 
@@ -5154,787 +5155,7 @@ def concatenate_catalogs(catalog_list, name=""):
 					name=name, default_Mrelations=default_Mrelations)
 
 
-def get_catalogs_map(catalogs, catalog_styles=[], symbols=[], edge_colors=[], fill_colors=[],
-					labels=[], mag_size_inc=4,  Mtype="MW", Mrelation={},
-					coastline_style={}, country_style={}, river_style=None, continent_style=None,
-					source_model=None, sm_style={"line_color": 'k', "line_pattern": '-', "line_width": 2},
-					sm_label_colname="ShortName",
-					sites=[], site_style={"shape": 's', "fill_color": 'b', "size": 10}, site_legend="",
-					circles=[], circle_styles=[],
-					projection="merc", region=None, origin=(None, None), graticule_interval=(1., 1.), resolution="i",
-					graticule_style={"annot_axes": "SE"}, title=None, legend_style={}, border_style={}):
-	"""
-	Construct map of multiple catalogs.
-
-	:param catalogs:
-		List containing instances of :class:`EQCatalog`
-	:param catalog_styles:
-		List with styles (instances of :class:`PointStyle` or dictionaries
-		with subset of PointStyle attributes as keys) for each catalog.
-		If list contains only 1 element, the same style will be used for
-		all catalogs. If list is empty, a default style will be used.
-		Point size refers to a magnitude-3 earthquake if :param:`mag_size_inc`
-		is set (default: [])
-	:param symbols:
-		List containing point symbols (matplotlib marker specifications)
-		for each catalog, overriding style given by :param:`catalog_styles`
-		(default: [])
-	:param edge_colors:
-		List containing symbol edge colors (matplotlib color specifications)
-		for each catalog, overriding style given by :param:`catalog_styles`
-		(default: [])
-	:param fill_colors:
-		List containing symbol fill colors (matplotlib color specifications)
-		for each catalog, overriding style given by :param:`catalog_styles`
-		(default: [])
-	:param labels:
-		List containing plot labels, one for each catalog (default: [])
-	:param mag_size_inc:
-		Int or Float, symbol size increment per magnitude relative to M=3
-		(default: 4)
-	:param Mtype:
-		String, magnitude type for magnitude scaling (default: "MW")
-	:param Mrelation:
-		{str: str} dict, mapping name of magnitude conversion relation
-		to magnitude type ("MW", "MS" or "ML")
-		(default: {})
-	:param coastline_style:
-		instance of :class:`LineStyle` or dictionary with subset of
-		LineStyle attributes as keys, used to plot coastlines. If None,
-		coastlines will not be drawn
-		(default: {}, equivalent to default line style)
-	:param country_style:
-		instance of :class:`LineStyle` or dictionary with subset of
-		LineStyle attributes as keys, used to plot country borders. If None,
-		country borders will not be drawn
-		(default: {}, equivalent to default line style)
-	:param river_style:
-		instance of :class:`LineStyle` or dictionary with subset of
-		LineStyle attributes as keys, used to plot rivers. If None, rivers
-		will not be drawn
-		(default: None)
-	:param continent_style:
-		instance of :class:`PolygonStyle` or dictionary with subset of
-		PolygonStyle attributes as keys, used to plot continents/oceans.
-		If None, continents/oceans will not be drawn (default: None)
-	:param source_model:
-		String, name of source model to overlay on the plot
-		or full path to GIS file containing source model
-		(default: None)
-	:param sm_style:
-		instance of :class:`LineStyle`, :class:`PolygonStyle`,
-		:class:`CompositeStyle` or dictionary with subset of attributes
-		of LineStyle or PolygonStyle as keys, used to plot source model.
-		(default: {"line_color": 'k', "line_style": '-', "line_width": 2, "fill_color": "None"}
-	:param sm_label_colname:
-		Str, column name of GIS table to use as label (default: "ShortName")
-	:param sites:
-		List of (lon, lat) tuples or instance of :class:`PSHASite`
-	:param site_style:
-		instance of :class:`PointStyle` or dictionary containing subset of
-		PointStyle attributes as keys, used to plot sites
-		(default: {"shape": 's', "fill_color": 'b', "size": 10})
-	:param site_legend:
-		String, common text referring to all sites to be placed in legend
-		(default: "")
-	:param circles:
-		list with (lon, lat, radius) tuples defining center and radius
-		(in km) of circles to plot (default: [])
-	:param circle_styles:
-		List with styles (instances of :class:`LineStyle` or dictionaries
-		with subset of LineStyle attributes as keys) for each circle.
-		If list contains only 1 element, the same style will be used for
-		all circles. If list is empty, a default style will be used
-		(default: [])
-	:param projection:
-		String, map projection. See Basemap documentation
-		(default: "merc")
-	:param region:
-		(w, e, s, n) tuple specifying rectangular region to plot in
-		geographic coordinates (default: None)
-	:param origin:
-		(lon, lat) tuple defining map origin. Needed for some
-		projections (default: None)
-	:param graticule_interval:
-		(dlon, dlat) tuple defining meridian and parallel interval in
-		degrees (default: (1., 1.)
-	:param resolution:
-		String, map resolution (coastlines and country borders):
-		'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
-		(default: 'i')
-	:param graticule_style:
-		instance of :class:`GraticuleStyle` or dictionary containing
-		GraticuleStyle attributes as keys, defining graticule style of map
-		(default: {"annot_axes": "SE"}
-		annot_axes: string, containing up to 4 characters ('W', 'E', 'S' and/or 'N'),
-		defining which axes should be annotated
-	:param title:
-		String, plot title (default: None)
-	:param legend_style:
-		instance of :class:`LegendStyle` or dictionary containing
-		LegendStyle attributes as keys, defining style of map legend
-		(default: {})
-	:param border_style:
-		instance ov :class:`MapBorderStyle` or dictionary containing
-		MapBorderStyle attributes as keys, defining style of map border
-		(default: {})
-
-	:return:
-		instance of :class:`LayeredBasemap`
-	"""
-	import mapping.layeredbasemap as lbm
-
-	layers = []
-
-	## Continents/oceans
-	if continent_style != None:
-		data = lbm.BuiltinData("continents")
-		if isinstance(continent_style, dict):
-			style = lbm.PolygonStyle.from_dict(continent_style)
-		else:
-			style = continent_style
-		layers.append(lbm.MapLayer(data, style, name="continents"))
-
-	## Coastlines
-	if coastline_style != None:
-		data = lbm.BuiltinData("coastlines")
-		if isinstance(coastline_style, dict):
-			style = lbm.LineStyle.from_dict(coastline_style)
-		else:
-			style = coastline_style
-		layers.append(lbm.MapLayer(data, style, name="coastlines"))
-
-	## Country borders
-	if country_style != None:
-		data = lbm.BuiltinData("countries")
-		if isinstance(country_style, dict):
-			style = lbm.LineStyle.from_dict(country_style)
-		else:
-			style = country_style
-		layers.append(lbm.MapLayer(data, style, name="countries"))
-
-	## Rivers
-	if river_style != None:
-		data = lbm.BuiltinData("rivers")
-		if isinstance(river_style, dict):
-			style = lbm.LineStyle.from_dict(river_style)
-		else:
-			style = country_style
-		layers.append(lbm.MapLayer(data, style, name="rivers"))
-
-	## Source model
-	if source_model:
-		from .rob.source_models import rob_source_models_dict
-		try:
-			gis_filespec = rob_source_models_dict[source_model]["gis_filespec"]
-		except:
-			if isinstance(source_model, basestring):
-				gis_filespec = source_model
-				source_model_name = os.path.splitext(os.path.split(source_model)[1])[0]
-			else:
-				import hazard.rshalib as rshalib
-				if isinstance(source_model, rshalib.source.SourceModel):
-					gis_filespec = None
-					source_model_name = source_model.name
-		else:
-			source_model_name = source_model
-
-		if gis_filespec:
-			data = lbm.GisData(gis_filespec, label_colname=sm_label_colname)
-		else:
-			# TODO: implement line and point sources too
-			point_lons, point_lats, point_labels = [], [], []
-			line_lons, line_lats, line_labels = [], [], []
-			polygon_lons, polygon_lats, polygon_labels = [], [], []
-			for src in source_model:
-				if isinstance(src, rshalib.source.AreaSource):
-					polygon_lons.append(src.polygon.lons)
-					polygon_lats.append(src.polygon.lats)
-					polygon_labels.append(getattr(src, sm_label_colname, ""))
-				elif isinstance(src, rshalib.source.PointSource):
-					point_lons.append(src.location.longitude)
-					point_lats.append(src.location.latitude)
-					point_labels.append(getattr(src, sm_label_colname, ""))
-				elif isinstance(src, rshalib.source.SimpleFaultSource):
-					line_lons.append([pt.lon for pt in src.fault_trace.points])
-					line_lats.append([pt.lat for pt in src.fault_trace.points])
-					line_labels.append(getattr(src, sm_label_colname, ""))
-			point_data = lbm.MultiPointData(point_lons, point_lats, labels=point_labels)
-			line_data = lbm.MultiLineData(line_lons, line_lats, labels=line_labels)
-			polygon_data = lbm.MultiPolygonData(polygon_lons, polygon_lats, labels=polygon_labels)
-			data = lbm.CompositeData(points=point_data, lines=line_data, polygons=polygon_data)
-		if isinstance(sm_style, dict):
-			if "fill_color" in sm_style and not sm_style.get("fill_color") in ("None", None):
-				polygon_style = lbm.PolygonStyle.from_dict(sm_style)
-				line_style = None
-			else:
-				line_style = lbm.LineStyle.from_dict(sm_style)
-				polygon_style = None
-		elif isinstance(sm_style, lbm.CompositeStyle):
-			line_style = sm_style.line_style
-			polygon_style = sm_style.polygon_style
-		elif isinstance(sm_style, lbm.LineStyle):
-			line_style = sm_style
-			polygon_style = None
-		elif isinstance(sm_style, lbm.PolygonStyle):
-			polygon_style = sm_style
-			line_style = None
-		if line_style and not line_style.label_style:
-			line_style.label_style = lbm.TextStyle(color=line_style.line_color, font_size=8)
-		elif polygon_style and not polygon_style.label_style:
-			polygon_style.label_style = lbm.TextStyle(color=polygon_style.line_color, font_size=8)
-		style = lbm.CompositeStyle(line_style=line_style, polygon_style=polygon_style)
-		legend_label = {'lines': source_model_name + " faults", 'polygons': source_model_name + " zones"}
-		layer = lbm.MapLayer(data, style, legend_label=legend_label, name="source model")
-		layers.append(layer)
-
-	## Earthquakes
-	if not labels:
-		labels = [None] * len(catalogs)
-	if catalog_styles in ([], None):
-		catalog_styles = lbm.PointStyle(shape='o', size=9)
-	if isinstance(catalog_styles, (lbm.PointStyle, dict)):
-		catalog_styles = [catalog_styles]
-	if len(catalog_styles) == 1:
-		base_style = catalog_styles[0]
-		if isinstance(base_style, dict):
-			base_style = lbm.PointStyle.from_dict(base_style)
-		if not symbols:
-			symbols = ["o"]
-		if not edge_colors:
-			edge_colors = ("r", "g", "b", "c", "m", "k")
-		if not fill_colors:
-			fill_colors = ["None"]
-		catalog_styles = []
-		for i in range(len(catalogs)):
-			style = lbm.PointStyle.from_dict(base_style.__dict__)
-			style.shape = symbols[i%len(symbols)]
-			style.line_color = edge_colors[i%len(edge_colors)]
-			style.fill_color = fill_colors[i%len(fill_colors)]
-			catalog_styles.append(style)
-
-	for i in range(len(catalogs)):
-		catalog = catalogs[i]
-		style = catalog_styles[i]
-		if isinstance(style, dict):
-			style = lbm.PointStyle.from_dict(style)
-		values = {}
-		if mag_size_inc:
-			## Magnitude-dependent size
-			if i == 0:
-				min_mag = np.floor(catalog.get_Mmin(Mtype, Mrelation))
-				max_mag = np.ceil(catalog.get_Mmax(Mtype, Mrelation))
-				mags = np.linspace(min_mag, max_mag, min(5, max_mag-min_mag+1))
-				sizes = style.size + (mags - 3) * mag_size_inc
-				sizes = sizes.clip(min=1)
-				style.thematic_legend_style = lbm.LegendStyle(title="Magnitude", location=3, shadow=True, fancy_box=True, label_spacing=0.7)
-			values['magnitude'] = catalog.get_magnitudes(Mtype, Mrelation)
-			style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
-
-		# TODO: color by depth
-		#values['depth'] = catalog.get_depths()
-		#colorbar_style = ColorbarStyle(title="Depth (km)", location="bottom", format="%d")
-		#style.fill_color = ThematicStyleRanges([0,1,10,25,50], ['red', 'orange', 'yellow', 'green'], value_key="depth", colorbar_style=colorbar_style)
-
-		# TODO: color by age
-		#values['year'] = [eq.datetime.year for eq in catalog]
-		#style.fill_color = ThematicStyleRanges([1350,1910,2050], ['green', (1,1,1,0)], value_key="year")
-
-		point_data = lbm.MultiPointData(catalog.get_longitudes(), catalog.get_latitudes(), values=values)
-
-		layer = lbm.MapLayer(point_data, style, legend_label=labels[i], name="earthquakes")
-		layers.append(layer)
-
-	## Sites
-	if sites:
-		if isinstance(site_style, dict):
-			site_style = lbm.PointStyle.from_dict(site_style)
-			site_style.label_style = lbm.TextStyle()
-		site_lons, site_lats, site_labels = [], [], []
-		for i, site in enumerate(sites):
-			try:
-				lon, lat = site.longitude, site.latitude
-				name = site.name
-			except:
-				lon, lat, name = site[:3]
-			site_lons.append(lon)
-			site_lats.append(lat)
-			site_labels.append(name)
-
-		point_data = lbm.MultiPointData(site_lons, site_lats, labels=site_labels)
-		layer = lbm.MapLayer(point_data, site_style, site_legend, name="sites")
-		layers.append(layer)
-
-	## Circles
-	if circles:
-		if circle_styles == []:
-			circle_styles = {}
-		if isinstance(circle_styles, dict):
-			circle_styles = lbm.LineStyle.from_dict(circle_styles)
-		if isinstance(circle_styles, lbm.LineStyle):
-			circle_styles = [circle_styles]
-		for circle in circles:
-			lon, lat, radius = circle
-			circle_data = lbm.CircleData([lon], [lat], [radius])
-			layer = lbm.MapLayer(circle_data, circle_styles[i%len(circle_styles)], name="circles")
-			layers.append(layer)
-
-	if isinstance(legend_style, dict):
-		legend_style = lbm.LegendStyle.from_dict(legend_style)
-	if isinstance(border_style, dict):
-		border_style = lbm.MapBorderStyle.from_dict(border_style)
-	if isinstance(graticule_style, dict):
-		graticule_style = lbm.GraticuleStyle.from_dict(graticule_style)
-
-	## Determine map extent if necessary
-	if not region:
-		west, east, south, north = 180, -180, 90, -90
-		for catalog in catalogs:
-			if catalog.region:
-				w, e, s, n = list(catalog.region)
-			else:
-				w, e, s, n = list(catalog.get_region())
-			if w < west:
-				west = w
-			if e > east:
-				east = e
-			if s < south:
-				south = s
-			if n > north:
-				north = n
-		region = (west, east, south, north)
-
-	map = lbm.LayeredBasemap(layers, title, projection, region=region, origin=origin, graticule_interval=graticule_interval, resolution=resolution, graticule_style=graticule_style, legend_style=legend_style)
-	return map
-
-
-def plot_catalogs_map(catalogs, symbols=[], edge_colors=[], fill_colors=[], edge_widths=[], labels=[], symbol_size=9, symbol_size_inc=4, Mtype="MW", Mrelation={}, circle=None, region=None, projection="merc", resolution="i", dlon=1., dlat=1., source_model=None, sm_color='k', sm_line_style='-', sm_line_width=2, sm_label_size=11, sm_label_colname="ShortName", sites=[], site_symbol='o', site_color='b', site_size=10, site_legend="", title=None, legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
-	"""
-	Plot multiple catalogs on a map
-
-	:param catalogs:
-		List containing instances of :class:`EQCatalog`
-	:param symbols:
-		List containing earthquake symbols for each catalog
-		(matplotlib marker specifications)
-	:param edge_colors:
-		List containing symbol edge colors for each catalog
-		(matplotlib color specifications)
-		(default: [])
-	:param fill_colors:
-		List containing symbol fill colors for each catalog
-		(matplotlib color specifications)
-		(default: [])
-	:param edge_widths:
-		List containing symbol edge width for each catalog
-		(default: [])
-	:param labels:
-		List containing plot labels, one for each catalog (default: [])
-	:param symbol_size:
-		Int or Float, symbol size in points (default: 9)
-	:param symbol_size_inc:
-		Int or Float, symbol size increment per magnitude relative to M=3
-		(default: 4)
-	:param Mtype:
-		String, magnitude type for magnitude scaling (default: "MW")
-	:param Mrelation:
-		{str: str} dict, mapping name of magnitude conversion relation
-		to magnitude type ("MW", "MS" or "ML")
-		(default: {})
-	:param circle:
-		((lon, lat), float, string), respectively defining center, radius (in
-		km) and color of circle to plot
-	:param region:
-		(w, e, s, n) tuple specifying rectangular region to plot in
-		geographic coordinates (default: None)
-	:param projection:
-		String, map projection. See Basemap documentation
-		(default: "merc")
-	:param resolution:
-		String, map resolution (coastlines and country borders):
-		'c' (crude), 'l' (low), 'i' (intermediate), 'h' (high), 'f' (full)
-		(default: 'i')
-	:param dlon:
-		Float, meridian interval in degrees (default: 1.)
-	:param dlat:
-		Float, parallel interval in degrees (default: 1.)
-	:param source_model:
-		String, name of source model to overlay on the plot
-		(default: None)
-	:param sm_color:
-		matplotlib color specification to plot source model
-		(default: 'k')
-	:param sm_line_style:
-		String, line style to plot source model (default: '-')
-	:param sm_line_width:
-		Int, line width to plot source model (default: 2)
-	:param sm_label_size:
-		Int, font size of source labels. If 0 or None, no labels will
-		be plotted (default: 11)
-	:param sm_label_colname:
-		Str, column name of GIS table to use as label (default: "ShortName")
-	:param sites:
-		List of (lon, lat) tuples or instance of :class:`PSHASite`
-	:param site_symbol:
-		matplotlib marker specifications for site symbols (default: 'o')
-	:param site_color:
-		matplotlib color specification for site symbols (default: 'b')
-	:param site_size:
-		Int, size to be used for site symbols (default: 10)
-	:param site_legend:
-		String, common text referring to all sites to be placed in legend
-		(default: "")
-	:param title:
-		String, plot title (default: None)
-	:param legend_location:
-		String or Int: location of legend (matplotlib location code):
-			"best" 	0
-			"upper right" 	1
-			"upper left" 	2
-			"lower left" 	3
-			"lower right" 	4
-			"right" 	5
-			"center left" 	6
-			"center right" 	7
-			"lower center" 	8
-			"upper center" 	9
-			"center" 	10
-		(default: 0)
-	:param fig_filespec:
-		String, full path of image to be saved.
-		If None (default), map is displayed on screen.
-	:param fig_width:
-		Float, figure width in cm, used to recompute :param:`dpi` with
-		respect to default figure width (default: 0)
-	:param dpi:
-		Int, image resolution in dots per inch (default: 300)
-	"""
-	from mpl_toolkits.basemap import Basemap
-
-	## Symbols, colors, and labels
-	if not symbols:
-		symbols = ["o"]
-	if not edge_colors:
-		edge_colors = ("r", "g", "b", "c", "m", "k")
-	if not fill_colors:
-		fill_colors = ["None"]
-	if not edge_widths:
-		edge_widths = [1]
-	if not labels:
-		labels = [None]
-
-	## Determine map extent and center
-	if not region:
-		if catalogs[0].region:
-			region = list(catalogs[0].region)
-		else:
-			region = list(catalogs[0].get_region())
-			lon_range = region[1] - region[0]
-			lat_range = region[3] - region[2]
-			region[0] -= lon_range / 5.
-			region[1] += lon_range / 5.
-			region[2] -= lat_range / 5.
-			region[3] += lat_range / 5.
-	else:
-		region = list(region)
-	lon_0 = (region[0] + region[1]) / 2.
-	lat_0 = (region[2] + region[3]) / 2.
-
-	## Base map
-	map = Basemap(projection=projection, resolution=resolution, llcrnrlon=region[0], llcrnrlat=region[2], urcrnrlon=region[1], urcrnrlat=region[3], lon_0=lon_0, lat_0=lat_0)
-	map.drawcoastlines()
-	map.drawcountries()
-
-	## Meridians and parallels
-	if dlon:
-		first_meridian = np.ceil(region[0] / dlon) * dlon
-		last_meridian = np.floor(region[1] / dlon) * dlon + dlon
-		meridians = np.arange(first_meridian, last_meridian, dlon)
-		map.drawmeridians(meridians, labels=[0,1,0,1])
-	if dlat:
-		first_parallel = np.ceil(region[2] / dlat) * dlat
-		last_parallel = np.floor(region[3] / dlat) * dlat + dlat
-		parallels = np.arange(first_parallel, last_parallel, dlat)
-		map.drawparallels(parallels, labels=[0,1,0,1])
-
-	## Source model
-	if source_model:
-		from .rob.source_models import (rob_source_models_dict, read_source_model)
-		try:
-			rob_source_models_dict[source_model_name]["gis_filespec"]
-		except:
-			source_model_name = os.path.splitext(os.path.split(source_model)[1])[0]
-		else:
-			source_model_name = source_model
-		model_data = read_source_model(source_model)
-		for i, zone_data in enumerate(model_data.values()):
-			geom = zone_data['obj']
-			lines = []
-			if geom.GetGeometryName() == "LINESTRING":
-				## In some versions of ogr, GetPoints method does not exist
-				#points = linear_ring.GetPoints()
-				points = [geom.GetPoint(i) for i in range(geom.GetPointCount())]
-				lines.append(points)
-				centroid = None
-			elif geom.GetGeometryName() == "POLYGON":
-				centroid = geom.Centroid()
-				for linear_ring in geom:
-					points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
-					lines.append(points)
-			for j, line in enumerate(lines):
-				lons, lats, _ = zip(*line)
-				x, y = map(lons, lats)
-				if i == 0 and j == 0:
-					label = source_model_name
-				else:
-					label = "_nolegend_"
-				map.plot(x, y, ls=sm_line_style, lw=sm_line_width, color=sm_color, label=label)
-
-				if centroid and sm_label_size:
-					x, y = map(centroid.GetX(), centroid.GetY())
-					if isinstance(sm_label_colname, basestring):
-						zone_label = zone_data.get("sm_label_colname", "")
-					else:
-						zone_label = " / ".join([str(zone_data[colname]) for colname in sm_label_colname])
-					pylab.text(x, y, zone_label, color=sm_color, fontsize=sm_label_size, fontweight='bold', ha='center', va='center')
-
-	## Catalogs
-	for i, catalog in enumerate(catalogs):
-		if len(catalog):
-			symbol = symbols[i%len(symbols)]
-			edge_color = edge_colors[i%len(edge_colors)]
-			if edge_color is None:
-				edge_color = "None"
-			fill_color = fill_colors[i%len(fill_colors)]
-			if fill_color is None:
-				fill_color = "None"
-			edge_width = edge_widths[i%len(edge_widths)]
-			label = labels[i%len(labels)]
-			if label is None:
-				label = catalog.name
-
-			## Earthquake symbol size varying with magnitude
-			if not symbol_size_inc:
-				symbol_sizes = symbol_size ** 2
-			else:
-				magnitudes = catalog.get_magnitudes(Mtype, Mrelation)
-				symbol_sizes = symbol_size + (magnitudes - 3.0) * symbol_size_inc
-				symbol_sizes = symbol_sizes ** 2
-				if symbol_sizes.min() <= 0:
-					print("Warning: negative or zero symbol size encountered")
-				#print(symbol_sizes.min(), symbol_sizes.max())
-
-			## Earthquake epicenters
-			if len(catalog.eq_list) > 0:
-				lons, lats = catalog.get_longitudes(), catalog.get_latitudes()
-				x, y = map(lons, lats)
-				map.scatter(x, y, s=symbol_sizes, marker=symbol, edgecolors=edge_color, facecolors=fill_color, linewidth=edge_width, label=label)
-
-	## Sites
-	for i, site in enumerate(sites):
-		try:
-			lon, lat = site.longitude, site.latitude
-			name = site.name
-		except:
-			lon, lat, name = site[:3]
-		x, y = map(lon, lat)
-		if i == 0:
-			label = site_legend
-		else:
-			label = None
-		map.plot(x, y, site_symbol, markerfacecolor=site_color, markeredgecolor='k', markersize=site_size, label=label)
-
-	## Circle
-	if circle:
-		from openquake.hazardlib.geo.geodetic import point_at
-		center, radius, color = circle
-		x, y = [], []
-		for azimuth in range(0, 360):
-			lon, lat = point_at(center[0], center[1], azimuth, radius)
-			x.append(lon)
-			y.append(lat)
-		x.append(x[0])
-		y.append(y[0])
-		x, y = map(x,y)
-		map.plot(x, y, c=color)
-
-	## Map border and title
-	map.drawmapboundary()
-	if title:
-		pylab.title(title)
-	plt.legend(loc=legend_location)
-
-	#plt.tight_layout()
-	if fig_filespec:
-		default_figsize = pylab.rcParams['figure.figsize']
-		#default_dpi = pylab.rcParams['figure.dpi']
-		if fig_width:
-			fig_width /= 2.54
-			dpi = dpi * (fig_width / default_figsize[0])
-		pylab.savefig(fig_filespec, dpi=dpi)
-		pylab.clf()
-	else:
-		pylab.show()
-
-
-#def plot_catalogs_time_magnitude(catalogs, symbols=[], edge_colors=[], fill_colors=[], labels=[], symbol_size=50, Mtype="MW", Mrelation=None, completeness=None, completeness_color="r", vlines=False, grid=True, plot_date=False, major_tick_interval=None, minor_tick_interval=1, title=None, lang="en", legend_location=0, fig_filespec=None, fig_width=0, dpi=300):
-#	"""
-#	:param catalogs:
-#		List containing instances of :class:`EQCatalog`
-#	:param symbols:
-#		List containing earthquake symbols for each catalog
-#		(matplotlib marker specifications)
-#	:param edge_colors:
-#		List containing symbol edge colors for each catalog
-#		(matplotlib color specifications)
-#		(default: [])
-#	:param fill_colors:
-#		List containing symbol fill colors for each catalog
-#		(matplotlib color specifications)
-#		(default: [])
-#	:param labels:
-#		List containing plot labels, one for each catalog (default: [])
-#	:param symbol_size:
-#		Int or Float, symbol size in points (default: 50)
-#	:param Mtype:
-#		String, magnitude type for magnitude scaling (default: "MW")
-#	:param Mrelation:
-#		{str: str} dict, mapping name of magnitude conversion relation
-#		to magnitude type ("MW", "MS" or "ML") (default: None, will
-#		select the default relation for the given Mtype)
-#	:param completeness:
-#		class:`Completeness` instance, plot completeness (default: None)
-#	:param completeness_color:
-#		Str, color to plot completeness line (default: "r")
-#	:param vlines:
-#		Boolean, plot vertical lines from data point to x-axis (default: False)
-#	:param grid:
-#		Boolean, plot grid (default: False)
-#	:param plot_date:
-#		Boolean, whether or not to plot time axis as dates instead of
-#		fractional years (default: False)
-#	:param major_tick_interval:
-#		Int, interval in years for major ticks (default: None). If none, a
-#		maximum number of ticks at nice locations will be used.
-#	:param minor_tick_interval:
-#		Int, interval in years for minor ticks (default: 1)
-#	:param lang:
-#		String, language of plot labels (default: "en")
-#	:param title:
-#		String, plot title (default: None)
-#	:param legend_location:
-#		String or Int: location of legend (matplotlib location code):
-#			"best" 	0
-#			"upper right" 	1
-#			"upper left" 	2
-#			"lower left" 	3
-#			"lower right" 	4
-#			"right" 		5
-#			"center left" 	6
-#			"center right" 	7
-#			"lower center" 	8
-#			"upper center" 	9
-#			"center" 		10
-#		(default: 0)
-#	:param fig_filespec:
-#		String, full path of image to be saved.
-#		If None (default), map is displayed on screen.
-#	:param fig_width:
-#		Float, figure width in cm, used to recompute :param:`dpi` with
-#		respect to default figure width (default: 0)
-#	:param dpi:
-#		Int, image resolution in dots per inch (default: 300)
-#	"""
-#	## Symbols, colors, and labels
-#	if not symbols:
-#		symbols = ["o"]
-#	if not edge_colors:
-#		edge_colors = ("r", "g", "b", "c", "m", "k")
-#	if not fill_colors:
-#		fill_colors = ["None"]
-#	if not labels:
-#		labels = [None]
-
-#	for i, catalog in enumerate(catalogs):
-
-#		symbol = symbols[i%len(symbols)]
-#		edge_color = edge_colors[i%len(edge_colors)]
-#		if edge_color is None:
-#			edge_color = "None"
-#		fill_color = fill_colors[i%len(fill_colors)]
-#		if fill_color is None:
-#			fill_color = "None"
-#		label = labels[i%len(labels)]
-#		if label is None:
-#			label = catalog.name
-
-#		y = catalog.get_magnitudes(Mtype, Mrelation)
-#		if not plot_date:
-#			x = catalog.get_fractional_years()
-#			plt.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label, marker=symbol, facecolors=fill_color)
-#			xmin, xmax, ymin, ymax = plt.axis()
-#			xmin, xmax = catalog.start_date.year, catalog.end_date.year+1
-#			plt.axis((xmin, xmax, 0, max(y)*1.1))
-#		else:
-#			x = pylab.date2num(catalog.get_datetimes())
-#			plt.plot_date(x, y, ms=np.sqrt(symbol_size), mec=edge_color, color=fill_color, label=label, marker=symbol, mfc=fill_color)
-
-#		## plot vlines
-#		if vlines and not plot_date:
-#			plt.vlines(x, ymin=ymin, ymax=y)
-
-#	## plot ticks
-#	ax = plt.gca()
-#	if not plot_date:
-#		if major_tick_interval:
-#			majorLocator = MultipleLocator(major_tick_interval)
-#		else:
-#			majorLocator = MaxNLocator()
-#		minorLocator = MultipleLocator(minor_tick_interval)
-#		ax.xaxis.set_major_locator(majorLocator)
-#		ax.xaxis.set_minor_locator(minorLocator)
-#		ax.yaxis.set_minor_locator(MultipleLocator(0.1))
-#	for label in ax.get_xticklabels() + ax.get_yticklabels():
-#		label.set_size('large')
-#	if plot_date:
-#		for label in ax.get_xticklabels():
-#			label.set_horizontalalignment('right')
-#			label.set_rotation(30)
-
-#	## plot x and y labels
-#	if not plot_date:
-#		xlabel = {"en": "Time (years)", "nl": "Tijd (jaar)"}[lang]
-#	else:
-#		xlabel = {"en": "Date", "nl": "Datum"}[lang]
-#	plt.xlabel(xlabel, fontsize="x-large")
-#	plt.ylabel("Magnitude ($M_%s$)" % Mtype[1].upper(), fontsize="x-large")
-
-#	## plot completeness
-#	if completeness and not plot_date:
-#		x, y = completeness.min_years, completeness.min_mags
-#		x = np.append(x, max([catalog.end_date for catalog in catalogs]).year+1)
-#		plt.hlines(y, xmin=x[:-1], xmax=x[1:], colors=completeness_color)
-#		plt.vlines(x[1:-1], ymin=y[1:], ymax=y[:-1], colors=completeness_color, lw=2)
-
-#	if grid:
-#		plt.grid()
-
-#	if title:
-#		plt.title(title)
-
-#	plt.legend(loc=legend_location)
-
-#	if fig_filespec:
-#		default_figsize = plt.rcParams['figure.figsize']
-#		default_dpi = plt.rcParams['figure.dpi']
-#		if fig_width:
-#			fig_width /= 2.54
-#			dpi = dpi * (fig_width / default_figsize[0])
-#		pylab.savefig(fig_filespec, dpi=dpi)
-#		pylab.clf()
-#	else:
-#		pylab.show()
-
+# TODO: this function is now obsolete
 def plot_catalogs_magnitude_time(catalogs, symbols=['o'], edge_colors=[], fill_colors=['None'],
 								edge_widths=[1], labels=[], symbol_size=50,
 								Mtype="MW", Mrelation={}, start_year=None,
@@ -6177,97 +5398,6 @@ def plot_catalogs_magnitude_time(catalogs, symbols=['o'], edge_colors=[], fill_c
 		plt.tight_layout()
 		default_figsize = plt.rcParams['figure.figsize']
 		#default_dpi = plt.rcParams['figure.dpi']
-		if fig_width:
-			fig_width /= 2.54
-			dpi = dpi * (fig_width / default_figsize[0])
-		pylab.savefig(fig_filespec, dpi=dpi)
-		pylab.clf()
-	else:
-		pylab.show()
-
-
-def plot_depth_statistics(
-	catalogs,
-	labels=[],
-	dmin=0,
-	dmax=30,
-	Mmin=None,
-	Mtype="MW",
-	Mrelation={},
-	title="",
-	fig_filespec="",
-	fig_width=0,
-	dpi=300,
-	ax=None):
-	"""
-	Plot depth statistics for different catalogs.
-
-	:param catalogs:
-		List containing instances of :class:`EQCatalog`
-	:param labels:
-		List containing catalog labels
-		(default: [])
-	:param dmin:
-		float, minimum depth
-		(default: 0)
-	:param dmax:
-		float, maximum depth
-		(default: 30)
-	:param Mtype:
-		String, magnitude type for magnitude scaling (default: "MW")
-	:param Mrelation:
-		{str: str} dict, mapping name of magnitude conversion relation
-		to magnitude type ("MW", "MS" or "ML")
-		(default: {})
-	:param title:
-		String, plot title (default: None)
-	:param fig_filespec:
-		String, full path of image to be saved.
-		If None (default), map is displayed on screen.
-	:param fig_width:
-		Float, figure width in cm, used to recompute :param:`dpi` with
-		respect to default figure width
-		(default: 0)
-	:param dpi:
-		Int, image resolution in dots per inch
-		(default: 300)
-	:param ax:
-		matplotlib Axes instance
-		(default: None)
-	"""
-	if ax is None:
-		ax = pylab.axes()
-	else:
-		fig_filespec = "hold"
-
-	if not labels:
-		labels = [catalog.name for catalog in catalogs]
-	for i, catalog in enumerate(catalogs):
-		if Mmin != None:
-			catalog = catalog.subselect(Mmin=Mmin, Mtype=Mtype, Mrelation=Mrelation)
-		depths = catalog.get_depths()
-
-		ax.boxplot(depths, positions=[i], widths=0.15)
-		ax.plot([i], [np.nanmean(depths)], marker='d', mfc='g', ms=8)
-		ax.plot([i], [np.percentile(depths, 2.5)], marker='v', mfc='g', ms=8)
-		ax.plot([i], [np.percentile(depths, 97.5)], marker='^', mfc='g', ms=8)
-
-	ax.set_ylim(dmin, dmax)
-	ax.invert_yaxis()
-	ax.set_xlim(-0.5, len(catalogs) - 0.5)
-	ax.set_xticks(np.arange(len(catalogs)))
-	ax.set_xticklabels(labels)
-	ax.set_xlabel("Catalog", fontsize="x-large")
-	ax.set_ylabel("Depth (km)", fontsize="x-large")
-	if title is None:
-		title = 'Depth statistics  (M>=%.1f)' % Mmin
-	ax.set_title(title)
-
-	if fig_filespec == "hold":
-		return
-	elif fig_filespec:
-		default_figsize = pylab.rcParams['figure.figsize']
-		#default_dpi = pylab.rcParams['figure.dpi']
 		if fig_width:
 			fig_width /= 2.54
 			dpi = dpi * (fig_width / default_figsize[0])
