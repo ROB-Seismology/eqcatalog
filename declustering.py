@@ -420,7 +420,9 @@ class Cluster():
 			- order: array, ordered indexes
 		"""
 		mags = self.get_magnitudes()
-		return (mags, np.argsort(mags)[::-1])
+		nan_idxs = np.isnan(mags)
+		ordered_idxs = np.hstack([np.argsort(mags[~nan_idxs])[::-1], nan_idxs])
+		return (mags, ordered_idxs)
 
 	def sort_mag(self):
 		"""
@@ -730,6 +732,7 @@ class DeclusteringResult():
 		self.dc_idxs = dc_idxs
 		self.Mrelation = Mrelation
 		self.distance_metric = distance_metric
+		self._fix_indexes()
 
 	def print_info(self):
 		print("Number of clusters identified: %d" % self.get_num_clusters())
@@ -739,12 +742,56 @@ class DeclusteringResult():
 		print("Num. dependent/independent events: %d / %d"
 			% (self.get_num_dependent_events(), self.get_num_independent_events()))
 
+	def _fix_indexes(self):
+		"""
+		Cluster index array may contain gaps (when clusters were merged
+		during the declustering process). This reorders cluster indexes
+		such that they are contiguous.
+		"""
+		current_idxs = self.get_cluster_ids()
+		ordered_idxs = np.arange(self.get_num_clusters())
+		for current_idx, ordered_idx in zip(current_idxs, ordered_idxs):
+			if current_idx != ordered_idx:
+				self.dc_idxs[self.dc_idxs == current_idx] = ordered_idx
+
 	def get_cluster_ids(self):
 		"""
 		:return:
-			array containing IDs of identified clusters
+			array containing IDs (= indexes) of identified clusters
 		"""
 		return np.sort(np.unique(self.dc_idxs[self.dc_idxs >= 0]))
+
+	def argsort_clusters(self, sort_key='datetime0', order='asc'):
+		"""
+		Return sorted cluster indexes
+
+		:param sort_key:
+			str, sort key: 'datetime0', 'datetime1', 'size', 'mag' or 'duration'
+			(default: 'datetime0')
+		:param order:
+			str, sort order: 'asc' or 'desc'
+			(default: 'asc')
+
+		:return:
+			1-D int array
+		"""
+		cluster_idxs = self.get_cluster_ids()
+		if sort_key == 'datetime0':
+			cluster_props = [self.get_cluster(idx).datetime0() for idx in cluster_idxs]
+		elif sort_key == 'datetime1':
+			cluster_props = [self.get_cluster(idx).datetime1() for idx in cluster_idxs]
+		elif sort_key == 'size':
+			cluster_props = [len(self.get_cluster(idx)) for idx in cluster_idxs]
+		elif sort_key == 'mag':
+			cluster_props = [self.get_cluster(idx).mag1() for idx in cluster_idxs]
+		elif sort_key == 'duration':
+			cluster_props = [self.get_cluster(idx).duration() for idx in cluster_idxs]
+
+		ordered_prop_idxs = np.argsort(cluster_props)
+		if order == 'desc':
+			ordered_prop_idxs = ordered_prop_idxs[::-1]
+
+		return cluster_idxs[ordered_prop_idxs]
 
 	def get_cluster_lengths(self):
 		"""
@@ -806,12 +853,38 @@ class DeclusteringResult():
 		"""
 		clusters = []
 		for cluster_id in self.get_cluster_ids():
-			eq_list = (self.catalog[self.dc_idxs == cluster_id]).eq_list
-			cluster = Cluster(eq_list, cluster_id, self.Mrelation, self.distance_metric)
+			cluster = self.get_cluster(cluster_id)
 			clusters.append(cluster)
 		return clusters
 
-	def get_cluster(self, eq):
+	def get_cluster(self, cluster_idx):
+		"""
+		Fetch cluster with given index
+
+		:param cluster_idx:
+			int, cluster index
+
+		:return:
+			instance of :class:`Cluster`
+		"""
+		eq_list = (self.catalog[self.dc_idxs == cluster_idx]).eq_list
+		cluster = Cluster(eq_list, cluster_idx, self.Mrelation, self.distance_metric)
+		return cluster
+
+	def get_cluster_by_eq_idx(self, eq_idx):
+		"""
+		Fetch cluster corresponding to given index of earthquake in catalog
+
+		:param eq_idx:
+			int, index of earthquake in :prop:`catalog`
+
+		:return:
+			instance of :class:`Cluster`
+		"""
+		cluster_idx = self.dc_idxs[eq_idx]
+		return self.get_cluster(cluster_idx)
+
+	def get_cluster_by_eq(self, eq):
 		"""
 		Fetch the cluster that a particular earthquake belongs to
 
@@ -821,10 +894,8 @@ class DeclusteringResult():
 		:return:
 			instance of :class:`Cluster`
 		"""
-		clusters = self.get_clusters()
-		for cluster in clusters:
-			if eq in cluster:
-				return cluster
+		eq_idx = self.catalog.index(eq)
+		return self.get_cluster_by_eq_idx(eq_idx)
 
 	def get_unclustered_events(self):
 		"""
@@ -889,10 +960,6 @@ class DeclusteringResult():
 		clusters = self.get_clusters()
 		equivalent_events = [cluster.get_equivalent_event() for cluster in clusters]
 		return EQCatalog(equivalent_events)
-
-	def reorder_clusters(self):
-		# TODO
-		pass
 
 
 class DeclusteringMethod():
@@ -1323,7 +1390,7 @@ class WindowMethod(DeclusteringMethod):
 		return d_index
 
 
-class ClusterMethod(DeclusteringMethod):
+class LinkedWindowMethod(DeclusteringMethod):
 	"""
 	Class implementing cluster (= linked-window) declustering method.
 	In this method, aftershocks may generate additional aftershocks,
@@ -1493,6 +1560,10 @@ class ClusterMethod(DeclusteringMethod):
 		clusters = []
 
 		for i, eqi in enumerate(catalog):
+			## Skip NaN magnitudes
+			if np.isnan(eqi.get_MW(Mrelation)):
+				continue
+
 			## Create temporary cluster with 1 event
 			clust = Cluster([eqi], -1, Mrelation, self.distance_metric)
 
@@ -1676,7 +1747,7 @@ class ClusterMethod(DeclusteringMethod):
 		return declustering
 
 
-LinkedWindowMethod = ClusterMethod
+ClusterMethod = LinkedWindowMethod
 
 
 class ReasenbergMethod(DeclusteringMethod):
