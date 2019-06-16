@@ -1191,7 +1191,8 @@ class WindowMethod(DeclusteringMethod):
 
 		## Loop over magnitudes in descending order
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
-		order = np.argsort(magnitudes)[::-1]
+		nan_idxs = np.isnan(magnitudes)
+		order = np.hstack([np.argsort(magnitudes[~nan_idxs])[::-1], nan_idxs])
 		for i in order:
 			main_mag = magnitudes[i]
 			## if earthquake is not marked as triggered
@@ -1226,6 +1227,15 @@ class WindowMethod(DeclusteringMethod):
 							print("Found new cluster #%d (n=%d)"
 									% (ncl, np.sum(in_window)))
 						ncl += 1
+					"""
+					in_window_and_not_yet_clustered = in_window & (dc_idxs == -1)
+					if np.sum(in_window_and_not_yet_clustered) > 1:
+						dc_idxs[in_window_and_not_yet_clustered] = ncl
+						if verbose:
+							print("Found new cluster #%d (n=%d)"
+									% (ncl, np.sum(in_window_and_not_yet_clustered)))
+						ncl += 1
+					"""
 
 		"""
 		## Only possible with fa_ratio = 0
@@ -1306,7 +1316,8 @@ class WindowMethod(DeclusteringMethod):
 
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Loop over magnitudes in descending order
-		order = np.argsort(magnitudes)[::-1]
+		nan_idxs = np.isnan(magnitudes)
+		order = np.hstack([np.argsort(magnitudes[~nan_idxs])[::-1], nan_idxs])
 		for i in order:
 			main_mag = magnitudes[i]
 			## If earthquake is not marked as triggered
