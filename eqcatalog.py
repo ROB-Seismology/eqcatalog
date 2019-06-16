@@ -3202,7 +3202,7 @@ class EQCatalog(object):
 
 		bins_N, bins_mag = self.bin_by_mag(Mmin, Mmax, dM, completeness=completeness,
 											Mtype=Mtype, Mrelation=Mrelation,
-											include_right_edge=Trueverbose=False)
+											include_right_edge=True, verbose=False)
 
 		kwargs['colors'] = [color] if color else None
 		kwargs['labels'] = [label] if label else None
