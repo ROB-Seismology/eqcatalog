@@ -111,9 +111,7 @@ if not reloading:
 	from . import eqcatalog
 else:
 	reload(eqcatalog)
-from .eqcatalog import (EQCatalog, plot_catalogs_map,
-	concatenate_catalogs, get_catalogs_map, plot_catalogs_magnitude_time,
-	plot_depth_statistics)
+from .eqcatalog import (EQCatalog, concatenate_catalogs)
 
 ## composite_catalog (depends on completeness, eqcatalog)
 if not reloading:
