@@ -831,7 +831,8 @@ class LocalEarthquake(object):
 		:return:
 			Float, magnitude
 		"""
-		return getattr(self, "get_"+Mtype)(Mrelation=Mrelation)
+		#return getattr(self, "get_"+Mtype)(Mrelation=Mrelation)
+		return get_or_convert_mag(Mtype, Mrelation)
 
 	def get_M0(self, Mrelation={}):
 		"""
