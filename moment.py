@@ -115,7 +115,7 @@ def calc_moment(rupture_area, displacement, rigidity=3E+10):
 	:param rupture_area:
 		float or float array, rupture area (in km2)
 	:param displacement:
-		float or float array, average displacement over rupture area (in m2)
+		float or float array, average displacement over rupture area (in m)
 	:param rigidity:
 		float, rigidity of crust (in N/m2)
 		(default: 3E+10)
