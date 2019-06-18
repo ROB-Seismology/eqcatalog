@@ -269,7 +269,13 @@ class Cluster():
 		return self.eq_list.__iter__()
 
 	def __getitem__(self, item):
-		return np.array(self.eq_list).__getitem__(item)
+		subselection = np.array(self.eq_list).__getitem__(item)
+		if isinstance(subselection, LocalEarthquake):
+			return subselection
+		else:
+			eq_list = list(subselection)
+			return self.__class__(eq_list, self.ID, self.Mrelation,
+								self.distance_metric)
 
 	def __contains__(self, eq):
 		assert isinstance(eq, LocalEarthquake)
@@ -705,8 +711,14 @@ class Cluster():
 		:return:
 			bool
 		"""
-		return (self.is_in_time_window(eq, dc_window)
-				& self.is_in_dist_window(eq, dc_window)).any()
+		#return (self.is_in_time_window(eq, dc_window)
+		#		& self.is_in_dist_window(eq, dc_window)).any()
+		in_t_window = self.is_in_time_window(eq, dc_window)
+		subcluster = self.__getitem__(in_t_window)
+		in_d_window = subcluster.is_in_dist_window(eq, dc_window)
+		in_window = in_t_window
+		in_window[in_t_window] &= in_d_window
+		return in_window.any()
 
 
 class DeclusteringResult():
@@ -1082,8 +1094,12 @@ class WindowMethod(DeclusteringMethod):
 			bool array
 		"""
 		in_t_window = self.is_in_time_window(main_event, main_mag, catalog, dc_window)
-		in_d_window = self.is_in_dist_window(main_event, main_mag, catalog, dc_window)
-		in_window = (in_t_window & in_d_window)
+		#in_d_window = self.is_in_dist_window(main_event, main_mag, catalog, dc_window)
+		#in_window = (in_t_window & in_d_window)
+		in_d_window = self.is_in_dist_window(main_event, main_mag, catalog[in_t_window],
+											dc_window)
+		in_window = in_t_window
+		in_window[in_t_window] &= in_d_window
 		return in_window
 
 	def get_dependent_events(self, main_event, catalog, dc_window, Mrelation):
@@ -1189,22 +1205,26 @@ class WindowMethod(DeclusteringMethod):
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		ncl = 0
 
-		## Loop over magnitudes in descending order
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
+		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		nan_idxs = np.isnan(magnitudes)
-		order = np.hstack([np.argsort(magnitudes[~nan_idxs])[::-1], nan_idxs])
+		if np.sum(nan_idxs):
+			msg = "Warning: setting %d NaN magnitudes to lowest magnitude!"
+			msg %= np.sum(nan_idxs)
+			print(msg)
+			magnitudes[nan_idxs] = min(0, np.nanmin(magnitudes))
+		## Loop over magnitudes in descending order
+		order = np.argsort(magnitudes)[::-1]
+
 		for i in order:
 			main_mag = magnitudes[i]
 			## if earthquake is not marked as triggered
-			if dc_idxs[i] == -1 and not np.isnan(main_mag):
+			if dc_idxs[i] == -1:
 				main_event = catalog[i]
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
-				## Do not include earthquakes that are already marked as
-				## belonging to the cluster of a larger mainshock
-				#in_window = in_window & (magnitudes < main_mag)
-				#in_window = in_window & (dc_idxs == -1)
 				if np.sum(in_window) > 1:
 					## > 1 because main_event is always in window
+					"""
 					in_window_and_already_clustered = in_window & (dc_idxs >= 0)
 					## If there is another cluster (belonging to a larger mainshock)
 					## in the window of this one, append to that cluster
@@ -1228,71 +1248,17 @@ class WindowMethod(DeclusteringMethod):
 									% (ncl, np.sum(in_window)))
 						ncl += 1
 					"""
-					in_window_and_not_yet_clustered = in_window & (dc_idxs == -1)
+					## Do not include earthquakes that are already marked as
+					## belonging to the cluster of a larger mainshock
+					# Note: mag comparison fails with NaN magnitudes!
+					in_window_and_not_yet_clustered = (in_window & (dc_idxs == -1)
+													& (magnitudes <= main_mag))
 					if np.sum(in_window_and_not_yet_clustered) > 1:
 						dc_idxs[in_window_and_not_yet_clustered] = ncl
 						if verbose:
 							print("Found new cluster #%d (n=%d)"
 									% (ncl, np.sum(in_window_and_not_yet_clustered)))
 						ncl += 1
-					"""
-
-		"""
-		## Only possible with fa_ratio = 0
-		## This seems to result in linked-window cluster analysis
-		for i, eqi in enumerate(catalog):
-			## Create temporary cluster with 1 event
-			clust = Cluster([eqi], -1, Mrelation)
-			magi = eqi.get_MW(Mrelation=Mrelation)
-			print(i, magi)
-
-			subcatalog = catalog[i+1:]
-			if len(subcatalog) == 0:
-				break
-			in_window = self.is_in_window(eqi, magi, subcatalog, dc_window,
-										fa_ratio=0.)
-			print(in_window)
-			for j in range(len(in_window)):
-				if in_window[j]:
-					## Cluster declared
-					J = j + i + 1
-					eqj = catalog[J]
-					if dc_idxs[i] == -1 and dc_idxs[J] == -1:
-						## Initialize new cluster
-						clust.append(eqj)
-						ncl = len(clusters)
-						clust.ID = ncl
-						clusters.append(clust)
-						dc_idxs[i] = dc_idxs[J] = ncl
-						if verbose:
-							print("Initializing new cluster %d" % (ncl))
-					elif dc_idxs[J] == -1:
-						## If event i is already associated with a cluster,
-						## add event j to it
-						k = dc_idxs[i]
-						clusters[k].append(eqj)
-						dc_idxs[J] = k
-					elif dc_idxs[i] == -1:
-						## If event j is already associated with a cluster,
-						## add event i to it
-						k = dc_idxs[J]
-						clusters[k].append(eqi)
-						dc_idxs[i] = k
-					elif dc_idxs[i] == dc_idxs[J]:
-						## Events i and j already associated with same cluster
-						pass
-					else:
-						## Combine existing clusters by merging into earlier cluster
-						k = min(dc_idxs[i], dc_idxs[J])
-						l = max(dc_idxs[i], dc_idxs[J])
-						clusters[k].extend(clusters[l])
-						clusters[l].eq_list = []
-						dc_idxs[dc_idxs == l] = k
-						if verbose:
-							print("Combining clusters %d and %d" % (k, l))
-					#print(dc_idxs[:j+1])
-			print(dc_idxs)
-		"""
 
 		return DeclusteringResult(catalog, dc_idxs, Mrelation, self.distance_metric)
 
@@ -1312,21 +1278,30 @@ class WindowMethod(DeclusteringMethod):
 			instance of :class:`EQCatalog`, declustered catalog
 		"""
 		## Create array storing declustering status
+		## True means mainshock or unclustered, False means dependent
 		dc_idxs = np.ones(len(catalog), dtype='bool')
 
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
-		## Loop over magnitudes in descending order
+		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		nan_idxs = np.isnan(magnitudes)
-		order = np.hstack([np.argsort(magnitudes[~nan_idxs])[::-1], nan_idxs])
+		if np.sum(nan_idxs):
+			msg = "Warning: setting %d NaN magnitudes to lowest magnitude!"
+			msg %= np.sum(nan_idxs)
+			print(msg)
+			magnitudes[nan_idxs] = min(0, np.nanmin(magnitudes))
+		## Loop over magnitudes in descending order
+		order = np.argsort(magnitudes)[::-1]
+
 		for i in order:
 			main_mag = magnitudes[i]
 			## If earthquake is not marked as triggered
-			if dc_idxs[i] == True and not np.isnan(main_mag):
+			if dc_idxs[i] == True:
 				## Create window index
 				main_event = catalog[i]
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 				num_in_window = np.sum(in_window)
 				if num_in_window > 1:
+					"""
 					in_window_and_not_yet_clustered = (in_window & dc_idxs
 													& (magnitudes <= main_mag))
 					if num_in_window == np.sum(in_window_and_not_yet_clustered):
@@ -1341,6 +1316,15 @@ class WindowMethod(DeclusteringMethod):
 					## Apply window to declustering index,
 					## but avoid marking larger earthquakes as clustered
 					dc_idxs[in_window_and_not_yet_clustered] = False
+					"""
+					## If there are events in window that are not yet clustered
+					## or not larger (e.g., mainshock of another cluster),
+					## earthquake i defines a new cluster
+					in_window_and_not_yet_clustered = (in_window & dc_idxs
+													& (magnitudes <= main_mag))
+					if np.sum(in_window_and_not_yet_clustered) > 1:
+						dc_idxs[in_window_and_not_yet_clustered] = False
+						dc_idxs[i] = True
 
 		return catalog[dc_idxs]
 
@@ -1494,8 +1478,12 @@ class LinkedWindowMethod(DeclusteringMethod):
 			bool array
 		"""
 		in_t_window = self.is_in_time_window(main_event, main_mag, catalog, dc_window)
-		in_d_window = self.is_in_dist_window(main_event, main_mag, catalog, dc_window)
-		in_window = (in_t_window & in_d_window)
+		#in_d_window = self.is_in_dist_window(main_event, main_mag, catalog, dc_window)
+		#in_window = (in_t_window & in_d_window)
+		in_d_window = self.is_in_dist_window(main_event, main_mag, catalog[in_t_window],
+											dc_window)
+		in_window = in_t_window
+		in_window[in_t_window] &= in_d_window
 
 		return in_window
 
@@ -1655,6 +1643,13 @@ class LinkedWindowMethod(DeclusteringMethod):
 		dc_idxs = np.ones(len(catalog), dtype='bool')
 
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
+		## Set NaN magnitudes to 0 or lowest magnitude in catalog
+		nan_idxs = np.isnan(magnitudes)
+		if np.sum(nan_idxs):
+			msg = "Warning: setting %d NaN magnitudes to lowest magnitude!"
+			msg %= np.sum(nan_idxs)
+			print(msg)
+			magnitudes[nan_idxs] = min(0, np.nanmin(magnitudes))
 		## Loop over magnitudes in ascending order
 		order = np.argsort(magnitudes)
 		for i in order:
@@ -1823,7 +1818,7 @@ class ReasenbergMethod(DeclusteringMethod):
 				z -= eq2.errz
 			z = max(0, z)
 
-		r = np.sqrt(d**2 + z**2)
+		r = np.sqrt(d*d + z*z)
 
 		## Calculate interaction radius for the first event of the pair and for
 		## the largest event in the cluster associated with the first event
