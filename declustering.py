@@ -340,6 +340,7 @@ class Cluster():
 			array containing magnitude of all events in cluster
 		"""
 		mags = np.array([eq.get_MW(Mrelation=self.Mrelation) for eq in self])
+		mags[nan_idxs] = min(0, np.nanmin(mags))
 		return mags
 
 	def get_datetimes(self):
