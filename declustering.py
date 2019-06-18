@@ -1554,6 +1554,10 @@ class LinkedWindowMethod(DeclusteringMethod):
 		"""
 		## Make sure catalog is ordered by date (ascending)
 		catalog = catalog.get_sorted()
+		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
+		if np.sum(np.isnan(magnitudes)):
+			print("Warning: Catalog contains NaN magnitudes!")
+			print("Better remove these first.")
 
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		clusters = []
