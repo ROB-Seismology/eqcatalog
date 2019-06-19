@@ -738,7 +738,10 @@ class LocalEarthquake(object):
 			print("Warning: Mrelation should be ordered dictionary!")
 		for Mtype, msce_name in Mrelation.items():
 			if self.has_mag(Mtype):
-				msce = getattr(msc, msce_name)()
+				if not isinstance(msce_name, msc.MSCE):
+					msce = getattr(msc, msce_name)()
+				else:
+					msce = msce_name
 				return msce.get_mean(self.get_mag(Mtype))
 
 		## If Mrelation is empty or none of the Mtype's match
