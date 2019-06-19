@@ -421,6 +421,36 @@ class Scordilis2006(MSCE_MS_MW):
 		return sigma
 
 
+class Scordilis2006mb(MSCE):
+	"""
+	Conversion mb -> MW
+
+	mb range: 3.5 - 6.2
+	Region: global
+	"""
+	def get_mean(self, mb):
+		if np.isscalar(mb):
+			if 3.5 <= mb <= 6.2:
+				MW = 0.85 * mb + 1.03
+			else:
+				MW = np.nan
+		else:
+			MW = 0.85 * mb + 1.03
+			MW[(mb < 3.5) | (mb > 6.2)] = np.nan
+		return MW
+
+	def get_sigma(self, mb):
+		if np.isscalar(mb):
+			if 3.5 <= mb <= 6.2:
+				sigma = 0.29
+			else:
+				sigma = np.nan
+		else:
+			sigma = np.zeros_like(mb, dtype='float') + 0.29
+			sigma[(mb < 3.5) | (mb > 6.2)] = np.nan
+		return sigma
+
+
 class Utsu2002(MSCE_MS_MW):
 	"""
 	Conversion MS -> MW
@@ -435,4 +465,69 @@ class Utsu2002(MSCE_MS_MW):
 		return MW
 
 	def get_sigma(self, MS=None):
+		return None
+
+
+class IdentityMSC(MSCE):
+	"""
+	One-to-one conversion of magntiudes
+	"""
+	def get_mean(self, other_mag):
+		return other_mag
+
+	def get_sigma(self, other_mag=None):
+		return None
+
+
+class Suckale2016MS_USGS(MSCE):
+	"""
+	Regression between MS and MW based on the USGS/NEIC catalog
+	(for Vanuatu)
+
+	From: Suckale J., Gruenthal, G., Regnier, M. & Bosse, C., 2016,
+		Probabilistic seismic hazard assessment for Vanuatu,
+		Technical Report STR 05/16, GFZ
+	"""
+	def get_mean(self, MS):
+		MW = 1.269 * MS - 1.0436
+		return MW
+
+	def get_sigma(self, MS=None):
+		return None
+
+class Suckale2016mb_USGS(MSCE):
+	"""
+	Regression between mb and MW based on the USGS/NEIC catalog
+	(for Vanuatu)
+
+	From: Suckale J., Gruenthal, G., Regnier, M. & Bosse, C., 2016,
+		Probabilistic seismic hazard assessment for Vanuatu,
+		Technical Report STR 05/16, GFZ
+	"""
+	def get_mean(self, mb):
+		MW = 0.7813 * mb + 1.5175
+		return MW
+
+	def get_sigma(self, mb=None):
+		return None
+
+
+class KadiriogluKartal2016(MSCE):
+	"""
+	Regression between Md and MW
+
+	From:
+	Kadirioglu, F.T. & Kartal R.F., 2016, The new empirical magnitude
+	conversion relations using an improved earthquake catalogue for
+	Turkey and its near vicinity (1900-2012), Turkish Journal of Earth
+	Sciences, 25: 300-310, doi: 0.3906/yer-1511-7
+
+	Md range: 3.5 - 7.4
+	Region: Turkey
+	"""
+	def get_mean(self, Md):
+		MW = 0.7947 * Md + 1.342
+		return MW
+
+	def get_sigma(self, Md=None):
 		return None
