@@ -35,7 +35,9 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 	:param catalogs:
 		list with instances of :class:`EQCatalog`
 	:param Mtype:
-		str, magnitude type
+		str, magnitude type for magnitude scaling
+		or list of strs, magnitude type for each catalog (in which case
+		:param:`Mrelation` will be ignored)
 	:param Mrelation:
 		{str: str} ordered dict, mapping magnitude type ("MW", "MS" or "ML")
 		to name of magnitude conversion relation for :param:`Mtype`
@@ -126,8 +128,15 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 		kwargs[key] = max_mag
 
 	## Catalogs
+	if isinstance(Mtype, list):
+		Mtypes = Mtype
+		Mrelation = {}
+	else:
+		Mtypes = [Mtype] * len(catalogs)
+
 	datasets = []
 	for i, catalog in enumerate(catalogs):
+		Mtype = Mtypes[i]
 		mags = catalog.get_magnitudes(Mtype, Mrelation)
 		if rel_time_unit:
 			dates = tf.timespan(start_date, catalog.get_datetimes(), rel_time_unit)
@@ -354,7 +363,9 @@ def plot_map(catalogs,
 	:param catalogs:
 		List containing instances of :class:`EQCatalog`
 	:param Mtype:
-		String, magnitude type for magnitude scaling
+		str, magnitude type for magnitude scaling
+		or list of strs, magnitude type for each catalog (in which case
+		:param:`Mrelation` will be ignored)
 		(default: "MW")
 	:param Mrelation:
 		{str: str} ordered dict, mapping magnitude type ("MW", "MS" or "ML")
@@ -635,7 +646,14 @@ def plot_map(catalogs,
 			style.line_width = edge_widths[i%len(edge_widths)]
 			catalog_styles.append(style)
 
+	if isinstance(Mtype, list):
+		Mtypes = Mtype
+		Mrelation = {}
+	else:
+		Mtypes = [Mtype] * len(catalogs)
+
 	for i in range(len(catalogs)):
+		Mtype = Mtypes[i]
 		catalog = catalogs[i]
 		style = catalog_styles[i]
 		if isinstance(style, dict):
