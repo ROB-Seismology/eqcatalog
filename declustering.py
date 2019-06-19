@@ -1012,13 +1012,13 @@ class WindowMethod(DeclusteringMethod):
 
 	:param fa_ratio:
 		float, ratio between foreshock and aftershock time windows
-		(default: 0.5)
+		(default: 0.17, cf. SHARE project, Danciu pers. comm.)
 	:param distance_metric:
 		str, metric used to compute inter-event distances,
 		either "hypocentral" or "epicentral"
 		(default: "hypocentral"
 	"""
-	def __init__(self, fa_ratio=0.5, distance_metric="hypocentral"):
+	def __init__(self, fa_ratio=0.17, distance_metric="hypocentral"):
 		self.fa_ratio = fa_ratio
 		self.distance_metric = distance_metric
 		print("Warning: Using the window method for declustering "
