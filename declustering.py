@@ -282,8 +282,12 @@ class Cluster():
 		return eq.ID in self.get_ids()
 
 	def print_info(self):
-		# TODO
-		pass
+		print("Cluster #%d" % self.ID)
+		print("Number of events: %d" % len(self))
+		print("Mainshock: %s (M=%.1f)" % (self.datetime1(), self.mag1()))
+		print("First event: %s (M=%.1f)" % (self.datetime0(), self.mag0()))
+		print("Duration: %d days" % self.duration().astype('<m8[D]').astype('int'))
+		print("Equivalent magnitude: %.1f" % self.mag)
 
 	def append(self, eq):
 		"""
@@ -340,7 +344,7 @@ class Cluster():
 			array containing magnitude of all events in cluster
 		"""
 		mags = np.array([eq.get_MW(Mrelation=self.Mrelation) for eq in self])
-		mags[nan_idxs] = min(0, np.nanmin(mags))
+		mags[np.isnan(mags)] = min(0, np.nanmin(mags))
 		return mags
 
 	def get_datetimes(self):
