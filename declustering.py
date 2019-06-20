@@ -1183,7 +1183,8 @@ class WindowMethod(DeclusteringMethod):
 		return self.get_dependent_events(main_event, catalog, dc_window, Mrelation)
 		self.fa_ratio = fa_ratio
 
-	def analyze_clusters(self, catalog, dc_window, Mrelation, verbose=False):
+	def analyze_clusters(self, catalog, dc_window, Mrelation,
+						include_larger_aftershocks=1, verbose=False):
 		"""
 		Full analysis of individual clusters in earthquake catalog.
 		Note that earthquakes that could be aftershocks of an earthquake
@@ -1197,25 +1198,45 @@ class WindowMethod(DeclusteringMethod):
 			instance of :class:`DeclusteringWindow`
 		:param Mrelation:
 			dict specifying how to convert catalog magnitudes to MW
+		:param include_larger_aftershocks:
+			int, how to deal with larger earthquakes that are in the
+			aftershock window of a smaller event
+			0: do not include larger aftershocks in cluster, whatever
+				their nature
+			1: if there is a larger aftershock that is isolated (i.e.,
+				not the mainshock of another cluster), assign it to
+				the cluster
+			2: if there is a larger aftershock that is the mainshock of
+				another cluster, merge the two clusters.
+				This possibly corresponds to:
+				"reset the dimensions of the window to the largest shock
+				in the series, whether the largest was the first or a
+				subsequent shock" (Knopoff & Gardner, 1972)
+			(default: 1)
 		:param verbose:
 			bool, whether or not to print progress information
 
 		:return:
 			instance of :class:`DeclusteringResult`
 		"""
+		## Array storing cluster index, -1 means not belonging to any cluster
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		ncl = 0
 
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Set NaN magnitudes to 0 or lowest magnitude in catalog
+		## (necessary because magnitude comparison fails with NaN magnitudes)
 		nan_idxs = np.isnan(magnitudes)
 		if np.sum(nan_idxs):
 			msg = "Warning: setting %d NaN magnitudes to lowest magnitude!"
 			msg %= np.sum(nan_idxs)
 			print(msg)
 			magnitudes[nan_idxs] = min(0, np.nanmin(magnitudes))
-		## Loop over magnitudes in descending order
-		order = np.argsort(magnitudes)[::-1]
+
+		## Order by descending magnitude and ascending time
+		mag_dates = np.rec.fromarrays([-magnitudes, catalog.get_datetimes()],
+										names=str('magnitude,datetime'))
+		order = np.argsort(mag_dates, order=['magnitude', 'datetime'])
 
 		for i in order:
 			main_mag = magnitudes[i]
@@ -1225,35 +1246,31 @@ class WindowMethod(DeclusteringMethod):
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 				if np.sum(in_window) > 1:
 					## > 1 because main_event is always in window
-					"""
-					in_window_and_already_clustered = in_window & (dc_idxs >= 0)
-					## If there is another cluster (belonging to a larger mainshock)
-					## in the window of this one, append to that cluster
-					## This corresponds to:
-					## "reset the dimensions of the window to the largest shock
-					## in the series, whether the largest was the first or a
-					## subsequent shock" (Knopoff & Gardner, 1972)
-					if np.sum(in_window_and_already_clustered) > 0:
-						_ncl = dc_idxs[in_window_and_already_clustered][0]
-						in_window_and_not_yet_clustered = in_window & (dc_idxs == -1)
-						dc_idxs[in_window_and_not_yet_clustered] = _ncl
-						if verbose:
-							print("Appending %d events to cluster #%d"
-							% (np.sum(in_window_and_not_yet_clustered), _ncl))
-					else:
-						dc_idxs[in_window] = ncl
-						## should not be necessary, as main_event is always in window
-						#dc_idxs[i] = ncl
-						if verbose:
-							print("Found new cluster #%d (n=%d)"
-									% (ncl, np.sum(in_window)))
-						ncl += 1
-					"""
+
 					## Do not include earthquakes that are already marked as
 					## belonging to the cluster of a larger mainshock
-					# Note: mag comparison fails with NaN magnitudes!
-					in_window_and_not_yet_clustered = (in_window & (dc_idxs == -1)
-													& (magnitudes <= main_mag))
+					in_window_and_not_yet_clustered = (in_window & (dc_idxs == -1))
+
+					if include_larger_aftershocks == 2:
+						in_window_and_already_clustered = in_window & (dc_idxs >= 0)
+						## If there is another cluster (belonging to a larger mainshock)
+						## in the window of this one, append to that cluster
+						## This possibly corresponds to:
+						## "reset the dimensions of the window to the largest shock
+						## in the series, whether the largest was the first or a
+						## subsequent shock" (Knopoff & Gardner, 1972)
+						if np.sum(in_window_and_already_clustered) > 0:
+							_ncl = dc_idxs[in_window_and_already_clustered][0]
+							if verbose:
+								print("Appending %d events to cluster #%d"
+								% (np.sum(in_window_and_not_yet_clustered), _ncl))
+							dc_idxs[in_window_and_not_yet_clustered] = _ncl
+							in_window_and_not_yet_clustered[:] = False
+
+					if include_larger_aftershocks == 0:
+						## Do not include larger aftershocks, whatever their nature
+						in_window_and_not_yet_clustered &= (magnitudes <= main_mag)
+
 					if np.sum(in_window_and_not_yet_clustered) > 1:
 						dc_idxs[in_window_and_not_yet_clustered] = ncl
 						if verbose:
@@ -1263,10 +1280,13 @@ class WindowMethod(DeclusteringMethod):
 
 		return DeclusteringResult(catalog, dc_idxs, Mrelation, self.distance_metric)
 
-	def decluster_catalog(self, catalog, dc_window, Mrelation):
+	def decluster_catalog(self, catalog, dc_window, Mrelation, include_larger_aftershocks=True):
 		"""
 		Decluster catalog quickly, without identifying individual clusters.
 		Based on original :meth:`decluster` by Bart Vleminckx.
+
+		Note that this method does not capture larger aftershocks that are
+		in the window of a smaller event, in contrast to :meth:`analyze_clusters`
 
 		:param catalog:
 			instance of :class:`EQCatalog`
@@ -1274,6 +1294,17 @@ class WindowMethod(DeclusteringMethod):
 			instance of :class:`DeclusteringWindow`
 		:param Mrelation:
 			dict specifying how to convert catalog magnitudes to MW
+		:param include_larger_aftershocks:
+			bool, whether or not to mark earthquakes as dependent
+			if there is a larger earthquake in their aftershock window
+			(regardless if it is an isolated earthquake or the mainshock
+			of another cluster)
+			Note that this method corresponds to :meth:`analyze_clusters`
+			only if this parameter is False (or zero) in both cases.
+			If set to True, there is no correspondance, as there is no
+			way to determine whether the larger aftershock is an isolated
+			event or the mainshock of another cluster
+			(default: True)
 
 		:return:
 			instance of :class:`EQCatalog`, declustered catalog
@@ -1290,8 +1321,11 @@ class WindowMethod(DeclusteringMethod):
 			msg %= np.sum(nan_idxs)
 			print(msg)
 			magnitudes[nan_idxs] = min(0, np.nanmin(magnitudes))
-		## Loop over magnitudes in descending order
-		order = np.argsort(magnitudes)[::-1]
+
+		## Order by descending magnitude and ascending time
+		mag_dates = np.rec.fromarrays([-magnitudes, catalog.get_datetimes()],
+										names=str('magnitude,datetime'))
+		order = np.argsort(mag_dates, order=['magnitude', 'datetime'])
 
 		for i in order:
 			main_mag = magnitudes[i]
@@ -1300,32 +1334,32 @@ class WindowMethod(DeclusteringMethod):
 				## Create window index
 				main_event = catalog[i]
 				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
-				num_in_window = np.sum(in_window)
-				if num_in_window > 1:
-					"""
-					in_window_and_not_yet_clustered = (in_window & dc_idxs
+				if np.sum(in_window) > 1:
+					in_window_and_independent = (in_window & dc_idxs)
+					in_window_and_not_yet_clustered = (in_window_and_independent
 													& (magnitudes <= main_mag))
-					if num_in_window == np.sum(in_window_and_not_yet_clustered):
-						## All events in window belong to new cluster
-						## Current earthquake is mainshock, so remove from window index
-						in_window_and_not_yet_clustered[i] = False
-					else:
-						## There is another mainshock or cluster in the window
-						## Mark current earthquake as clustered
-						in_window_and_not_yet_clustered[i] = True
+					if include_larger_aftershocks:
+						if (np.sum(in_window_and_independent)
+							== np.sum(in_window_and_not_yet_clustered)):
+							## No larger events in window
+							## All events in window belong to new cluster
+							## Current earthquake is mainshock, so remove from window index
+							in_window_and_not_yet_clustered[i] = False
+						else:
+							## There is a larger earthquake in the window
+							## Impossible to tell if it is an isolated event
+							## or the mainshock of another cluster
+							## Mark current earthquake as clustered, leaving the
+							## larger earthquake as it is
+							in_window_and_not_yet_clustered[i] = True
 
-					## Apply window to declustering index,
-					## but avoid marking larger earthquakes as clustered
-					dc_idxs[in_window_and_not_yet_clustered] = False
-					"""
-					## If there are events in window that are not yet clustered
-					## or not larger (e.g., mainshock of another cluster),
-					## earthquake i defines a new cluster
-					in_window_and_not_yet_clustered = (in_window & dc_idxs
-													& (magnitudes <= main_mag))
-					if np.sum(in_window_and_not_yet_clustered) > 1:
+					else:
+						## Ignore larger aftershocks, if any
+						in_window_and_not_yet_clustered[i] = False
+
+					## Apply window to declustering index
+					if np.sum(in_window_and_not_yet_clustered):
 						dc_idxs[in_window_and_not_yet_clustered] = False
-						dc_idxs[i] = True
 
 		return catalog[dc_idxs]
 
@@ -1560,6 +1594,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 			print("Warning: Catalog contains NaN magnitudes!")
 			print("Better remove these first.")
 
+		## Array storing cluster index, -1 means not belonging to any cluster
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		clusters = []
 
@@ -1655,8 +1690,11 @@ class LinkedWindowMethod(DeclusteringMethod):
 			msg %= np.sum(nan_idxs)
 			print(msg)
 			magnitudes[nan_idxs] = min(0, np.nanmin(magnitudes))
-		## Loop over magnitudes in ascending order
-		order = np.argsort(magnitudes)
+		## Order by descending magnitude and ascending time
+		mag_dates = np.rec.fromarrays([-magnitudes, catalog.get_datetimes()],
+										names=str('magnitude,datetime'))
+		order = np.argsort(mag_dates, order=['magnitude', 'datetime'])
+
 		for i in order:
 			main_mag = magnitudes[i]
 			if not np.isnan(main_mag):
