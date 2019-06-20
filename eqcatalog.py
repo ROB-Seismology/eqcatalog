@@ -1154,19 +1154,30 @@ class EQCatalog(object):
 
 		:param key:
 			str, property of :class:`LocalEarthquake` to use as sort key
+			Multiple sorting criteria can be specified, separated by a comma
 			(default: "datetime")
 		:param order:
 			str, sorting order: "asc" or "desc"
+			If :param:`key` contains multiple sorting criteria, a different
+			order can be specified for each, separated by a comma
 			(default: "asc")
 
 		:return:
 			int array, indexes that sort catalog
 		"""
-		values = np.array([getattr(eq, key) for eq in self])
-		idxs = np.argsort(values)
-		if order == "desc":
-			idxs = idxs[::-1]
-		return idxs
+		keys = key.split(',')
+		orders = order.split(',')
+		if len(orders) == 1 and len(keys) > 1:
+			orders = orders * len(keys)
+		arrays = [np.array([getattr(eq, key) for eq in self]) for key in keys]
+		for i, order in enumerate(orders):
+			if order == "desc":
+				if isinstance(arrays[i][0], np.datetime64):
+					arrays[i] = tf.seconds_since_epoch(arrays[i])
+				arrays[i] = -arrays[i]
+		rec = np.rec.fromarrays(arrays, names=keys)
+		idxs = np.argsort(rec, order=keys)
+		return np.asarray(idxs)
 
 	def get_sorted(self, key="datetime", order="asc"):
 		"""
@@ -1182,11 +1193,8 @@ class EQCatalog(object):
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		reverse = {"asc": False, "desc": True}[order]
-		eq_list = sorted(self.eq_list, key=lambda eq:getattr(eq, key), reverse=reverse)
-		return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date,
-						region=self.region, name=self.name,
-						default_Mrelations=self.default_Mrelations)
+		idxs = self.argsort(key=key, order=order)
+		return self.__getitem__(idxs)
 
 	def sort(self, key="datetime", order="asc"):
 		"""
@@ -1202,9 +1210,8 @@ class EQCatalog(object):
 		:return:
 			None, catalog is sorted in place
 		"""
-		reverse = {"asc": False, "desc": True}[order]
-		eq_list = sorted(self.eq_list, key=lambda eq: getattr(eq, key), reverse=reverse)
-		self.eq_list = eq_list
+		idxs = self.argsort(key=key, order=order)
+		self.eq_list = list(np.array(self.eq_list)[idxs])
 
 	## Subselection and splitting methods
 
