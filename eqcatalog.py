@@ -170,6 +170,22 @@ class EQCatalog(object):
 		"""
 		self.eq_list.append(eq)
 
+	def copy(self):
+		"""
+		Copy catalog
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		eq_list = [eq.copy() for eq in self]
+		start_date, end_date = self.start_date, self.end_date
+		region = self.region
+		name = self.name
+		default_Mrelations = self.default_Mrelations
+		return self.__class__(eq_list, start_date=start_date, end_date=end_date,
+							region=region, name=name,
+							default_Mrelations=default_Mrelations)
+
 	@property
 	def lons(self):
 		return self.get_longitudes()
@@ -4216,9 +4232,17 @@ class EQCatalog(object):
 		#else:
 		#	f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
 
+		if Mtype:
+			Mrelation = Mrelation or self.default_Mrelations[Mtype]
+			catalog = self.copy()
+			catalog.convert_magnitudes(Mtype, Mrelation=Mrelation)
+			eq_list = catalog.eq_list
+		else:
+			eq_list = self.eq_list
+
 		f.write(','.join(columns) + '\n')
 
-		for eq in self.eq_list:
+		for eq in eq_list:
 			output_line = ', '.join([column_format_dict.get(col, '%s')
 									for col in columns])
 			## If 'col' is not an earthquake attribute, try getting it from magnitude dict
