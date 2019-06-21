@@ -1808,6 +1808,8 @@ class ReasenbergMethod(DeclusteringMethod):
 	Cluster2000 method by Reasenberg,
 	adapted to python from FORTRAN program cluster2000x.f
 	"""
+	distance_metric = 'hypocentral'
+
 	def is_in_dist_window(self, eq1, eq2, mag1, cmag1, dc_window,
 					rfact=10, dsigma=30, rmax=30, ignore_location_errors=True):
 		"""
