@@ -590,7 +590,8 @@ class Cluster():
 		mainshock_dt = self.datetime1()
 		foreshocks = [eq for eq in self.sort_datetime()
 						if eq.datetime < mainshock_dt]
-		return EQCatalog(foreshocks)
+		return EQCatalog(foreshocks, name=self.catalog.name + ' (foreshocks)',
+						default_Mrelations={'MW': self.Mrelation})
 
 	def get_aftershocks(self):
 		"""
@@ -602,7 +603,8 @@ class Cluster():
 		mainshock_dt = self.datetime1()
 		aftershocks = [eq for eq in self.sort_datetime()
 						if eq.datetime > mainshock_dt]
-		return EQCatalog(aftershocks)
+		return EQCatalog(aftershocks, name=self.catalog.name + ' (aftershocks)',
+						default_Mrelations={'MW': self.Mrelation})
 
 	def to_catalog(self):
 		"""
@@ -611,7 +613,8 @@ class Cluster():
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		return EQCatalog(self.eq_list, name="Cluster #%s" % self.ID)
+		return EQCatalog(self.eq_list, name="Cluster #%s" % self.ID,
+						default_Mrelations={'MW': self.Mrelation})
 
 	def get_end_of_time_windows(self, dc_window):
 		"""
@@ -885,7 +888,8 @@ class DeclusteringResult():
 			instance of :class:`Cluster`
 		"""
 		eq_list = (self.catalog[self.dc_idxs == cluster_idx]).eq_list
-		cluster = Cluster(eq_list, cluster_idx, self.Mrelation, self.distance_metric)
+		Mrelation = self.Mrelation or self.catalog.default_Mrelations['MW']
+		cluster = Cluster(eq_list, cluster_idx, Mrelation, self.distance_metric)
 		return cluster
 
 	def get_cluster_by_eq_idx(self, eq_idx):
@@ -966,7 +970,8 @@ class DeclusteringResult():
 		"""
 		clusters = self.get_clusters()
 		mainshocks = [cluster.get_mainshock() for cluster in clusters]
-		return EQCatalog(mainshocks)
+		return EQCatalog(mainshocks, name=self.catalog.name + ' (mainshocks)',
+						default_Mrelations={'MW': self.Mrelation})
 
 	def get_equivalent_events(self):
 		"""
@@ -976,7 +981,8 @@ class DeclusteringResult():
 		"""
 		clusters = self.get_clusters()
 		equivalent_events = [cluster.get_equivalent_event() for cluster in clusters]
-		return EQCatalog(equivalent_events)
+		return EQCatalog(equivalent_events, name=self.catalog.name + ' (equiv. events)',
+						default_Mrelations={'MW': self.Mrelation})
 
 
 class DeclusteringMethod():
@@ -1125,6 +1131,7 @@ class WindowMethod(DeclusteringMethod):
 		:return:
 			instance of :class:`EQCatalog` containing dependent events
 		"""
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 		main_mag = main_event.get_MW(Mrelation)
 		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 		return catalog[in_window & (catalog.get_ids() != main_event.ID)]
@@ -1144,6 +1151,7 @@ class WindowMethod(DeclusteringMethod):
 		:return:
 			instance of :class:`EQCatalog` containing independent events
 		"""
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 		main_mag = main_event.get_MW(Mrelation)
 		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 		return catalog[~in_window]
@@ -1227,6 +1235,7 @@ class WindowMethod(DeclusteringMethod):
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		ncl = 0
 
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		## (necessary because magnitude comparison fails with NaN magnitudes)
@@ -1317,6 +1326,7 @@ class WindowMethod(DeclusteringMethod):
 		## True means mainshock or unclustered, False means dependent
 		dc_idxs = np.ones(len(catalog), dtype='bool')
 
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		nan_idxs = np.isnan(magnitudes)
@@ -1530,6 +1540,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 		"""
 		Re-entrant function used in :meth:`get_aftershocks`
 		"""
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		main_mag = main_event.get_MW(Mrelation)
 		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
@@ -1568,7 +1579,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 		# TODO: catalog name, start and end date
 		aftershocks = self._find_aftershocks(main_event, catalog, dc_window, Mrelation)
 		if len(aftershocks):
-			return EQCatalog(aftershocks)
+			return EQCatalog(aftershocks, name=catalog.name + ' (aftershocks)',
+						default_Mrelations={'MW': self.Mrelation})
 
 	def get_foreshocks(self, main_event, catalog, dc_window, Mrelation):
 		# TODO
@@ -1593,6 +1605,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 		"""
 		## Make sure catalog is ordered by date (ascending)
 		catalog = catalog.get_sorted()
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		if np.sum(np.isnan(magnitudes)):
 			print("Warning: Catalog contains NaN magnitudes!")
@@ -1686,6 +1699,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 		## True means mainshock or unclustered, False means dependent
 		dc_idxs = np.ones(len(catalog), dtype='bool')
 
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		nan_idxs = np.isnan(magnitudes)
@@ -1909,6 +1923,8 @@ class ReasenbergMethod(DeclusteringMethod):
 		"""
 		## Make sure catalog is ordered by date (ascending)
 		catalog = catalog.get_sorted()
+
+		Mrelation = Mrelation or catalog.default_Mrelations['MW']
 
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		clusters = []
