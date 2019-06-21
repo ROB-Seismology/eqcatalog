@@ -4216,7 +4216,7 @@ class EQCatalog(object):
 		#else:
 		#	f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
 
-		f.write(', '.join(columns) + '\n')
+		f.write(','.join(columns) + '\n')
 
 		for eq in self.eq_list:
 			output_line = ', '.join([column_format_dict.get(col, '%s')
