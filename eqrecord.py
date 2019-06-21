@@ -595,6 +595,12 @@ class LocalEarthquake(object):
 			for row in tab:
 				print('\t'.join(row))
 
+	def copy(self):
+		"""
+		Copy LocalEarthquake object
+		"""
+		return self.from_dict(self.to_dict())
+
 	## date-time-related methods
 
 	@property
