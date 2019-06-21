@@ -334,6 +334,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 			## If column_map is still empty, infer it from keys of 1st row
 			if r == 0 and not column_map:
 				for col_name in row.keys():
+					col_name = col_name.strip()
 					if col_name in ('ID', 'ML', 'MS', 'MW', 'Mtype'):
 						column_map[col_name] = col_name
 					else:
@@ -351,6 +352,10 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 
 			## Strip leading/traling white space
 			for key, val in row.items():
+				stripped_key = key.strip()
+				if stripped_key != key:
+					del row[key]
+				key = stripped_key
 				if val:
 					row[key] = val.strip()
 
