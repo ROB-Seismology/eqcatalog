@@ -484,6 +484,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		"""
 		import datetime
 		from .seismodb import query_phase_picks
+		from robspy import UTCDateTime
 		from robspy.phase_pick import PhasePick
 
 		recs = query_phase_picks(self.ID, station_code=station_code, verbose=verbose)
@@ -491,6 +492,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		for rec in recs:
 			phase_name = rec['name']
 			dt = rec['datetime'] + datetime.timedelta(microseconds=rec['hund'] * 1E+4)
+			dt = UTCDateTime(dt)
 			component = rec['comp'] if rec['comp'] != 'V' else 'Z'
 			pick = PhasePick(phase_name, dt, self.ID, rec['station_code'],
 							component, rec['movement'], rec['id_mesure_t'],
@@ -502,7 +504,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			picks[rec['station_code']][rec['name']] = pick
 
 		if station_code:
-			return picks[station_code]
+			return picks.get(station_code, {})
 		else:
 			return picks
 
