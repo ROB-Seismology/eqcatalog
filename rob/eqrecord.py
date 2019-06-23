@@ -499,9 +499,13 @@ class ROBLocalEarthquake(LocalEarthquake):
 							rec['include_in_loc'], rec['amplitude'],
 							rec['periode'], rec['magnitude'], rec['mag_type'],
 							rec['distance'])
-			if not rec['station_code'] in picks:
-				picks[rec['station_code']] = {}
-			picks[rec['station_code']][rec['name']] = pick
+			_station_code = rec['station_code']
+			if station_code:
+				## Trim record station code to length of given station code
+				_station_code = _station_code[:len(station_code)]
+			if not _station_code in picks:
+				picks[_station_code] = {}
+			picks[_station_code][rec['name']] = pick
 
 		if station_code:
 			return picks.get(station_code, {})
