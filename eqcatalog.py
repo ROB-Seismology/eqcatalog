@@ -4289,8 +4289,9 @@ class EQCatalog(object):
 		else:
 			f = open(h71_filespec, "w")
 
+		Mrelation = Mrelation or self.default_Mrelations[Mtype]
 		for eq in self.eq_list:
-			f.write('%s\n' % eq.to_hypo71())
+			f.write('%s\n' % eq.to_hypo71(Mtype=Mtype, Mrelation=Mrelation))
 
 		if h71_filespec != None:
 			f.close()
