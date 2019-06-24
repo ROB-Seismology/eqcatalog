@@ -4290,7 +4290,7 @@ class EQCatalog(object):
 			f = open(h71_filespec, "w")
 
 		Mrelation = Mrelation or self.default_Mrelations[Mtype]
-		for eq in self.eq_list:
+		for eq in self.get_sorted():
 			f.write('%s\n' % eq.to_hypo71(Mtype=Mtype, Mrelation=Mrelation))
 
 		if h71_filespec != None:
@@ -4802,7 +4802,8 @@ class EQCatalog(object):
 		reg_line=None,
 		Mtype="MW", Mrelation={},
 		title=None,
-		fig_filespec="", fig_width=0, dpi=300):
+		fig_filespec="", dpi=300,
+		**kwargs):
 		"""
 		Analyze catalog completeness with the CUVI method (Mulargia, 1987).
 
@@ -4813,33 +4814,49 @@ class EQCatalog(object):
 		:param dYear:
 			Int, bin interval in years
 		:param year1:
-			Int, year to plot as completeness year (default=None)
+			Int, year to plot as completeness year
+			(default=None)
 		:param year2:
-			Int, year to plot as next completeness year (default=None)
+			Int, year to plot as next completeness year
+			(default=None)
 		:param reg_line:
-			Float, magnitude to plot regression line for (default=None)
+			Float, magnitude to plot regression line for
+			(requires :param:`year1` to be set)
+			(default=None)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param title:
-			str, title of plot (default: None, automatic title is used)
+			str, title of plot
+			(default: None, automatic title is used)
 		:param fig_filespec:
 			String, full path to output image file, if None plot to screen
 			(default: None)
 		:param fig_width:
 			Float, figure width in cm, used to recompute :param:`dpi` with
-			respect to default figure width (default: 0)
+			respect to default figure width
+			(default: 0)
 		:param dpi:
-			Int, image resolution in dots per inch (default: 300)
+			Int, image resolution in dots per inch
+			(default: 300)
+		:param kwargs:
+			see :func:`plot.plot_generic.plot_xy`
 		"""
-		colors = ['b', 'g', 'r', 'y', 'm', 'c', 'k']
+		from .plot.plot_generic import plot_xy
+
+		#colors = ['b', 'g', 'r', 'y', 'm', 'c', 'k']
 		max_mag = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
 		start_year_index = None
 		cat_start_year = tf.to_year(self.start_date)
 		cat_end_year = tf.to_year(self.end_date)
+
+		datasets = []
+		labels = []
+		regression_line = None
 		for i, magnitude in enumerate(magnitudes):
 			bins_N, bins_Years = self.bin_by_year(cat_start_year, cat_end_year+1, dYear,
 							magnitude, max_mag, Mtype=Mtype, Mrelation=Mrelation)
@@ -4848,15 +4865,59 @@ class EQCatalog(object):
 				start_year_index = np.abs(bins_Years - start_year).argmin()
 			bins_Years = bins_Years[start_year_index:]
 			bins_N_cumul = bins_N_cumul[start_year_index:]
-			plt.plot(bins_Years, bins_N_cumul, colors[i%len(colors)], label= '%.1f' % magnitude)
-			plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i%len(colors)], label='_nolegend_')
+			#plt.plot(bins_Years, bins_N_cumul, colors[i%len(colors)], label= '%.1f' % magnitude)
+			datasets.append((bins_Years, bins_N_cumul))
+			labels.append('%.1f' % magnitude)
+			#plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i%len(colors)], label='_nolegend_')
+			#datasets.append((bins_Years, bins_N_cumul))
+			#labels.append('_nolegend_')
+
 			if reg_line and np.allclose(magnitude, reg_line) and year1 != None:
 				index = np.abs(bins_Years - year1).argmin()
 				bins_Years = bins_Years[index:]
 				bins_N_cumul = bins_N_cumul[index:]
 				x = np.array([bins_Years, np.ones_like(bins_Years)])
 				m, c = np.linalg.lstsq(x.T, bins_N_cumul)[0]
-				plt.plot(bins_Years, m*bins_Years+c, color='k', linestyle='--', linewidth=5)
+				regression_line = (bins_Years, m*bins_Years+c)
+				#plt.plot(bins_Years, m*bins_Years+c, color='k', linestyle='--', linewidth=5)
+
+		#markers = ['', 'o'] * len(datasets) // 2
+		markers = ['o']
+
+		ax = plot_xy(datasets, labels=labels, markers=markers,
+					fig_filespec='wait')
+
+		ymin, ymax = ax.get_ylim()
+		if year1:
+			ax.vlines(year1, ymin, ymax, colors='r', linestyles='-', linewidth=3)
+		if year2:
+			ax.vlines(year2, ymin, ymax, colors='r', linestyles='--', linewidth=3)
+
+		if regression_line:
+			datasets = [regression_line]
+		else:
+			datasets = []
+
+		kwargs['xmin'] = kwargs.get('xmin', start_year)
+		kwargs['xmax'] = kwargs.get('xmax', cat_end_year)
+		kwargs['xgrid'] = kwargs.get('xgrid', 1)
+		kwargs['ygrid'] = kwargs.get('ygrid', 1)
+		kwargs['xtick_interval'] = kwargs.get('xtick_interval', (None, dYear))
+		default_xlabel = 'Time (years)'
+		kwargs['xlabel'] = kwargs.get('xlabel', default_xlabel)
+		default_ylabel = 'Cumulative number of events since %d' % cat_start_year
+		kwargs['ylabel'] = kwargs.get('ylabel', default_ylabel)
+		default_title = 'CUVI completeness analysis for magnitudes %.1f - %.1f'
+		default_title %= (magnitudes[0], magnitudes[-1])
+		kwargs['title'] = title or default_title
+		kwargs['legend_location'] = kwargs.get('legend_location', 0)
+
+		plot_xy(datasets, labels=['_nolegend_'], colors=['k'],
+				linestyles=['--'], linewidths=[3],
+				fig_filespec=fig_filespec, dpi=dpi, ax=ax, **kwargs)
+
+
+		"""
 		minorLocator = MultipleLocator(dYear)
 		plt.gca().xaxis.set_minor_locator(minorLocator)
 		ymin, ymax = plt.ylim()
@@ -4883,6 +4944,7 @@ class EQCatalog(object):
 			pylab.clf()
 		else:
 			pylab.show()
+		"""
 
 	## HMTK wrappers
 
