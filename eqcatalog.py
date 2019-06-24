@@ -4710,7 +4710,7 @@ class EQCatalog(object):
 			cc_catalog = self
 		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
 
-		num_events = float(len(catalog))
+		num_events = len(catalog)
 		td = catalog.get_time_delta()
 		catalog_num_days = tf.fractional_time_delta(td, 'D')
 		num_intervals = np.ceil(catalog_num_days / interval)
@@ -4729,7 +4729,7 @@ class EQCatalog(object):
 
 		## Theoretical Poisson distribution
 		n = np.arange(nmax)
-		tau = catalog_num_days / num_events
+		tau = catalog_num_days / float(num_events)
 		if verbose:
 			print("Number of events in catalog: %d" % num_events)
 			print("Number of days in catalog: %s" % catalog_num_days)
@@ -4748,12 +4748,12 @@ class EQCatalog(object):
 					% (Mmin, interval, tau, num_intervals))
 
 		## Histogram of number of intervals having n events
-		ax = plot_histogram([num_events_per_interval], bins=np.arange(nmax+1),
-							labels=["Catalog distribution"], align='right',
+		ax = plot_histogram([num_events_per_interval], bins=np.arange(nmax+1)-0.5,
+							labels=["Catalog distribution"], align='mid',
 							fig_filespec='wait')
 		return plot_xy([(n, poisson_n)], colors=['r'], linewidths=[2],
 							labels=["Poisson distribution"],
-							xlabel=xlabel, ylabel=ylabel, xmax=nmax,
+							xlabel=xlabel, ylabel=ylabel, xmin=-0.5, xmax=nmax,
 							title=title,
 							fig_filespec=fig_filespec, ax=ax)
 
