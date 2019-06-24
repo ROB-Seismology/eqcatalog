@@ -841,7 +841,7 @@ class LocalEarthquake(object):
 			Float, magnitude
 		"""
 		#return getattr(self, "get_"+Mtype)(Mrelation=Mrelation)
-		return get_or_convert_mag(Mtype, Mrelation)
+		return self.get_or_convert_mag(Mtype, Mrelation)
 
 	def get_M0(self, Mrelation={}):
 		"""
