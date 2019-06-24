@@ -4642,7 +4642,7 @@ class EQCatalog(object):
 
 		return cls(eq_list, name=table_name)
 
-	def plot_Poisson_test(self,
+	def plot_poisson_test(self,
 		Mmin, interval=100, nmax=0,
 		Mtype='MW', Mrelation={},
 		completeness=DEFAULT_COMPLETENESS,
@@ -4701,27 +4701,31 @@ class EQCatalog(object):
 
 		## Apply completeness constraint, and truncate result to completeness
 		## year for specified minimum magnitude
-		min_date = completeness.get_initial_completeness_date(Mmin)
-		cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation,
-												completeness=completeness)
+		if completeness:
+			min_date = completeness.get_initial_completeness_date(Mmin)
+			cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation,
+													completeness=completeness)
+		else:
+			min_date = self.start_date
+			cc_catalog = self
 		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
 
-		num_events = len(catalog)
+		num_events = float(len(catalog))
 		td = catalog.get_time_delta()
-		catalog_num_days = tf.time_delta_to_days(td)
+		catalog_num_days = tf.fractional_time_delta(td, 'D')
 		num_intervals = np.ceil(catalog_num_days / interval)
 
 		## Real catalog distribution
 		## Compute interval index for each event
 		time_deltas = catalog.get_time_deltas()
-		time_delta_days = np.array([tf.time_delta_to_days(td) for td in time_deltas])
+		time_delta_days = np.array([tf.fractional_time_delta(td, 'D') for td in time_deltas])
 		interval_indexes = np.floor(time_delta_days / interval)
 		## Compute number of events in each interval
 		num_events_per_interval, _ = np.histogram(interval_indexes, np.arange(num_intervals))
 		if not nmax:
 			nmax = num_events_per_interval.max()
 		## Compute number of intervals having n events
-		bins_num_events, _ = np.histogram(num_events_per_interval, bins=np.arange(nmax+1))
+		#bins_num_events, _ = np.histogram(num_events_per_interval, bins=np.arange(nmax+1))
 
 		## Theoretical Poisson distribution
 		n = np.arange(nmax)
@@ -4735,27 +4739,23 @@ class EQCatalog(object):
 		poisson_n = poisson_probs * num_intervals
 
 		## Plot
-		pylab.bar(n-0.5, bins_num_events, label="Catalog distribution")
-		pylab.plot(n, poisson_n, 'r', lw=2, label="Poisson distribution")
-		pylab.xlabel("Number of events per interval", fontsize="x-large")
-		pylab.ylabel("Number of intervals", fontsize="x-large")
-		pylab.legend()
-		ymin, ymax = pylab.ylim()
-		pylab.axis((-0.5, nmax, ymin, ymax))
+		from .plot.plot_generic import plot_histogram, plot_xy
 
-		ax = pylab.gca()
-		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('large')
+		xlabel = "Number of events per interval"
+		ylabel = "Number of intervals"
 		if title is None:
 			title = (r"Poisson test for $M\geq%.1f$ (t=%d, $\tau$=%.1f days, nt=%d)"
 					% (Mmin, interval, tau, num_intervals))
-		pylab.title(title, fontsize="x-large")
 
-		if fig_filespec:
-			pylab.savefig(fig_filespec)
-			pylab.clf()
-		else:
-			pylab.show()
+		## Histogram of number of intervals having n events
+		ax = plot_histogram([num_events_per_interval], bins=np.arange(nmax+1),
+							labels=["Catalog distribution"], align='right',
+							fig_filespec='wait')
+		return plot_xy([(n, poisson_n)], colors=['r'], linewidths=[2],
+							labels=["Poisson distribution"],
+							xlabel=xlabel, ylabel=ylabel, xmax=nmax,
+							title=title,
+							fig_filespec=fig_filespec, ax=ax)
 
 	def plot_3d(self, limits=None, Mtype=None, Mrelation={}):
 		"""
