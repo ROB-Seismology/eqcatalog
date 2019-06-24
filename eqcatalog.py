@@ -4837,9 +4837,11 @@ class EQCatalog(object):
 		colors = ['b', 'g', 'r', 'y', 'm', 'c', 'k']
 		max_mag = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
 		start_year_index = None
+		cat_start_year = tf.to_year(self.start_date)
+		cat_end_year = tf.to_year(self.end_date)
 		for i, magnitude in enumerate(magnitudes):
-			bins_N, bins_Years = self.bin_by_year(self.start_date.year,
-				self.end_date.year+1, dYear, magnitude, max_mag, Mtype=Mtype, Mrelation=Mrelation)
+			bins_N, bins_Years = self.bin_by_year(cat_start_year, cat_end_year+1, dYear,
+							magnitude, max_mag, Mtype=Mtype, Mrelation=Mrelation)
 			bins_N_cumul = np.cumsum(bins_N)
 			if not start_year_index:
 				start_year_index = np.abs(bins_Years - start_year).argmin()
@@ -4861,10 +4863,10 @@ class EQCatalog(object):
 			plt.vlines(year1, ymin, ymax, colors='r', linestyles='-', linewidth=5)
 		if year2:
 			plt.vlines(year2, ymin, ymax, colors='r', linestyles='--', linewidth=5)
-		plt.axis((start_year, self.end_date.year, ymin, ymax))
+		plt.axis((start_year, cat_end_year, ymin, ymax))
 		plt.xlabel('Time (years)', fontsize='large')
-		plt.ylabel('Cumulative number of events since' + ' %d' % self.start_date.year,
-			fontsize='large')
+		plt.ylabel('Cumulative number of events since' + ' %d' % cat_start_year,
+					fontsize='large')
 		title = title or ('CUVI completeness analysis for magnitudes %.1f - %.1f'
 						% (magnitudes[0], magnitudes[-1]))
 		plt.title(title, fontsize='x-large')
