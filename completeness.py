@@ -45,7 +45,7 @@ class Completeness(object):
 		if not np.all(np.diff(self.min_dates).astype('float') >= 0):
 			raise Exception("Completeness dates not in chronological order")
 		if not np.all(np.diff(self.min_mags) < 0):
-			raise Exception("Completeness magnitudes not monotonically "
+			print("Warning: Completeness magnitudes not monotonically "
 							"decreasing with time!")
 
 	def __len__(self):
