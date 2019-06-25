@@ -2254,7 +2254,8 @@ class EQCatalog(object):
 
 		## Set lower magnitude to lowermost threshold magnitude possible
 		if completeness:
-			Mmin = max(Mmin, completeness.get_completeness_magnitude(self.end_date))
+			#Mmin = max(Mmin, completeness.get_completeness_magnitude(self.end_date))
+			Mmin = max(Mmin, completeness.get_lowest_completeness_magnitude(self.end_date))
 
 		## Construct bins_Mag, including Mmax as right edge
 		#num_bins = int(np.floor((Mmax - Mmin) / dM)) + 1
@@ -2349,9 +2350,8 @@ class EQCatalog(object):
 		"""
 		completeness = completeness or self.default_completeness
 		if not completeness:
-			min_date = self.start_date
 			min_mag = np.min(magnitudes)
-			completeness = Completeness([min_date], [min_mag], Mtype="MW")
+			completeness = self.get_uniform_completeness(min_mag, Mtype="MW")
 		return completeness.get_completeness_timespans(magnitudes, self.end_date, unit=unit)
 
 	## MFD methods
