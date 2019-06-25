@@ -971,7 +971,8 @@ class DeclusteringResult():
 		clusters = self.get_clusters()
 		mainshocks = [cluster.get_mainshock() for cluster in clusters]
 		return EQCatalog(mainshocks, name=self.catalog.name + ' (mainshocks)',
-						default_Mrelations={'MW': self.Mrelation})
+						default_Mrelations={'MW': self.Mrelation},
+						default_completeness=self.catalog.default_completeness)
 
 	def get_equivalent_events(self):
 		"""
@@ -982,7 +983,8 @@ class DeclusteringResult():
 		clusters = self.get_clusters()
 		equivalent_events = [cluster.get_equivalent_event() for cluster in clusters]
 		return EQCatalog(equivalent_events, name=self.catalog.name + ' (equiv. events)',
-						default_Mrelations={'MW': self.Mrelation})
+						default_Mrelations={'MW': self.Mrelation},
+						default_completeness=self.catalog.default_completeness)
 
 
 class DeclusteringMethod():
@@ -1580,7 +1582,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 		aftershocks = self._find_aftershocks(main_event, catalog, dc_window, Mrelation)
 		if len(aftershocks):
 			return EQCatalog(aftershocks, name=catalog.name + ' (aftershocks)',
-						default_Mrelations={'MW': self.Mrelation})
+						default_Mrelations={'MW': self.Mrelation},
+						default_completeness=catalog.default_completeness)
 
 	def get_foreshocks(self, main_event, catalog, dc_window, Mrelation):
 		# TODO
