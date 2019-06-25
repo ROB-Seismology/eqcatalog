@@ -162,7 +162,7 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 
 	## Completeness
 	if completeness:
-		clabel = {"en": "Completeness magnitude",
+		clabel = {"en": "Completeness",
 				"nl": "Compleetheidsmagnitude",
 				"fr": u"Magnitude de complétude",
 				"nlfr": u"Compleetheid / Complétude"}[lang]
