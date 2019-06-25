@@ -187,9 +187,11 @@ class EQCatalog(object):
 		region = self.region
 		name = self.name
 		default_Mrelations = self.default_Mrelations
+		default_completeness = self.default_completeness
 		return self.__class__(eq_list, start_date=start_date, end_date=end_date,
 							region=region, name=name,
-							default_Mrelations=default_Mrelations)
+							default_Mrelations=default_Mrelations,
+							default_completeness=default_completeness)
 
 	@property
 	def lons(self):
@@ -1370,7 +1372,7 @@ class EQCatalog(object):
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=region, name=catalog_name,
-						default_Mrelations=self.default_Mrelations,
+						default_Mrelations={Mtype: Mrelation},
 						default_completeness=self.default_completeness)
 
 	def subselect_distance(self, point, distance, catalog_name=""):
@@ -1609,6 +1611,7 @@ class EQCatalog(object):
 
 		## Select magnitudes according to completeness criteria
 		if completeness:
+			Mrelation = Mrelation or self.default_Mrelations[Mtype]
 			eq_list = []
 			for eq in self.eq_list:
 				M = eq.get_or_convert_mag(Mtype, Mrelation)
@@ -1625,7 +1628,7 @@ class EQCatalog(object):
 			catalog_name = self.name + " (completeness-constrained)"
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=self.region, name=catalog_name,
-						default_Mrelations=self.default_Mrelations,
+						default_Mrelations={Mtype: Mrelation},
 						default_completeness=completeness)
 
 	def split_completeness(self,
