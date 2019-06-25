@@ -113,8 +113,8 @@ class Completeness(object):
 
 	def get_completeness_magnitude(self, date):
 		"""
-		Return completeness magnitude for given date, this is the lowest
-		magnitude for which the catalog is complete.
+		Return completeness magnitude for given date, this corresponds
+		to the most recent completeness magnitude.
 
 		:param date:
 			datetime.date or Int, date or year
@@ -131,6 +131,23 @@ class Completeness(object):
 			return 10
 		else:
 			return self.min_mags[index]
+
+	def get_lowest_completeness_magnitude(self, date):
+		"""
+		Return lowest completeness magnitude before given date,
+		this is the lowest magnitude for which the catalog is complete
+		(not necessarily corresponding to the most recent completeness
+		magnitude!)
+
+		:param date:
+			datetime.date or Int, date or year
+
+		:return:
+			Float, completeness magnitude
+		"""
+		if isinstance(date, int):
+			date = tf.time_tuple_to_np_datetime(date, 1, 1)
+		return self.min_mags[self.min_dates <= date].min()
 
 	def get_initial_completeness_date(self, M):
 		"""
@@ -183,13 +200,13 @@ class Completeness(object):
 			numpy float array, completeness timespans in fractions of :param:`unit`
 		"""
 		if self.are_mags_monotonously_decreasing():
-			return self.get_completeness_timespans_monotonous(magnitudes, end_date,
+			return self._get_completeness_timespans_monotonous(magnitudes, end_date,
 																unit=unit)
 		else:
-			return self.get_completeness_timespans_non_monotonous(magnitudes, end_date,
+			return self._get_completeness_timespans_non_monotonous(magnitudes, end_date,
 																	unit=unit)
 
-	def get_completeness_timespans_monotonous(self, magnitudes, end_date, unit='Y'):
+	def _get_completeness_timespans_monotonous(self, magnitudes, end_date, unit='Y'):
 		"""
 		Compute completeness timespans in fractional years for list of magnitudes.
 		Works only if completeness magnitudes are monotonously decreasing.
@@ -216,7 +233,7 @@ class Completeness(object):
 		completeness_timespans[np.where(completeness_timespans < 0)] = 0
 		return completeness_timespans
 
-	def get_completeness_timespans_non_monotonous(self, magnitudes, end_date, unit='Y'):
+	def _get_completeness_timespans_non_monotonous(self, magnitudes, end_date, unit='Y'):
 		"""
 		Compute completeness timespans in fractional years for list of
 		magnitudes. This method can cope with non-monotonously decreasing
