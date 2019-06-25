@@ -189,8 +189,11 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 	:return:
 		instance of :class:`EQCatalog`
+		Note that catalog will have default Mrelations and completeness
+		attached!
 	"""
 	from .eqrecord import (ROBLocalEarthquake, DEFAULT_MRELATIONS)
+	from .completeness import DEFAULT_COMPLETENESS
 	from ..eqcatalog import EQCatalog
 	from .. import time_functions_np as tf
 
@@ -366,7 +369,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	name = "ROB Catalog %s - %s" % (start_date, end_date)
 	start_date, end_date = np.datetime64(start_date), np.datetime64(end_date)
 	return EQCatalog(eq_list, start_date, end_date, region=region, name=name,
-					default_Mrelations=DEFAULT_MRELATIONS)
+					default_Mrelations=DEFAULT_MRELATIONS,
+					default_completeness=DEFAULT_COMPLETENESS)
 
 
 def query_local_eq_catalog_by_id(id_earth, verbose=False, errf=None):
