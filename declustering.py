@@ -750,7 +750,7 @@ class DeclusteringResult():
 	def __init__(self, catalog, dc_idxs, Mrelation, distance_metric):
 		self.catalog = catalog
 		self.dc_idxs = dc_idxs
-		self.Mrelation = Mrelation
+		self.Mrelation = Mrelation or self.catalog.default_Mrelations['MW']
 		self.distance_metric = distance_metric
 		self._fix_indexes()
 
@@ -888,8 +888,7 @@ class DeclusteringResult():
 			instance of :class:`Cluster`
 		"""
 		eq_list = (self.catalog[self.dc_idxs == cluster_idx]).eq_list
-		Mrelation = self.Mrelation or self.catalog.default_Mrelations['MW']
-		cluster = Cluster(eq_list, cluster_idx, Mrelation, self.distance_metric)
+		cluster = Cluster(eq_list, cluster_idx, self.Mrelation, self.distance_metric)
 		return cluster
 
 	def get_cluster_by_eq_idx(self, eq_idx):
@@ -923,14 +922,18 @@ class DeclusteringResult():
 		:return:
 			instance of :class:`EQCatalog` containing unclustered events
 		"""
-		return self.catalog[self.dc_idxs < 0]
+		unclustered = self.catalog[self.dc_idxs < 0]
+		unclustered.default_Mrelations['MW'] = self.Mrelation
+		return unclustered
 
 	def get_clustered_events(self):
 		"""
 		:return:
 			instance of :class:`EQCatalog` containing all clustered events
 		"""
-		return self.catalog[self.dc_idxs >= 0]
+		clustered = self.catalog[self.dc_idxs >= 0]
+		clustered.default_Mrelations['MW'] = self.Mrelation
+		return clustered
 
 	def get_declustered_catalog(self, replace_clusters_with="mainshocks"):
 		"""
