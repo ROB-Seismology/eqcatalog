@@ -1320,6 +1320,9 @@ class EQCatalog(object):
 				eq_list = [eq for eq in eq_list if eq.datetime <= end_date]
 			else:
 				eq_list = [eq for eq in eq_list if eq.datetime < end_date]
+
+		Mrelation = Mrelation or self.default_Mrelations[Mtype]
+
 		if Mmin != None:
 			cat2 = EQCatalog(eq_list)
 			Mags = cat2.get_magnitudes(Mtype, Mrelation)
@@ -1600,6 +1603,8 @@ class EQCatalog(object):
 			instance of :class:`EQCatalog`
 		"""
 		completeness = completeness or self.default_completeness
+		Mrelation = Mrelation or self.default_Mrelations[Mtype]
+
 		if completeness:
 			start_date = min(completeness.min_dates)
 			if completeness.Mtype != Mtype:
@@ -1611,7 +1616,6 @@ class EQCatalog(object):
 
 		## Select magnitudes according to completeness criteria
 		if completeness:
-			Mrelation = Mrelation or self.default_Mrelations[Mtype]
 			eq_list = []
 			for eq in self.eq_list:
 				M = eq.get_or_convert_mag(Mtype, Mrelation)
