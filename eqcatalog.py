@@ -56,7 +56,6 @@ import mapping.geotools.geodetic as geodetic
 ## Import package submodules
 from .eqrecord import LocalEarthquake
 from .completeness import Completeness
-from .rob.completeness import DEFAULT_COMPLETENESS
 from . import time_functions_np as tf
 
 
@@ -88,9 +87,12 @@ class EQCatalog(object):
 		in turn mapping Mtype to name of magnitude conversion relations):
 		default conversion relations for different magnitude types
 		(default: {})
+	:param default_completeness:
+		instance of :class:`Completeness`, default catalog completeness
+		(default: None)
 	"""
 	def __init__(self, eq_list, start_date=None, end_date=None, region=None,
-				name="", default_Mrelations={}):
+				name="", default_Mrelations={}, default_completeness=None):
 		self.eq_list = eq_list[:]
 		Tmin, Tmax = self.Tminmax()
 		if not start_date:
@@ -104,6 +106,7 @@ class EQCatalog(object):
 		self.region = region
 		self.name = name
 		self.default_Mrelations = default_Mrelations
+		self.default_completeness = default_completeness
 
 	def __len__(self):
 		"""
@@ -125,7 +128,8 @@ class EQCatalog(object):
 			return EQCatalog(self.eq_list.__getitem__(item), start_date=self.start_date,
 							end_date=self.end_date, region=self.region,
 							name=self.name + " %s" % item,
-							default_Mrelations=self.default_Mrelations)
+							default_Mrelations=self.default_Mrelations,
+							default_completeness=self.default_completeness)
 		elif isinstance(item, (list, np.ndarray)):
 			## item can contain indexes or bool
 			eq_list = []
@@ -136,7 +140,8 @@ class EQCatalog(object):
 					eq_list.append(self.eq_list[idx])
 			return EQCatalog(eq_list, start_date=self.start_date, end_date=self.end_date,
 							region=self.region, name=self.name + " %s" % item,
-							default_Mrelations=self.default_Mrelations)
+							default_Mrelations=self.default_Mrelations,
+							default_completeness=self.default_completeness)
 
 	def __contains__(self, eq):
 		"""
@@ -993,6 +998,7 @@ class EQCatalog(object):
 		:return:
 			Float, seismic moment rate in N.m per unit of :param:`time_unit`
 		"""
+		completeness = completeness or self.default_completeness
 		if completeness is None:
 			M0rate = self.get_M0_total(Mrelation=Mrelation) / self.timespan(time_unit)
 		else:
@@ -1364,7 +1370,8 @@ class EQCatalog(object):
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=region, name=catalog_name,
-						default_Mrelations=self.default_Mrelations)
+						default_Mrelations=self.default_Mrelations,
+						default_completeness=self.default_completeness)
 
 	def subselect_distance(self, point, distance, catalog_name=""):
 		"""
@@ -1396,7 +1403,8 @@ class EQCatalog(object):
 												azimuth=np.arange(0, 360, 90))
 		region = (lons.min(), lons.max(), lats.min(), lats.max())
 		subcat = EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name,
-						default_Mrelations=self.default_Mrelations)
+						default_Mrelations=self.default_Mrelations,
+						default_completeness=self.default_completeness)
 		return subcat
 
 	def subselect_polygon(self, poly_obj, catalog_name=""):
@@ -1472,7 +1480,8 @@ class EQCatalog(object):
 		if not catalog_name:
 			catalog_name = self.name + " (inside polygon)"
 		return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name,
-						default_Mrelations=self.default_Mrelations)
+						default_Mrelations=self.default_Mrelations,
+						default_completeness=self.default_completeness)
 
 	def split_into_zones(self,
 		source_model_name, ID_colname="",
@@ -1561,7 +1570,7 @@ class EQCatalog(object):
 		return subcatalogs
 
 	def subselect_completeness(self,
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		Mtype="MW", Mrelation={},
 		catalog_name="",
 		verbose=True):
@@ -1570,9 +1579,11 @@ class EQCatalog(object):
 		completeness criterion.
 
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness`
+			(default: None)
 		:param Mtype:
-			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
+			String, magnitude type: "MW", "MS" or "ML"
+			(default: "MW")
 		:param Mrelation":
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
@@ -1586,6 +1597,7 @@ class EQCatalog(object):
 		:return:
 			instance of :class:`EQCatalog`
 		"""
+		completeness = completeness or self.default_completeness
 		if completeness:
 			start_date = min(completeness.min_dates)
 			if completeness.Mtype != Mtype:
@@ -1613,16 +1625,18 @@ class EQCatalog(object):
 			catalog_name = self.name + " (completeness-constrained)"
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=self.region, name=catalog_name,
-						default_Mrelations=self.default_Mrelations)
+						default_Mrelations=self.default_Mrelations,
+						default_completeness=completeness)
 
 	def split_completeness(self,
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		Mtype="MW", Mrelation={}):
 		"""
 		Split catlog in subcatalogs according to completeness periods and magnitudes
 
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness`
+			(default: None)
 		:param Mtype:
 			String, magnitude type: "MW", "MS" or "ML" (default: "MW")
 		:param Mrelation":
@@ -1633,6 +1647,7 @@ class EQCatalog(object):
 		:return:
 			list of instances of :class:`EQCatalog`
 		"""
+		completeness = completeness or self.default_completeness
 		assert Mtype == completeness.Mtype
 		completeness_catalogs = []
 		min_mags = completeness.min_mags[::-1]
@@ -2202,16 +2217,19 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude to bin
 		:param dM:
-			Float, magnitude interval (default: 0.2)
+			Float, magnitude interval
+			(default: 0.2)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of
-			completeness and corresponding minimum magnitudes (default: None)
+			completeness and corresponding minimum magnitudes
+			(default: None)
 		:param include_right_edge:
 			bool, whether or not right edge should be included in magnitude bins
 			(default: False)
@@ -2224,6 +2242,8 @@ class EQCatalog(object):
 			bins_Mag: array containing lower magnitude of each interval
 		"""
 		from hazard.rshalib.utils import seq
+
+		completeness = completeness or self.default_completeness
 
 		## Set lower magnitude to lowermost threshold magnitude possible
 		if completeness:
@@ -2253,7 +2273,7 @@ class EQCatalog(object):
 	## Completeness methods
 
 	def get_initial_completeness_dates(self, magnitudes,
-									completeness=DEFAULT_COMPLETENESS):
+									completeness=None):
 		"""
 		Compute initial date of completeness for list of magnitudes
 
@@ -2263,12 +2283,13 @@ class EQCatalog(object):
 			instance of :class:`Completeness` containing initial years of
 			completeness and corresponding minimum magnitudes.
 			If None, use start year of catalog.
-			(default: DEFAULT_COMPLETENESS)
+			(default: None)
 
 		:return:
 			numpy array, completeness dates
 		"""
 		## Calculate year of completeness for each magnitude interval
+		completeness = completeness or self.default_completeness
 		if completeness:
 			completeness_dates = []
 			for M in magnitudes:
@@ -2300,7 +2321,7 @@ class EQCatalog(object):
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
 	def get_completeness_timespans(self, magnitudes,
-								completeness=DEFAULT_COMPLETENESS, unit='Y'):
+								completeness=None, unit='Y'):
 		"""
 		Compute completeness timespans for list of magnitudes
 
@@ -2309,7 +2330,8 @@ class EQCatalog(object):
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes. If None, use start year of
-			catalog (default: DEFAULT_COMPLETENESS)
+			catalog
+			(default: None)
 		:param unit:
 			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
 			(year|week|day|hour|minute|second|millisecond|microsecond)
@@ -2318,6 +2340,7 @@ class EQCatalog(object):
 		:return:
 			numpy float array, completeness timespans in fractions of :param:`unit`
 		"""
+		completeness = completeness or self.default_completeness
 		if not completeness:
 			min_date = self.start_date
 			min_mag = np.min(magnitudes)
@@ -2329,7 +2352,7 @@ class EQCatalog(object):
 	def get_incremental_mag_freqs(self,
 		Mmin, Mmax, dM=0.2,
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		trim=False,
 		verbose=True):
 		"""
@@ -2342,19 +2365,22 @@ class EQCatalog(object):
 		:param dM:
 			Float, magnitude interval
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
+			and corresponding minimum magnitudes
+			(default: None)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
 		:param verbose:
-			Bool, whether or not to print additional information (default: True)
+			Bool, whether or not to print additional information
+			(default: True)
 
 		:return:
 			Tuple (bins_N_incremental, bins_Mag)
@@ -2378,7 +2404,7 @@ class EQCatalog(object):
 	def get_incremental_mfd(self,
 		Mmin, Mmax, dM=0.2,
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		trim=False,
 		verbose=True):
 		"""
@@ -2391,19 +2417,22 @@ class EQCatalog(object):
 		:param dM:
 			Float, magnitude interval
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
+			and corresponding minimum magnitudes
+			(default: None)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
 		:param verbose:
-			Bool, whether or not to print additional information (default: True)
+			Bool, whether or not to print additional information
+			(default: True)
 
 		:return:
 			instance of :class:`hazard.rshalib.EvenlyDiscretizedMFD`
@@ -2419,7 +2448,7 @@ class EQCatalog(object):
 	def get_cumulative_mag_freqs(self,
 		Mmin, Mmax, dM=0.1,
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		trim=False,
 		verbose=True):
 		"""
@@ -2430,21 +2459,25 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude to bin
 		:param dM:
-			Float, magnitude bin width (default: 0.1)
+			Float, magnitude bin width
+			(default: 0.1)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
+			and corresponding minimum magnitudes
+			(default: None)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
 		:param verbose:
-			Bool, whether or not to print additional information (default: True)
+			Bool, whether or not to print additional information
+			(default: True)
 
 		:return:
 			Tuple (bins_N_cumulative, bins_Mag)
@@ -2462,7 +2495,7 @@ class EQCatalog(object):
 		Mmin, Mmax, dM=0.1,
 		cumul=True,
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		b_val=None,
 		weighted=False,
 		verbose=False):
@@ -2475,27 +2508,33 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude to use for binning
 		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
+			Float, magnitude interval to use for binning
+			(default: 0.1)
 		:param cumul:
 			Bool, whether to use cumulative (True) or incremental (False)
-			occurrence rates for linear regression (default: True)
+			occurrence rates for linear regression
+			(default: True)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness`
+			(default: None)
 		:param b_val:
-			Float, fixed b value to constrain MLE estimation (default: None)
+			Float, fixed b value to constrain MLE estimation
+			(default: None)
 			This parameter is currently ignored.
 		:param weighted:
 			bool, whether or not magnitude bins should be weighted by the
 			number of events in them
 			(default: False)
 		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
+			Bool, whether some messages should be printed or not
+			(default: False)
 
 		Return value:
 			Tuple (a, b, stda, stdb)
@@ -2532,7 +2571,7 @@ class EQCatalog(object):
 	def calcGR_Aki(self,
 		Mmin=None, Mmax=None, dM=0.1,
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		b_val=None,
 		verbose=False):
 		"""
@@ -2544,19 +2583,23 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude to use for binning (ignored)
 		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
+			Float, magnitude interval to use for binning
+			(default: 0.1)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness`
+			(default: None)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (ignored)
 		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
+			Bool, whether some messages should be printed or not
+			(default: False)
 
 		:return:
 			Tuple (a, b, stdb)
@@ -2570,7 +2613,7 @@ class EQCatalog(object):
 	def calcGR_Weichert(self,
 		Mmin, Mmax, dM=0.1,
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		b_val=None,
 		verbose=True):
 		"""
@@ -2586,19 +2629,24 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude to use for binning
 		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
+			Float, magnitude interval to use for binning
+			(default: 0.1)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness`
+			(default: None)
 		:param b_val:
-			Float, fixed b value to constrain MLE estimation (default: None)
+			Float, fixed b value to constrain MLE estimation
+			(default: None)
 		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
+			Bool, whether some messages should be printed or not
+			(default: False)
 
 		:return:
 			Tuple (a, b, stdb)
@@ -2718,7 +2766,7 @@ class EQCatalog(object):
 		Mmin, Mmax, dM=0.1,
 		method="Weichert",
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		b_val=None,
 		verbose=True):
 		"""
@@ -2730,24 +2778,29 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude to use for binning
 		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
+			Float, magnitude interval to use for binning
+			(default: 0.1)
 		:param method:
 			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi",
 			"wLSQc" or "wLSQi"
 			(default: "Weichert")
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness`
+			(default: None)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation
-			Currently only supported by Weichert method (default: None)
+			Currently only supported by Weichert method
+			(default: None)
 		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
+			Bool, whether some messages should be printed or not
+			(default: False)
 
 		:return:
 			instance of :class:`mfd.TruncatedGRMFD`
@@ -2777,7 +2830,7 @@ class EQCatalog(object):
 		Mmin, Mmax, dM=0.2,
 		method="Weichert",
 		Mtype="MW", Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		b_val=None,
 		num_sigma=0,
 		color_observed="b",
@@ -2795,21 +2848,26 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude to use for binning
 		:param dM:
-			Float, magnitude interval to use for binning (default: 0.1)
+			Float, magnitude interval to use for binning
+			(default: 0.1)
 		:param method:
 			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi",
 			"wLSQc" or "wLSQi"
-			(default: "Weichert"). If None, only observed MFD will be plotted.
+			If None, only observed MFD will be plotted.
+			(default: "Weichert")
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness`
+			(default: None)
 		:param b_val:
-			Float, fixed b value to constrain Weichert estimation (default: None)
+			Float, fixed b value to constrain Weichert estimation
+			(default: None)
 		:param num_sigma:
 			Int, number of standard deviations to consider for plotting uncertainty
 			(default: 0)
@@ -2818,28 +2876,34 @@ class EQCatalog(object):
 		:param color_estimated:
 			matplotlib color specification for estimated MFD
 		:param plot_completeness_limits:
-			Bool, whether or not to plot completeness limits (default: True)
+			Bool, whether or not to plot completeness limits
+			(default: True)
 		:param Mrange:
 			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
 			(default: ())
 		:param Freq_range:
 			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
-			(Y) axis (default: ())
+			(Y) axis
+			(default: ())
 		:param title:
 			String, plot title. If None, title will be automatically generated
 			(default: None)
 		:param lang:
-			String, language of plot axis labels (default: "en")
+			String, language of plot axis labels
+			(default: "en")
 		:param fig_filespec:
 			String, full path to output image file, if None plot to screen
 			(default: None)
 		:param fig_width:
 			Float, figure width in cm, used to recompute :param:`dpi` with
-			respect to default figure width (default: 0)
+			respect to default figure width
+			(default: 0)
 		:param dpi:
-			Int, image resolution in dots per inch (default: 300)
+			Int, image resolution in dots per inch
+			(default: 300)
 		:param verbose:
-			Bool, whether some messages should be printed or not (default: False)
+			Bool, whether some messages should be printed or not
+			(default: False)
 		"""
 		from hazard.rshalib.mfd import plot_MFD
 
@@ -3004,7 +3068,8 @@ class EQCatalog(object):
 				eq_list.append(new_eq)
 			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date,
 									self.end_date, region=self.region,
-									default_Mrelations=self.default_Mrelations))
+									default_Mrelations=self.default_Mrelations),
+									default_completeness=self.default_completeness)
 
 		return synthetic_catalogs
 
@@ -3012,7 +3077,7 @@ class EQCatalog(object):
 
 	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
 					b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
-					Mrelation={}, completeness=DEFAULT_COMPLETENESS,
+					Mrelation={}, completeness=None,
 					verbose=True):
 		"""
 		Compute Mmax distribution following Bayesian approach.
@@ -3049,9 +3114,11 @@ class EQCatalog(object):
 			(default: {})
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
+			and corresponding minimum magnitudes
+			(default: None)
 		:param verbose:
-			Bool, whether or not to print additional information (default: True)
+			Bool, whether or not to print additional information
+			(default: True)
 
 		:return:
 			(prior, likelihood, posterior, params) tuple
@@ -3101,7 +3168,7 @@ class EQCatalog(object):
 
 	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
 						b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
-						Mrelation={}, completeness=DEFAULT_COMPLETENESS,
+						Mrelation={}, completeness=None,
 						num_discretizations=0, title=None, fig_filespec=None,
 						verbose=True):
 		"""
@@ -3132,14 +3199,16 @@ class EQCatalog(object):
 			the distribution
 			(default: (5.5, 8.25), corresponding to the truncation applied in CEUS)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of completeness
-			and corresponding minimum magnitudes (default: DEFAULT_COMPLETENESS)
+			and corresponding minimum magnitudes
+			(default: None)
 		:param num_discretizations:
 			int, number of portions to discretize the posterior in
 			(default: 0)
@@ -3150,7 +3219,8 @@ class EQCatalog(object):
 			String, full path of image to be saved.
 			If None (default), histogram is displayed on screen.
 		:param verbose:
-			Bool, whether or not to print additional information (default: True)
+			Bool, whether or not to print additional information
+			(default: True)
 		"""
 		prior, likelihood, posterior, params = self.get_Bayesian_Mmax_pdf(prior_model,
 					Mmin_n, b_val=b_val, dM=dM, truncation=truncation, Mtype=Mtype,
@@ -3202,7 +3272,8 @@ class EQCatalog(object):
 			float, magnitude binning interval
 			(default: 0.5)
 		:param Mtype:
-			str, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			str, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} ordered dict, mapping magnitude type ("MW", "MS" or "ML")
 			to name of magnitude conversion relation for :param:`Mtype`
@@ -3258,15 +3329,18 @@ class EQCatalog(object):
 		:param Mmax:
 			Float, maximum magnitude (inclusive)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param major_tick_interval:
-			Int, interval in years for major ticks (default: 10)
+			Int, interval in years for major ticks
+			(default: 10)
 		:param minor_tick_interval:
-			Int, interval in years for minor ticks (default: 1)
+			Int, interval in years for minor ticks
+			(default: 1)
 		:param completeness_year:
 			Int, year of completeness where arrow should be plotted
 			(default: None)
@@ -3274,7 +3348,8 @@ class EQCatalog(object):
 			List, range of years where regression should be computed and plotted
 			(default: [])
 		:param lang:
-			String, language of plot labels (default: "en")
+			String, language of plot labels
+			(default: "en")
 		"""
 		from matplotlib.patches import FancyArrowPatch
 		catalog_start_year = tf.to_year(self.start_date) // dYear * dYear
@@ -4646,7 +4721,7 @@ class EQCatalog(object):
 	def plot_poisson_test(self,
 		Mmin, interval=100, nmax=0,
 		Mtype='MW', Mrelation={},
-		completeness=DEFAULT_COMPLETENESS,
+		completeness=None,
 		title=None,
 		fig_filespec=None,
 		verbose=True):
@@ -4669,12 +4744,14 @@ class EQCatalog(object):
 			Float, minimum magnitude to consider in analysis (ideally
 			corresponding to one of the completeness magnitudes)
 		:param interval:
-			Int, length of interval (number of days) (default: 100)
+			Int, length of interval (number of days)
+			(default: 100)
 		:param nmax:
 			Int, maximum number of earthquakes in an interval to test
 			(default: 0, will determine automatically)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
@@ -4683,7 +4760,7 @@ class EQCatalog(object):
 			instance of :class:`Completeness` containing initial years of
 			completeness and corresponding minimum magnitudes.
 			If None, use start year of catalog
-			(default: DEFAULT_COMPLETENESS)
+			(default: None)
 		:param title:
 			String, plot title. (None = default title, "" = no title)
 			(default: None)
@@ -4702,6 +4779,7 @@ class EQCatalog(object):
 
 		## Apply completeness constraint, and truncate result to completeness
 		## year for specified minimum magnitude
+		completeness = completeness or self.default_completeness
 		if completeness:
 			min_date = completeness.get_initial_completeness_date(Mmin)
 			cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation,
@@ -5099,7 +5177,7 @@ class EQCatalog(object):
 		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
 		return Mmax, Mmax_sigma
 
-	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation={}, completeness=DEFAULT_COMPLETENESS):
+	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation={}, completeness=None):
 		"""
 		Analyse magnitude-frequency.
 		This method is a wrapper for meth:`recurrence_analysis` in the
@@ -5122,7 +5200,7 @@ class EQCatalog(object):
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
-			instance of :class:`Completeness` (default: DEFAULT_COMPLETENESS)
+			instance of :class:`Completeness` (default: None)
 
 		:return:
 			Tuple (a, b, stdb)
@@ -5188,7 +5266,7 @@ class EQCatalog(object):
 		catalogue.load_from_array(keys_int, np.array(data_int, dtype=np.int))
 		return catalogue
 
-	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation={}, completeness=DEFAULT_COMPLETENESS):
+	def get_hmtk_smoothed_source_model(self, spcx=0.1, spcy=0.1, Mtype='MW', Mrelation={}, completeness=None):
 		"""
 		"""
 		from hmtk.seismicity.smoothing.smoothed_seismicity import SmoothedSeismicity
@@ -5225,6 +5303,7 @@ def concatenate_catalogs(catalog_list, name=""):
 	start_date = catalog0.start_date
 	end_date = catalog0.end_date
 	default_Mrelations = catalog0.default_Mrelations
+	default_completeness = catalog0.default_completeness
 	try:
 		region = list(catalog0.region)
 	except TypeError:
@@ -5248,7 +5327,8 @@ def concatenate_catalogs(catalog_list, name=""):
 		if n > region[3]:
 			region[3] = n
 	return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region,
-					name=name, default_Mrelations=default_Mrelations)
+					name=name, default_Mrelations=default_Mrelations,
+					default_completeness=default_completeness)
 
 
 # TODO: this function is now obsolete
@@ -5813,7 +5893,7 @@ if __name__ == "__main__":
 	Mmin = 0.0
 	Mmax = 7.0
 	dM = 0.2
-	completeness = DEFAULT_COMPLETENESS
+	completeness = None
 	Mtype = "MW"
 	Mrange = (1.5, 7.0)
 	Freq_range = (1E-4, 10**1.25)
