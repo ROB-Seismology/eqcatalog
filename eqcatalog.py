@@ -1488,6 +1488,40 @@ class EQCatalog(object):
 						default_Mrelations=self.default_Mrelations,
 						default_completeness=self.default_completeness)
 
+	def subselect_fault(self, oq_fault, max_dist, catalog_name=''):
+		"""
+		Subselect earthquakes located within given distance from a fault
+
+		:param oq_fault:
+			instance of :class:`rshalib.source.SimpleFaultSource`
+		:param max_dist:
+			float, maximum distance around fault (in km)
+		:param catalog_name:
+			str, name of resulting catalog
+			(default: "")
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		import openquake.hazardlib as oqhazlib
+		import hazard.rshalib as rshalib
+
+		lons, lats = self.get_longitudes(), self.get_latitudes()
+		depths = self.get_depths()
+		eq_mesh = oqhazlib.geo.mesh.Mesh(lons, lats, depths)
+		fault_mesh = oq_fault.get_mesh()
+		distances = fault_mesh.get_min_distance(eq_mesh)
+		idxs = np.where(distances <= max_dist)[0]
+		fault_catalog = self.__getitem__(idxs)
+		if not catalog_name:
+			catalog_name = self.name
+			if hasattr(oq_fault, 'name'):
+				catalog_name += (' (%s)' % oq_fault.name)
+			else:
+				catalog_name += " (fault)"
+		fault_catalog.name = catalog_name
+		return fault_catalog
+
 	def split_into_zones(self,
 		source_model_name, ID_colname="",
 		fix_mi_lambert=True,
