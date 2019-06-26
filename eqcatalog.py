@@ -2553,6 +2553,8 @@ class EQCatalog(object):
 		from hazard.rshalib.mfd import get_a_separation
 		from .calcGR import calcGR_LSQ
 
+		completeness = completeness or self.default_completeness
+
 		if weighted:
 			bins_N, _ = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation,
 										completeness=completeness, verbose=False)
@@ -2614,6 +2616,8 @@ class EQCatalog(object):
 			- b: b value
 			- stdb: standard deviation on b value
 		"""
+		completeness = completeness or self.default_completeness
+
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype,
 								Mrelation=Mrelation, completeness=completeness)
 
@@ -2670,6 +2674,8 @@ class EQCatalog(object):
 		from .calcGR import calcGR_Weichert
 		## Note: don't use get_incremental_mag_freqs here, as completeness
 		## is taken into account in the Weichert algorithm !
+		completeness = completeness or self.default_completeness
+
 		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation,
 										completeness=completeness, verbose=verbose)
 		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date,
