@@ -157,7 +157,7 @@ class Completeness(object):
 			Float, magnitude
 
 		:return:
-			datetime.date, initial date of completeness for given magnitude
+			np.datetime64, initial date of completeness for given magnitude
 		"""
 		try:
 			index = np.where(M >= self.min_mags)[0][0]
@@ -167,6 +167,32 @@ class Completeness(object):
 			return tf.time_tuple_to_np_datetime(1000000, 1, 1)
 		else:
 			return self.min_dates[index]
+
+	def get_final_completeness_date(self, M):
+		"""
+		Return last date of completeness for given magnitude
+		(useful for non-monotonically decreasing completeness magnitudes)
+
+		:param M:
+			float, magnitude
+
+		:return:
+			np.datetime64, final date of completeness for given magnitude
+			(or None if magnitude is complete beyond the defined
+			completeness interval)
+		"""
+		try:
+			index = np.where(M >= self.min_mags)[0][-1] + 1
+		except:
+			## Magnitude below smallest completeness magnitude
+			## Return oldest date in completeness interval
+			return self.min_dates[0]
+		else:
+			if index < len(self):
+				return self.min_dates[index]
+			else:
+				## Magnitude still complete at end of completeness interval
+				return None
 
 	def get_initial_completeness_year(self, M):
 		"""
