@@ -2265,5 +2265,23 @@ class MacroseismicEnquiryEnsemble():
 						& (np.sum(self.damage[:,1:], axis=1) > 0))[0]
 		return self.__getitem__(idxs)
 
+	def plot_cii_histogram(self, include_other_felt=True, include_heavy_appliance=False,
+						color=None, label='', **kwargs):
+		"""
+		Plot histogram of individual questionnaire intensities
+		"""
+		from ..plot.plot_generic import plot_histogram
+
+		cii = self.calc_cii(aggregate=False, include_other_felt=include_other_felt,
+							include_heavy_appliance=include_heavy_appliance)
+		bins = np.arange(int(np.ceil(cii).max()))
+		if label:
+			kwargs['labels'] = [label]
+		if color:
+			kwargs['colors'] = [color]
+		kwargs['xticks'] = bins
+
+		return plot_histogram([cii], bins + 0.5, **kwargs)
+
 
 DYFIEnsemble = MacroseismicEnquiryEnsemble
