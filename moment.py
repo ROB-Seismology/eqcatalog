@@ -126,3 +126,20 @@ def calc_moment(rupture_area, displacement, rigidity=3E+10):
 	## Convert rupture area from km2 to m2
 	rupture_area *= 1E+6
 	return rigidity * rupture_area * displacement
+
+
+def estimate_fc_brune(moment, VS=3500, stress_drop=3E+6):
+	"""
+	Estimate corner frequency according to Brune (1970)
+
+	:param VS:
+		float, mean shear-wave velocity in the crust (in m/s)
+		(default: 3500)
+	:param stress_drop:
+		float, stress drop (in Pa = bar * 1E+5)
+
+	:return:
+		float, corner frequency in Hz
+	"""
+	fc = 0.37 * VS * ((16 * stress_drop) / (7 * moment))**(1./3)
+	return fc
