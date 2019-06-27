@@ -85,8 +85,10 @@ def plot_xy(datasets,
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 			tick_label_fontsize='medium', tick_params={},
 			title='', title_fontsize='large',
-			xgrid=0, ygrid=0, style_sheet='classic',
+			xgrid=0, ygrid=0,
+			hlines=[], hline_args={}, vlines=[], vline_args={},
 			legend_location=0, legend_fontsize='medium',
+			style_sheet='classic',
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Generic function to plot (X, Y) data sets (lines, symbols and/or polygons)
@@ -221,10 +223,22 @@ def plot_xy(datasets,
 	:param ygrid:
 		int, 0/1/2/3 = draw no/major/minor/major+minor Y grid lines
 		(default: 0)
-	:param style_sheet:
-		str, matplotlib style sheet to apply to plot
-		See matplotlib.style.available for availabel style sheets
-		(default: 'classic')
+	:param hlines:
+		[y, xmin, xmax] list of arrays (of same length) or scalars
+		If xmin or xmax are None, limits of X axis will be used
+		(default: [])
+	:param hline_args:
+		dict, containing keyword arguments understood by :func:`pylab.hlines`
+		(e.g., 'colors', 'linestyles', 'linewidth', 'label')
+		(default: {})
+	:param vlines:
+		[x, ymin, ymax] list of arrays (of same length) or scalars
+		If ymin or ymax are None, limints of Y axis will be used
+		(default: [])
+	:param vline_args:
+		dict, containing keyword arguments understood by :func:`pylab.vlines`
+		(e.g., 'colors', 'linestyles', 'linewidth', 'label')
+		(default: {})
 	:param legend_location:
 		int or str, location of legend (matplotlib location code):
 			"best" 	0
@@ -243,6 +257,10 @@ def plot_xy(datasets,
 		int or str, font size to use for legend labels
 		If not specified, will use the value of :param:`tick_label_fontsize`
 		(default: 'medium')
+	:param style_sheet:
+		str, matplotlib style sheet to apply to plot
+		See matplotlib.style.available for availabel style sheets
+		(default: 'classic')
 	:param fig_filespec:
 		str, full path to output file
 		If None, will plot on screen
@@ -281,8 +299,6 @@ def plot_xy(datasets,
 	if ax is None:
 		#ax = pylab.axes()
 		fig, ax = pylab.subplots(figsize=figsize)
-	else:
-		fig_filespec = "wait"
 
 	## markers, colors, linewidhts, linestyles, labels, etc.
 	if not colors:
@@ -406,8 +422,10 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 			tick_label_fontsize='medium', tick_params={},
-			xgrid=0, ygrid=0, style_sheet='classic',
+			xgrid=0, ygrid=0,
+			hlines=[], hline_args={}, vlines=[], vline_args={},
 			title='', title_fontsize='large',
+			style_sheet='classic',
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Plot XY data as density (number of data points per grid cell)
@@ -545,8 +563,10 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
-				xgrid=0, ygrid=0, style_sheet='classic',
+				xgrid=0, ygrid=0,
+				hlines=[], hline_args={}, vlines=[], vline_args={},
 				legend_location=0, legend_fontsize='medium',
+				style_sheet='classic',
 				fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Plot histograms
@@ -648,7 +668,8 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
-				xgrid=0, ygrid=0):
+				xgrid=0, ygrid=0,
+				hlines=[], hline_args={}, vlines=[], vline_args={}):
 	"""
 	Plot ax frame
 
@@ -684,6 +705,10 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	:param title_fontsize:
 	:param xgrid:
 	:param ygrid:
+	:param hlines:
+	:param hline_args:
+	:param vlines:
+	:param vline_args:
 		see :func:`plot_xy`
 
 	:return:
@@ -709,14 +734,29 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 
 	## Axis limits
 	_xmin, _xmax = ax.get_xlim()
-	xmin = xmin or _xmin
-	xmax = xmax or _xmax
+	xmin = _xmin if xmin is None else xmin
+	xmax = _xmax if xmax is None else xmax
 	ax.set_xlim(xmin, xmax)
 
 	_ymin, _ymax = ax.get_ylim()
-	ymin = ymin or _ymin
-	ymax = ymax or _ymax
+	ymin = _ymin if ymin is None else ymin
+	ymax = _ymax if ymax is None else ymax
 	ax.set_ylim(ymin, ymax)
+
+	## Horizontal / vertical lines
+	if hlines:
+		y, xmin, xmax = hlines
+		_xmin, _xmax = ax.get_xlim()
+		xmin = _xmin if xmin is None else xmin
+		xmax = _xmax if xmax is None else xmax
+		ax.hlines(y, xmin, xmax, **hline_args)
+
+	if vlines:
+		x, ymin, ymax = vlines
+		_ymin, _ymax = ax.get_ylim()
+		ymin = _ymin if ymin is None else ymin
+		ymax = _ymax if ymax is None else ymax
+		ax.vlines(x, ymin, ymax, **vline_args)
 
 	## X ticks
 	if xticks is not None:
