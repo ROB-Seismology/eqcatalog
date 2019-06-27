@@ -5012,11 +5012,17 @@ class EQCatalog(object):
 		ax = plot_xy(datasets, labels=labels, markers=markers,
 					fig_filespec='wait')
 
-		ymin, ymax = ax.get_ylim()
+		#ymin, ymax = ax.get_ylim()
 		if year1:
-			ax.vlines(year1, ymin, ymax, colors='r', linestyles='-', linewidth=3)
+			kwargs['vlines'] = [[year1], None, None]
+			kwargs['vline_args'] = {'colors': 'r', 'linestyles': ['-'],
+									'linewidth': 2.5}
+		#if year1:
+		#	ax.vlines(year1, ymin, ymax, colors='r', linestyles='-', linewidth=3)
 		if year2:
-			ax.vlines(year2, ymin, ymax, colors='r', linestyles='--', linewidth=3)
+			#ax.vlines(year2, ymin, ymax, colors='r', linestyles='--', linewidth=3)
+			kwargs['vlines'][0].append(year2)
+			kwargs['vline_args']['linestyles'].append('--')
 
 		if regression_line:
 			datasets = [regression_line]
@@ -5037,7 +5043,7 @@ class EQCatalog(object):
 		kwargs['title'] = title or default_title
 		kwargs['legend_location'] = kwargs.get('legend_location', 0)
 
-		plot_xy(datasets, labels=['_nolegend_'], colors=['k'],
+		return plot_xy(datasets, labels=['_nolegend_'], colors=['k'],
 				linestyles=['--'], linewidths=[3],
 				fig_filespec=fig_filespec, dpi=dpi, ax=ax, **kwargs)
 
