@@ -1811,6 +1811,8 @@ class MacroseismicEnquiryEnsemble():
 			bins = np.arange(self.damage.shape[1])
 			counts = np.sum(self.damage, axis=0)
 			return (bins, counts)
+		elif prop == "id_earth":
+			ar = np.ma.array(self.get_prop_values(prop))
 		else:
 			try:
 				ar = getattr(self, prop)
@@ -1833,7 +1835,7 @@ class MacroseismicEnquiryEnsemble():
 			if not include_nan:
 				#bins.pop(bins.index(np.nan))
 				bins = np.delete(bins, np.where(np.isnan(bins)))
-			counts = np.zeros(len(bins))
+			counts = np.zeros(len(bins), dtype='int')
 			partial_counts = np.bincount(np.digitize(np.ma.compressed(ar), bins,
 										right=True))
 			counts[:len(partial_counts)] = partial_counts
