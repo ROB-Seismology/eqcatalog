@@ -172,7 +172,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		Int or List, ID(s) of event to extract (default: None)
 	:param sort_key":
 		String, property name to sort results with: "date" (= "time")
-		or "mag" (= "size") (default: "date")
+		or "mag" (= "size"). May also be None to prevent sorting.
+		(default: "date")
 	:param sort_order:
 		String, sort order, either "asc" or "desc" (default: "asc")
 	:param event_type:
@@ -271,15 +272,18 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 				Mmax = 10.0
 			having_clause += 'HAVING M BETWEEN %f and %f' % (Mmin, Mmax)
 
-	if sort_order.lower()[:3] == "asc":
-		sort_order = "asc"
+	if sort_key:
+		if sort_order.lower()[:3] == "asc":
+			sort_order = "asc"
+		else:
+			sort_order = "desc"
+		order_clause = ""
+		if sort_key.lower() in ("date", "time"):
+			order_clause += 'date %s, time %s' % (sort_order, sort_order)
+		elif sort_key.lower() in ("size", "mag"):
+			order_clause += 'M %s' % sort_order
 	else:
-		sort_order = "desc"
-	order_clause = ""
-	if sort_key.lower() in ("date", "time"):
-		order_clause += 'date %s, time %s' % (sort_order, sort_order)
-	elif sort_key.lower() in ("size", "mag"):
-		order_clause += 'M %s' % sort_order
+		order_clause = ""
 
 	if errf !=None:
 		errf.write("Querying KSB-ORB local earthquake catalog:\n")
@@ -373,8 +377,10 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 					default_completeness=DEFAULT_COMPLETENESS)
 
 
-def query_local_eq_catalog_by_id(id_earth, verbose=False, errf=None):
-	return query_local_eq_catalog(id_earth=id_earth, verbose=verbose, errf=errf)
+def query_local_eq_catalog_by_id(id_earth, sort_key=None, sort_order="asc",
+								verbose=False, errf=None):
+	return query_local_eq_catalog(id_earth=id_earth, sort_key=sort_key,
+								sort_order=sort_order, verbose=verbose, errf=errf)
 
 
 def query_focal_mechanisms(region=None, start_date=None, end_date=None,
