@@ -345,9 +345,26 @@ class MacroseismicEnquiryEnsemble():
 			event_times.append(dt)
 		return np.array(event_times, dtype='datetime64[s]')
 
-	def get_elapsed_times(self):
-		eq = self.get_eq()
-		return self.get_datetimes() - np.datetime64(eq.datetime)
+	def get_elapsed_times(self, use_enq_event_time=False):
+		"""
+		Get time interval between earthquake origin time and submit time
+		of each enquiry
+
+		:param use_enq_event_time:
+			bool, whether or not to use event time reported in enquiry
+			If False, earthquake origin time will be fetched from the
+			earthquakes database, but this only works if all enquiries
+			belong to the same earthquake
+			(default: False)
+
+		:return:
+			np.timedelta64 array
+		"""
+		if use_enq_event_time:
+			return self.get_datetimes() - self.get_event_times()
+		else:
+			eq = self.get_eq()
+			return self.get_datetimes() - np.datetime64(eq.datetime)
 
 	def subselect_by_property(self, prop, prop_values, negate=False):
 		"""
