@@ -5012,17 +5012,15 @@ class EQCatalog(object):
 		ax = plot_xy(datasets, labels=labels, markers=markers,
 					fig_filespec='wait')
 
-		#ymin, ymax = ax.get_ylim()
+		## Optional completeness years and regression line
+
 		if year1:
 			kwargs['vlines'] = [[year1], None, None]
 			kwargs['vline_args'] = {'colors': 'r', 'linestyles': ['-'],
 									'linewidth': 2.5}
-		#if year1:
-		#	ax.vlines(year1, ymin, ymax, colors='r', linestyles='-', linewidth=3)
-		if year2:
-			#ax.vlines(year2, ymin, ymax, colors='r', linestyles='--', linewidth=3)
-			kwargs['vlines'][0].append(year2)
-			kwargs['vline_args']['linestyles'].append('--')
+			if year2:
+				kwargs['vlines'][0].append(year2)
+				kwargs['vline_args']['linestyles'].append('--')
 
 		if regression_line:
 			datasets = [regression_line]
