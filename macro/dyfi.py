@@ -304,13 +304,46 @@ class MacroseismicEnquiryEnsemble():
 		return sorted(set(prop_values))
 
 	def get_datetimes(self):
-		import datetime
+		"""
+		Get submit time of each enquiry
+		Note: NULL date values will be replace by the event time
+		(see :meth:`get_event_times`)
 
-		format = "%Y-%m-%d %H:%M:%S"
-		date_times = self.get_prop_values('submit_time')
-		date_times = [datetime.datetime.strptime(dt, format) for dt in date_times]
-		date_times = np.array(date_times, dtype='datetime64[s]')
-		return date_times
+		:return:
+			datetime64 array
+		"""
+		#import datetime
+
+		submit_times = self.get_prop_values('submit_time')
+		NULL_DATE = '0000-00-00 00:00:00'
+		if NULL_DATE in submit_times:
+			event_times = self.get_event_times()
+			submit_times = [submit_times[i] if not submit_times[i] == NULL_DATE
+							else event_times[i] for i in range(len(self))]
+
+		#format = "%Y-%m-%d %H:%M:%S"
+		#submit_times = [datetime.datetime.strptime(dt, format) for dt in submit_times]
+		submit_times = np.array(submit_times, dtype='datetime64[s]')
+		return submit_times
+
+	def get_event_times(self):
+		"""
+		Get event time for each enquiry as reported in database
+
+		:return:
+			datetime64 array
+		"""
+		import datetime
+		years = self.get_prop_values('time_year')
+		months = self.get_prop_values('time_month')
+		days = self.get_prop_values('time_day')
+		hrmin = self.get_prop_values('time_hrmin')
+
+		event_times = []
+		for i in range(len(self)):
+			dt = datetime.datetime(years[i], months[i], days[i]) + hrmin[i]
+			event_times.append(dt)
+		return np.array(event_times, dtype='datetime64[s]')
 
 	def get_elapsed_times(self):
 		eq = self.get_eq()
