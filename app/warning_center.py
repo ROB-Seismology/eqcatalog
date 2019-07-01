@@ -409,6 +409,7 @@ class WarningCenter():
 				msg += "%s: %s" % (MSG_FIELDS['website_short'][lang], short_url)
 		else:
 			msg += "\n%s\n%s\n" % (MSG_FIELDS['website_long'][lang], url)
+			msg += MSG_FIELDS['signature'][lang]
 
 		return msg
 
@@ -1077,9 +1078,9 @@ MSG_FIELDS = {
 						'FR': 'Evènement révisé'},
 	'subject': {'FR': "Nouvel évènement enregistré par le réseau sismique belge",
 			'NL': "Nieuwe gebeurtenis geregistreerd door Belgisch seismisch netwerk",
-			'EN': "New event recorded by Belgian seismic network"},
+			'EN': "New event recorded by the Belgian seismic network"},
 	'subject_revision': {'EN': "Revision of event recorded by Belgian seismic network",
-			'NL': "Herevaluatie van gebeurtenis geregistreerd door Belgisch seismisch netwerk",
+			'NL': "Revisie van gebeurtenis geregistreerd door Belgisch seismisch netwerk",
 			'FR': "Révision d'événement enregistrée par le réseau sismique belge"},
 	'url': {'EN': "en/seismology/earthquakes-in-belgium",
 				'NL': "nl/seismologie/aardbevingen-in-belgie",
@@ -1090,12 +1091,21 @@ MSG_FIELDS = {
 	'region': {'EN': 'Region', 'NL': 'Regio', 'FR': 'Région'},
 	'depth': {'EN': 'Depth', 'NL': 'Diepte', 'FR': 'Profondeur'},
 	'website_short': {'EN': 'Website', 'NL': 'Website', 'FR': 'Site web'},
-	'website_long': {'EN': 'These parameters are subject to change.\n'
+	'website_long': {'EN': 'This event was verified by a seismologist.\n'
+						'The reported parameters are subject to change, however.\n'
 						'Please consult our website for the most up-to-date information:',
-					'NL': 'Deze parameters kunnen mogelijk nog gewijzigd worden.\n'
+					'NL': 'Deze gebeurtenis werd geverifieerd door een seismoloog.\n'
+						'De meegedeelde parameters kunnen echter nog gewijzigd worden.\n'
 						'Raadpleeg onze website voor de meest actuele informatie:',
-					'FR': 'Ces paramètres sont sujets à changement.\n'
+					'FR': 'Cet événement a été vérifié par un sismologue.\n'
+						'Cependant, les paramètres communiqués sont sujets à changement.\n'
 						'Veuillez consulter notre site web pour obtenir les informations les plus récentes:'},
+	'signature': {'EN': '\nOD Seismology & Gravimetry\n'
+						'Royal Observatory of Belgium\n',
+					'NL': '\nOD Seismologie & Gravimetrie\n'
+						'Koninklijke Sterrenwacht van België\n',
+					'FR': '\nDO Séismologie & Gravimétrie\n'
+						'Observatoire royal de Belgique\n'}
 	'num_dyfi': {'EN': 'Number of felt reports',
 				'NL': 'Aantal meldingen',
 				'FR': 'Nombre de rapports'}}
