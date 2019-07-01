@@ -1105,7 +1105,7 @@ MSG_FIELDS = {
 					'NL': '\nOD Seismologie & Gravimetrie\n'
 						'Koninklijke Sterrenwacht van België\n',
 					'FR': '\nDO Séismologie & Gravimétrie\n'
-						'Observatoire royal de Belgique\n'}
+						'Observatoire royal de Belgique\n'},
 	'num_dyfi': {'EN': 'Number of felt reports',
 				'NL': 'Aantal meldingen',
 				'FR': 'Nombre de rapports'}}
