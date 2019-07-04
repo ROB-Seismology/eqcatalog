@@ -78,6 +78,7 @@ def plot_xy(datasets,
 			colors=[], fill_colors=[], linewidths=[1], linestyles=['-'], labels=[],
 			markers=[], marker_sizes=[6], marker_intervals=[],
 			marker_edge_colors=['k'], marker_fill_colors=[], marker_edge_widths=[1],
+			marker_labels=[], marker_label_fontsize='small',
 			xscaling='lin', yscaling='lin',
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
@@ -288,6 +289,7 @@ def plot_xy(datasets,
 							'linestyles', 'labels', 'markers', 'marker_sizes',
 							'marker_intervals', 'marker_edge_colors',
 							'marker_fill_colors', 'marker_edge_widths',
+							'marker_labels', 'marker_label_fontsize',
 							'legend_location', 'legend_fontsize',
 							'style_sheet', 'fig_filespec', 'figsize', 'dpi',
 							'ax']}
@@ -389,6 +391,9 @@ def plot_xy(datasets,
 				mew=marker_edge_width, markevery=marker_interval, label=label)
 			#ax.scatter(x, y, s=symbol_size, edgecolors=edge_color, label=label,
 			#	marker=symbol, facecolors=fill_color, linewidth=edge_width)
+
+		for i, lbl in enumerate(marker_labels):
+			ax.annotate(lbl, (x[i], y[i]), fontsize=marker_label_fontsize)
 
 	## Frame
 	plot_ax_frame(ax, **frame_args)
@@ -795,6 +800,10 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		## Note: no formatter for minor ticks, as we don't print them
 
 	## X ticklabels
+	if xscaling == 'log' and xticklabels is None:
+		## Do not use log notation for small exponents
+		if xmin > 1E-4 and xmax < 1E+4:
+			xticklabels = matplotlib.ticker.FormatStrFormatter('%g')
 	if isinstance(xticklabels, matplotlib.ticker.Formatter):
 		ax.xaxis.set_major_formatter(xticklabels)
 	elif isinstance(xticklabels, basestring):
@@ -845,6 +854,10 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		## Note: no formatter for minor ticks, as we don't print them
 
 	## Y tick labels
+	if yscaling == 'log' and yticklabels is None:
+		## Do not use log notation for small exponents
+		if ymin > 1E-4 and ymax < 1E+4:
+			yticklabels = matplotlib.ticker.FormatStrFormatter('%g')
 	if isinstance(yticklabels, matplotlib.ticker.Formatter):
 		ax.yaxis.set_major_formatter(yticklabels)
 	elif isinstance(yticklabels, basestring):
