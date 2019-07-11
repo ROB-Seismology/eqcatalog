@@ -3345,8 +3345,8 @@ class EQCatalog(object):
 											Mtype=Mtype, Mrelation=Mrelation,
 											include_right_edge=True, verbose=False)
 
-		kwargs['colors'] = [color] if color else None
-		kwargs['labels'] = [label] if label else None
+		kwargs['colors'] = [color] if color else []
+		kwargs['labels'] = [label] if label else []
 
 		kwargs['xlabel'] = kwargs.get('xlabel', "Magnitude ($M_%s$)" % Mtype[1])
 		kwargs['ylabel'] = kwargs.get('ylabel', "Number of events")
@@ -4179,6 +4179,76 @@ class EQCatalog(object):
 
 		from .plot import plot_map
 		return plot_map([self], **kwargs)
+
+	def to_lbm_layer(self,
+		Mtype="MW", Mrelation={},
+		label=None, catalog_style={},
+		marker='o', edge_color=None, fill_color=None, edge_width=0.5,
+		marker_size=9, mag_size_inc=4):
+		"""
+		Generate layer to be plotted with layeredbasemap
+
+		:param Mtype:
+		:param Mrelation:
+		:param label
+		:param catalog_style:
+		:param marker:
+		:param edge_color:
+		:param fill_color:
+		:param edge_width:
+		:param marker_size:
+		:param mag_size_inc:
+			see :meth:`plot_map`
+
+		:return:
+			instance of :class:`mapping.layeredbasemap.MapLayer`
+		"""
+		import mapping.layeredbasemap as lbm
+
+		if isinstance(catalog_style, dict):
+			catalog_style = lbm.PointStyle.from_dict(catalog_style)
+		if marker:
+			catalog_style.shape = marker
+		if edge_color:
+			catalog_style.line_color = edge_color
+		if fill_color:
+			catalog_style.fill_color = fill_color
+		if edge_width is not None:
+			catalog_style.line_width = edge_width
+		if marker_size is not None:
+			catalog_style.size = marker_size
+
+		values = {}
+		if mag_size_inc:
+			## Magnitude-dependent size
+			min_mag = np.floor(self.get_Mmin(Mtype, Mrelation))
+			max_mag = np.ceil(self.get_Mmax(Mtype, Mrelation))
+			mags = np.linspace(min_mag, max_mag, min(5, max_mag-min_mag+1))
+			sizes = catalog_style.size + (mags - 3) * mag_size_inc
+			sizes = sizes.clip(min=1)
+			catalog_style.thematic_legend_style = lbm.LegendStyle(title="Magnitude",
+												location=3, shadow=True, fancy_box=True,
+												label_spacing=0.7)
+			values['magnitude'] = self.get_magnitudes(Mtype, Mrelation)
+			catalog_style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
+
+		# TODO: color by depth
+		#values['depth'] = self.get_depths()
+		#colorbar_style = lbm.ColorbarStyle(title="Depth (km)", location="bottom", format="%d")
+		#style.fill_color = lbm.ThematicStyleRanges([0,1,10,25,50], ['red', 'orange', 'yellow', 'green'], value_key="depth", colorbar_style=colorbar_style)
+
+		# TODO: color by age
+		#values['year'] = self.get_fractional_years()
+		#style.fill_color = lbm.ThematicStyleRanges([1350,1910,2050], ['green', (1,1,1,0)], value_key="year")
+
+		point_data = lbm.MultiPointData(self.get_longitudes(), self.get_latitudes(),
+										values=values)
+
+		if label is None:
+			label = self.name
+		layer = lbm.MapLayer(point_data, catalog_style, legend_label=label)
+
+		return layer
 
 	## Export methods
 
