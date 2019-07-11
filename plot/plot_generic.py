@@ -393,7 +393,8 @@ def plot_xy(datasets,
 			#	marker=symbol, facecolors=fill_color, linewidth=edge_width)
 
 		for i, lbl in enumerate(marker_labels):
-			ax.annotate(lbl, (x[i], y[i]), fontsize=marker_label_fontsize)
+			ax.annotate(lbl, (x[i], y[i]), fontsize=marker_label_fontsize,
+							clip_on=True)
 
 	## Frame
 	plot_ax_frame(ax, **frame_args)
