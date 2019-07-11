@@ -1167,7 +1167,6 @@ class MacroseismicEnquiryEnsemble():
 				grid_spacing = float(grid_spacing)
 			else:
 				grid_spacing = 5
-			aggregate_by = 'grid'
 			agg_ensemble_dict = ensemble.aggregate_by_grid(grid_spacing)
 
 		try:
@@ -1191,7 +1190,7 @@ class MacroseismicEnquiryEnsemble():
 			if aggregate_by in ('id_com', 'id_main') or not aggregate_by:
 				lon = agg_ensemble_dict[key].longitudes[0]
 				lat = agg_ensemble_dict[key].latitudes[0]
-			elif aggregate_by == 'grid':
+			elif aggregate_by[:4] == 'grid':
 				lon, lat = key
 			web_ids = agg_ensemble_dict[key].get_prop_values('id_web')
 
