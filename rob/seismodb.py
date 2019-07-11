@@ -379,7 +379,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 def query_local_eq_catalog_by_id(id_earth, sort_key=None, sort_order="asc",
 								verbose=False, errf=None):
-	return query_local_eq_catalog(id_earth=id_earth, sort_key=sort_key,
+	if not id_earth in (None, []):
+		return query_local_eq_catalog(id_earth=id_earth, sort_key=sort_key,
 								sort_order=sort_order, verbose=verbose, errf=errf)
 
 
@@ -1353,7 +1354,7 @@ def get_station_coordinates(station_codes, include_z=False, verbose=False):
 			return (lons[0], lats[0])
 
 
-def get_station_catalog(station_code, verbose=False):
+def get_station_catalog(station_code, ignore_code_sup=False, verbose=False):
 	"""
 	Fetch catalog of earthquakes that have been measured using a
 	particular station
@@ -1361,6 +1362,10 @@ def get_station_catalog(station_code, verbose=False):
 	:param station_code:
 		str, 3- or 4-character station code
 		(default: None)
+	:param ignore_code_sup:
+		bool, whether or not to ignore supplemantary station code
+		(4th char)
+		(default: False)
 	:param verbose:
 		bool, if True the query string will be echoed to standard output
 		(default: False)
@@ -1372,7 +1377,10 @@ def get_station_catalog(station_code, verbose=False):
 	column_clause = 'id_earth'
 	join_clause = [('LEFT JOIN', 'stations_network',
 					'mesure_t.id_eq = stations_network.id_station')]
-	where_clause = 'CONCAT(code, code_sup) = "%s"' % station_code
+	if ignore_code_sup:
+		where_clause = 'code = "%s"' % station_code[:3]
+	else:
+		where_clause = 'CONCAT(code, code_sup) = "%s"' % station_code
 	recs = query_seismodb_table(table_clause, column_clause=column_clause,
 							where_clause=where_clause, join_clause=join_clause,
 							verbose=verbose)
