@@ -41,19 +41,38 @@ class DeclusteringWindow():
 
 	@abc.abstractmethod
 	def get_time_window(self, magnitude):
+		"""
+		Get time window for given magnitude(s)
+
+		:param magnitude:
+			float or float array, moment magnitude(s) of main shock
+
+		:return:
+			np.timedelta64 (scalar or array)
+		"""
 		pass
 
 	@abc.abstractmethod
 	def get_dist_window(self, magnitude):
+		"""
+		Get distance window for given magnitude(s)
+
+		:param magnitude:
+			float or float array, moment magnitude(s) of main shock
+
+		:return:
+			float or float array, distance(s) in km
+		"""
 		pass
 
 	def get_windows(self, magnitude):
 		"""
 		:param magnitude:
+			float or float array, moment magnitude(s) of main shock
 			float, magnitude for wich to calculate window.
 
 		:returns:
-			(float, float), defining time window (in days) and distance window (in km)
+			(time_window, distance_window) tuple
 		"""
 		t_window = self.get_time_window(magnitude)
 		s_window = self.get_dist_window(magnitude)
@@ -81,9 +100,11 @@ class GardnerKnopoff1974Window(DeclusteringWindow):
 			idxs = np.where(magnitude < 6.5)
 			t_window[idxs] = 10**(0.5409*magnitude[idxs] - 0.5470)
 			return np.round(t_window * SECS_PER_DAY).astype('m8[s]')
+	get_time_window.__doc__ = DeclusteringWindow.get_time_window.__doc__
 
 	def get_dist_window(self, magnitude):
 		return 10**(0.1238*magnitude + 0.983)
+	get_dist_window.__doc__ = DeclusteringWindow.get_dist_window.__doc__
 
 
 class Uhrhammer1986Window(DeclusteringWindow):
@@ -98,9 +119,11 @@ class Uhrhammer1986Window(DeclusteringWindow):
 			return np.timedelta64(int(round(t_window * SECS_PER_DAY)), 's')
 		else:
 			return np.round(t_window * SECS_PER_DAY).astype('m8[s]')
+	get_time_window.__doc__ = DeclusteringWindow.get_time_window.__doc__
 
 	def get_dist_window(self, magnitude):
 		return np.exp(-1.024 + 0.804*magnitude)
+	get_dist_window.__doc__ = DeclusteringWindow.get_dist_window.__doc__
 
 
 class Gruenthal2009Window(DeclusteringWindow):
@@ -126,10 +149,12 @@ class Gruenthal2009Window(DeclusteringWindow):
 			idxs = np.where((magnitude > 0) & (magnitude < 6.5))
 			t_window[idxs] = np.exp(-3.95 + np.sqrt(0.62 + 17.32*magnitude[idxs]))
 			return np.round(t_window * SECS_PER_DAY).astype('m8[s]')
+	get_time_window.__doc__ = DeclusteringWindow.get_time_window.__doc__
 
 	def get_dist_window(self, magnitude):
 		s_window = np.maximum(0, np.exp(1.77 + np.sqrt(0.037 + 1.02*magnitude)))
 		return s_window
+	get_dist_window.__doc__ = DeclusteringWindow.get_dist_window.__doc__
 
 
 class Reasenberg1985Window(DeclusteringWindow):
@@ -750,7 +775,7 @@ class DeclusteringResult():
 	def __init__(self, catalog, dc_idxs, Mrelation, distance_metric):
 		self.catalog = catalog
 		self.dc_idxs = dc_idxs
-		self.Mrelation = Mrelation or self.catalog.default_Mrelations['MW']
+		self.Mrelation = Mrelation or self.catalog.default_Mrelations.get('MW', {})
 		self.distance_metric = distance_metric
 		self._fix_indexes()
 
@@ -1136,7 +1161,7 @@ class WindowMethod(DeclusteringMethod):
 		:return:
 			instance of :class:`EQCatalog` containing dependent events
 		"""
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		main_mag = main_event.get_MW(Mrelation)
 		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 		return catalog[in_window & (catalog.get_ids() != main_event.ID)]
@@ -1156,7 +1181,7 @@ class WindowMethod(DeclusteringMethod):
 		:return:
 			instance of :class:`EQCatalog` containing independent events
 		"""
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		main_mag = main_event.get_MW(Mrelation)
 		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 		return catalog[~in_window]
@@ -1240,7 +1265,7 @@ class WindowMethod(DeclusteringMethod):
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		ncl = 0
 
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		## (necessary because magnitude comparison fails with NaN magnitudes)
@@ -1331,7 +1356,7 @@ class WindowMethod(DeclusteringMethod):
 		## True means mainshock or unclustered, False means dependent
 		dc_idxs = np.ones(len(catalog), dtype='bool')
 
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		nan_idxs = np.isnan(magnitudes)
@@ -1545,7 +1570,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 		"""
 		Re-entrant function used in :meth:`get_aftershocks`
 		"""
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		main_mag = main_event.get_MW(Mrelation)
 		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
@@ -1611,7 +1636,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 		"""
 		## Make sure catalog is ordered by date (ascending)
 		catalog = catalog.get_sorted()
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		if np.sum(np.isnan(magnitudes)):
 			print("Warning: Catalog contains NaN magnitudes!")
@@ -1705,7 +1730,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 		## True means mainshock or unclustered, False means dependent
 		dc_idxs = np.ones(len(catalog), dtype='bool')
 
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		## Set NaN magnitudes to 0 or lowest magnitude in catalog
 		nan_idxs = np.isnan(magnitudes)
@@ -1930,7 +1955,7 @@ class ReasenbergMethod(DeclusteringMethod):
 		## Make sure catalog is ordered by date (ascending)
 		catalog = catalog.get_sorted()
 
-		Mrelation = Mrelation or catalog.default_Mrelations['MW']
+		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 
 		dc_idxs = -np.ones(len(catalog), dtype='int')
 		clusters = []
