@@ -520,7 +520,8 @@ class EQCatalog(object):
 		tab.add_column('Z', depths, align='r', valign='m')
 		Mtypes = self.get_Mtypes()
 		for Mtype in Mtypes:
-			mags = self.get_magnitudes(Mtype, Mrelation={})
+			#mags = self.get_magnitudes(Mtype, Mrelation={})
+			mags = np.array([eq.mag.get(Mtype, np.nan) for eq in self])
 			if not np.isnan(mags).all():
 				mags = remove_nan_values(mags)
 				tab.add_column(Mtype, mags, align='r', valign='m')
