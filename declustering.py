@@ -357,10 +357,15 @@ class Cluster():
 
 	def get_depths(self):
 		"""
+		Get depth array
+		Note that NaN values will be replaced by zeros, in order to
+		obtain valid hypocentral distances
+
 		:return:
 			array containing depth of all events in cluster
 		"""
 		depths = np.array([eq.depth for eq in self])
+		depths[np.isnan(depths)] = 0.
 		return depths
 
 	def get_magnitudes(self):
