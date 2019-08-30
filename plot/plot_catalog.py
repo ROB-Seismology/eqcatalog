@@ -324,8 +324,12 @@ def plot_cumulated_moment(catalogs,
 	kwargs['ymin'] = 0
 	kwargs['ymax'] = M0max
 
-	kwargs['marker_edge_colors'] = kwargs.get('colors', [])[:]
-	kwargs['marker_fill_colors'] = ['None']
+	if not 'marker_edge_colors' in kwargs:
+		#kwargs['marker_edge_colors'] = ['k']
+		kwargs['marker_edge_colors'] = kwargs.get('colors', [])[:]
+	if not 'marker_fill_colors' in kwargs:
+		#kwargs['marker_fill_colors'] = kwargs.get('colors', [])[:]
+		kwargs['marker_fill_colors'] = ['None']
 
 	## Default tick intervals
 	default_date_tick_interval = (AutoDateLocator(),
