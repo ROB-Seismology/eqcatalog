@@ -1322,7 +1322,7 @@ class EQCatalog(object):
 			else:
 				eq_list = [eq for eq in eq_list if eq.datetime < end_date]
 
-		Mrelation = Mrelation or self.default_Mrelations[Mtype]
+		Mrelation = Mrelation or self.default_Mrelations.get(Mtype, {})
 
 		if Mmin != None:
 			cat2 = EQCatalog(eq_list)
@@ -1638,7 +1638,7 @@ class EQCatalog(object):
 			instance of :class:`EQCatalog`
 		"""
 		completeness = completeness or self.default_completeness
-		Mrelation = Mrelation or self.default_Mrelations[Mtype]
+		Mrelation = Mrelation or self.default_Mrelations.get(Mtype, {})
 
 		if completeness:
 			start_date = min(completeness.min_dates)
@@ -4426,7 +4426,7 @@ class EQCatalog(object):
 		#	f.write('ID,Date,Time,Name,Lon,Lat,Depth,ML,MS,MW,Intensity_max,Macro_radius\n')
 
 		if Mtype:
-			Mrelation = Mrelation or self.default_Mrelations[Mtype]
+			Mrelation = Mrelation or self.default_Mrelations.get(Mtype, {})
 			catalog = self.copy()
 			catalog.convert_magnitudes(Mtype, Mrelation=Mrelation)
 			eq_list = catalog.eq_list
@@ -4482,7 +4482,7 @@ class EQCatalog(object):
 		else:
 			f = open(h71_filespec, "w")
 
-		Mrelation = Mrelation or self.default_Mrelations[Mtype]
+		Mrelation = Mrelation or self.default_Mrelations.get(Mtype, {})
 		for eq in self.get_sorted():
 			f.write('%s\n' % eq.to_hypo71(Mtype=Mtype, Mrelation=Mrelation))
 
