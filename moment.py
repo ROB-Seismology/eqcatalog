@@ -28,7 +28,9 @@ def log_moment_to_mag(log_moment, unit='N.m'):
 	if unit == 'dyn.cm':
 		return base_term - 10.73
 	elif unit == 'N.m':
-		return base_term - 6.06
+		## Note: additional decimals added to obtain exactly factor of 1E-7
+		## difference with dyn.cm
+		return base_term - 6.063333333333334
 	else:
 		raise Exception("Moment unit %s not supported!" % unit)
 
@@ -68,7 +70,7 @@ def mag_to_log_moment(mag, unit='N.m'):
 	if unit == 'dyn.cm':
 		return 1.5*mag + 16.095
 	elif unit == 'N.m':
-		return 1.5*mag + 9.09
+		return 1.5*mag + 9.095
 	else:
 		raise Exception("Moment unit %s not supported!" % unit)
 
@@ -128,15 +130,17 @@ def calc_moment(rupture_area, displacement, rigidity=3E+10):
 	return rigidity * rupture_area * displacement
 
 
-def estimate_fc_brune(moment, VS=3500, stress_drop=3E+6):
+def estimate_fc_brune(moment, stress_drop=3E+6, VS=3500):
 	"""
 	Estimate corner frequency according to Brune (1970)
 
-	:param VS:
-		float, mean shear-wave velocity in the crust (in m/s)
-		(default: 3500)
+	:param moment:
+		float, seismic moment (in N.m)
 	:param stress_drop:
 		float, stress drop (in Pa = bar * 1E+5)
+	:param VS:
+		float, shear-wave velocity in the crust near the source (in m/s)
+		(default: 3500)
 
 	:return:
 		float, corner frequency in Hz
