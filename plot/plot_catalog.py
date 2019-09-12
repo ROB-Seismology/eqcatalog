@@ -305,24 +305,27 @@ def plot_cumulated_moment(catalogs,
 
 		datasets.append((dates2, M0_cumul2))
 
-	kwargs['marker_intervals'] = [2]
+	kwargs['marker_intervals'] = kwargs.get('marker_intervals', [2])
 
-	kwargs['xlabel'] = "Time"
+	xlabel = "Time"
 	time_unit_str = {'Y': 'years', 'W': 'weeks', 'D': 'days',
 					'h': 'hours', 'm': 'minutes', 's': 'seconds'}.get(rel_time_unit)
 	if time_unit_str:
-		kwargs['xlabel'] += ' (%s)' % time_unit_str
-	kwargs['ylabel'] = "Seismic Moment (N.m)"
+		xlabel += ' (%s)' % time_unit_str
+	kwargs['xlabel'] = kwargs.get('xlabel', xlabel)
+	kwargs['ylabel'] = kwargs.get('ylabel', "Seismic Moment (N.m)")
 
 	if rel_time_unit:
-		kwargs['xmin'] = 0
-		kwargs['xmax'] = tf.timespan(start_date, end_date, rel_time_unit)
+		xmin = 0
+		xmax = tf.timespan(start_date, end_date, rel_time_unit)
 	else:
-		kwargs['xmin'] = tf.to_py_datetime(start_date)
-		kwargs['xmax'] = tf.to_py_datetime(end_date)
+		xmin = tf.to_py_datetime(start_date)
+		xmax = tf.to_py_datetime(end_date)
+	kwargs['xmin'] = kwargs.get('xmin', xmin)
+	kwargs['xmax'] = kwargs.get('xmax', xmax)
 
-	kwargs['ymin'] = 0
-	kwargs['ymax'] = M0max
+	kwargs['ymin'] = kwargs.get('ymin', 0)
+	kwargs['ymax'] = kwargs.get('ymax', M0max)
 
 	if not 'marker_edge_colors' in kwargs:
 		#kwargs['marker_edge_colors'] = ['k']
