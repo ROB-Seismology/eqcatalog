@@ -397,7 +397,7 @@ def plot_xy(datasets,
 							clip_on=True)
 
 	## Frame
-	plot_ax_frame(ax, **frame_args)
+	plot_ax_frame(ax, x_is_date=x_is_date, y_is_date=y_is_date, **frame_args)
 
 	## Legend
 	legend_fontsize = legend_fontsize or tick_label_fontsize
@@ -537,7 +537,15 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 		ax.axis(extent)
 
 	## Frame
-	plot_ax_frame(ax, **frame_args)
+	if isinstance(x[0], datetime.datetime):
+		x_is_date = True
+	else:
+		x_is_date = False
+	if isinstance(y[0], datetime.datetime):
+		y_is_date = True
+	else:
+		y_is_date = False
+	plot_ax_frame(ax, x_is_date=x_is_date, y_is_date=y_is_date, **frame_args)
 
 	## Colorbar
 	cbar = pylab.colorbar(sm, ax=ax, **cbar_args)
@@ -785,7 +793,8 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 			major_loc = matplotlib.ticker.NullLocator()
 		ax.xaxis.set_major_locator(major_loc)
 		if isinstance(major_loc, mpl_dates.DateLocator):
-			ax.xaxis.set_major_formatter(mpl_dates.AutoDateFormatter(locator=major_loc))
+			if xticklabels is None:
+				ax.xaxis.set_major_formatter(mpl_dates.AutoDateFormatter(locator=major_loc))
 
 		if isinstance(minor_tick_interval, matplotlib.ticker.Locator):
 			minor_loc = minor_tick_interval
@@ -839,7 +848,8 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 			major_loc = matplotlib.ticker.NullLocator()
 		ax.yaxis.set_major_locator(major_loc)
 		if isinstance(major_loc, mpl_dates.DateLocator):
-			ax.yaxis.set_major_formatter(mpl_dates.AutoDateFormatter(locator=major_loc))
+			if yticklabels is None:
+				ax.yaxis.set_major_formatter(mpl_dates.AutoDateFormatter(locator=major_loc))
 
 		if isinstance(minor_tick_interval, matplotlib.ticker.Locator):
 			minor_loc = minor_tick_interval
