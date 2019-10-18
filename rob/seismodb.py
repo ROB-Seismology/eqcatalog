@@ -1408,22 +1408,24 @@ def query_phase_picks(id_earth, station_code=None, verbose=False):
 	"""
 	table_clause = "mesure_t"
 	where_clause = "id_earth = %s" % id_earth
-	column_clause = ["CONCAT(stations_network.code, stations_network.code_sup) AS station_code"]
+	column_clause = ["CONCAT(station_place.code, station.code_sup) AS station_code"]
 	column_clause += ['mesure_t.id_mesure_t', 'id_earth', 'comp', 'movement',
 					'TIMESTAMP(date, time) AS datetime', 'hund',
 					'include_in_loc', 'periode', 'amplitude', 'distance',
 					'magnitude', 'mag_type', 'lookup_phase.name']
 	if station_code:
 		station_code, code_sup = station_code[:3], station_code[3:]
-		where_clause += ' AND stations_network.code = "%s"' % station_code
+		where_clause += ' AND station_place.code = "%s"' % station_code
 		if code_sup:
-			where_clause += ' AND stations_network.code_sup = "%s"' % code_sup
+			where_clause += ' AND station.code_sup = "%s"' % code_sup
 	join_clause = [('LEFT JOIN', 'mesure_a',
 					'mesure_t.id_mesure_t = mesure_a.id_mesure_t'),
 					('LEFT JOIN', 'lookup_phase',
 					'mesure_t.id_phase = lookup_phase.id_phase'),
-					('LEFT JOIN', 'stations_network',
-					'mesure_t.id_eq = stations_network.id_station')]
+					('LEFT JOIN', 'station',
+					'mesure_t.id_eq = station.id_station'),
+					('LEFT JOIN', 'station_place',
+					'station.id_place = station_place.id_place')]
 
 	return query_seismodb_table(table_clause, column_clause=column_clause,
 								where_clause=where_clause, join_clause=join_clause,
