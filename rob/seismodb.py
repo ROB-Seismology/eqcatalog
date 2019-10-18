@@ -1328,9 +1328,10 @@ def get_station_coordinates(station_codes, include_z=False, verbose=False):
 		column_clause = ["CONCAT(station_place.code, station.code_sup) AS station_code"]
 	else:
 		column_clause = ["station_place.code AS station_code"]
-	column_clause += ["station.longitude", "station.latitude"]
+	column_clause += ["IFNULL(station.longitude, station_place.longitude) AS longitude",
+					"IFNULL(station.latitude, station_place.latitude) AS latitude"]
 	if include_z:
-		column_clause.append("station.altitude")
+		column_clause.append("IFNULL(station.altitude, station_place.altitude) AS altitude")
 	having_clause = 'station_code in (%s)'
 	having_clause %= ','.join(['"%s"' % code for code in station_codes])
 	join_clause = [('LEFT JOIN', 'station_place',
