@@ -1322,19 +1322,22 @@ def get_station_coordinates(station_codes, include_z=False, verbose=False):
 		station_codes = [station_codes]
 		is_list = False
 
-	table_clause = "stations_network"
+	table_clause = 'station'
 	code_lengths = set([len(code) for code in station_codes])
-	if 4 in code_lengths:
-		column_clause = ["CONCAT(code, code_sup) AS station_code"]
+	if sorted(code_lengths)[-1] > 3:
+		column_clause = ["CONCAT(station_place.code, station.code_sup) AS station_code"]
 	else:
-		column_clause = ["code AS station_code"]
-	column_clause += ["longitude", "latitude"]
+		column_clause = ["station_place.code AS station_code"]
+	column_clause += ["station.longitude", "station.latitude"]
 	if include_z:
-		column_clause.append("altitude")
+		column_clause.append("station.altitude")
 	having_clause = 'station_code in (%s)'
 	having_clause %= ','.join(['"%s"' % code for code in station_codes])
+	join_clause = [('LEFT JOIN', 'station_place',
+					'station.id_place = station_place.id_place')]
 	recs = query_seismodb_table(table_clause, column_clause=column_clause,
-								having_clause=having_clause, verbose=verbose)
+								having_clause=having_clause, join_clause=join_clause,
+								verbose=verbose)
 
 	## Note that order may not be preserved in query result
 	recs = {rec['station_code']: rec for rec in recs}
