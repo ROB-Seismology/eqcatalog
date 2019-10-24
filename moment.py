@@ -138,6 +138,7 @@ def estimate_fc_brune(moment, stress_drop=3E+6, VS=3500):
 		float, seismic moment (in N.m)
 	:param stress_drop:
 		float, stress drop (in Pa = bar * 1E+5)
+		(default: 3E+6 = 30 bar)
 	:param VS:
 		float, shear-wave velocity in the crust near the source (in m/s)
 		(default: 3500)
