@@ -884,6 +884,7 @@ class LocalEarthquake(object):
 		:param pt:
 			(lon, lat, [z]) tuple or other instance of :class:`LocalEarthquake`
 			Note that lon, lat, z may also be arrays
+			Note: z should be depth (not altitude) and in km!
 
 		:return:
 			Float, hypocentral distance in km
