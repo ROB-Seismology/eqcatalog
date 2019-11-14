@@ -4253,13 +4253,22 @@ class EQCatalog(object):
 
 	## Export methods
 
-	def to_multi_point_data(self, combine_datetime=True):
+	def to_multi_point_data(self, combine_datetime=True,
+							columns=['ID', 'datetime', 'lon', 'lat', 'depth',
+							'ML', 'MS', 'MW', 'intensity_max']):
 		"""
 		Convert to layeredbasemap MultiPointData
 
 		:param combine_datetime:
 			bool, whether or not to combine date and time in one attribute
 			(default: True)
+		:param columns:
+			list of column names to export
+			(default: ['ID', 'datetime', 'lon', 'lat', 'depth',
+					'ML', 'MS', 'MW', 'intensity_max'])
+
+		:return:
+			instance of :class:`mapping.layeredbasemap.MultiPointData`
 		"""
 		import mapping.layeredbasemap as lbm
 
@@ -4270,41 +4279,51 @@ class EQCatalog(object):
 		values = OrderedDict()
 		values['ID'] = self.get_ids()
 
-		if combine_datetime:
+		if combine_datetime and 'datetime' in columns:
 			values['datetime'] = self.get_datetimes()
 		else:
-			values['date'] = [tf.to_py_date(eq.date) for eq in self]
-			## Convert times to strings to avoid problems with Shapefiles
-			values['time'] = [str(eq.time) for eq in self]
+			if 'date' in columns or 'datetime' in columns:
+				values['date'] = [tf.to_py_date(eq.date) for eq in self]
+			if 'time' in columns or 'datetime' in columns:
+				## Convert times to strings to avoid problems with Shapefiles
+				values['time'] = [str(eq.time) for eq in self]
 
-		values['lon'] = self.get_longitudes()
-		values['lat'] = self.get_latitudes()
-		values['depth'] = self.get_depths()
+		if 'lon' in columns:
+			values['lon'] = self.get_longitudes()
+		if 'lat' in columns:
+			values['lat'] = self.get_latitudes()
+		if 'depth' in columns:
+			values['depth'] = self.get_depths()
 
 		for Mtype in self.get_Mtypes():
-			values[Mtype] = self.get_magnitudes(Mtype=Mtype, Mrelation={})
+			if Mtype in columns:
+				values[Mtype] = self.get_magnitudes(Mtype=Mtype, Mrelation={})
 
-		names = [eq.name for eq in self]
-		if sum([len(name) for name in names]):
-			values['name'] = names
+		if 'name' in columns:
+			names = [eq.name for eq in self]
+			if sum([len(name) for name in names]):
+				values['name'] = names
 
-		intensities = self.get_max_intensities()
-		if not ((intensities == 0).all() or np.isnan(intensities).all()):
-			values['Imax'] = intensities
+		if 'intensity_max'  in columns:
+			intensities = self.get_max_intensities()
+			if not ((intensities == 0).all() or np.isnan(intensities).all()):
+				values['Imax'] = intensities
 
 		for attrib in ['macro_radius', 'errh', 'errz', 'errt', 'errM']:
-			ar = np.array([getattr(eq, attrib) for eq in self])
-			if not ((ar == 0).all() or np.isnan(ar).all()):
-				if attrib == 'macro_radius':
-					## Shorten attibute name to <= 10 characters
-					## to avoid problems with Shapefiles
-					attrib = 'Rmacro'
-				values[attrib] = ar
+			if attrib in columns:
+				ar = np.array([getattr(eq, attrib) for eq in self])
+				if not ((ar == 0).all() or np.isnan(ar).all()):
+					if attrib == 'macro_radius':
+						## Shorten attibute name to <= 10 characters
+						## to avoid problems with Shapefiles
+						attrib = 'Rmacro'
+					values[attrib] = ar
 
 		for attrib in ['zone', 'agency', 'event_type']:
-			lst = [getattr(eq, attrib) for eq in self]
-			if len(set(lst)) > min(1, len(self)-1):
-				values[attrib] = lst
+			if attrib in columns:
+				lst = [getattr(eq, attrib) for eq in self]
+				if len(set(lst)) > min(1, len(self)-1):
+					values[attrib] = lst
 
 		return lbm.MultiPointData(lons, lats, z=z, values=values)
 
@@ -4321,6 +4340,8 @@ class EQCatalog(object):
 		return self.to_multi_point_data(combine_datetime).to_geojson(as_multi=False)
 
 	def export_gis(self, format, filespec, encoding='latin-1',
+					columns=['ID', 'datetime', 'lon', 'lat', 'depth',
+					'ML', 'MS', 'MW', 'intensity_max'],
 					combine_datetime=True):
 		"""
 		Export to GIS file
@@ -4333,6 +4354,10 @@ class EQCatalog(object):
 		:param encoding:
 			str, encoding to use for non-ASCII characters
 			(default: 'latin-1')
+		:param columns:
+			list of column names to export
+			(default: ['ID', 'datetime', 'lon', 'lat', 'depth',
+					'ML', 'MS', 'MW', 'intensity_max'])
 		:param combine_datetime:
 			bool, whether or not to combine date and time in one attribute
 			(default: True)
@@ -4344,7 +4369,7 @@ class EQCatalog(object):
 		if format == 'ESRI Shapefile':
 			## Shapefiles do not support datetime fields
 			combine_datetime = False
-		mpd = self.to_multi_point_data(combine_datetime)
+		mpd = self.to_multi_point_data(combine_datetime, columns=columns)
 		return mpd.export_gis(format, filespec, encoding=encoding)
 
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation={}):
@@ -4370,7 +4395,7 @@ class EQCatalog(object):
 
 	def export_csv(self, csv_filespec=None,
 					columns=['ID', 'date', 'time', 'lon', 'lat', 'depth',
-					'ML', 'MS', 'MW', 'intensity_max', 'macro_radius'],
+					'ML', 'MS', 'MW', 'intensity_max'],
 					Mtype=None, Mrelation={}):
 		"""
 		Export earthquake list to a csv file.
@@ -4381,7 +4406,7 @@ class EQCatalog(object):
 		:param columns:
 			list of column names to export
 			(default: ['ID', 'date', 'time', 'lon', 'lat', 'depth',
-					'ML', 'MS', 'MW', 'intensity_max', 'macro_radius'])
+					'ML', 'MS', 'MW', 'intensity_max'])
 		:param Mtype:
 			Str, magnitude type, either 'ML', 'MS' or 'MW'.
 			If None, magnitudes will not be converted
@@ -4489,11 +4514,13 @@ class EQCatalog(object):
 		if h71_filespec != None:
 			f.close()
 
-	def export_KML(self,
+	def export_kml(self,
 		kml_filespec=None,
 		time_folders=True,
 		instrumental_start_year=1910,
-		color_by_depth=False):
+		color_by_depth=False,
+		columns=['ID', 'date', 'time', 'name', 'lon', 'lat', 'depth',
+				'ML', 'MS', 'MW', 'intensity_max']):
 		"""
 		Export earthquake catalog to KML.
 
@@ -4501,13 +4528,20 @@ class EQCatalog(object):
 			String, full path to output KML file. If None, kml is printed
 			on screen (default: None)
 		:param time_folders:
-			Bool, whether or not to organize earthquakes in folders by time
+			int, whether or not to organize earthquakes in folders by time
+			0 = no time folders
+			1 = instrumental/decade and historical/century folders
+			2 = 1 + past 24 h / past 2 weekds / past 1 year folders
 			(default: True)
 		:param instrumental_start_year:
 			Int, start year of instrumental period (only applies when time_folders
 			is True) (default: 1910)
 		:param color_by_depth:
 			Bool, whether or not to color earthquakes by depth (default: False)
+		:param columns:
+			list of column names to export
+			(default: ['ID', 'date', 'time', 'name', 'lon', 'lat', 'depth',
+					'ML', 'MS', 'MW', 'intensity_max'])
 
 		:return:
 			str, KML code (if :param:`kml_filespec` is not set)
@@ -4515,11 +4549,12 @@ class EQCatalog(object):
 		import mapping.kml.mykml as mykml
 
 		kmldoc = mykml.KML()
-		#year, month, day = self.start_date.year, self.start_date.month, self.start_date.day
-		#start_time = datetime.datetime(year, month, day)
-		start_time = tf.utcnow()
+		start_date = tf.to_py_date(self.start_date)
+		year, month, day = start_date.year, start_date.month, start_date.day
+		start_time = datetime.datetime(year, month, day)
 		kmldoc.addTimeStamp(start_time)
-		current_year = tf.to_year(start_time)
+		current_time = tf.utcnow()
+		current_year = tf.to_year(current_time)
 		eq_years = self.get_years()
 		eq_centuries = sorted(set((eq_years // 100) * 100))
 
@@ -4527,17 +4562,19 @@ class EQCatalog(object):
 		nt_folder = None
 
 		if time_folders:
-			hist_folder = kmldoc.addFolder("Historical", visible=False, open=False)
+			if time_folders > 1:
+				recent_folder = kmldoc.addFolder("Recent", visible=True, open=True)
+				folder_24h = kmldoc.createFolder("Past 24 hours", visible=True, open=False)
+				recent_folder.appendChild(folder_24h)
+				folder_2w = kmldoc.createFolder("Past 2 weeks", visible=True, open=False)
+				recent_folder.appendChild(folder_2w)
+				folder_lastyear = kmldoc.createFolder("Past year", visible=True, open=False)
+				recent_folder.appendChild(folder_lastyear)
+
 			inst_folder = kmldoc.addFolder("Instrumental", visible=True, open=False)
 			if len(event_types) > 1 and "ke" in event_types:
 				nt_folder = kmldoc.addFolder("Non-tectonic", visible=True, open=False)
-
-			folder_24h = kmldoc.createFolder("Past 24 hours", visible=True, open=False)
-			inst_folder.appendChild(folder_24h)
-			folder_2w = kmldoc.createFolder("Past 2 weeks", visible=True, open=False)
-			inst_folder.appendChild(folder_2w)
-			folder_lastyear = kmldoc.createFolder("Past year", visible=True, open=False)
-			inst_folder.appendChild(folder_lastyear)
+			hist_folder = kmldoc.addFolder("Historical", visible=False, open=False)
 
 			decade_folders = {}
 			for decade in range(max(instrumental_start_year, eq_years.min()),
@@ -4549,7 +4586,7 @@ class EQCatalog(object):
 
 			century_folders = {}
 			last_century = ((instrumental_start_year - 1) // 100) * 100
-			for century in eq_centuries:
+			for century in eq_centuries[::-1]:
 				if century <= last_century:
 					folder_name = ("%d - %d"
 						% (century, min(instrumental_start_year, century + 99)))
@@ -4567,12 +4604,19 @@ class EQCatalog(object):
 				nt_folder = kmldoc.addFolder("Non-tectonic", visible=True, open=False)
 				topfolder.appendChild(nt_folder)
 
+		Mtypes = ('MW', 'MS', 'ML')
 		for eq in self:
 			if eq.event_type == "ke":
-				if eq.year < instrumental_start_year:
-					Mtype = "MS"
+				#if eq.year < instrumental_start_year:
+				#	Mtype = "MS"
+				#else:
+				#	Mtype = "ML"
+				try:
+					idx = [np.isnan(getattr(eq, Mt)) for Mt in Mtypes].index(False)
+				except:
+					Mtype = 'M'
 				else:
-					Mtype = "ML"
+					Mtype = Mtypes[idx]
 			else:
 				Mtype = "ML"
 
@@ -4592,22 +4636,24 @@ class EQCatalog(object):
 				else:
 					visible = True
 					#Mtype = "ML"
-					if start_time - eq.datetime <= np.timedelta64(1, 'D'):
-						folder = folder_24h
-						color = (255, 0, 0)
-					elif start_time - eq.datetime <= np.timedelta64(14, 'D'):
-						folder = folder_2w
-						color = (255, 128, 0)
-					elif start_time - eq.datetime <= np.timedelta64(365, 'D'):
-						folder = folder_lastyear
-						color = (255, 255, 0)
+
+					decade = (eq.year // 10) * 10
+					folder = decade_folders[decade]
+					if eq.year >= 2000:
+						color = (192, 0, 192)
 					else:
-						decade = (eq.year // 10) * 10
-						folder = decade_folders[decade]
-						if eq.year >= 2000:
-							color = (192, 0, 192)
-						else:
-							color = (0, 0, 255)
+						color = (0, 0, 255)
+
+					if time_folders > 1:
+						if current_time - eq.datetime <= np.timedelta64(1, 'D'):
+							folder = folder_24h
+							color = (255, 0, 0)
+						elif current_time - eq.datetime <= np.timedelta64(14, 'D'):
+							folder = folder_2w
+							color = (255, 128, 0)
+						elif current_time - eq.datetime <= np.timedelta64(365, 'D'):
+							folder = folder_lastyear
+							color = (255, 255, 0)
 			else:
 				folder = ke_folder
 				color = (255, 128, 0)
@@ -4629,7 +4675,7 @@ class EQCatalog(object):
 				elif eq.depth > 20.:
 					color = (255, 0, 0)
 
-			t = eq.time()
+			t = tf.to_py_datetime(eq.datetime)
 			#url = 'http://seismologie.oma.be/active.php?LANG=EN&CNT=BE&LEVEL=211&id=%d' % eq.ID
 			try:
 				hash = eq.get_rob_hash()
@@ -4639,23 +4685,45 @@ class EQCatalog(object):
 				url = 'http://seismologie.oma.be/en/seismology/earthquakes-in-belgium/%s' % hash
 			url = '<a href="' + url + '">ROB web page</a>'
 
+			## Attributes
 			values = OrderedDict()
-			values['ID'] = eq.ID
-			values['Date'] = str(eq.date)
-			values['Time'] = ("%02d:%02d:%02d"
-				% (t.hour, t.minute, int(round(t.second + t.microsecond/1e+6))))
-			values['Name'] = mykml.xmlstr(eq.name)
-			values['ML'] = eq.ML
-			values['MS'] = eq.MS
-			values['MW'] = eq.MW
-			values['Lon'] = eq.lon
-			values['Lat'] = eq.lat
-			values['Depth'] = eq.depth
-			if len(event_types) > 1:
+			if 'ID' in columns:
+				values['ID'] = eq.ID
+			if 'datetime' in columns:
+				values['Date & Time'] = eq.datetime
+			if 'date' in columns:
+				values['Date'] = str(eq.date)
+			if 'time' in columns:
+				values['Time'] = ("%02d:%02d:%02d"
+					% (t.hour, t.minute, int(round(t.second + t.microsecond/1e+6))))
+			if 'name' in columns:
+				values['Name'] = mykml.xmlstr(eq.name)
+			if 'lon' in columns:
+				values['Lon'] = eq.lon
+			if 'lat' in columns:
+				values['Lat'] = eq.lat
+			if 'depth' in columns:
+				values['Depth'] = eq.depth
+			if 'ML' in columns:
+				values['ML'] = eq.ML
+			if 'MS' in columns:
+				values['MS'] = eq.MS
+			if 'MW' in columns:
+				values['MW'] = eq.MW
+			if 'intensity_max' in columns:
+				values['Imax'] = eq.intensity_max
+			if 'macro_radius' in columns:
+				values['Rmacro'] = eq.macro_radius
+			for attrib in ['errh', 'errz', 'errt', 'errM', 'zone', 'agency']:
+				if attrib in columns:
+					values[attrib.capitalize()] = getattr(eq, attrib)
+			if 'event_type' in columns and len(event_types) > 1:
 				values['Event type'] = eq.event_type
-			values[None] = url
-			name = ("%s %.1f %s %s %s"
-				% (Mtype, values[Mtype], values['Date'], values['Time'], values['Name']))
+			if eq.year >= instrumental_start_year:
+				values[None] = url
+
+			name = "%s=%.1f %s %s"
+			name %= (Mtype, getattr(eq, Mtype, '?'), t.isoformat(), mykml.xmlstr(eq.name))
 			labelstyle = kmldoc.createLabelStyle(scale=0)
 			#iconstyle = kmldoc.createStandardIconStyle(palette="pal2", icon_nr=26, scale=0.75+(values[Mtype]-3.0)*0.15, rgb=color)
 			icon_href = "http://kh.google.com:80/flatfile?lf-0-icons/shield3_nh.png"
