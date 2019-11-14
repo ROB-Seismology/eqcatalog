@@ -1376,7 +1376,7 @@ class EQCatalog(object):
 
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=region, name=catalog_name,
-						default_Mrelations={Mtype: Mrelation},
+						default_Mrelations=dict(self.default_Mrelations, **{Mtype: Mrelation}),
 						default_completeness=self.default_completeness)
 
 	def subselect_distance(self, point, distance, catalog_name=""):
@@ -1667,7 +1667,7 @@ class EQCatalog(object):
 			catalog_name = self.name + " (completeness-constrained)"
 		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
 						region=self.region, name=catalog_name,
-						default_Mrelations={Mtype: Mrelation},
+						default_Mrelations=dict(self.default_Mrelations, **{Mtype: Mrelation}),
 						default_completeness=completeness)
 
 	def split_completeness(self,
