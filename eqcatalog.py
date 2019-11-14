@@ -833,6 +833,7 @@ class EQCatalog(object):
 		:return:
 			1-D numpy float array, earthquake magnitudes
 		"""
+		# TODO: it should also be possible to get magnitudes without any conversion...
 		if not Mrelation:
 			Mrelation = self.default_Mrelations.get(Mtype, {})
 		Mags = [eq.get_or_convert_mag(Mtype, Mrelation) for eq in self]
@@ -4297,7 +4298,8 @@ class EQCatalog(object):
 
 		for Mtype in self.get_Mtypes():
 			if Mtype in columns:
-				values[Mtype] = self.get_magnitudes(Mtype=Mtype, Mrelation={})
+				#values[Mtype] = self.get_magnitudes(Mtype=Mtype, Mrelation={})
+				values[Mtype] = [getattr(eq, Mtype) for eq in self]
 
 		if 'name' in columns:
 			names = [eq.name for eq in self]
@@ -4342,7 +4344,7 @@ class EQCatalog(object):
 	def export_gis(self, format, filespec, encoding='latin-1',
 					columns=['ID', 'datetime', 'lon', 'lat', 'depth',
 					'ML', 'MS', 'MW', 'intensity_max'],
-					combine_datetime=True):
+					combine_datetime=True, replace_null_values=None):
 		"""
 		Export to GIS file
 
@@ -4361,6 +4363,10 @@ class EQCatalog(object):
 		:param combine_datetime:
 			bool, whether or not to combine date and time in one attribute
 			(default: True)
+		:param replace_null_values:
+			None or str or scalar, value to replace NULL (None, NaN)
+			values with
+			(default: None, will not replace NULL values)
 
 		:return:
 			instance of :class:`ogr.DataSource` if :param:`format`
@@ -4370,7 +4376,8 @@ class EQCatalog(object):
 			## Shapefiles do not support datetime fields
 			combine_datetime = False
 		mpd = self.to_multi_point_data(combine_datetime, columns=columns)
-		return mpd.export_gis(format, filespec, encoding=encoding)
+		return mpd.export_gis(format, filespec, encoding=encoding,
+							replace_null_values=replace_null_values)
 
 	def export_ZMAP(self, filespec, Mtype="MW", Mrelation={}):
 		"""
