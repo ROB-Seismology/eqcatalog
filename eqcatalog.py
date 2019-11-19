@@ -4523,7 +4523,7 @@ class EQCatalog(object):
 
 	def export_kml(self,
 		kml_filespec=None,
-		time_folders=True,
+		folders='time',
 		instrumental_start_year=1910,
 		color_by_depth=False,
 		columns=['ID', 'date', 'time', 'name', 'lon', 'lat', 'depth',
@@ -4534,12 +4534,12 @@ class EQCatalog(object):
 		:param kml_filespec:
 			String, full path to output KML file. If None, kml is printed
 			on screen (default: None)
-		:param time_folders:
-			int, whether or not to organize earthquakes in folders by time
-			0 = no time folders
-			1 = instrumental/decade and historical/century folders
-			2 = 1 + past 24 h / past 2 weekds / past 1 year folders
-			(default: True)
+		:param folders:
+			str, how to organize earthquakes in folders:
+			- "time": instrumental/decade and historical/century folders
+			- "time+recent": + past 24 h / past 2 weekds / past 1 year folders
+			- "event_type": folders by event type
+			(default: "time")
 		:param instrumental_start_year:
 			Int, start year of instrumental period (only applies when time_folders
 			is True) (default: 1910)
@@ -4565,12 +4565,15 @@ class EQCatalog(object):
 		eq_years = self.get_years()
 		eq_centuries = sorted(set((eq_years // 100) * 100))
 
-		event_types = set([eq.event_type for eq in self])
-		nt_folder = None
+		event_types = [eq.event_type for eq in self]
+		unique_event_types = set(event_types)
 
-		if time_folders:
-			if time_folders > 1:
+		topfolder = kmldoc.addFolder(self.name, visible=True, open=False)
+
+		if 'time' in folders:
+			if folders == 'time+recent':
 				recent_folder = kmldoc.addFolder("Recent", visible=True, open=True)
+				topfolder.appendChild(recent_folder)
 				folder_24h = kmldoc.createFolder("Past 24 hours", visible=True, open=False)
 				recent_folder.appendChild(folder_24h)
 				folder_2w = kmldoc.createFolder("Past 2 weeks", visible=True, open=False)
@@ -4579,9 +4582,9 @@ class EQCatalog(object):
 				recent_folder.appendChild(folder_lastyear)
 
 			inst_folder = kmldoc.addFolder("Instrumental", visible=True, open=False)
-			if len(event_types) > 1 and "ke" in event_types:
-				nt_folder = kmldoc.addFolder("Non-tectonic", visible=True, open=False)
+			topfolder.appendChild(inst_folder)
 			hist_folder = kmldoc.addFolder("Historical", visible=False, open=False)
+			topfolder.appendChild(hist_folder)
 
 			decade_folders = {}
 			for decade in range(max(instrumental_start_year, eq_years.min()),
@@ -4601,15 +4604,34 @@ class EQCatalog(object):
 														open=False)
 					hist_folder.appendChild(century_folder)
 					century_folders[century] = century_folder
+		elif folders == 'event_type':
+			from .earthquake_types import EARTHQUAKE_TYPES
 
-		else:
-			topfolder = kmldoc.addFolder("Earthquake catalog", visible=True, open=False)
-			ke_folder = topfolder
-			if len(event_types) > 1 and "ke" in event_types:
-				ke_folder = kmldoc.addFolder("Tectonic", visible=True, open=False)
-				topfolder.appendChild(ke_folder)
-				nt_folder = kmldoc.addFolder("Non-tectonic", visible=True, open=False)
-				topfolder.appendChild(nt_folder)
+			et_folders = OrderedDict()
+			et_colors = {'ke': (255, 0, 0), 'se': (255, 128, 128),
+						'ki': (255, 128, 0), 'si': (255, 178, 102),
+						'ls': (255, 255, 255),
+						'qb': (0, 255, 0), 'sqb': (128, 255, 128),
+						'km': (0, 0, 255), 'sm': (0, 102, 204),
+						'qr': (0, 255, 255), 'sr': (128, 255, 255),
+						'kn': (128, 0, 255), 'sn': (204, 153, 255),
+						'cb': (255, 0, 255), 'scb': (255, 128, 255),
+						'kx': (255, 0, 127), 'sx': (255, 153, 204),
+						'ex': (102, 0, 51), 'sb': (128, 128, 128),
+						'uk': (255, 255, 255), None: (0, 0, 0)}
+			for et in ['ke', 'se', 'ki', 'si', 'ls',
+						'kr', 'sr', 'km', 'sm', 'qb', 'sqb',
+						'kn', 'sn', 'cb', 'scb', 'kx', 'sx', 'ex', 'sb',
+						'uk', None]:
+				if et in unique_event_types:
+					try:
+						et_name = EARTHQUAKE_TYPES['EN'][et]
+					except:
+						et_name = 'Unclassified'
+					et_name += ' (%d)' % event_types.count(et)
+					et_folder = kmldoc.addFolder(et_name, visible=True, open=False)
+					topfolder.appendChild(et_folder)
+					et_folders[et] = et_folder
 
 		Mtypes = ('MW', 'MS', 'ML')
 		for eq in self:
@@ -4627,13 +4649,7 @@ class EQCatalog(object):
 			else:
 				Mtype = "ML"
 
-			if nt_folder and eq.event_type != "ke":
-				folder = nt_folder
-				visible = True
-				color = (0, 0, 0)
-				#Mtype = "ML"
-
-			elif time_folders:
+			if 'time' in folders:
 				if eq.year < instrumental_start_year:
 					century = (eq.year // 100) * 100
 					folder = century_folders[century]
@@ -4651,7 +4667,7 @@ class EQCatalog(object):
 					else:
 						color = (0, 0, 255)
 
-					if time_folders > 1:
+					if folders == 'time+recent':
 						if current_time - eq.datetime <= np.timedelta64(1, 'D'):
 							folder = folder_24h
 							color = (255, 0, 0)
@@ -4661,10 +4677,13 @@ class EQCatalog(object):
 						elif current_time - eq.datetime <= np.timedelta64(365, 'D'):
 							folder = folder_lastyear
 							color = (255, 255, 0)
-			else:
-				folder = ke_folder
-				color = (255, 128, 0)
+
+			elif folders == 'event_type':
+				folder = et_folders.get(eq.event_type, et_folders[None])
 				visible = True
+				color = et_colors.get(eq.event_type, (0, 0, 0))
+				#color = (0, 0, 0)
+				#color = (255, 128, 0)
 
 			if color_by_depth:
 				if eq.depth == 0.:
@@ -4724,7 +4743,7 @@ class EQCatalog(object):
 			for attrib in ['errh', 'errz', 'errt', 'errM', 'zone', 'agency']:
 				if attrib in columns:
 					values[attrib.capitalize()] = getattr(eq, attrib)
-			if 'event_type' in columns and len(event_types) > 1:
+			if 'event_type' in columns or len(unique_event_types) > 1:
 				values['Event type'] = eq.event_type
 			if eq.year >= instrumental_start_year:
 				values[None] = url
