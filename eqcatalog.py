@@ -4568,22 +4568,22 @@ class EQCatalog(object):
 		event_types = [eq.event_type for eq in self]
 		unique_event_types = set(event_types)
 
-		topfolder = kmldoc.addFolder(self.name, visible=True, open=False)
+		topfolder = kmldoc.addFolder(self.name, visible=True, open=True)
 
 		if 'time' in folders:
 			if folders == 'time+recent':
 				recent_folder = kmldoc.addFolder("Recent", visible=True, open=True)
 				topfolder.appendChild(recent_folder)
-				folder_24h = kmldoc.createFolder("Past 24 hours", visible=True, open=False)
+				folder_24h = kmldoc.createFolder("Past 24 hours", visible=True, open=True)
 				recent_folder.appendChild(folder_24h)
-				folder_2w = kmldoc.createFolder("Past 2 weeks", visible=True, open=False)
+				folder_2w = kmldoc.createFolder("Past 2 weeks", visible=True, open=True)
 				recent_folder.appendChild(folder_2w)
-				folder_lastyear = kmldoc.createFolder("Past year", visible=True, open=False)
+				folder_lastyear = kmldoc.createFolder("Past year", visible=True, open=True)
 				recent_folder.appendChild(folder_lastyear)
 
-			inst_folder = kmldoc.addFolder("Instrumental", visible=True, open=False)
+			inst_folder = kmldoc.addFolder("Instrumental", visible=True, open=True)
 			topfolder.appendChild(inst_folder)
-			hist_folder = kmldoc.addFolder("Historical", visible=False, open=False)
+			hist_folder = kmldoc.addFolder("Historical", visible=False, open=True)
 			topfolder.appendChild(hist_folder)
 
 			decade_folders = {}
@@ -4613,7 +4613,7 @@ class EQCatalog(object):
 						'ls': (255, 255, 255),
 						'qb': (0, 255, 0), 'sqb': (128, 255, 128),
 						'km': (0, 0, 255), 'sm': (0, 102, 204),
-						'qr': (0, 255, 255), 'sr': (128, 255, 255),
+						'kr': (0, 255, 255), 'sr': (128, 255, 255),
 						'kn': (128, 0, 255), 'sn': (204, 153, 255),
 						'cb': (255, 0, 255), 'scb': (255, 128, 255),
 						'kx': (255, 0, 127), 'sx': (255, 153, 204),
