@@ -4679,7 +4679,7 @@ class EQCatalog(object):
 							color = (255, 255, 0)
 
 			elif folders == 'event_type':
-				folder = et_folders.get(eq.event_type, et_folders[None])
+				folder = et_folders.get(eq.event_type, et_folders.get(None))
 				visible = True
 				color = et_colors.get(eq.event_type, (0, 0, 0))
 				#color = (0, 0, 0)
@@ -4747,6 +4747,14 @@ class EQCatalog(object):
 				values['Event type'] = eq.event_type
 			if eq.year >= instrumental_start_year:
 				values[None] = url
+
+			## Replace NaN values
+			for key, val in values.items():
+				try:
+					if np.isnan(val):
+						values[key] = '-'
+				except:
+					pass
 
 			name = "%s=%.1f %s %s"
 			name %= (Mtype, getattr(eq, Mtype, '?'), t.isoformat(), mykml.xmlstr(eq.name))
