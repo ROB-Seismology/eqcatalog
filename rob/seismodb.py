@@ -179,6 +179,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	:param event_type:
 		str, event type (one of "all", "cb", "ex", "ke", "ki", "km",
 		"kr", "kx", "qb", "sb", "se", "si", "sm", "sr", "sx" or "uk")
+		or comma-separated str
 		(default: "ke" = known earthquakes)
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
@@ -251,7 +252,14 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	else:
 		where_clause += 'is_true = 1'
 		if event_type != "all":
-			where_clause += ' and type = "%s"' % event_type
+			if event_type in ('NULL', None):
+				where_clause += ' and type IS NULL'
+			elif ',' in event_type:
+				## Multiple event types
+				event_types = ','.join(['"%s"' % et for et in event_type.split(',')])
+				where_clause += ' AND type IN (%s)' % event_types
+			else:
+				where_clause += ' AND type = "%s"' % event_type
 		if region:
 			w, e, s, n = region
 			where_clause += ' AND longitude BETWEEN %f and %f' % (w, e)
@@ -265,7 +273,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		if max_depth:
 			where_clause += ' AND depth <= %f' % max_depth
 
-		if Mmax or Mmin != None:
+		if not(Mmax is None and Mmin is None):
 			if Mmin is None:
 				Mmin = 0.0
 			if not Mmax:
