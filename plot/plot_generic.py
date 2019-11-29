@@ -732,12 +732,12 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	if xscaling[0] == '-':
 		xscaling = xscaling[1:]
 		ax.invert_xaxis()
-	xscaling = {'lin': 'linear', 'log': 'log'}[xscaling]
+	xscaling = {'lin': 'linear', 'log': 'log'}[xscaling[:3]]
 	ax.set_xscale(xscaling)
 	if yscaling[0] == '-':
 		yscaling = yscaling[1:]
 		ax.invert_yaxis()
-	yscaling = {'lin': 'linear', 'log': 'log'}[yscaling]
+	yscaling = {'lin': 'linear', 'log': 'log'}[yscaling[:3]]
 	ax.set_yscale(yscaling)
 
 	## Axis labels
@@ -810,7 +810,7 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		## Note: no formatter for minor ticks, as we don't print them
 
 	## X ticklabels
-	if xscaling == 'log' and xticklabels is None:
+	if xscaling[:3] == 'log' and xticklabels is None:
 		## Do not use log notation for small exponents
 		if xmin > 1E-4 and xmax < 1E+4:
 			xticklabels = matplotlib.ticker.FormatStrFormatter('%g')
@@ -865,7 +865,7 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		## Note: no formatter for minor ticks, as we don't print them
 
 	## Y tick labels
-	if yscaling == 'log' and yticklabels is None:
+	if yscaling[:3] == 'log' and yticklabels is None:
 		## Do not use log notation for small exponents
 		if ymin > 1E-4 and ymax < 1E+4:
 			yticklabels = matplotlib.ticker.FormatStrFormatter('%g')
