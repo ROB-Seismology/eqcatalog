@@ -335,7 +335,11 @@ def plot_cumulated_moment(catalogs,
 		kwargs['marker_fill_colors'] = ['None']
 
 	## Default tick intervals
-	default_date_tick_interval = (AutoDateLocator(),
+	if rel_time_unit:
+		default_date_tick_interval = (matplotlib.ticker.AutoLocator(),
+								matplotlib.ticker.AutoMinorLocator())
+	else:
+		default_date_tick_interval = (AutoDateLocator(),
 								matplotlib.ticker.AutoMinorLocator())
 
 	kwargs['xtick_interval'] = kwargs.get('xtick_interval', default_date_tick_interval)
