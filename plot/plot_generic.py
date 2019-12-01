@@ -775,7 +775,8 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	## X ticks
 	if xticks is not None:
 		ax.set_xticks(xticks)
-	elif xtick_interval is not None:
+	#elif xtick_interval is not None:
+	else:
 		if isinstance(xtick_interval, tuple) and len(xtick_interval) == 2:
 			major_tick_interval, minor_tick_interval = xtick_interval
 		else:
@@ -830,7 +831,8 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	## Y ticks
 	if yticks is not None:
 		ax.set_yticks(yticks)
-	if ytick_interval is not None:
+	#if ytick_interval is not None:
+	else:
 		if isinstance(ytick_interval, tuple) and len(ytick_interval) == 2:
 			major_tick_interval, minor_tick_interval = ytick_interval
 		else:
