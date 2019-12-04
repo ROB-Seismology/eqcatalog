@@ -789,7 +789,10 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		elif major_tick_interval:
 			major_loc = matplotlib.ticker.MultipleLocator(major_tick_interval)
 		elif major_tick_interval is None:
-			major_loc = matplotlib.ticker.AutoLocator()
+			if xscaling[:3] == 'log':
+				major_loc = matplotlib.ticker.LogLocator()
+			else:
+				major_loc = matplotlib.ticker.AutoLocator()
 		else:
 			major_loc = matplotlib.ticker.NullLocator()
 		ax.xaxis.set_major_locator(major_loc)
@@ -845,7 +848,10 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		elif major_tick_interval:
 			major_loc = matplotlib.ticker.MultipleLocator(major_tick_interval)
 		elif major_tick_interval is None:
-			major_loc = matplotlib.ticker.AutoLocator()
+			if yscaling[:3] == 'log':
+				major_loc = matplotlib.ticker.LogLocator()
+			else:
+				major_loc = matplotlib.ticker.AutoLocator()
 		else:
 			major_loc = matplotlib.ticker.NullLocator()
 		ax.yaxis.set_major_locator(major_loc)
