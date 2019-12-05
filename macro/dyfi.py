@@ -1142,6 +1142,10 @@ class MacroseismicEnquiryEnsemble():
 		if filter_floors:
 			ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
 
+		if aggregate_by == 'commune':
+			aggregate_by = 'id_com'
+		elif aggregate_by == 'main commune':
+			aggregate_by = 'id_main'
 		if aggregate_by in ('id_com', 'id_main'):
 			comm_key = aggregate_by
 			ensemble.set_locations_from_communes(comm_key=comm_key, max_quality=10,
