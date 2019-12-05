@@ -136,7 +136,8 @@ def query_seismodb_table(table_clause, column_clause="*", join_clause="",
 def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 						Mmin=None, Mmax=None, min_depth=None, max_depth=None,
 						id_earth=None, sort_key="date", sort_order="asc",
-						event_type="ke", null_value=np.nan, verbose=False, errf=None):
+						event_type="ke", has_open_enquiry=None, null_value=np.nan,
+						verbose=False, errf=None):
 	"""
 	Query ROB catalog of local earthquakes.
 
@@ -272,6 +273,9 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 			where_clause += ' AND depth >= %f' % min_depth
 		if max_depth:
 			where_clause += ' AND depth <= %f' % max_depth
+
+		if has_open_enquiry is not None:
+			where_clause += ' AND web_status = %d' % int(has_open_enquiry)
 
 		if not(Mmax is None and Mmin is None):
 			if Mmin is None:
