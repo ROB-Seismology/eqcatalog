@@ -935,7 +935,7 @@ class MacroseismicEnquiryEnsemble():
 			(default: False)
 		"""
 		import db.simpledb as simpledb
-		from seismodb_secrets import host, database
+		from secrets.seismodb import host, database
 		#from ..rob.seismodb import query_seismodb_table
 
 		db_rec_dict = self.read_locations_from_db()

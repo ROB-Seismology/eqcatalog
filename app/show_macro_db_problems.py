@@ -3,7 +3,7 @@ Demonstrate some database inconsistencies related to macroseismic data
 """
 
 import db.simpledb as simpledb
-from seismodb_secrets import host, database, user, passwd
+from secrets.seismodb import host, database, user, passwd
 
 
 ## Print macro_detail records where intensity_max = 13

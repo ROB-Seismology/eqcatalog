@@ -122,7 +122,7 @@ def get_earthquake_type(code, lang='EN'):
 if __name__ == "__main__":
 	## Write translated earthquake type names to database
 	import db.simpledb as simpledb
-	from seismodb_secrets import (host, database, user_rw, passwd_rw)
+	from secrets.seismodb import (host, database, user_rw, passwd_rw)
 
 	seismodb = simpledb.MySQLDB(database, host, user_rw, passwd_rw)
 	table_name = 'earthquake_types'

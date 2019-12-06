@@ -79,9 +79,9 @@ def query_seismodb_table_generic(query, verbose=False, print_table=False, errf=N
 		generator object, yielding a dictionary for each record
 	"""
 	## Database information
-	from seismodb_secrets import host, user, passwd, database
+	from secrets.seismodb import host, user, passwd, database
 	try:
-		from seismodb_secrets import port
+		from secrets.seismodb import port
 	except:
 		port = 3306
 
@@ -734,7 +734,7 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 
 	if id_earth == 18280223:
 		# TODO: check how this can be integrated in seismodb
-		from eqmapperdb_secrets import (host as _host, user as _user,
+		from secrets.eqmapperdb import (host as _host, user as _user,
 									passwd as _passwd, database as _database)
 
 		query = 'SELECT id_com_main as "id_com",'

@@ -6,7 +6,7 @@ import os
 import csv
 
 import db.simpledb as simpledb
-from seismodb_secrets import (host, database, user_rw, passwd_rw)
+from secrets.seismodb import (host, database, user_rw, passwd_rw)
 
 from eqcatalog.rob.seismodb import query_seismodb_table
 
@@ -20,8 +20,8 @@ qualities = [rec['quality'] for rec in db_recs]
 
 
 ## Read geocoding results from CSV file
-csv_folder = "D:\\Earthquake Reports\\20180525\\DYFI geocoding"
-csv_filename = "macroseismic_inq_for_6625_modified_floorcorrected_no dupl_geocoded-ArcGIS_with comm.csv"
+csv_folder = "D:\\Earthquake Reports\\20190623\\DYFI geocoding"
+csv_filename = "macroseismic_inq_for_8285_corrected_geocoded-ArcGIS.csv"
 csv_file = os.path.join(csv_folder, csv_filename)
 
 recs_to_add, recs_to_modify = [], []
