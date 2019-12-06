@@ -687,10 +687,10 @@ class MacroseismicEnquiryEnsemble():
 
 					country_comm_rec_dict = {}
 					if country == "NL":
-						query_values = '|'.join(['%s' % ZIP for ZIP in unique_zips])
+						query_values = '|'.join(['%s' % ZIP for ZIP in unique_zips if ZIP])
 						where_clause = 'zip REGEXP "%s"' % query_values
 					else:
-						query_values = ','.join(['"%s"' % ZIP for ZIP in unique_zips])
+						query_values = ','.join(['"%s"' % ZIP for ZIP in unique_zips if ZIP])
 						where_clause = 'zip IN (%s)' % query_values
 					for table in com_tables:
 						table_clause = table
