@@ -27,9 +27,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				int_conversion="round", symbol_style=None, line_style="default",
 				thematic_num_replies=False, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
-				admin_level="province", admin_style="default", colorbar_style="default",
-				radii=[], plot_pie={}, title="", fig_filespec=None,
-				ax=None, copyright=u"© ROB", text_box={}, dpi="default", verbose=True):
+				country_style="default", admin_level="province", admin_style="default",
+				city_style="default", colorbar_style="default", radii=[],
+				plot_pie={}, title="", fig_filespec=None,
+				ax=None, copyright=u"© ROB", text_box={}, dpi="default",
+				border_width=0.2, verbose=True):
 	"""
 	Plot macroseismic map for given earthquake
 
@@ -87,6 +89,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		instance of :class:`mapping.layeredbasemap.SymbolStyle`,
 		point style for earthquake epicenter
 		(default: "default")
+	:param country_style:
+		instance of :class:`mapping.layeredbasemap.LineStyle`,
+		line style for country borders
+		(default: "default")
 	:param admin_level:
 		str, administrative level to plot over intensity map,
 		one of 'province', 'region' or 'country'
@@ -94,6 +100,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	:param admin_style:
 		instance of :class:`mapping.layeredbasemap.LineStyle`,
 		line style for administrative boundaries
+		(default: "default")
+	:param city_style:
+		instance of :class:`mapping.layeredbasemap.PointStyle`,
+		point style for main cities
 		(default: "default")
 	:param colorbar_style:
 		instance of :class:`mapping.layeredbasemap.ColorbarStyle`
@@ -130,6 +140,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		int, resolution of output image
 		(default: "default" = 90 if :param:`fig_filespec` is None,
 		else 300)
+	:param border_width:
+		float, width of border around map frame in cm
+		If None, white space will not be removed
+		(default: 0.2)
 	:param verbose:
 		bool, whether or not to plot some useful information
 
@@ -320,6 +334,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		macro_style = polygon_style
 		legend_label = {"polygons": ""}
 	else:
+		symbol_style = symbol_style.copy()
 		## Plot points
 		## Symbol size in function of number of replies
 		if plot_info != 'num_replies' and thematic_num_replies:
@@ -345,6 +360,15 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
 
+	## Country layer
+	if country_style == 'default':
+		country_style = lbm.LineStyle(line_width=1.0)
+	if country_style:
+		for feature in ('coastlines', 'countries'):
+			country_data = lbm.BuiltinData(feature)
+			country_layer = lbm.MapLayer(country_data, country_style)
+			layers.append(country_layer)
+
 	## Admin layer
 	admin_data = None
 	if admin_level.lower() == 'province':
@@ -360,10 +384,27 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	if admin_data:
 		if admin_style == "default":
-			admin_style = lbm.PolygonStyle(line_width=1.5, fill_color='none')
+			admin_style = lbm.PolygonStyle(line_width=0.5, fill_color='none')
 		#gis_style = lbm.CompositeStyle(polygon_style=admin_style)
 		admin_layer = lbm.MapLayer(admin_data, admin_style, legend_label={"polygons": ""})
 		layers.append(admin_layer)
+
+	if city_style:
+		# TODO: label style, thematic size
+		if city_style == "default":
+			city_symbol_size = 4
+			city_label_style = lbm.TextStyle(font_size=6, vertical_alignment="top",
+											offset=(0, -4))
+			population = np.array([10000, 50000, 100000, 200000, 500000,
+						1000000, 2000000, 5000000, 10000000, 20000000])
+			sizes = city_symbol_size + np.log10(population / 500000) * city_symbol_size
+			ts = lbm.ThematicStyleGradient(population, sizes, value_key="Population_agglomeration")
+			city_style = lbm.PointStyle('s', size=ts, fill_color='k', label_style=city_label_style)
+		gis_file = os.path.join(SEISMOGIS_ROOT, "collections", "UN_Cities",
+								"TAB", "UN Cities.TAB")
+		city_data = lbm.GisData(gis_file, label_colname="Name")
+		city_layer = lbm.MapLayer(city_data, city_style)
+		layers.append(city_layer)
 
 	## Pie charts
 	# TODO: legend
@@ -404,10 +445,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 								line_color=None, label_style=label_style)
 	if event_style:
 		eq = macro_info_coll[0].get_eq()
-		#label = "%s - ML=%.1f" % (eq.date.isoformat(), eq.ML)
+		legend_label = "%s - ML=%.1f" % (eq.date, eq.ML)
 		label = ""
 		event_data = lbm.PointData(eq.lon, eq.lat, label=label)
-		event_layer = lbm.MapLayer(event_data, event_style, legend_label="Epicenter")
+		event_layer = lbm.MapLayer(event_data, event_style, legend_label=legend_label)
 		layers.append(event_layer)
 
 	## Plot radii around epicenter
@@ -424,7 +465,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	## Plot copyright box
 	if copyright:
-		text_style = lbm.TextStyle(font_size=10, color='w', background_color='k',
+		text_style = lbm.TextStyle(font_size=8, color='w', background_color='k',
 					horizontal_alignment='left', vertical_alignment='bottom',
 					font_weight='bold', alpha=1)
 		offset = text_style.border_pad * text_style.font_size
@@ -447,7 +488,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	map = lbm.LayeredBasemap(layers, title, projection, region=region,
 				graticule_interval=graticule_interval, legend_style=legend_style,
-				graticule_style=graticule_style, dpi=dpi, ax=ax)
+				graticule_style=graticule_style, resolution='auto', dpi=dpi, ax=ax)
 
 	## Text box
 	if text_box:
@@ -460,4 +501,5 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 						background_color='w', border_color='k', border_pad=0.5)
 		map.draw_text_box(pos, text, text_style, zorder=1000)
 
-	return map.plot(fig_filespec=("hold" if ax else fig_filespec), dpi=dpi)
+	return map.plot(fig_filespec=("hold" if ax else fig_filespec), dpi=dpi,
+					border_width=border_width)
