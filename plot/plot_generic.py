@@ -89,7 +89,7 @@ def plot_xy(datasets,
 			xgrid=0, ygrid=0,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			legend_location=0, legend_fontsize='medium',
-			style_sheet='classic',
+			style_sheet='classic', border_width=0.2,
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Generic function to plot (X, Y) data sets (lines, symbols and/or polygons)
@@ -262,6 +262,10 @@ def plot_xy(datasets,
 		str, matplotlib style sheet to apply to plot
 		See matplotlib.style.available for availabel style sheets
 		(default: 'classic')
+	:param border_width:
+		float, width of border around plot frame in cm
+		If None, white space will not be removed
+		(default: 0.2)
 	:param fig_filespec:
 		str, full path to output file
 		If None, will plot on screen
@@ -298,6 +302,7 @@ def plot_xy(datasets,
 
 	pylab.style.use(style_sheet)
 
+	fig = None
 	if ax is None:
 		#ax = pylab.axes()
 		fig, ax = pylab.subplots(figsize=figsize)
@@ -406,11 +411,17 @@ def plot_xy(datasets,
 	if len(unique_labels.difference(set(['_nolegend_']))):
 		ax.legend(loc=legend_location, prop=legend_font)
 
+	#if fig and tight_layout:
+	#	fig.tight_layout(pad=0)
+
 	## Output
 	if fig_filespec == "wait":
 		return ax
 	elif fig_filespec:
-		pylab.savefig(fig_filespec, dpi=dpi)
+		kwargs = {}
+		if border_width is not None:
+			kwargs = dict(bbox_inches="tight", pad_inches=border_width/2.54)
+		fig.savefig(fig_filespec, dpi=dpi, **kwargs)
 		pylab.clf()
 	else:
 		pylab.show()
@@ -431,7 +442,7 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 			xgrid=0, ygrid=0,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			title='', title_fontsize='large',
-			style_sheet='classic',
+			style_sheet='classic', border_width=0.2,
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Plot XY data as density (number of data points per grid cell)
@@ -478,6 +489,7 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 		#ax = pylab.axes()
 		fig, ax = pylab.subplots(figsize=figsize)
 	else:
+		fig = None
 		fig_filespec = "wait"
 
 	## Density plot
@@ -555,7 +567,10 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 	if fig_filespec == "wait":
 		return ax
 	elif fig_filespec:
-		pylab.savefig(fig_filespec, dpi=dpi)
+		kwargs = {}
+		if border_width is not None:
+			kwargs = dict(bbox_inches="tight", pad_inches=border_width/2.54)
+		fig.savefig(fig_filespec, dpi=dpi, **kwargs)
 		pylab.clf()
 	else:
 		pylab.show()
@@ -580,7 +595,7 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 				xgrid=0, ygrid=0,
 				hlines=[], hline_args={}, vlines=[], vline_args={},
 				legend_location=0, legend_fontsize='medium',
-				style_sheet='classic',
+				style_sheet='classic', border_width=0.2,
 				fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Plot histograms
@@ -611,6 +626,7 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 	if ax is None:
 		fig, ax = pylab.subplots(figsize=figsize)
 	else:
+		fig = None
 		fig_filespec = "wait"
 
 	## markers, colors, linewidhts, linestyles, labels, etc.
@@ -664,7 +680,10 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 	if fig_filespec == "wait":
 		return ax
 	elif fig_filespec:
-		pylab.savefig(fig_filespec, dpi=dpi)
+		kwargs = {}
+		if border_width is not None:
+			kwargs = dict(bbox_inches="tight", pad_inches=border_width/2.54)
+		pylab.savefig(fig_filespec, dpi=dpi, **kwargs)
 		pylab.clf()
 	else:
 		pylab.show()
