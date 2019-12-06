@@ -15,9 +15,7 @@ import eqcatalog
 
 
 #TODO:
-# - automatic graticule interval
 # - administrative boundaries for DE / NL / LU / FR
-# - cities
 # - more command-line options
 
 
@@ -33,8 +31,10 @@ parser = argparse.ArgumentParser(description="ROB macroseismic map generator")
 
 parser.add_argument("--id_earth", help="Force creating maps for given earthquake ID",
 					nargs=1, type=int)
-parser.add_argument("--aggregate-by", help="How to aggregate macroseismic data points",
-					choices=["", "commune", "main commune", "grid"], default="commune")
+parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data points",
+					choices=["", "commune", "main commune", "grid5", "grid10"], default="commune")
+parser.add_argument("--agg_method", help="Aggregation method",
+                    choices=["mean", "aggregated"], default="mean")
 args = parser.parse_args()
 
 
@@ -88,7 +88,7 @@ for eq in catalog:
 
 			## Aggregate
 			macro_info = dyfi.get_aggregated_info(aggregate_by=args.aggregate_by,
-					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
+					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
 					fix_records=True, include_other_felt=True,
 					include_heavy_appliance=False, remove_outliers=(2.5, 97.5))
 
@@ -96,7 +96,7 @@ for eq in catalog:
 
 			## Plot parameters
 			projection = 'merc'
-			graticule_interval = (None, None) # auto?
+			graticule_interval = 'auto'
 			plot_info = 'intensity'
 			symbol_style = lbm.PointStyle(shape='D', size=4)
 			line_style = "default"
@@ -105,8 +105,10 @@ for eq in catalog:
 			color_gradient = "discrete"
 			colorbar_style = "default"
 			event_style = "default"
-			admin_level = "province"
-			admin_style = "default"
+			country_style = "default"
+			#admin_level = "province"
+			admin_style = lbm.LineStyle(line_width=0.5)
+			city_style = "default"
 			copyright = 'Collaborative project of ROB and BNS'
 			dpi = 200
 
@@ -120,8 +122,11 @@ for eq in catalog:
 					map_filespec = os.path.join(BASE_FOLDER, agency, size, map_filename)
 					if size == 'large':
 						region = (minlon-1, maxlon+1, minlat-.5, maxlat+.5)
+						admin_level = 'region'
 					else:
-						region = (eq.lon-1, eq.lon+1, eq.lat-.5, eq.lat+.5)
+						#region = (eq.lon-1, eq.lon+1, eq.lat-.5, eq.lat+.5)
+						region = (minlon-0.25, maxlon+0.25, minlat-0.1, maxlat+0.1)
+						admin_level = 'main commune'
 
 					## Plot map
 					if agency == 'ROB':
@@ -132,8 +137,10 @@ for eq in catalog:
 							line_style=line_style, thematic_num_replies=thematic_num_replies,
 							interpolate_grid={}, cmap=cmap,
 							color_gradient=color_gradient, event_style=event_style,
+							country_style=country_style,
 							admin_level=admin_level, admin_style=admin_style,
-							colorbar_style=colorbar_style, radii=[], plot_pie=None,
+							city_style=city_style, colorbar_style=colorbar_style,
+							radii=[], plot_pie=None,
 							title='', fig_filespec=map_filespec, copyright=copyright,
 							text_box={}, dpi=dpi, verbose=False)
 					else:
