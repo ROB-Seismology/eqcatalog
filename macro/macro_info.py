@@ -428,10 +428,10 @@ class MacroInfoCollection():
 				int_conversion="round", symbol_style=None, line_style="default",
 				thematic_num_replies=False, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
-				admin_level="province", admin_style="default", colorbar_style="default",
-				radii=[], plot_pie=None, title="", fig_filespec=None,
-				ax=None, copyright=u"© ROB", text_box={}, dpi="default",
-				verbose=True):
+				country_style="default", admin_level="province", admin_style="default",
+				city_style="default", colorbar_style="default", radii=[], plot_pie=None,
+				title="", fig_filespec=None, ax=None, copyright=u"© ROB", text_box={},
+				dpi="default", border_width=0.2, verbose=True):
 		"""
 		Plot macroseismic map
 
