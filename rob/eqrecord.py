@@ -537,3 +537,53 @@ class ROBLocalEarthquake(LocalEarthquake):
 		arrivals = m.get_travel_times(distance_in_degree=dist_deg,
 			source_depth_in_km=self.depth, receiver_depth_in_km=stat_depth)
 		return {arr.name: arr for arr in arrivals}
+
+	def calc_MLbg(self, distance_metric='hypocentral', verbose=False):
+		"""
+		Compute local magnitude (MLbg) from phase pick amplitudes
+
+		:param distance_metric:
+			str, distance metric to use, either 'epi[central]' or
+			'hypo[central]'
+			(default: 'hypocentral')
+		:param verbose:
+			bool, whether or not to print magnitude determinations
+			for individual stations
+			(default: False)
+
+		:return:
+			(ML_mean, ML_sigma) tuple of floats
+		"""
+		import numpy as np
+		from robspy.rob import get_stations, calc_MLbg
+
+		phase_picks = self.get_phase_picks()
+		ML_estimates = []
+		for stat_code in sorted(phase_picks.keys()):
+			stat_phase_picks = phase_picks[stat_code]
+			if 'S' in stat_phase_picks:
+				Spick = stat_phase_picks['S']
+				if Spick.amplitude:
+					station = get_stations(stat_code)[0]
+					station_coords = station.get_coordinates()
+					lon = station_coords['longitude']
+					lat = station_coords['latitude']
+					z = -station_coords['elevation'] / 1000.
+					if distance_metric[:4] == 'hypo':
+						distance = self.hypocentral_distance((lon, lat, z))
+					elif distance_metric[:3] == 'epi':
+						distance = self.epicentral_distance((lon, lat, z))
+					MLbg = calc_MLbg(Spick.amplitude/1000., distance)
+					ML_estimates.append(MLbg)
+					if verbose:
+						msg = "%s:\tA=%.1f nm\tD=%.0f km\tML=%.2f"
+						msg %= (stat_code, Spick.amplitude, distance, MLbg)
+						print(msg)
+
+		ML_mean, ML_sigma = np.mean(ML_estimates), np.std(ML_estimates)
+		if verbose:
+			msg = "AVG:\tML=%.2f +/- %.2f"
+			msg %= (ML_mean, ML_sigma)
+			print(msg)
+
+		return (ML_mean, ML_sigma)
