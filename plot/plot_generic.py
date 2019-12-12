@@ -294,9 +294,8 @@ def plot_xy(datasets,
 							'marker_intervals', 'marker_edge_colors',
 							'marker_fill_colors', 'marker_edge_widths',
 							'marker_labels', 'marker_label_fontsize',
-							'legend_location', 'legend_fontsize',
-							'style_sheet', 'fig_filespec', 'figsize', 'dpi',
-							'ax']}
+							'legend_location', 'legend_fontsize', 'style_sheet',
+							'border_width', 'fig_filespec', 'figsize', 'dpi', 'ax']}
 
 	from itertools import cycle
 
@@ -480,8 +479,8 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 	frame_args = {key: val for (key, val) in locals().items()
 				if not key in ['x', 'y', 'grid_size', 'density_type',
 							'min_cnt', 'max_cnt', 'cmap', 'bins', 'cbar_args',
-							'cbar_label', 'style_sheet', 'fig_filespec',
-							'figsize', 'dpi', 'ax']}
+							'cbar_label', 'style_sheet', 'border_width',
+							'fig_filespec', 'figsize', 'dpi', 'ax']}
 
 	pylab.style.use(style_sheet)
 
@@ -615,9 +614,8 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 							'cumulative', 'stacked', 'normed', 'orientation',
 							'align', 'bar_width', 'baseline', 'colors', 'labels',
 							'line_color', 'line_width',
-							'legend_location', 'legend_fontsize',
-							'style_sheet', 'fig_filespec', 'figsize', 'dpi',
-							'ax']}
+							'legend_location', 'legend_fontsize', 'style_sheet',
+							'border_width', 'fig_filespec', 'figsize', 'dpi', 'ax']}
 
 	from itertools import cycle
 
