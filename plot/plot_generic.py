@@ -83,7 +83,9 @@ def plot_xy(datasets,
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
 			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+			xtick_direction='out', xtick_side='bottom',
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+			ytick_direction='out', ytick_side='left',
 			tick_label_fontsize='medium', tick_params={},
 			title='', title_fontsize='large',
 			xgrid=0, ygrid=0,
@@ -191,6 +193,13 @@ def plot_xy(datasets,
 	:param xtick_rotation:
 		float, rotation angle for X axis tick labels
 		(default: 0)
+	:param xtick_direction:
+		str, X axis tick direction: 'in', 'out' or 'both'
+		(default: 'out')
+	:param xtick_side:
+		str, on which side of the plot X ticks should be drawn:
+		'bottom', 'top' or 'both'
+		(default: 'bottom')
 	:param yticks:
 		list or array, Y axis tick positions
 		Note that, if Y values of :param:`datasets` are datetimes,
@@ -205,6 +214,13 @@ def plot_xy(datasets,
 	:param ytick_rotation:
 		float, rotation angle for Y axis tick labels
 		(default: 0)
+	:param ytick_direction:
+		str, Y axis tick direction: 'in', 'out' or 'both'
+		(default: 'out')
+	:param ytick_side:
+		str, on which side of the plot Y ticks should be drawn:
+		'left', 'right' or 'both'
+		(default: 'left')
 	:param tick_label_fontsize:
 		int or str, font size to use for axis tick labels
 		(default: 'medium')
@@ -436,8 +452,10 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
 			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+			xtick_direction='out', xtick_side='bottom',
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 			tick_label_fontsize='medium', tick_params={},
+			ytick_direction='out', ytick_side='left',
 			xgrid=0, ygrid=0,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			title='', title_fontsize='large',
@@ -588,7 +606,9 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 				xmin=None, xmax=None, ymin=None, ymax=None,
 				xlabel='', ylabel='', ax_label_fontsize='large',
 				xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+				xtick_direction='out', xtick_side='bottom',
 				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+				ytick_direction='out', ytick_side='left',
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
 				xgrid=0, ygrid=0,
@@ -696,7 +716,9 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 				xmin=None, xmax=None, ymin=None, ymax=None,
 				xlabel='', ylabel='', ax_label_fontsize='large',
 				xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+				xtick_direction='out', xtick_side='bottom',
 				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+				ytick_direction='out', ytick_side='left',
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
 				xgrid=0, ygrid=0,
@@ -726,10 +748,14 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	:param xticklabels:
 	:param xtick_interval:
 	:param xtick_rotation:
+	:param xtick_direction:
+	:param xtick_side:
 	:param yticks:
 	:param yticklabels:
 	:param ytick_interval:
 	:param ytick_rotation:
+	:param ytick_direction:
+	:param ytick_side:
 	:param tick_label_fontsize:
 	:param tick_params:
 	:param title:
@@ -924,6 +950,28 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	## Tick aspect
 	if tick_params:
 		ax.tick_params(axis='both', **tick_params)
+
+	if xtick_direction:
+		ax.tick_params(axis='x', direction=xtick_direction)
+
+	if xtick_side:
+		side_kwargs = {}
+		if xtick_side in ('top', 'both'):
+			side_kwargs['top'] = True
+		if xtick_side in ('bottom', 'both'):
+			side_kwargs['bottom'] = True
+		ax.tick_params(axis='x', **side_kwargs)
+
+	if ytick_direction:
+		ax.tick_params(axis='y', direction=ytick_direction)
+
+	if ytick_side:
+		side_kwargs = {}
+		if ytick_side in ('left', 'both'):
+			side_kwargs['left'] = True
+		if ytick_side in ('right', 'both'):
+			side_kwargs['right'] = True
+		ax.tick_params(axis='y', **side_kwargs)
 
 	## Grid
 	if xgrid:
