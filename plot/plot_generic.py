@@ -22,7 +22,8 @@ import matplotlib.dates as mpl_dates
 from matplotlib.font_manager import FontProperties
 
 
-__all__ = ['plot_xy', 'plot_density', 'plot_histogram', 'plot_ax_frame']
+__all__ = ['plot_xy', 'plot_density', 'plot_histogram', 'plot_grid',
+			'plot_ax_frame']
 
 
 MPL_FONT_SIZES = ['xx-small', 'x-small', 'small', 'medium',
@@ -83,9 +84,9 @@ def plot_xy(datasets,
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
 			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
-			xtick_direction='out', xtick_side='bottom',
+			xtick_direction='', xtick_side='',
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
-			ytick_direction='out', ytick_side='left',
+			ytick_direction='', ytick_side='',
 			tick_label_fontsize='medium', tick_params={},
 			title='', title_fontsize='large',
 			xgrid=0, ygrid=0,
@@ -195,11 +196,11 @@ def plot_xy(datasets,
 		(default: 0)
 	:param xtick_direction:
 		str, X axis tick direction: 'in', 'out' or 'both'
-		(default: 'out')
+		(default: '')
 	:param xtick_side:
 		str, on which side of the plot X ticks should be drawn:
 		'bottom', 'top' or 'both'
-		(default: 'bottom')
+		(default: '')
 	:param yticks:
 		list or array, Y axis tick positions
 		Note that, if Y values of :param:`datasets` are datetimes,
@@ -216,11 +217,11 @@ def plot_xy(datasets,
 		(default: 0)
 	:param ytick_direction:
 		str, Y axis tick direction: 'in', 'out' or 'both'
-		(default: 'out')
+		(default: '')
 	:param ytick_side:
 		str, on which side of the plot Y ticks should be drawn:
 		'left', 'right' or 'both'
-		(default: 'left')
+		(default: '')
 	:param tick_label_fontsize:
 		int or str, font size to use for axis tick labels
 		(default: 'medium')
@@ -452,10 +453,10 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
 			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
-			xtick_direction='out', xtick_side='bottom',
+			xtick_direction='', xtick_side='',
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 			tick_label_fontsize='medium', tick_params={},
-			ytick_direction='out', ytick_side='left',
+			ytick_direction='', ytick_side='',
 			xgrid=0, ygrid=0,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			title='', title_fontsize='large',
@@ -606,9 +607,9 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 				xmin=None, xmax=None, ymin=None, ymax=None,
 				xlabel='', ylabel='', ax_label_fontsize='large',
 				xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
-				xtick_direction='out', xtick_side='bottom',
+				xtick_direction='', xtick_side='',
 				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
-				ytick_direction='out', ytick_side='left',
+				ytick_direction='', ytick_side='',
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
 				xgrid=0, ygrid=0,
@@ -711,14 +712,223 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 	pylab.style.use('default')
 
 
+def plot_grid(data, X=None, Y=None,
+			cmap='jet', norm=None, vmin=None, vmax=None,
+			color_gradient='cont', shading=False, smoothed=False,
+			colorbar=True, cax=None, cbar_title='', cbar_orientation='horizontal',
+			cbar_spacing='uniform', cbar_ticks=None, cbar_label_format='',
+			cbar_size=0.05, cbar_padding=0.1, cbar_aspect=20, cbar_extend='neither',
+			cbar_lines=False,
+			contour_lines=None, contour_color='k', contour_width=0.5, contour_style='-',
+			xscaling='lin', yscaling='lin',
+			xmin=None, xmax=None, ymin=None, ymax=None,
+			xlabel='', ylabel='', ax_label_fontsize='large',
+			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+			xtick_direction='', xtick_side='',
+			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+			ytick_direction='', ytick_side='',
+			tick_label_fontsize='medium', tick_params={},
+			title='', title_fontsize='large',
+			xgrid=0, ygrid=0,
+			hlines=[], hline_args={}, vlines=[], vline_args={},
+			style_sheet='classic', border_width=0.2,
+			fig_filespec=None, figsize=None, dpi=300, ax=None):
+	"""
+	:param data:
+		2D array, gridded data
+	:param X/Y:
+		[x/ymin, x/ymax] or 1D array or 2D array or None, X/Y coodinates
+		dimension may be either the same as data (= center coordinates)
+		or 1 larger (= edge coordinates)
+
+	"""
+	frame_args = {key: val for (key, val) in locals().items()
+				if not key in ['data', 'X', 'Y', 'cmap', 'norm', 'vmin', 'vmax',
+							'color_gradient', 'shading', 'smoothed',
+							'colorbar', 'cax', 'cbar_title', 'cbar_orientation',
+							'cbar_spacing', 'cbar_ticks', 'cbar_label_format',
+							'cbar_size', 'cbar_padding', 'cbar_aspect', 'cbar_extend',
+							'cbar_lines',
+							'contour_lines', 'contour_color', 'contour_width', 'contour_style',
+							'style_sheet',
+							'border_width', 'fig_filespec', 'figsize', 'dpi', 'ax',
+							'kwargs']}
+
+	from matplotlib.colors import BoundaryNorm
+	from mapping.layeredbasemap.cm.norm import (PiecewiseLinearNorm,
+												PiecewiseConstantNorm)
+
+	pylab.style.use(style_sheet)
+
+	fig = None
+	if ax is None:
+		fig, ax = pylab.subplots(figsize=figsize)
+
+	## Determine if we need center or edge coordinates or both
+	## Note: give preference to edge coordinates, as it is easier to
+	## convert to center coordinates
+	need_center_coordinates = False
+	need_edge_coordinates = False
+	if smoothed or shading or contour_lines not in (None, 0):
+		need_center_coordinates = True
+	if not smoothed:
+		need_edge_coordinates = True
+
+	## Construct X/Y arrays
+	if X is not None and Y is not None:
+		if len(X) == len(Y) == 2:
+			## X/Y specified as x/ymin / x/ymax
+			if not need_edge_coordinates:
+				nx, ny = data.shape[1], data.shape[0]
+			else:
+				nx, ny = nx + 1, ny + 1
+			X = np.linspace(X[0], X[1], nx)
+			Y = np.linspace(Y[0], Y[1], ny)
+		if len(X.shape) == len(Y.shape) == 1:
+			## X/Y are 1D arrays
+			X, Y = np.meshgrid(X, Y)
+
+		if X.shape == data.shape:
+			## Center coordinates
+			Xc, Yc = X, Y
+			if need_edge_coordinates:
+				print("Transforming center to edge coordinates!")
+				nx, ny = data.shape[1] + 1, data.shape[0] + 1
+				_Xe, _Ye = np.zeros((ny-1, nx)), np.zeros((ny, nx-1))
+				dxx, dyy = np.diff(Xc, axis=1), np.diff(Yc, axis=0)
+				_Xe[:,1:-1] = Xc[:,:-1] + dxx / 2.
+				_Xe[:,:1] = Xc[:,:1] - dxx[:,:1] / 2.
+				_Xe[:,-1:] = Xc[:,-1:] + dxx[:,-1:] / 2.
+				_Ye[1:-1] = Yc[:-1] + dyy / 2.
+				_Ye[:1] = Yc[:1] - dyy[:1] / 2.
+				_Ye[-1:] = Yc[-1:] + dyy[-1:] / 2.
+
+				Xe, Ye = np.zeros((ny, nx)), np.zeros((ny, nx))
+				dxy, dyx = np.diff(_Xe, axis=0), np.diff(_Ye, axis=1)
+				Xe[1:-1] = _Xe[:-1] + dxy / 2.
+				Xe[:1] = _Xe[:1] - dxy[:1] / 2.
+				Xe[-1:] = _Xe[-1:] + dxy[-1:] / 2.
+				Ye[:,1:-1] = _Ye[:,:-1] + dyx / 2.
+				Ye[:,:1] = _Ye[:,:1] + dyx[:,:1] / 2.
+				Ye[:,-1:] = _Ye[:,-1:] + dyx[:,-1:] / 2.
+			else:
+				Xe, Ye = None, None
+		elif X.shape[0] == data.shape[0] + 1:
+			## Edge coordinates
+			Xe, Ye = X, Y
+			if need_center_coordinates:
+				print("Transforming edge to center coordinates!")
+				nx, ny = data.shape
+				_Xc, _Yc = np.zeros((ny+1, nx)), np.zeros((ny, nx+1))
+				dxx, dyy = np.diff(Xe, axis=1), np.diff(Ye, axis=0)
+				_Xc = Xe[:,:-1] + dxx / 2.
+				_Yc = Ye[:-1] + dyy / 2.
+
+				dxy, dyx = np.diff(_Xc, axis=0), np.diff(_Yc, axis=1)
+				Xc = _Xc[:-1] + dxy / 2.
+				Yc = _Yc[:,:-1] + dyx / 2.
+			else:
+				Xc, Yc = None, None
+		else:
+			raise Exception('Dimensions of data and coordinates do not match!')
+
+	## Mask NaN values
+	data = np.ma.masked_array(data, mask=np.isnan(data))
+
+	## Plot grid
+	cs = None
+	common_kwargs = {'cmap': cmap, 'norm': norm, 'vmin': vmin, 'vmax': vmax}
+
+	if color_gradient[:4] == 'disc':
+		if isinstance(norm, PiecewiseLinearNorm):
+			norm = norm.to_piecewise_constant_norm()
+		elif not isinstance(norm, (PiecewiseConstantNorm, BoundaryNorm)):
+			print('Warning: need constant norm to plot discrete colors')
+			## Alternatively, we can try limiting the number of colors in the palette
+			if not isinstance(cmap, matplotlib.colors.Colormap):
+				cmap = matplotlib.cm.get_cmap(cmap, 10)
+
+	if smoothed:
+		## data must have same size as X and Y for contourf
+		if color_gradient[:4] == 'disc':
+			if X is None and Y is None:
+				cs = ax.contourf(data, **common_kwargs)
+			else:
+				cs = ax.contourf(Xc, Yc, data, **common_kwargs)
+		else:
+			if X is None and Y is None:
+				cs = ax.contourf(data, 256, **common_kwargs)
+			else:
+				cs = ax.contourf(Xc, Yc, data, 256, **common_kwargs)
+
+	else:
+		## both pcolor and pcolormesh need edge coordinates,
+		## except if shading == 'gouraud'
+		#shading = {True: 'gouraud', False: 'flat'}[shading]
+		if X is None and Y is None:
+			cs = ax.pcolormesh(data, shading=shading, **common_kwargs)
+			# or use imshow?
+
+		else:
+			if shading:
+				cs = ax.pcolormesh(Xc, Yc, data, shading='gouraud', **common_kwargs)
+			else:
+				cs = ax.pcolormesh(Xe, Ye, data, shading='flat', **common_kwargs)
+
+	## Contour lines
+	if contour_lines:
+		# 'None' or 0 = no contours
+		# list
+		# N = number of contours
+		# X and Y must have same shape as data !
+		ax.contour(Xc, Yc, data, contour_lines, colors=contour_color,
+					linewidths=contour_width, linestyles=contour_style)
+
+	## Frame
+	plot_ax_frame(ax, x_is_date=False, y_is_date=False, **frame_args)
+
+	## Color bar
+	if colorbar:
+		cbar = pylab.colorbar(cs, cax=cax, ax=ax if cax is None else None,
+							orientation=cbar_orientation, spacing=cbar_spacing,
+							ticks=cbar_ticks, format=cbar_label_format,
+							fraction=cbar_size, pad=cbar_padding, aspect=cbar_aspect,
+							extend=cbar_extend, drawedges=cbar_lines)
+
+		if cbar_orientation == 'horizontal':
+			cbar.set_label(cbar_title, size=ax_label_fontsize)
+		else:
+			cbar.ax.set_title(cbar_title, size=ax_label_fontsize)
+		cbar.ax.tick_params(labelsize=tick_label_fontsize)
+
+		# TODO: boundaries / values, cf. layeredbasemap ?
+
+
+	## Output
+	if fig_filespec == "wait":
+		return ax
+	elif fig_filespec:
+		kwargs = {}
+		if border_width is not None:
+			kwargs = dict(bbox_inches="tight", pad_inches=border_width/2.54)
+		fig.savefig(fig_filespec, dpi=dpi, **kwargs)
+		pylab.clf()
+	else:
+		pylab.show()
+		return ax
+
+	## Restore default style if we get here
+	pylab.style.use('default')
+
+
 def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 				xscaling='lin', yscaling='lin',
 				xmin=None, xmax=None, ymin=None, ymax=None,
 				xlabel='', ylabel='', ax_label_fontsize='large',
 				xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
-				xtick_direction='out', xtick_side='bottom',
+				xtick_direction='', xtick_side='',
 				yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
-				ytick_direction='out', ytick_side='left',
+				ytick_direction='', ytick_side='',
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
 				xgrid=0, ygrid=0,
