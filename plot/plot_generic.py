@@ -712,14 +712,86 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 	pylab.style.use('default')
 
 
+def grid_center_to_edge_coordinates(Xc, Yc):
+	"""
+	Transform grid (or mesh) center coordinates to edge coordinates
+
+	:param Xc:
+		2D array (num_lats x num_lons), X center coordinates
+	:param Yc:
+		2D array (num_lats x num_lons), Y center coordinates
+
+	:return:
+		(Xe, Ye)
+		2D arrays (num_lats+1 x num_lons+1), X and Y edge coordinates
+	"""
+	assert Xc.shape == Yc.shape
+
+	## Output dimension
+	nx, ny = Xc.shape[1] + 1, Xc.shape[0] + 1
+
+	## First pass: compute edge coordinates along respective axes
+	_Xe, _Ye = np.zeros((ny-1, nx)), np.zeros((ny, nx-1))
+	dxx, dyy = np.diff(Xc, axis=1), np.diff(Yc, axis=0)
+	_Xe[:,1:-1] = Xc[:,:-1] + dxx / 2.
+	_Xe[:,:1] = Xc[:,:1] - dxx[:,:1] / 2.
+	_Xe[:,-1:] = Xc[:,-1:] + dxx[:,-1:] / 2.
+	_Ye[1:-1] = Yc[:-1] + dyy / 2.
+	_Ye[:1] = Yc[:1] - dyy[:1] / 2.
+	_Ye[-1:] = Yc[-1:] + dyy[-1:] / 2.
+
+	## Second pass: compute edge coordinates along opposite axes
+	Xe, Ye = np.zeros((ny, nx)), np.zeros((ny, nx))
+	dxy, dyx = np.diff(_Xe, axis=0), np.diff(_Ye, axis=1)
+	Xe[1:-1] = _Xe[:-1] + dxy / 2.
+	Xe[:1] = _Xe[:1] - dxy[:1] / 2.
+	Xe[-1:] = _Xe[-1:] + dxy[-1:] / 2.
+	Ye[:,1:-1] = _Ye[:,:-1] + dyx / 2.
+	Ye[:,:1] = _Ye[:,:1] + dyx[:,:1] / 2.
+	Ye[:,-1:] = _Ye[:,-1:] + dyx[:,-1:] / 2.
+
+	return (Xe, Ye)
+
+
+def grid_edge_to_center_coordinates(Xe, Ye):
+	"""
+	Transform grid (or mesh) edge coordinates to center coordinates
+
+	:param Xe:
+		2D array (num_lats x num_lons), X edge coordinates
+	:param Ye:
+		2D array (num_lats x num_lons), Y edge coordinates
+
+	:return:
+		(Xc, Yc)
+		2D arrays (num_lats-1 x num_lons-1), X and Y center coordinates
+	"""
+	## Output dimension
+	nx, ny = Xe.shape[1] - 1, Xe.shape[0] - 1
+
+	## First pass: compute center coordinates along respective axes
+	_Xc, _Yc = np.zeros((ny+1, nx)), np.zeros((ny, nx+1))
+	dxx, dyy = np.diff(Xe, axis=1), np.diff(Ye, axis=0)
+	_Xc = Xe[:,:-1] + dxx / 2.
+	_Yc = Ye[:-1] + dyy / 2.
+
+	## Second pass: compute center coordinates along opposite axes
+	dxy, dyx = np.diff(_Xc, axis=0), np.diff(_Yc, axis=1)
+	Xc = _Xc[:-1] + dxy / 2.
+	Yc = _Yc[:,:-1] + dyx / 2.
+
+	return (Xc, Yc)
+
+
 def plot_grid(data, X=None, Y=None,
 			cmap='jet', norm=None, vmin=None, vmax=None,
 			color_gradient='cont', shading=False, smoothed=False,
-			colorbar=True, cax=None, cbar_title='', cbar_orientation='horizontal',
+			colorbar=True, cax=None, cbar_size=0.05, cbar_padding=0.1,
+			cbar_title='', cbar_orientation='horizontal',
 			cbar_spacing='uniform', cbar_ticks=None, cbar_label_format='',
-			cbar_size=0.05, cbar_padding=0.1, cbar_aspect=20, cbar_extend='neither',
-			cbar_lines=False,
-			contour_lines=None, contour_color='k', contour_width=0.5, contour_style='-',
+			cbar_aspect=20, cbar_extend='neither', cbar_lines=False,
+			contour_lines=None, contour_color='k', contour_width=0.5,
+			contour_style='-', contour_labels=None, alpha=1,
 			xscaling='lin', yscaling='lin',
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
@@ -734,25 +806,118 @@ def plot_grid(data, X=None, Y=None,
 			style_sheet='classic', border_width=0.2,
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
+	Plot raster or mesh data
+
 	:param data:
 		2D array, gridded data
 	:param X/Y:
 		[x/ymin, x/ymax] or 1D array or 2D array or None, X/Y coodinates
 		dimension may be either the same as data (= center coordinates)
 		or 1 larger (= edge coordinates)
+		(default: None, will just plot rectangular grid)
+	:param cmap:
+		str or instance of :class:`matplotlib.colors.Colormap, color palette
+		(default: 'jet')
+	:param norm:
+		instance of :class:`matplotlib.colors.Normalize`, defining how
+		to scale data values to the [0 - 1] interval, and hence to colors
+		(default: None, uses default linear scaling)
+	:param vmin:
+	:param vmax:
+		float, min/max data values to be mapped to 0/1, respectively,
+		overriding vmin/vmax values of :param:`norm` if specified
+		(default: None)
+	:param color_gradient:
+		str, if colors should be 'cont[inuous]' or 'disc[rete]'.
+		Note that this mainly depends on the normalization, and can
+		only be honoured in certain cases
+		(default: 'cont')
+	:param shading;
+		bool, whether or not Gouraud shading should be applied to each
+		cell or quad. Only applies if :param:`smoothed` is False
+		(default: False)
+	:param smoothed:
+		bool, whether or not grid cells should be smoothed; this is
+		accomplished using matplotlib's contourf function instead of
+		pcolor(mesh)
+		(default: False)
+	:param colorbar:
+		bool, whether or not to plot color bar
+		(default: True)
+	:param cax:
+		matplotlib Axes instance to be used for the colorbar
+		(default: None, will steal place from parent Axes instance
+		given in :param:`ax`)
+	:param cbar_size:
+		float, fraction of original Axes to use for colorbar
+		(default: 0.15)
+	:param cbar_padding:
+		float, fraction between colorbar and original Axes
+		(default: 0.10)
+	:param cbar_title:
+		str, title for colorbar
+		(default: '')
+	:param cbar_orientation:
+		str, orientation of colorbar, either 'horizontal' or 'vertical'
+		(default: 'horizontal')
+	:param cbar_spacing:
+		str, either 'uniform' (each discrete color gets the same space)
+		or 'proportional' (space proportional to represented data interval)
+		(default: 'uniform')
+	:param cbar_ticks:
+		list or array, tick positions for colorbar
+		(default: None, will position ticks automatically)
+	:param cbar_label_format:
+		str or instance of :class:`matplotlib.ticker.Formatter`, format for
+		colorbar tick labels (e.g., '%.2f')
+		(default: None)
+	:param cbar_aspect:
+		float, aspect ratio (long/short dimension) of colorbar
+		(default: 20)
+	:param cbar_extend:
+		str, if and how colorbar should be extended with triangular
+		ends for out-of-range values, one of 'neither', 'both',
+		'min' or 'max'
+		(default: 'neither')
+	:param cbar_lines:
+		bool, whether or not lines should be drawn at color boundaries
+		in colorbar
+		(default: False)
+	:param contour_lines:
+		int, list or array, values of contour lines to be drawn on top of grid:
+		- 'None' or 0 = no contours
+		- N (int): number of contours
+		- list or array specifying contour values
+		(default: None)
+	:param contour_color:
+		matplotlib color specification (or list), color to use for contour
+		lines (default: 'k')
+	:param contour_width:
+		float or list, line width(s) of contour lines
+		(default: 0.5)
+	:param contour_style:
+		str or list, line style(s) of contour lines: '-', '--', ':' or '-:'
+		(default: '-')
+	:param contour_labels:
+		list, labels for contour lines. If None, use the contour
+		line values; if empty list, no labels will be drawn
+		(default: None)
+	:param alpha:
+		float in the range 0 - 1, grid opacity
+		(default: 1)
 
+	See :func:`plot_xy` for additional keyword arguments
 	"""
 	frame_args = {key: val for (key, val) in locals().items()
 				if not key in ['data', 'X', 'Y', 'cmap', 'norm', 'vmin', 'vmax',
 							'color_gradient', 'shading', 'smoothed',
-							'colorbar', 'cax', 'cbar_title', 'cbar_orientation',
-							'cbar_spacing', 'cbar_ticks', 'cbar_label_format',
-							'cbar_size', 'cbar_padding', 'cbar_aspect', 'cbar_extend',
-							'cbar_lines',
-							'contour_lines', 'contour_color', 'contour_width', 'contour_style',
-							'style_sheet',
-							'border_width', 'fig_filespec', 'figsize', 'dpi', 'ax',
-							'kwargs']}
+							'colorbar', 'cax', 'cbar_size', 'cbar_padding',
+							'cbar_title', 'cbar_orientation', 'cbar_spacing',
+							'cbar_ticks', 'cbar_label_format', 'cbar_aspect',
+							'cbar_extend', 'cbar_lines', 'contour_lines',
+							'contour_color', 'contour_width', 'contour_style',
+							'contour_labels', 'alpha', 'style_sheet', 'border_width',
+							'fig_filespec', 'figsize', 'dpi', 'ax', 'kwargs']}
 
 	from matplotlib.colors import BoundaryNorm
 	from mapping.layeredbasemap.cm.norm import (PiecewiseLinearNorm,
@@ -765,8 +930,6 @@ def plot_grid(data, X=None, Y=None,
 		fig, ax = pylab.subplots(figsize=figsize)
 
 	## Determine if we need center or edge coordinates or both
-	## Note: give preference to edge coordinates, as it is easier to
-	## convert to center coordinates
 	need_center_coordinates = False
 	need_edge_coordinates = False
 	if smoothed or shading or contour_lines not in (None, 0):
@@ -778,9 +941,8 @@ def plot_grid(data, X=None, Y=None,
 	if X is not None and Y is not None:
 		if len(X) == len(Y) == 2:
 			## X/Y specified as x/ymin / x/ymax
-			if not need_edge_coordinates:
-				nx, ny = data.shape[1], data.shape[0]
-			else:
+			nx, ny = data.shape[1], data.shape[0]
+			if need_edge_coordinates:
 				nx, ny = nx + 1, ny + 1
 			X = np.linspace(X[0], X[1], nx)
 			Y = np.linspace(Y[0], Y[1], ny)
@@ -793,24 +955,7 @@ def plot_grid(data, X=None, Y=None,
 			Xc, Yc = X, Y
 			if need_edge_coordinates:
 				print("Transforming center to edge coordinates!")
-				nx, ny = data.shape[1] + 1, data.shape[0] + 1
-				_Xe, _Ye = np.zeros((ny-1, nx)), np.zeros((ny, nx-1))
-				dxx, dyy = np.diff(Xc, axis=1), np.diff(Yc, axis=0)
-				_Xe[:,1:-1] = Xc[:,:-1] + dxx / 2.
-				_Xe[:,:1] = Xc[:,:1] - dxx[:,:1] / 2.
-				_Xe[:,-1:] = Xc[:,-1:] + dxx[:,-1:] / 2.
-				_Ye[1:-1] = Yc[:-1] + dyy / 2.
-				_Ye[:1] = Yc[:1] - dyy[:1] / 2.
-				_Ye[-1:] = Yc[-1:] + dyy[-1:] / 2.
-
-				Xe, Ye = np.zeros((ny, nx)), np.zeros((ny, nx))
-				dxy, dyx = np.diff(_Xe, axis=0), np.diff(_Ye, axis=1)
-				Xe[1:-1] = _Xe[:-1] + dxy / 2.
-				Xe[:1] = _Xe[:1] - dxy[:1] / 2.
-				Xe[-1:] = _Xe[-1:] + dxy[-1:] / 2.
-				Ye[:,1:-1] = _Ye[:,:-1] + dyx / 2.
-				Ye[:,:1] = _Ye[:,:1] + dyx[:,:1] / 2.
-				Ye[:,-1:] = _Ye[:,-1:] + dyx[:,-1:] / 2.
+				Xe, Ye = grid_center_to_edge_coordinates(Xc, Yc)
 			else:
 				Xe, Ye = None, None
 		elif X.shape[0] == data.shape[0] + 1:
@@ -818,15 +963,7 @@ def plot_grid(data, X=None, Y=None,
 			Xe, Ye = X, Y
 			if need_center_coordinates:
 				print("Transforming edge to center coordinates!")
-				nx, ny = data.shape
-				_Xc, _Yc = np.zeros((ny+1, nx)), np.zeros((ny, nx+1))
-				dxx, dyy = np.diff(Xe, axis=1), np.diff(Ye, axis=0)
-				_Xc = Xe[:,:-1] + dxx / 2.
-				_Yc = Ye[:-1] + dyy / 2.
-
-				dxy, dyx = np.diff(_Xc, axis=0), np.diff(_Yc, axis=1)
-				Xc = _Xc[:-1] + dxy / 2.
-				Yc = _Yc[:,:-1] + dyx / 2.
+				Xc, Yc = grid_edge_to_center_coordinates(Xe, Ye)
 			else:
 				Xc, Yc = None, None
 		else:
@@ -835,10 +972,8 @@ def plot_grid(data, X=None, Y=None,
 	## Mask NaN values
 	data = np.ma.masked_array(data, mask=np.isnan(data))
 
-	## Plot grid
-	cs = None
-	common_kwargs = {'cmap': cmap, 'norm': norm, 'vmin': vmin, 'vmax': vmax}
-
+	## Try to convert to piecewise constant norm or limit the number of colors
+	## in the color palette if color_gradient is 'discontinuous'
 	if color_gradient[:4] == 'disc':
 		if isinstance(norm, PiecewiseLinearNorm):
 			norm = norm.to_piecewise_constant_norm()
@@ -847,6 +982,11 @@ def plot_grid(data, X=None, Y=None,
 			## Alternatively, we can try limiting the number of colors in the palette
 			if not isinstance(cmap, matplotlib.colors.Colormap):
 				cmap = matplotlib.cm.get_cmap(cmap, 10)
+
+	## Plot grid
+	cs = None
+	common_kwargs = {'cmap': cmap, 'norm': norm, 'vmin': vmin, 'vmax': vmax,
+					'alpha': alpha}
 
 	if smoothed:
 		## data must have same size as X and Y for contourf
@@ -877,12 +1017,19 @@ def plot_grid(data, X=None, Y=None,
 
 	## Contour lines
 	if contour_lines:
-		# 'None' or 0 = no contours
-		# list
-		# N = number of contours
 		# X and Y must have same shape as data !
-		ax.contour(Xc, Yc, data, contour_lines, colors=contour_color,
+		cl = ax.contour(Xc, Yc, data, contour_lines, colors=contour_color,
 					linewidths=contour_width, linestyles=contour_style)
+
+		## Contour labels:
+		if contour_labels is None:
+			contour_labels = contour_lines
+		if contour_labels:
+			clabels = ax.clabel(cl, contour_labels, colors=contour_color, inline=True,
+								fontsize=tick_label_fontsize, fmt=cbar_label_format)
+		# TODO: white background for contour labels
+		#bbox_args = label_style.to_kwargs()['bbox']
+		#[txt.set_bbox(bbox_args) for txt in clabels]
 
 	## Frame
 	plot_ax_frame(ax, x_is_date=False, y_is_date=False, **frame_args)
@@ -902,6 +1049,7 @@ def plot_grid(data, X=None, Y=None,
 		cbar.ax.tick_params(labelsize=tick_label_fontsize)
 
 		# TODO: boundaries / values, cf. layeredbasemap ?
+		# TODO: precise control of width/height of colorbar possible??
 
 
 	## Output
