@@ -786,10 +786,10 @@ def grid_edge_to_center_coordinates(Xe, Ye):
 def plot_grid(data, X=None, Y=None,
 			cmap='jet', norm=None, vmin=None, vmax=None,
 			color_gradient='cont', shading=False, smoothed=False,
-			colorbar=True, cax=None, cbar_size=0.05, cbar_padding=0.1,
-			cbar_title='', cbar_orientation='horizontal',
-			cbar_spacing='uniform', cbar_ticks=None, cbar_label_format='',
-			cbar_aspect=20, cbar_extend='neither', cbar_lines=False,
+			colorbar=True, cax=None, cax_size=0.1, cax_padding=0.1, cax_shrink=1.,
+			cbar_length=1., cbar_aspect=20, cbar_location='bottom center',
+			cbar_spacing='uniform', cbar_ticks=None, cbar_label_format=None,
+			cbar_title='', cbar_extend='neither', cbar_lines=False,
 			contour_lines=None, contour_color='k', contour_width=0.5,
 			contour_style='-', contour_labels=None, alpha=1,
 			xscaling='lin', yscaling='lin',
@@ -848,18 +848,33 @@ def plot_grid(data, X=None, Y=None,
 		matplotlib Axes instance to be used for the colorbar
 		(default: None, will steal place from parent Axes instance
 		given in :param:`ax`)
-	:param cbar_size:
-		float, fraction of original Axes to use for colorbar
-		(default: 0.15)
-	:param cbar_padding:
-		float, fraction between colorbar and original Axes
+	:param cax_size:
+		float, fraction of original Axes to use for colorbar Axes.
+		Ignored if :param:`cax` is not None.
 		(default: 0.10)
-	:param cbar_title:
-		str, title for colorbar
-		(default: '')
-	:param cbar_orientation:
-		str, orientation of colorbar, either 'horizontal' or 'vertical'
-		(default: 'horizontal')
+	:param cax_padding:
+		float, fraction between colorbar and original Axes
+		Ignored if :param:`cax` is not None.
+		(default: 0.10)
+	:param cax_shrink:
+		float, fraction by which to shrink cax
+		Ignored if :param:`cax` is not None.
+		(default: 1.)
+	:param cbar_length:
+		float, length of colorbar as fraction of Axes width or height
+		Ignored if :param:`cax` is not None.
+		(default: 1.)
+	:param cbar_aspect:
+		float, aspect ratio (long/short dimension) of colorbar
+		Ignored if :param:`cax` is not None.
+		(default: 20)
+	:param cbar_location:
+		str, location (side of parent axes) and alignment of colorbar,
+		location: 'left' / 'right' (vertical), 'top' / 'bottom' (horizontal)
+		alignment: 'center' or 'left' / 'right' (if orientation is horizontal)
+		or 'top' / 'bottom' (if orientation is vertical)
+		Ignored if :param:`cax` is not None.
+		(default: 'bottom center')
 	:param cbar_spacing:
 		str, either 'uniform' (each discrete color gets the same space)
 		or 'proportional' (space proportional to represented data interval)
@@ -871,9 +886,9 @@ def plot_grid(data, X=None, Y=None,
 		str or instance of :class:`matplotlib.ticker.Formatter`, format for
 		colorbar tick labels (e.g., '%.2f')
 		(default: None)
-	:param cbar_aspect:
-		float, aspect ratio (long/short dimension) of colorbar
-		(default: 20)
+	:param cbar_title:
+		str, title for colorbar
+		(default: '')
 	:param cbar_extend:
 		str, if and how colorbar should be extended with triangular
 		ends for out-of-range values, one of 'neither', 'both',
@@ -911,15 +926,18 @@ def plot_grid(data, X=None, Y=None,
 	frame_args = {key: val for (key, val) in locals().items()
 				if not key in ['data', 'X', 'Y', 'cmap', 'norm', 'vmin', 'vmax',
 							'color_gradient', 'shading', 'smoothed',
-							'colorbar', 'cax', 'cbar_size', 'cbar_padding',
-							'cbar_title', 'cbar_orientation', 'cbar_spacing',
-							'cbar_ticks', 'cbar_label_format', 'cbar_aspect',
+							'colorbar', 'cax', 'cax_size', 'cax_padding',
+							'cax_shrink', 'cbar_length', 'cbar_aspect',
+							'cbar_location', 'cbar_spacing',
+							'cbar_ticks', 'cbar_label_format', 'cbar_title',
 							'cbar_extend', 'cbar_lines', 'contour_lines',
 							'contour_color', 'contour_width', 'contour_style',
 							'contour_labels', 'alpha', 'style_sheet', 'border_width',
 							'fig_filespec', 'figsize', 'dpi', 'ax', 'kwargs']}
 
+	from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 	from matplotlib.colors import BoundaryNorm
+	from matplotlib.colorbar import make_axes
 	from mapping.layeredbasemap.cm.norm import (PiecewiseLinearNorm,
 												PiecewiseConstantNorm)
 
@@ -1004,8 +1022,8 @@ def plot_grid(data, X=None, Y=None,
 	else:
 		## both pcolor and pcolormesh need edge coordinates,
 		## except if shading == 'gouraud'
-		#shading = {True: 'gouraud', False: 'flat'}[shading]
 		if X is None and Y is None:
+			shading = {True: 'gouraud', False: 'flat'}[shading]
 			cs = ax.pcolormesh(data, shading=shading, **common_kwargs)
 			# or use imshow?
 
@@ -1036,11 +1054,97 @@ def plot_grid(data, X=None, Y=None,
 
 	## Color bar
 	if colorbar:
-		cbar = pylab.colorbar(cs, cax=cax, ax=ax if cax is None else None,
-							orientation=cbar_orientation, spacing=cbar_spacing,
-							ticks=cbar_ticks, format=cbar_label_format,
-							fraction=cbar_size, pad=cbar_padding, aspect=cbar_aspect,
-							extend=cbar_extend, drawedges=cbar_lines)
+		cbar_align = 'center'
+		if ' ' in cbar_location:
+			cbar_location, cbar_align = cbar_location.split()
+
+		if cbar_location in ("top", "bottom"):
+			cbar_orientation = "horizontal"
+		else:
+			cbar_orientation = "vertical"
+
+		if cax is None:
+			#ax_pos = ax.get_position()
+			#fig = ax.get_figure()
+			#cax = fig.add_axes([ax_pos.x1+0.01, ax_pos.y0, 0.02, ax_pos.height])
+
+			#from mpl_toolkits.axes_grid1 import make_axes_locatable, axes_size
+			#divider = make_axes_locatable(ax)
+			#if cbar_orientation == 'vertical':
+			#	size = axes_size.AxesY(ax, aspect=1./cbar_aspect)
+			#else:
+			#	size = axes_size.AxesX(ax, aspect=1./cbar_aspect)
+			#pad = axes_size.Fraction(cbar_padding, size)
+			#cax = divider.append_axes(cbar_location, size=size, pad=pad)
+
+			cbar_aspect *= cbar_length
+			cax, _ = make_axes(ax, location=cbar_location, fraction=cax_size,
+							aspect=cbar_aspect, shrink=cax_shrink, pad=cax_padding)
+
+			cax_pos = cax.get_position()
+			left, bottom = cax_pos.x0, cax_pos.y0
+			width, height = cax_pos.width, cax_pos.height
+			#print(left, bottom, width, height)
+			if cbar_orientation == 'vertical':
+				unshrinked_height = height / cax_shrink
+				center = bottom + height / 2
+				height *= cbar_length
+				if cbar_align == 'center':
+					bottom = center - height / 2
+				elif cbar_align == 'top':
+					top = center + unshrinked_height / 2
+					bottom = top - height
+				elif cbar_align == 'bottom':
+					bottom = center - unshrinked_height / 2
+			elif cbar_orientation == 'horizontal':
+				unshrinked_width = width / cax_shrink
+				center = left + width / 2
+				width *= cbar_length
+				if cbar_align == 'center':
+					left = center - width / 2
+				elif cbar_align == 'right':
+					right = center + unshrinked_width / 2
+					left = right - width
+				elif cbar_align == 'left':
+					left = center - unshrinked_width / 2
+			cax.set_position((left, bottom, width, height))
+
+		elif isinstance(cax, tuple):
+			## Test
+			anchor = cax
+			cax = None
+
+		elif cax == 'inside':
+			if cbar_orientation == 'horizontal':
+				width = cbar_length
+				height = width / cbar_aspect
+				loc = cbar_location + ' ' + cbar_align
+			else:
+				height = cbar_length
+				width = height / cbar_aspect
+				loc = cbar_align + ' ' + cbar_location
+			width = '%.0f%%' % (width * 100)
+			height = '%.0f%%' % (height * 100)
+			print(width, height)
+			loc = loc.replace('top', 'upper').replace('bottom', 'lower')
+			loc = {'upper right': 1,
+					'upper left': 2,
+					'lower left': 3,
+					'lower right': 4,
+					'right': 5,
+					'center left': 6,
+					'center right': 7,
+					'lower center': 8,
+					'upper center': 9,
+					'center': 10}[loc]
+			cax = inset_axes(ax, width=width, height=height, loc=loc,
+							borderpad=cax_padding)
+
+		if cax:
+			cbar = pylab.colorbar(cs, cax=cax, orientation=cbar_orientation,
+							spacing=cbar_spacing, ticks=cbar_ticks,
+							format=cbar_label_format, extend=cbar_extend,
+							drawedges=cbar_lines)
 
 		if cbar_orientation == 'horizontal':
 			cbar.set_label(cbar_title, size=ax_label_fontsize)
@@ -1049,7 +1153,6 @@ def plot_grid(data, X=None, Y=None,
 		cbar.ax.tick_params(labelsize=tick_label_fontsize)
 
 		# TODO: boundaries / values, cf. layeredbasemap ?
-		# TODO: precise control of width/height of colorbar possible??
 
 
 	## Output
