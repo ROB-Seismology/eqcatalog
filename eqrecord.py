@@ -197,6 +197,14 @@ class LocalEarthquake(object):
 		else:
 			return False
 
+	def __repr__(self):
+		mag_txt = ', '.join(['%s=%.1f' % (Mtype, getattr(self, Mtype))
+							for Mtype in self.get_Mtypes()])
+		txt = '<EQ #%s | %s %s | %s | %.3f %.3f %.1f km | %s>'
+		txt %= (self.ID, self.date, self.time, self.name, self.lon, self.lat,
+				self.depth, mag_txt)
+		return txt
+
 	@classmethod
 	def from_json(cls, s):
 		"""
