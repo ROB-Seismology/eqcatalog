@@ -2193,10 +2193,11 @@ class EQCatalog(object):
 		subcatalog = self.subselect(start_date=start_date, end_date=end_date,
 						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		if max_depth_error:
+			## Note: NaN errz values are ignored
 			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, np.nan)
 							and 0 <= eq.errz <= max_depth_error]
 		else:
-			#depths = np.nan_to_num(self.get_depths())
+			## Ignore NaN depth values
 			depths = self.get_depths()
 			depths = depths[~np.isnan(depths)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
