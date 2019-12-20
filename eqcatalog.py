@@ -2194,9 +2194,11 @@ class EQCatalog(object):
 						Mmin=Mmin, Mmax=Mmax, Mtype=Mtype, Mrelation=Mrelation)
 		if max_depth_error:
 			depths = [eq.depth for eq in subcatalog if not eq.depth in (None, np.nan)
-							and 0 <= np.nan_to_num(eq.errz) <= max_depth_error]
+							and 0 <= eq.errz <= max_depth_error]
 		else:
-			depths = np.nan_to_num(self.get_depths())
+			#depths = np.nan_to_num(self.get_depths())
+			depths = self.get_depths()
+			depths = depths[~np.isnan(depths)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, _ = np.histogram(depths, bins_depth)
 		if not include_right_edge:
@@ -2239,7 +2241,7 @@ class EQCatalog(object):
 		M0 = subcatalog.get_M0(Mrelation=Mrelation)
 		for e, eq in enumerate(subcatalog):
 			if (eq.depth not in (None, np.nan)
-				and 0 <= np.nan_to_num(eq.errz) <= max_depth_error):
+				and 0 <= eq.errz <= max_depth_error):
 				[bin_idx] = np.digitize([eq.depth], bins_depth) - 1
 				if 0 <= bin_idx < len(bins_M0):
 					bins_M0[bin_idx] += np.nansum(M0[e])
