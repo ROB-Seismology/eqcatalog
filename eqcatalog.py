@@ -2198,7 +2198,7 @@ class EQCatalog(object):
 							and 0 <= eq.errz <= max_depth_error]
 		else:
 			## Ignore NaN depth values
-			depths = self.get_depths()
+			depths = subcatalog.get_depths()
 			depths = depths[~np.isnan(depths)]
 		bins_depth = np.arange(min_depth, max_depth + bin_width, bin_width)
 		bins_N, _ = np.histogram(depths, bins_depth)
@@ -2275,7 +2275,8 @@ class EQCatalog(object):
 		:param completeness:
 			instance of :class:`Completeness` containing initial years of
 			completeness and corresponding minimum magnitudes
-			(default: None)
+			(default: None, will not apply completeness even if
+			catalog default_completeness is defined)
 		:param include_right_edge:
 			bool, whether or not right edge should be included in magnitude bins
 			(default: False)
@@ -2289,7 +2290,8 @@ class EQCatalog(object):
 		"""
 		from hazard.rshalib.utils import seq
 
-		completeness = completeness or self.default_completeness
+		## Note: do not take into account catalog default_completeness
+		#completeness = completeness or self.default_completeness
 
 		## Set lower magnitude to lowermost threshold magnitude possible
 		if completeness:
@@ -3880,7 +3882,8 @@ class EQCatalog(object):
 		color='b',
 		title=None, legend_location=0,
 		fig_filespec="", fig_width=0, dpi=300,
-		ax=None):
+		ax=None,
+		**kwargs):
 		"""
 		Plot histogram with number of earthquakes versus depth.
 
@@ -3938,6 +3941,8 @@ class EQCatalog(object):
 			matplotlib Axes instance
 			(default: None)
 		"""
+		from .plot.plot_generic import plot_histogram
+
 		if ax is None:
 			ax = pylab.axes()
 		else:
@@ -3946,24 +3951,20 @@ class EQCatalog(object):
 		if dM:
 			## Compute depth histogram for each magnitude bin
 			assert not None in (Mmin, Mmax)
-			_, bins_mag = self.bin_by_mag(Mmin, Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation)
+			_, bins_mag = self.bin_by_mag(Mmin, Mmax, dM=dM, Mtype=Mtype,
+										Mrelation=Mrelation)
 			bins_N = []
 			for mmin in bins_mag[::-1]:
 				mmax = mmin + dM
 				bins_n, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width,
-						depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date)
+						depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date,
+						include_right_edge=True)
 				bins_N.append(bins_n)
-			if isinstance(color, (list, np.ndarray)):
-				colors = color
-			elif isinstance(color, matplotlib.colors.Colormap):
-				values = np.linspace(0, 1, len(bins_mag))
-				colors = color(values)
-			else:
-				colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 
 		else:
 			bins_N, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width,
-					depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date)
+					depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date,
+					include_right_edge=True)
 			bins_N = [bins_N]
 			colors = [color]
 			bins_mag = [Mmin]
@@ -3972,25 +3973,18 @@ class EQCatalog(object):
 			total_num = np.sum(map(np.sum, bins_N)) * 1.0
 			bins_N = [bins_n.astype('f') / total_num for bins_n in bins_N]
 
-		left = 0
-		for bins_n, mmin, color in zip(bins_N, bins_mag[::-1], colors):
+		labels = []
+		for mmin in bins_mag[::-1]:
 			if dM:
 				label = "M %.1f - %.1f" % (mmin, mmin + dM)
 			else:
 				label = "_nolegend_"
-			ax.barh(bins_depth, bins_n, height=bin_width, left=left, color=color, label=label)
-			left += bins_n
+			labels.append(label)
 
-		xmin, xmax = ax.get_xlim()
-		ax.axis((xmin, xmax, min_depth, max_depth))
-		ax.set_ylabel("Depth (km)", fontsize='x-large')
 		xlabel = "Number of events"
 		if normalized:
 			xlabel += " (%)"
-		ax.set_xlabel(xlabel, fontsize='x-large')
-		ax.invert_yaxis()
-		for label in ax.get_xticklabels() + ax.get_yticklabels():
-			label.set_size('large')
+		ylabel = "Depth (km)"
 
 		if title is None:
 			if Mmin is None:
@@ -3998,21 +3992,14 @@ class EQCatalog(object):
 			if Mmax is None:
 				Mmax = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
 			title = "Depth histogram: M %.1f - %.1f" % (Mmin, Mmax)
-		ax.set_title(title)
-		ax.legend(loc=legend_location)
 
-		if fig_filespec == "hold":
-			return
-		elif fig_filespec:
-			default_figsize = pylab.rcParams['figure.figsize']
-			#default_dpi = pylab.rcParams['figure.dpi']
-			if fig_width:
-				fig_width /= 2.54
-				dpi = dpi * (fig_width / default_figsize[0])
-			pylab.savefig(fig_filespec, dpi=dpi)
-			pylab.clf()
-		else:
-			pylab.show()
+		stacked = (dM is not None)
+		return plot_histogram(bins_N, bins_depth, labels=labels, data_is_binned=True,
+							stacked=stacked, orientation='horizontal',
+							xlabel=xlabel, ylabel=ylabel, yscaling='-lin',
+							ymin=min_depth, ymax=max_depth,
+							title=title, legend_location=legend_location,
+							fig_filespec=fig_filespec, dpi=dpi, ax=ax, **kwargs)
 
 	def plot_Depth_M0_Histogram(self,
 		min_depth=0, max_depth=30, bin_width=2,
