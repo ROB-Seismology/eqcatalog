@@ -101,6 +101,7 @@ def plot_xy(datasets,
 		list with (x, y) array tuples (either values or datetimes)
 	:param colors:
 		list of line colors to cycle over for each dataset
+		or instance of :class:`matplotlib.colors.Colormap`
 		(default: [], will use default colors for :param:`style_sheet`)
 	:param fill_colors:
 		list of fill colors to cycle over for each dataset
@@ -328,6 +329,8 @@ def plot_xy(datasets,
 		#colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 		#colors = 'bgrcmyk'
 		colors = pylab.rcParams['axes.prop_cycle'].by_key()['color']
+	elif isinstance(colors, matplotlib.colors.Colormap):
+		colors = colors(np.linspace(0, 1, len(datasets))
 	if not fill_colors:
 		fill_colors = [None]
 	if not linewidths:
@@ -627,7 +630,7 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 	:param data_is_binned:
 		bool, whether or not data in :param:`datasets` is already binned
 		Note that, if this is True, :param:`bins` must correspond to
-		the bin edges!
+		the bin edges (including right edge)!
 		(default: False)
 	"""
 	frame_args = {key: val for (key, val) in locals().items()
@@ -652,6 +655,8 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 	if not colors:
 		#colors = 'bgrcmyk'
 		colors = pylab.rcParams['axes.prop_cycle'].by_key()['color']
+	elif isinstance(colors, matplotlib.colors.Colormap):
+		colors = colors(np.linspace(0, 1, len(datasets))
 	if not labels:
 		labels = ['%d' % i for i in range(len(datasets))]
 	unique_labels = set(labels)
@@ -1232,6 +1237,17 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	:return:
 		None
 	"""
+	## Axis limits
+	_xmin, _xmax = ax.get_xlim()
+	xmin = _xmin if xmin is None else xmin
+	xmax = _xmax if xmax is None else xmax
+	ax.set_xlim(xmin, xmax)
+
+	_ymin, _ymax = ax.get_ylim()
+	ymin = _ymin if ymin is None else ymin
+	ymax = _ymax if ymax is None else ymax
+	ax.set_ylim(ymin, ymax)
+
 	## Axis scaling
 	if xscaling[0] == '-':
 		xscaling = xscaling[1:]
@@ -1249,17 +1265,6 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		ax.set_xlabel(xlabel, fontsize=ax_label_fontsize)
 	if ylabel:
 		ax.set_ylabel(ylabel, fontsize=ax_label_fontsize)
-
-	## Axis limits
-	_xmin, _xmax = ax.get_xlim()
-	xmin = _xmin if xmin is None else xmin
-	xmax = _xmax if xmax is None else xmax
-	ax.set_xlim(xmin, xmax)
-
-	_ymin, _ymax = ax.get_ylim()
-	ymin = _ymin if ymin is None else ymin
-	ymax = _ymax if ymax is None else ymax
-	ax.set_ylim(ymin, ymax)
 
 	## Horizontal / vertical lines
 	if hlines:
