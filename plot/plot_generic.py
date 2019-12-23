@@ -319,18 +319,21 @@ def plot_xy(datasets,
 
 	pylab.style.use(style_sheet)
 
-	fig = None
 	if ax is None:
 		#ax = pylab.axes()
 		fig, ax = pylab.subplots(figsize=figsize)
+	else:
+		fig = ax.get_figure()
 
 	## markers, colors, linewidhts, linestyles, labels, etc.
 	if not colors:
 		#colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
 		#colors = 'bgrcmyk'
 		colors = pylab.rcParams['axes.prop_cycle'].by_key()['color']
-	elif isinstance(colors, matplotlib.colors.Colormap):
-		colors = colors(np.linspace(0, 1, len(datasets))
+	if isinstance(colors, basestring):
+		colors = matplotlib.cm.get_cmap(colors)
+	if isinstance(colors, matplotlib.colors.Colormap):
+		colors = colors(np.linspace(0, 1, len(datasets)))
 	if not fill_colors:
 		fill_colors = [None]
 	if not linewidths:
@@ -510,8 +513,7 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 		#ax = pylab.axes()
 		fig, ax = pylab.subplots(figsize=figsize)
 	else:
-		fig = None
-		fig_filespec = "wait"
+		fig = ax.get_figure()
 
 	## Density plot
 	if isinstance(grid_size, int):
@@ -648,15 +650,16 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 	if ax is None:
 		fig, ax = pylab.subplots(figsize=figsize)
 	else:
-		fig = None
-		fig_filespec = "wait"
+		fig = ax.get_figure()
 
 	## markers, colors, linewidhts, linestyles, labels, etc.
 	if not colors:
 		#colors = 'bgrcmyk'
 		colors = pylab.rcParams['axes.prop_cycle'].by_key()['color']
-	elif isinstance(colors, matplotlib.colors.Colormap):
-		colors = colors(np.linspace(0, 1, len(datasets))
+	if isinstance(colors, basestring):
+		colors = matplotlib.cm.get_cmap(colors)
+	if isinstance(colors, matplotlib.colors.Colormap):
+		colors = colors(np.linspace(0, 1, len(datasets)))
 	if not labels:
 		labels = ['%d' % i for i in range(len(datasets))]
 	unique_labels = set(labels)
@@ -948,9 +951,10 @@ def plot_grid(data, X=None, Y=None,
 
 	pylab.style.use(style_sheet)
 
-	fig = None
 	if ax is None:
 		fig, ax = pylab.subplots(figsize=figsize)
+	else:
+		fig = ax.get_figure()
 
 	## Determine if we need center or edge coordinates or both
 	need_center_coordinates = False
