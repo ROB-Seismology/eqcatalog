@@ -75,63 +75,10 @@ def _create_date_locator(tick_interval):
 	return date_loc
 
 
-def plot_xy(datasets,
-			colors=[], fill_colors=[], linewidths=[1], linestyles=['-'], labels=[],
-			markers=[], marker_sizes=[6], marker_intervals=[],
-			marker_edge_colors=['k'], marker_fill_colors=[], marker_edge_widths=[1],
-			marker_labels=[], marker_label_fontsize='small',
-			xscaling='lin', yscaling='lin',
-			xmin=None, xmax=None, ymin=None, ymax=None,
-			xlabel='', ylabel='', ax_label_fontsize='large',
-			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
-			xtick_direction='', xtick_side='',
-			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
-			ytick_direction='', ytick_side='',
-			tick_label_fontsize='medium', tick_params={},
-			title='', title_fontsize='large',
-			xgrid=0, ygrid=0,
-			hlines=[], hline_args={}, vlines=[], vline_args={},
-			legend_location=0, legend_fontsize='medium',
-			style_sheet='classic', border_width=0.2,
-			fig_filespec=None, figsize=None, dpi=300, ax=None):
-	"""
-	Generic function to plot (X, Y) data sets (lines, symbols and/or polygons)
+ax_frame_doc = """
 
-	:param datasets:
-		list with (x, y) array tuples (either values or datetimes)
-	:param colors:
-		list of line colors to cycle over for each dataset
-		or instance of :class:`matplotlib.colors.Colormap`
-		(default: [], will use default colors for :param:`style_sheet`)
-	:param fill_colors:
-		list of fill colors to cycle over for each dataset
-		(default: [], will not apply fill color)
-	:param linewidths:
-		list of line widths to cycle over for each dataset
-		(default: [1])
-	:param linestyles:
-		list of line styles to cycle over for each dataset
-		(default: ['-'])
-	:param labels:
-		list of labels to cycle over for each dataset
-		(default: [], will not label curves)
-	:param markers:
-		list of marker symbols to cycle over for each dataset
-		(default: [], will not draw markers)
-	:param marker_sizes:
-		list of marker sizes to cycle over for each dataset
-		(default: [6])
-	:param marker_intervals:
-		(default: [], will draw marker for each datapoint)
-	:param marker_edge_colors:
-		list of marker line colors to cycle over for each dataset
-		(default: ['k'])
-	:param marker_fill_colors:
-		list of marker fill colors to cycle over for each dataset
-		(default: [], will use colors defined in :param:`colors`)
-	:param marker_edge_widths:
-		list of marker line widths to cycle over for each dataset
-		(default: [1])
+	Frame arguments:
+
 	:param xscaling:
 		str, scaling to use for X axis ('lin' or 'log')
 		Prepend '-' to invert orientation of X axis
@@ -258,6 +205,11 @@ def plot_xy(datasets,
 		dict, containing keyword arguments understood by :func:`pylab.vlines`
 		(e.g., 'colors', 'linestyles', 'linewidth', 'label')
 		(default: {})
+"""
+
+
+common_doc = """
+
 	:param legend_location:
 		int or str, location of legend (matplotlib location code):
 			"best" 	0
@@ -284,6 +236,9 @@ def plot_xy(datasets,
 		float, width of border around plot frame in cm
 		If None, white space will not be removed
 		(default: 0.2)
+	:param skip_frame:
+		bool, whether or not to skip plotting the axes frame
+		(default: False)
 	:param fig_filespec:
 		str, full path to output file
 		If None, will plot on screen
@@ -305,6 +260,66 @@ def plot_xy(datasets,
 	:return:
 		matplotlib Axes instance if :param:`fig_filespec` is set to
 		'wait', else None
+"""
+
+
+def plot_xy(datasets,
+			colors=[], fill_colors=[], linewidths=[1], linestyles=['-'], labels=[],
+			markers=[], marker_sizes=[6], marker_intervals=[],
+			marker_edge_colors=['k'], marker_fill_colors=[], marker_edge_widths=[1],
+			marker_labels=[], marker_label_fontsize='small',
+			xscaling='lin', yscaling='lin',
+			xmin=None, xmax=None, ymin=None, ymax=None,
+			xlabel='', ylabel='', ax_label_fontsize='large',
+			xticks=None, xticklabels=None, xtick_interval=None, xtick_rotation=0,
+			xtick_direction='', xtick_side='',
+			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
+			ytick_direction='', ytick_side='',
+			tick_label_fontsize='medium', tick_params={},
+			title='', title_fontsize='large',
+			xgrid=0, ygrid=0,
+			hlines=[], hline_args={}, vlines=[], vline_args={},
+			legend_location=0, legend_fontsize='medium',
+			style_sheet='classic', border_width=0.2, skip_frame=False,
+			fig_filespec=None, figsize=None, dpi=300, ax=None):
+	"""
+	Generic function to plot (X, Y) data sets (lines, symbols and/or polygons)
+
+	:param datasets:
+		list with (x, y) array tuples (either values or datetimes)
+	:param colors:
+		list of line colors to cycle over for each dataset
+		or instance of :class:`matplotlib.colors.Colormap`
+		(default: [], will use default colors for :param:`style_sheet`)
+	:param fill_colors:
+		list of fill colors to cycle over for each dataset
+		(default: [], will not apply fill color)
+	:param linewidths:
+		list of line widths to cycle over for each dataset
+		(default: [1])
+	:param linestyles:
+		list of line styles to cycle over for each dataset
+		(default: ['-'])
+	:param labels:
+		list of labels to cycle over for each dataset
+		(default: [], will not label curves)
+	:param markers:
+		list of marker symbols to cycle over for each dataset
+		(default: [], will not draw markers)
+	:param marker_sizes:
+		list of marker sizes to cycle over for each dataset
+		(default: [6])
+	:param marker_intervals:
+		(default: [], will draw marker for each datapoint)
+	:param marker_edge_colors:
+		list of marker line colors to cycle over for each dataset
+		(default: ['k'])
+	:param marker_fill_colors:
+		list of marker fill colors to cycle over for each dataset
+		(default: [], will use colors defined in :param:`colors`)
+	:param marker_edge_widths:
+		list of marker line widths to cycle over for each dataset
+		(default: [1])
 	"""
 	frame_args = {key: val for (key, val) in locals().items()
 				if not key in ['datasets', 'colors', 'fill_colors', 'linewidths',
@@ -313,7 +328,8 @@ def plot_xy(datasets,
 							'marker_fill_colors', 'marker_edge_widths',
 							'marker_labels', 'marker_label_fontsize',
 							'legend_location', 'legend_fontsize', 'style_sheet',
-							'border_width', 'fig_filespec', 'figsize', 'dpi', 'ax']}
+							'border_width', 'skip_frame', 'fig_filespec',
+							'figsize', 'dpi', 'ax']}
 
 	from itertools import cycle
 
@@ -424,7 +440,8 @@ def plot_xy(datasets,
 							clip_on=True)
 
 	## Frame
-	plot_ax_frame(ax, x_is_date=x_is_date, y_is_date=y_is_date, **frame_args)
+	if not skip_frame:
+		plot_ax_frame(ax, x_is_date=x_is_date, y_is_date=y_is_date, **frame_args)
 
 	## Legend
 	legend_fontsize = legend_fontsize or tick_label_fontsize
@@ -452,6 +469,8 @@ def plot_xy(datasets,
 	## Restore default style if we get here
 	pylab.style.use('default')
 
+plot_xy.__doc__ += (ax_frame_doc + common_doc)
+
 
 def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=None,
 			bins=None, cmap='plasma', cbar_args={}, cbar_label='N',
@@ -466,7 +485,7 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 			xgrid=0, ygrid=0,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			title='', title_fontsize='large',
-			style_sheet='classic', border_width=0.2,
+			style_sheet='classic', border_width=0.2, skip_frame=False,
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Plot XY data as density (number of data points per grid cell)
@@ -498,14 +517,12 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 	:param cbar_label:
 		str, colorbar label
 		(default: 'N')
-
-	See :func:`plot_xy` for additional keyword arguments
 	"""
 	frame_args = {key: val for (key, val) in locals().items()
 				if not key in ['x', 'y', 'grid_size', 'density_type',
 							'min_cnt', 'max_cnt', 'cmap', 'bins', 'cbar_args',
 							'cbar_label', 'style_sheet', 'border_width',
-							'fig_filespec', 'figsize', 'dpi', 'ax']}
+							'skip_frame', 'fig_filespec', 'figsize', 'dpi', 'ax']}
 
 	pylab.style.use(style_sheet)
 
@@ -572,15 +589,16 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 		ax.axis(extent)
 
 	## Frame
-	if isinstance(x[0], datetime.datetime):
-		x_is_date = True
-	else:
-		x_is_date = False
-	if isinstance(y[0], datetime.datetime):
-		y_is_date = True
-	else:
-		y_is_date = False
-	plot_ax_frame(ax, x_is_date=x_is_date, y_is_date=y_is_date, **frame_args)
+	if not skip_frame:
+		if isinstance(x[0], datetime.datetime):
+			x_is_date = True
+		else:
+			x_is_date = False
+		if isinstance(y[0], datetime.datetime):
+			y_is_date = True
+		else:
+			y_is_date = False
+		plot_ax_frame(ax, x_is_date=x_is_date, y_is_date=y_is_date, **frame_args)
 
 	## Colorbar
 	cbar = pylab.colorbar(sm, ax=ax, **cbar_args)
@@ -602,6 +620,8 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 	## Restore default style if we get here
 	pylab.style.use('default')
 
+plot_density.__doc__ += (ax_frame_doc + common_doc)
+
 
 def plot_histogram(datasets, bins, data_is_binned=False,
 				histogram_type='bar', cumulative=False, stacked=True, normed=False,
@@ -620,7 +640,7 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 				xgrid=0, ygrid=0,
 				hlines=[], hline_args={}, vlines=[], vline_args={},
 				legend_location=0, legend_fontsize='medium',
-				style_sheet='classic', border_width=0.2,
+				style_sheet='classic', border_width=0.2, skip_frame=False,
 				fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Plot histograms
@@ -641,7 +661,8 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 							'align', 'bar_width', 'baseline', 'colors', 'labels',
 							'line_color', 'line_width',
 							'legend_location', 'legend_fontsize', 'style_sheet',
-							'border_width', 'fig_filespec', 'figsize', 'dpi', 'ax']}
+							'border_width', 'skip_frame', 'fig_filespec',
+							'figsize', 'dpi', 'ax']}
 
 	from itertools import cycle
 
@@ -694,7 +715,8 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 			log=log, weights=weights)
 
 	## Frame
-	plot_ax_frame(ax, **frame_args)
+	if not skip_frame:
+		plot_ax_frame(ax, **frame_args)
 
 	## Legend
 	legend_fontsize = legend_fontsize or tick_label_fontsize
@@ -718,6 +740,8 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 
 	## Restore default style if we get here
 	pylab.style.use('default')
+
+plot_histogram.__doc__ += (ax_frame_doc + common_doc)
 
 
 def grid_center_to_edge_coordinates(Xc, Yc):
@@ -811,7 +835,7 @@ def plot_grid(data, X=None, Y=None,
 			title='', title_fontsize='large',
 			xgrid=0, ygrid=0,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
-			style_sheet='classic', border_width=0.2,
+			style_sheet='classic', border_width=0.2, skip_frame=False,
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
 	"""
 	Plot raster or mesh data
@@ -928,8 +952,6 @@ def plot_grid(data, X=None, Y=None,
 	:param alpha:
 		float in the range 0 - 1, grid opacity
 		(default: 1)
-
-	See :func:`plot_xy` for additional keyword arguments
 	"""
 	frame_args = {key: val for (key, val) in locals().items()
 				if not key in ['data', 'X', 'Y', 'cmap', 'norm', 'vmin', 'vmax',
@@ -941,7 +963,8 @@ def plot_grid(data, X=None, Y=None,
 							'cbar_extend', 'cbar_lines', 'contour_lines',
 							'contour_color', 'contour_width', 'contour_style',
 							'contour_labels', 'alpha', 'style_sheet', 'border_width',
-							'fig_filespec', 'figsize', 'dpi', 'ax', 'kwargs']}
+							'skip_frame', 'fig_filespec', 'figsize', 'dpi',
+							'ax', 'kwargs']}
 
 	from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 	from matplotlib.colors import BoundaryNorm
@@ -1059,7 +1082,8 @@ def plot_grid(data, X=None, Y=None,
 		#[txt.set_bbox(bbox_args) for txt in clabels]
 
 	## Frame
-	plot_ax_frame(ax, x_is_date=False, y_is_date=False, **frame_args)
+	if not skip_frame:
+		plot_ax_frame(ax, x_is_date=False, y_is_date=False, **frame_args)
 
 	## Color bar
 	if colorbar:
@@ -1180,6 +1204,8 @@ def plot_grid(data, X=None, Y=None,
 	## Restore default style if we get here
 	pylab.style.use('default')
 
+plot_grid.__doc__ += (ax_frame_doc + common_doc)
+
 
 def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 				xscaling='lin', yscaling='lin',
@@ -1204,39 +1230,6 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	:para y_is_date:
 		bool, whether or not Y axis contains datetimes
 		(default: False)
-
-	:param xscaling:
-	:param yscaling:
-	:param xmin:
-	:param xmax:
-	:param ymin:
-	:param ymax:
-	:param xlabel:
-	:param ylabel:
-	:param ax_label_fontsize:
-	:param xticks:
-	:param xticklabels:
-	:param xtick_interval:
-	:param xtick_rotation:
-	:param xtick_direction:
-	:param xtick_side:
-	:param yticks:
-	:param yticklabels:
-	:param ytick_interval:
-	:param ytick_rotation:
-	:param ytick_direction:
-	:param ytick_side:
-	:param tick_label_fontsize:
-	:param tick_params:
-	:param title:
-	:param title_fontsize:
-	:param xgrid:
-	:param ygrid:
-	:param hlines:
-	:param hline_args:
-	:param vlines:
-	:param vline_args:
-		see :func:`plot_xy`
 
 	:return:
 		None
@@ -1454,3 +1447,5 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 	## Title
 	if title:
 		ax.set_title(title, fontsize=title_fontsize)
+
+plot_ax_frame.__doc__ += ax_frame_doc
