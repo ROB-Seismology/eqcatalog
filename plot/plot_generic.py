@@ -968,7 +968,7 @@ def plot_grid(data, X=None, Y=None,
 
 	from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 	from matplotlib.colors import BoundaryNorm
-	from matplotlib.colorbar import make_axes
+	from matplotlib.colorbar import make_axes, ColorbarBase
 	from mapping.layeredbasemap.cm.norm import (PiecewiseLinearNorm,
 												PiecewiseConstantNorm)
 
@@ -982,7 +982,7 @@ def plot_grid(data, X=None, Y=None,
 	## Determine if we need center or edge coordinates or both
 	need_center_coordinates = False
 	need_edge_coordinates = False
-	if smoothed or shading or contour_lines not in (None, 0):
+	if smoothed or shading or contour_lines is not None or contour_lines != 0:
 		need_center_coordinates = True
 	if not smoothed:
 		need_edge_coordinates = True
@@ -1020,7 +1020,8 @@ def plot_grid(data, X=None, Y=None,
 			raise Exception('Dimensions of data and coordinates do not match!')
 
 	## Mask NaN values
-	data = np.ma.masked_array(data, mask=np.isnan(data))
+	if not isinstance(data, np.ma.MaskedArray):
+		data = np.ma.masked_array(data, mask=np.isnan(data))
 
 	## Try to convert to piecewise constant norm or limit the number of colors
 	## in the color palette if color_gradient is 'discontinuous'
@@ -1041,15 +1042,17 @@ def plot_grid(data, X=None, Y=None,
 	if smoothed:
 		## data must have same size as X and Y for contourf
 		if color_gradient[:4] == 'disc':
+			V = norm.breakpoints
 			if X is None and Y is None:
-				cs = ax.contourf(data, **common_kwargs)
+				cs = ax.contourf(data, V, **common_kwargs)
 			else:
-				cs = ax.contourf(Xc, Yc, data, **common_kwargs)
+				cs = ax.contourf(Xc, Yc, data, V, **common_kwargs)
 		else:
+			V = 1100
 			if X is None and Y is None:
-				cs = ax.contourf(data, 256, **common_kwargs)
+				cs = ax.contourf(data, V, **common_kwargs)
 			else:
-				cs = ax.contourf(Xc, Yc, data, 256, **common_kwargs)
+				cs = ax.contourf(Xc, Yc, data, V, **common_kwargs)
 
 	else:
 		## both pcolor and pcolormesh need edge coordinates,
@@ -1057,7 +1060,7 @@ def plot_grid(data, X=None, Y=None,
 		if X is None and Y is None:
 			shading = {True: 'gouraud', False: 'flat'}[shading]
 			cs = ax.pcolormesh(data, shading=shading, **common_kwargs)
-			# or use imshow?
+			# or use imshow, which has interpolation possibilities?
 
 		else:
 			if shading:
@@ -1066,7 +1069,7 @@ def plot_grid(data, X=None, Y=None,
 				cs = ax.pcolormesh(Xe, Ye, data, shading='flat', **common_kwargs)
 
 	## Contour lines
-	if contour_lines:
+	if contour_lines is not None:
 		# X and Y must have same shape as data !
 		cl = ax.contour(Xc, Yc, data, contour_lines, colors=contour_color,
 					linewidths=contour_width, linestyles=contour_style)
@@ -1074,7 +1077,7 @@ def plot_grid(data, X=None, Y=None,
 		## Contour labels:
 		if contour_labels is None:
 			contour_labels = contour_lines
-		if contour_labels:
+		if contour_labels is not None:
 			clabels = ax.clabel(cl, contour_labels, colors=contour_color, inline=True,
 								fontsize=tick_label_fontsize, fmt=cbar_label_format)
 		# TODO: white background for contour labels
@@ -1158,7 +1161,6 @@ def plot_grid(data, X=None, Y=None,
 				loc = cbar_align + ' ' + cbar_location
 			width = '%.0f%%' % (width * 100)
 			height = '%.0f%%' % (height * 100)
-			print(width, height)
 			loc = loc.replace('top', 'upper').replace('bottom', 'lower')
 			loc = {'upper right': 1,
 					'upper left': 2,
@@ -1174,7 +1176,20 @@ def plot_grid(data, X=None, Y=None,
 							borderpad=cax_padding)
 
 		if cax:
-			cbar = pylab.colorbar(cs, cax=cax, orientation=cbar_orientation,
+			#cbar = pylab.colorbar(cs, cax=cax, orientation=cbar_orientation,
+			#				spacing=cbar_spacing, ticks=cbar_ticks,
+			#				format=cbar_label_format, extend=cbar_extend,
+			#				drawedges=cbar_lines)
+			if color_gradient == 'disc':
+				boundaries = norm.breakpoints
+				if cbar_extend in ('left', 'both'):
+					boundaries = np.hstack([[-1E+12], boundaries])
+				if cbar_extend in ('right', 'both'):
+					boundaries = np.hstack([boundaries, [1E+12]])
+			else:
+				boundaries = None
+			cbar = ColorbarBase(cax, cmap=cmap, norm=norm,
+							boundaries=boundaries, orientation=cbar_orientation,
 							spacing=cbar_spacing, ticks=cbar_ticks,
 							format=cbar_label_format, extend=cbar_extend,
 							drawedges=cbar_lines)
