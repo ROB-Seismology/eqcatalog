@@ -3879,9 +3879,9 @@ class EQCatalog(object):
 		Mmin=None, Mmax=None, dM=None,
 		Mtype="MW", Mrelation={},
 		start_date=None, end_date=None,
-		color='b',
+		colors=[],
 		title=None, legend_location=0,
-		fig_filespec="", fig_width=0, dpi=300,
+		fig_filespec="", dpi=300,
 		ax=None,
 		**kwargs):
 		"""
@@ -3919,10 +3919,10 @@ class EQCatalog(object):
 			Int or instance of :class:`datetime.date` or :class:`np.datetime64`,
 			upper year or date to bin
 			(default: None)
-		:param color:
-			String, matplotlib color specification for histogram bars
-			if :param:`dM` is set, this may also be a list of color specs
-			(default: 'b')
+		:param colors:
+			list of matplotlib color specifications for histogram bars
+			(one or more, depending on whether :param:`dM` is set)
+			(default: [])
 		:param title:
 			String, title (None = default title, empty string = no title)
 			(default: None)
@@ -3932,59 +3932,35 @@ class EQCatalog(object):
 		:param fig_filespec:
 			String, full path to output image file, if None plot to screen
 			(default: None)
-		:param fig_width:
-			Float, figure width in cm, used to recompute :param:`dpi` with
-			respect to default figure width (default: 0)
 		:param dpi:
 			Int, image resolution in dots per inch (default: 300)
 		:param ax:
 			matplotlib Axes instance
 			(default: None)
 		"""
-		from .plot.plot_generic import plot_histogram
+		from .plot.plot_catalog import plot_depth_histogram
 
-		if ax is None:
-			ax = pylab.axes()
-		else:
-			fig_filespec = "hold"
+		catalog = self.subselect(start_date=start_date, end_date=end_date)
 
 		if dM:
+			catalogs, labels = [], []
 			## Compute depth histogram for each magnitude bin
 			assert not None in (Mmin, Mmax)
 			_, bins_mag = self.bin_by_mag(Mmin, Mmax, dM=dM, Mtype=Mtype,
 										Mrelation=Mrelation)
-			bins_N = []
+
 			for mmin in bins_mag[::-1]:
 				mmax = mmin + dM
-				bins_n, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width,
-						depth_error, mmin, mmax, Mtype, Mrelation, start_date, end_date,
-						include_right_edge=True)
-				bins_N.append(bins_n)
+				subcatalog = self.subselect(Mmin=mmin, Mmax=mmax, Mtype=Mtype,
+								Mrelation=Mrelation, include_right_edges=False)
+				catalogs.append(subcatalog)
+				labels.append('M=[%.1f-%.1f[' % (mmin, mmax))
 
 		else:
-			bins_N, bins_depth = self.bin_by_depth(min_depth, max_depth, bin_width,
-					depth_error, Mmin, Mmax, Mtype, Mrelation, start_date, end_date,
-					include_right_edge=True)
-			bins_N = [bins_N]
-			colors = [color]
-			bins_mag = [Mmin]
-
-		if normalized:
-			total_num = np.sum(map(np.sum, bins_N)) * 1.0
-			bins_N = [bins_n.astype('f') / total_num for bins_n in bins_N]
-
-		labels = []
-		for mmin in bins_mag[::-1]:
-			if dM:
-				label = "M %.1f - %.1f" % (mmin, mmin + dM)
-			else:
-				label = "_nolegend_"
-			labels.append(label)
-
-		xlabel = "Number of events"
-		if normalized:
-			xlabel += " (%)"
-		ylabel = "Depth (km)"
+			subcatalog = self.subselect(Mmin=Mmin, Mmax=Mmax, Mtype=Mtype,
+							Mrelation=Mrelation, include_right_edges=True)
+			catalogs = [subcatalog]
+			labels = ["_nolegend_"]
 
 		if title is None:
 			if Mmin is None:
@@ -3994,10 +3970,10 @@ class EQCatalog(object):
 			title = "Depth histogram: M %.1f - %.1f" % (Mmin, Mmax)
 
 		stacked = (dM is not None)
-		return plot_histogram(bins_N, bins_depth, labels=labels, data_is_binned=True,
-							stacked=stacked, orientation='horizontal',
-							xlabel=xlabel, ylabel=ylabel, yscaling='-lin',
-							ymin=min_depth, ymax=max_depth,
+		return plot_depth_histogram(catalogs, labels=labels, stacked=stacked,
+							min_depth=min_depth, max_depth=max_depth,
+							bin_width=bin_width, depth_error=depth_error,
+							normalized=normalized,
 							title=title, legend_location=legend_location,
 							fig_filespec=fig_filespec, dpi=dpi, ax=ax, **kwargs)
 
