@@ -19,7 +19,7 @@ from .plot_generic import plot_xy
 
 
 __all__ = ['plot_time_magnitude', 'plot_cumulated_moment', 'plot_depth_statistics',
-			'plot_map']
+			'plot_depth_histogram', 'plot_map']
 
 
 def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
@@ -851,6 +851,102 @@ def plot_depth_statistics(
 		pylab.clf()
 	else:
 		pylab.show()
+
+
+def plot_depth_histogram(catalogs, labels=[], colors=[], stacked=False,
+	min_depth=0, max_depth=30, bin_width=2,
+	depth_error=None,
+	normalized=False,
+	title=None, legend_location=0,
+	fig_filespec="", dpi=300,
+	ax=None,
+	**kwargs):
+	"""
+	Plot histogram with number of earthquakes versus depth.
+
+	:param catalogs:
+		list containing instances of :class:`EQCatalog`
+	:param labels:
+		list containing plot labels, one for each catalog
+		(default: [])
+	:param colors:
+		list containing matplotlib color specifications for histogram bars
+		corresponding to each catalog
+		(default: [])
+	:param stacked:
+		bool, whether or not histograms should be stacked
+		(default: False)
+	:param min_depth:
+		float, minimum depth in km
+		(default: 0)
+	:param max_depth:
+		float, maximum depth in km
+		(default: 30)
+	:param bin_width:
+		float, bin width in km
+		(default: 2)
+	:param depth_error:
+		float, maximum depth uncertainty
+		(default: None)
+	:param normalized:
+		bool, whether or not bin numbers should be normalized
+		If :param:`stacked` is True, bin numbers are normalized with
+		respect to total number of events in combined catalogs, else
+		bin numbers are normalized with respect to number of events in
+		each separate catalog
+		(default: False)
+	:param title:
+		string, title (None = default title, empty string = no title)
+		(default: None)
+	:param legend_location:
+		int, matplotlib legend location code
+		(default: 0)
+	:param fig_filespec:
+		string, full path to output image file, if None plot to screen
+		(default: None)
+	:param dpi:
+		int, image resolution in dots per inch (default: 300)
+	:param ax:
+		matplotlib Axes instance
+		(default: None)
+	"""
+	from .plot_generic import plot_histogram
+
+	bins_N = []
+	for catalog in catalogs:
+		bins_n, bins_depth = catalog.bin_by_depth(min_depth, max_depth, bin_width,
+				depth_error, include_right_edge=True)
+		bins_N.append(bins_n)
+
+	if normalized:
+		if stacked:
+			## Normalize to total number of events in all catalogs
+			total_num = np.sum(map(np.sum, bins_N)) * 1.0
+			bins_N = [bins_n.astype('f') / total_num for bins_n in bins_N]
+		else:
+			## Normalize to number of events in each separate catalog
+			bins_N = [bins_n.astype('f') / np.sum(bins_n) for bins_n in bins_N]
+
+	if not labels:
+		labels = [catalog.name for catalog in catalogs]
+
+	xlabel = kwargs.pop('xlabel', "Number of events")
+	if normalized:
+		xlabel += " (%)"
+	ylabel = kwargs.pop('ylabel', "Depth (km)")
+
+	if title is None:
+		title = 'Depth histogram'
+
+	orientation = kwargs.pop('orientation', 'horizontal')
+	yscaling = kwargs.pop('yscaling', '-lin')
+
+	return plot_histogram(bins_N, bins_depth, labels=labels, data_is_binned=True,
+						stacked=stacked, orientation=orientation,
+						xlabel=xlabel, ylabel=ylabel, yscaling=yscaling,
+						ymin=min_depth, ymax=max_depth,
+						title=title, legend_location=legend_location,
+						fig_filespec=fig_filespec, dpi=dpi, ax=ax, **kwargs)
 
 
 def plot_catalogs_map(catalogs, labels=[],
