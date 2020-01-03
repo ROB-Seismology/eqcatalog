@@ -23,7 +23,7 @@ from matplotlib.font_manager import FontProperties
 
 
 __all__ = ['plot_xy', 'plot_density', 'plot_histogram', 'plot_grid',
-			'plot_ax_frame']
+			'plot_ax_frame', 'show_or_save_plot']
 
 
 MPL_FONT_SIZES = ['xx-small', 'x-small', 'small', 'medium',
@@ -189,6 +189,10 @@ ax_frame_doc = """
 	:param ygrid:
 		int, 0/1/2/3 = draw no/major/minor/major+minor Y grid lines
 		(default: 0)
+	:param aspect_ratio:
+		float, vertical-to-horizontal aspect ratio in data units
+		or str ('equal', 'auto')
+		(default: None)
 	:param hlines:
 		[y, xmin, xmax] list of arrays (of same length) or scalars
 		If xmin or xmax are None, limits of X axis will be used
@@ -258,8 +262,8 @@ common_doc = """
 		(default: None, will generate new Axes instance)
 
 	:return:
-		matplotlib Axes instance if :param:`fig_filespec` is set to
-		'wait', else None
+		matplotlib Axes instance if :param:`fig_filespec` is either None
+		or 'wait', else None
 """
 
 
@@ -277,7 +281,7 @@ def plot_xy(datasets,
 			ytick_direction='', ytick_side='',
 			tick_label_fontsize='medium', tick_params={},
 			title='', title_fontsize='large',
-			xgrid=0, ygrid=0,
+			xgrid=0, ygrid=0, aspect_ratio=None,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			legend_location=0, legend_fontsize='medium',
 			style_sheet='classic', border_width=0.2, skip_frame=False,
@@ -454,17 +458,8 @@ def plot_xy(datasets,
 	#	fig.tight_layout(pad=0)
 
 	## Output
-	if fig_filespec == "wait":
-		return ax
-	elif fig_filespec:
-		kwargs = {}
-		if border_width is not None:
-			kwargs = dict(bbox_inches="tight", pad_inches=border_width/2.54)
-		fig.savefig(fig_filespec, dpi=dpi, **kwargs)
-		pylab.clf()
-	else:
-		pylab.show()
-		return ax
+	return show_or_save_plot(ax, fig_filespec=fig_filespec, dpi=dpi,
+							border_width=border_width)
 
 	## Restore default style if we get here
 	pylab.style.use('default')
@@ -482,7 +477,7 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 			yticks=None, yticklabels=None, ytick_interval=None, ytick_rotation=0,
 			tick_label_fontsize='medium', tick_params={},
 			ytick_direction='', ytick_side='',
-			xgrid=0, ygrid=0,
+			xgrid=0, ygrid=0, aspect_ratio=None,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			title='', title_fontsize='large',
 			style_sheet='classic', border_width=0.2, skip_frame=False,
@@ -605,17 +600,8 @@ def plot_density(x, y, grid_size, density_type='hist2d', min_cnt=None, max_cnt=N
 	cbar.set_label(cbar_label)
 
 	## Output
-	if fig_filespec == "wait":
-		return ax
-	elif fig_filespec:
-		kwargs = {}
-		if border_width is not None:
-			kwargs = dict(bbox_inches="tight", pad_inches=border_width/2.54)
-		fig.savefig(fig_filespec, dpi=dpi, **kwargs)
-		pylab.clf()
-	else:
-		pylab.show()
-		return ax
+	return show_or_save_plot(ax, fig_filespec=fig_filespec, dpi=dpi,
+							border_width=border_width)
 
 	## Restore default style if we get here
 	pylab.style.use('default')
@@ -637,7 +623,7 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 				ytick_direction='', ytick_side='',
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
-				xgrid=0, ygrid=0,
+				xgrid=0, ygrid=0, aspect_ratio=None,
 				hlines=[], hline_args={}, vlines=[], vline_args={},
 				legend_location=0, legend_fontsize='medium',
 				style_sheet='classic', border_width=0.2, skip_frame=False,
@@ -726,17 +712,8 @@ def plot_histogram(datasets, bins, data_is_binned=False,
 		ax.legend(loc=legend_location, prop=legend_font)
 
 	## Output
-	if fig_filespec == "wait":
-		return ax
-	elif fig_filespec:
-		kwargs = {}
-		if border_width is not None:
-			kwargs = dict(bbox_inches="tight", pad_inches=border_width/2.54)
-		pylab.savefig(fig_filespec, dpi=dpi, **kwargs)
-		pylab.clf()
-	else:
-		pylab.show()
-		return ax
+	return show_or_save_plot(ax, fig_filespec=fig_filespec, dpi=dpi,
+							border_width=border_width)
 
 	## Restore default style if we get here
 	pylab.style.use('default')
@@ -821,7 +798,7 @@ def plot_grid(data, X=None, Y=None,
 			colorbar=True, cax=None, cax_size=0.1, cax_padding=0.1, cax_shrink=1.,
 			cbar_length=1., cbar_aspect=20, cbar_location='bottom center',
 			cbar_spacing='uniform', cbar_ticks=None, cbar_label_format=None,
-			cbar_title='', cbar_extend='neither', cbar_lines=False,
+			cbar_title='', cbar_extend='neither', cbar_lines=False, cbar_range='full',
 			contour_lines=None, contour_color='k', contour_width=0.5,
 			contour_style='-', contour_labels=None, alpha=1,
 			xscaling='lin', yscaling='lin',
@@ -833,7 +810,7 @@ def plot_grid(data, X=None, Y=None,
 			ytick_direction='', ytick_side='',
 			tick_label_fontsize='medium', tick_params={},
 			title='', title_fontsize='large',
-			xgrid=0, ygrid=0,
+			xgrid=0, ygrid=0, aspect_ratio=None,
 			hlines=[], hline_args={}, vlines=[], vline_args={},
 			style_sheet='classic', border_width=0.2, skip_frame=False,
 			fig_filespec=None, figsize=None, dpi=300, ax=None):
@@ -930,6 +907,10 @@ def plot_grid(data, X=None, Y=None,
 		bool, whether or not lines should be drawn at color boundaries
 		in colorbar
 		(default: False)
+	:param cbar_range:
+		str, colorbar range, indicating if colorbar should show full
+		range in colormap ('full') or only the data range ('data')
+		(default: 'full')
 	:param contour_lines:
 		int, list or array, values of contour lines to be drawn on top of grid:
 		- 'None' or 0 = no contours
@@ -960,7 +941,7 @@ def plot_grid(data, X=None, Y=None,
 							'cax_shrink', 'cbar_length', 'cbar_aspect',
 							'cbar_location', 'cbar_spacing',
 							'cbar_ticks', 'cbar_label_format', 'cbar_title',
-							'cbar_extend', 'cbar_lines', 'contour_lines',
+							'cbar_extend', 'cbar_lines', 'cbar_range', 'contour_lines',
 							'contour_color', 'contour_width', 'contour_style',
 							'contour_labels', 'alpha', 'style_sheet', 'border_width',
 							'skip_frame', 'fig_filespec', 'figsize', 'dpi',
@@ -975,6 +956,8 @@ def plot_grid(data, X=None, Y=None,
 	pylab.style.use(style_sheet)
 
 	if ax is None:
+		if fig_filespec:
+			pylab.ioff()
 		fig, ax = pylab.subplots(figsize=figsize)
 	else:
 		fig = ax.get_figure()
@@ -1117,11 +1100,15 @@ def plot_grid(data, X=None, Y=None,
 			cax, _ = make_axes(ax, location=cbar_location, fraction=cax_size,
 							aspect=cbar_aspect, shrink=cax_shrink, pad=cax_padding)
 
+			## Necessary for ax.get_position to return correct size
+			ax.apply_aspect()
+			ax_pos = ax.get_position(original=False)
+
 			cax_pos = cax.get_position()
 			left, bottom = cax_pos.x0, cax_pos.y0
 			width, height = cax_pos.width, cax_pos.height
-			#print(left, bottom, width, height)
 			if cbar_orientation == 'vertical':
+				bottom, height = ax_pos.y0, ax_pos.height
 				unshrinked_height = height / cax_shrink
 				center = bottom + height / 2
 				height *= cbar_length
@@ -1133,6 +1120,7 @@ def plot_grid(data, X=None, Y=None,
 				elif cbar_align == 'bottom':
 					bottom = center - unshrinked_height / 2
 			elif cbar_orientation == 'horizontal':
+				left, width = ax_pos.x0, ax_pos.width
 				unshrinked_width = width / cax_shrink
 				center = left + width / 2
 				width *= cbar_length
@@ -1176,23 +1164,33 @@ def plot_grid(data, X=None, Y=None,
 							borderpad=cax_padding)
 
 		if cax:
-			#cbar = pylab.colorbar(cs, cax=cax, orientation=cbar_orientation,
-			#				spacing=cbar_spacing, ticks=cbar_ticks,
-			#				format=cbar_label_format, extend=cbar_extend,
-			#				drawedges=cbar_lines)
+			sm = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
+			sm.set_array(data)
 			if color_gradient == 'disc':
 				boundaries = norm.breakpoints
 				if cbar_extend in ('left', 'both'):
 					boundaries = np.hstack([[-1E+12], boundaries])
 				if cbar_extend in ('right', 'both'):
 					boundaries = np.hstack([boundaries, [1E+12]])
+				if cbar_range == 'data':
+					start = np.where(boundaries < np.nanmin(data))[0][-1]
+					end = np.where(boundaries > np.nanmax(data))[0][0]
+					boundaries = boundaries[start:end+1]
 			else:
 				boundaries = None
-			cbar = ColorbarBase(cax, cmap=cmap, norm=norm,
-							boundaries=boundaries, orientation=cbar_orientation,
+				if cbar_range == 'data':
+					sm.set_clim(vmin=np.nanmin(data), vmax=np.nanmax(data))
+
+			cbar = pylab.colorbar(sm, cax=cax, orientation=cbar_orientation,
 							spacing=cbar_spacing, ticks=cbar_ticks,
 							format=cbar_label_format, extend=cbar_extend,
-							drawedges=cbar_lines)
+							drawedges=cbar_lines, boundaries=boundaries)
+			#elif cbar_range == 'full':
+			#	cbar = ColorbarBase(cax, cmap=cmap, norm=norm,
+			#				boundaries=boundaries, orientation=cbar_orientation,
+			#				spacing=cbar_spacing, ticks=cbar_ticks,
+			#				format=cbar_label_format, extend=cbar_extend,
+			#				drawedges=cbar_lines)
 
 		if cbar_orientation == 'horizontal':
 			cbar.set_label(cbar_title, size=ax_label_fontsize)
@@ -1204,6 +1202,39 @@ def plot_grid(data, X=None, Y=None,
 
 
 	## Output
+	return show_or_save_plot(ax, fig_filespec=fig_filespec, dpi=dpi,
+							border_width=border_width)
+
+	## Restore default style if we get here
+	pylab.style.use('default')
+
+plot_grid.__doc__ += (ax_frame_doc + common_doc)
+
+
+def show_or_save_plot(ax, fig_filespec=None, dpi=300, border_width=0.2):
+	"""
+	Show plot on screen or save it to a file
+
+	:param fig_filespec:
+		str, full path to output file
+		If None, will plot on screen
+		If 'wait', plotting is deferred
+		(default: None)
+	:param dpi:
+		int, resolution of plot,
+		only applies if :param:`fig_filespec` is set to output file
+		(default: 300)
+	:param border_width:
+		float, width of border around plot frame in cm
+		If None, white space will not be removed
+		(default: 0.2)
+
+	:return:
+		matplotlib Axes instance if :param:`fig_filespec` is either None
+		or 'wait', else None
+	"""
+	fig = ax.get_figure()
+
 	if fig_filespec == "wait":
 		return ax
 	elif fig_filespec:
@@ -1213,13 +1244,10 @@ def plot_grid(data, X=None, Y=None,
 		fig.savefig(fig_filespec, dpi=dpi, **kwargs)
 		pylab.clf()
 	else:
+		## Note, using fig.show(), the plot disappears immediately!
+		#fig.show()
 		pylab.show()
 		return ax
-
-	## Restore default style if we get here
-	pylab.style.use('default')
-
-plot_grid.__doc__ += (ax_frame_doc + common_doc)
 
 
 def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
@@ -1232,7 +1260,7 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 				ytick_direction='', ytick_side='',
 				tick_label_fontsize='medium', tick_params={},
 				title='', title_fontsize='large',
-				xgrid=0, ygrid=0,
+				xgrid=0, ygrid=0, aspect_ratio=None,
 				hlines=[], hline_args={}, vlines=[], vline_args={}):
 	"""
 	Plot ax frame
@@ -1271,6 +1299,10 @@ def plot_ax_frame(ax, x_is_date=False, y_is_date=False,
 		ax.invert_yaxis()
 	yscaling = {'lin': 'linear', 'log': 'log'}[yscaling[:3]]
 	ax.set_yscale(yscaling)
+
+	## Vertical / horizontal aspect ratio (in data units)
+	if aspect_ratio is not None:
+		ax.set_aspect(aspect_ratio)
 
 	## Axis labels
 	if xlabel:
