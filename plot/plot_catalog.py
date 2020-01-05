@@ -14,8 +14,8 @@ import pylab
 import matplotlib
 from matplotlib.dates import AutoDateLocator, DateFormatter
 
+from plotting.generic_mpl import plot_xy
 import eqcatalog.time_functions_np as tf
-from .plot_generic import plot_xy
 
 
 __all__ = ['plot_time_magnitude', 'plot_cumulated_moment', 'plot_depth_statistics',
@@ -91,7 +91,7 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 		str, language of plot labels
 		(default: 'en')
 
-	See :func:`eqcatalog.plot.plot_generic.plot_xy` for additional
+	See :func:`plotting.generic_mpl.plot_xy` for additional
 	keyword arguments
 	"""
 	if start_date is None:
@@ -263,7 +263,7 @@ def plot_cumulated_moment(catalogs,
 		float, maximum moment value in Y axis
 		(default: None)
 
-	See :func:`eqcatalog.plot.plot_generic.plot_xy` for additional
+	See :func:`plotting.generic_mpl.plot_xy` for additional
 	keyword arguments
 	"""
 	if start_date is None:
@@ -910,7 +910,7 @@ def plot_depth_histogram(catalogs, labels=[], colors=[], stacked=False,
 		matplotlib Axes instance
 		(default: None)
 	"""
-	from .plot_generic import plot_histogram
+	from plotting.generic_mpl import plot_histogram
 
 	bins_N = []
 	for catalog in catalogs:

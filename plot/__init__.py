@@ -24,14 +24,7 @@ else:
 
 ## Import submodules
 
-## plot_generic
-if not reloading:
-  from . import plot_generic
-else:
-  reload(plot_generic)
-from .plot_generic import *
-
-## plot_catalog (depends on plot_generic)
+## plot_catalog
 if not reloading:
   from . import plot_catalog
 else:
