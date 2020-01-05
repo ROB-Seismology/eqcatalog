@@ -2325,7 +2325,7 @@ class MacroseismicEnquiryEnsemble():
 		"""
 		Plot histogram of individual questionnaire intensities
 		"""
-		from ..plot.plot_generic import plot_histogram
+		from plotting.generic_mpl import plot_histogram
 
 		cii = self.calc_cii(aggregate=False, include_other_felt=include_other_felt,
 							include_heavy_appliance=include_heavy_appliance)
