@@ -3343,10 +3343,10 @@ class EQCatalog(object):
 			str, label to use for histogram
 			(default: '')
 
-		See :func:`plot.plot_generic.plot_histogram` for additional
+		See :func:`plotting.generic_mpl.plot_histogram` for additional
 		keyword arguments
 		"""
-		from .plot.plot_generic import plot_histogram
+		from plotting.generic_mpl import plot_histogram
 
 		bins_N, bins_mag = self.bin_by_mag(Mmin, Mmax, dM, completeness=completeness,
 											Mtype=Mtype, Mrelation=Mrelation,
@@ -3481,7 +3481,7 @@ class EQCatalog(object):
 			float, maximum moment value in Y axis
 			(default: None)
 
-		See :func:`eqcatalog.plot.plot_generic.plot_xy` for additional
+		See :func:`plotting.generic_mpl.plot_xy` for additional
 		keyword arguments
 		"""
 		kwargs.update(locals())
@@ -3786,7 +3786,7 @@ class EQCatalog(object):
 		:param lang:
 			String, language of plot labels (default: "en")
 
-		See :func:`eqcatalog.plot.plot_generic.plot_xy` for additional
+		See :func:`plotting.generic_mpl.plot_xy` for additional
 		keyword arguments
 		"""
 		kwargs.update(locals())
@@ -5004,7 +5004,7 @@ class EQCatalog(object):
 		poisson_n = poisson_probs * num_intervals
 
 		## Plot
-		from .plot.plot_generic import plot_histogram, plot_xy
+		from plotting.generic_mpl import plot_histogram, plot_xy
 
 		xlabel = "Number of events per interval"
 		ylabel = "Number of intervals"
@@ -5108,9 +5108,9 @@ class EQCatalog(object):
 			Int, image resolution in dots per inch
 			(default: 300)
 		:param kwargs:
-			see :func:`plot.plot_generic.plot_xy`
+			see :func:`plotting.generic_mpl.plot_xy`
 		"""
-		from .plot.plot_generic import plot_xy
+		from plotting.generic_mpl import plot_xy
 
 		#colors = ['b', 'g', 'r', 'y', 'm', 'c', 'k']
 		max_mag = self.get_Mmax(Mtype=Mtype, Mrelation=Mrelation)
