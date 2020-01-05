@@ -798,9 +798,11 @@ def plot_grid(data, X=None, Y=None,
 			colorbar=True, cax=None, cax_size=0.1, cax_padding=0.1, cax_shrink=1.,
 			cbar_length=1., cbar_aspect=20, cbar_location='bottom center',
 			cbar_spacing='uniform', cbar_ticks=None, cbar_label_format=None,
-			cbar_title='', cbar_extend='neither', cbar_lines=False, cbar_range='full',
+			cbar_label_fontsize=None, cbar_title='', cbar_title_fontsize=None,
+			cbar_extend='neither', cbar_lines=False, cbar_range='full',
 			contour_lines=None, contour_color='k', contour_width=0.5,
-			contour_style='-', contour_labels=None, alpha=1,
+			contour_style='-', contour_labels=None, contour_label_fontsize=None,
+			alpha=1,
 			xscaling='lin', yscaling='lin',
 			xmin=None, xmax=None, ymin=None, ymax=None,
 			xlabel='', ylabel='', ax_label_fontsize='large',
@@ -895,9 +897,15 @@ def plot_grid(data, X=None, Y=None,
 		str or instance of :class:`matplotlib.ticker.Formatter`, format for
 		colorbar tick labels (e.g., '%.2f')
 		(default: None)
+	:param cbar_label_fontsize:
+		int or str, font size to use for axis tick labels
+		(default: None, will use value of :param:`tick_label_fontsize`)
 	:param cbar_title:
 		str, title for colorbar
 		(default: '')
+	:param cbar_title_fontsize:
+		int or str, font size to use for axis tick labels
+		(default: None, will use value of :param:`ax_label_fontsize`)
 	:param cbar_extend:
 		str, if and how colorbar should be extended with triangular
 		ends for out-of-range values, one of 'neither', 'both',
@@ -930,6 +938,9 @@ def plot_grid(data, X=None, Y=None,
 		list, labels for contour lines. If None, use the contour
 		line values; if empty list, no labels will be drawn
 		(default: None)
+	:param contour_label_fontsize:
+		int or str, font size to use for axis tick labels
+		(default: None, will use value of :param:`cbar_label_fontsize`)
 	:param alpha:
 		float in the range 0 - 1, grid opacity
 		(default: 1)
@@ -954,6 +965,13 @@ def plot_grid(data, X=None, Y=None,
 												PiecewiseConstantNorm)
 
 	pylab.style.use(style_sheet)
+
+	if cbar_title_fontsize is None:
+		cbar_title_fontsize = ax_label_fontsize
+	if cbar_label_fontsize is None:
+		cbar_label_fontsize = tick_label_fontsize
+	if contour_label_fontsize is None:
+		contour_label_fontsize = cbar_label_fontsize
 
 	if ax is None:
 		if fig_filespec:
@@ -1062,7 +1080,7 @@ def plot_grid(data, X=None, Y=None,
 			contour_labels = contour_lines
 		if contour_labels is not None:
 			clabels = ax.clabel(cl, contour_labels, colors=contour_color, inline=True,
-								fontsize=tick_label_fontsize, fmt=cbar_label_format)
+								fontsize=contour_label_fontsize, fmt=cbar_label_format)
 		# TODO: white background for contour labels
 		#bbox_args = label_style.to_kwargs()['bbox']
 		#[txt.set_bbox(bbox_args) for txt in clabels]
@@ -1193,10 +1211,10 @@ def plot_grid(data, X=None, Y=None,
 			#				drawedges=cbar_lines)
 
 		if cbar_orientation == 'horizontal':
-			cbar.set_label(cbar_title, size=ax_label_fontsize)
+			cbar.set_label(cbar_title, size=cbar_title_fontsize)
 		else:
-			cbar.ax.set_title(cbar_title, size=ax_label_fontsize)
-		cbar.ax.tick_params(labelsize=tick_label_fontsize)
+			cbar.ax.set_title(cbar_title, size=cbar_title_fontsize)
+		cbar.ax.tick_params(labelsize=cbar_label_fontsize)
 
 		# TODO: boundaries / values, cf. layeredbasemap ?
 
