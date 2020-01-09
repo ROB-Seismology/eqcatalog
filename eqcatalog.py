@@ -718,6 +718,13 @@ class EQCatalog(object):
 		return etype_num_dict
 
 	## Time methods
+	@property
+	def start_year(self):
+		return tf.to_year(self.start_date)
+
+	@property
+	def end_year(self):
+		return tf.to_year(self.end_date)
 
 	def get_datetimes(self):
 		"""
@@ -5131,7 +5138,7 @@ class EQCatalog(object):
 			bins_N_cumul = bins_N_cumul[start_year_index:]
 			#plt.plot(bins_Years, bins_N_cumul, colors[i%len(colors)], label= '%.1f' % magnitude)
 			datasets.append((bins_Years, bins_N_cumul))
-			labels.append('%.1f' % magnitude)
+			labels.append('M>=%.1f' % magnitude)
 			#plt.plot(bins_Years, bins_N_cumul, '%so' % colors[i%len(colors)], label='_nolegend_')
 			#datasets.append((bins_Years, bins_N_cumul))
 			#labels.append('_nolegend_')
@@ -5149,7 +5156,8 @@ class EQCatalog(object):
 		markers = ['o']
 
 		ax = plot_xy(datasets, labels=labels, markers=markers,
-					fig_filespec='wait')
+					fig_filespec='wait', dpi=dpi, ax=kwargs.pop('ax', None),
+					**kwargs)
 
 		## Optional completeness years and regression line
 
@@ -5177,7 +5185,7 @@ class EQCatalog(object):
 		kwargs['ylabel'] = kwargs.get('ylabel', default_ylabel)
 		default_title = 'CUVI completeness analysis for magnitudes %.1f - %.1f'
 		default_title %= (magnitudes[0], magnitudes[-1])
-		kwargs['title'] = title or default_title
+		kwargs['title'] = title if title is not None else default_title
 		kwargs['legend_location'] = kwargs.get('legend_location', 0)
 
 		return plot_xy(datasets, labels=['_nolegend_'], colors=['k'],
@@ -5213,6 +5221,82 @@ class EQCatalog(object):
 		else:
 			pylab.show()
 		"""
+
+	def plot_completeness_evaluation(self, completeness, num_cols=2,
+									Mrelation={},
+									fig_filespec=None, dpi=None,
+									multi_params={}, ax_params={}):
+		"""
+		Evaluate particular completeness
+
+		:param completeness:
+			instance of :class:`Completeness`
+		:param num_cols:
+			int, number of columns
+			(default: 2)
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML")
+			(default: {})
+		:param fig_filespec:
+			str or None, full path to output file
+			(default: None, will plot on screen)
+		:param dpi:
+			int, resolution in dots per inch
+			(default: None)
+
+		"""
+		from string import ascii_lowercase
+		from plotting.generic_mpl import (create_multi_plot, show_or_save_plot)
+
+		num_plots = len(completeness) - 1
+		num_rows = int(np.ceil(num_plots / float(num_cols)))
+
+		if fig_filespec is None:
+			dpi = 90
+
+		labels = ascii_lowercase[:num_plots]
+		fig = create_multi_plot(num_cols=num_cols, num_rows=num_rows,
+								sharex=False, sharey=False,
+								share_xlabel=True, share_ylabel=True,
+								xlabel='Time (years)',
+								ylabel='Cumulative number of earthquakes',
+								labels=labels, label_loc=4, ax_size=(7.5, 5.),
+								dpi=dpi, **multi_params)
+
+		for i in range(num_plots):
+			ax = fig.axes[i]
+			year1 = completeness.min_years[i]
+			year2 = completeness.min_years[i+1]
+			if i > 0:
+				start_year = completeness.min_years[i-1]
+			else:
+				start_year = self.start_year
+
+			if year1 < 1700:
+				dYear = 20
+			elif year1 < 1800:
+				dYear = 10
+			elif year1 < 1900:
+				dYear = 5
+			elif year1 < 1985:
+				dYear = 2
+			else:
+				dYear = 1
+
+			dM = 0.1
+			mag = completeness.min_mags[i]
+			magnitudes = mag + np.arange(-2, 3) * dM
+
+			self.analyse_completeness_CUVI(magnitudes, start_year, dYear,
+											year1, year2, reg_line=mag,
+											Mtype=completeness.Mtype,
+											Mrelation=Mrelation, ax=ax,
+											xlabel='', ylabel='',
+											title='', legend_location=2,
+											fig_filespec='wait', **ax_params)
+
+		return show_or_save_plot(fig, fig_filespec, dpi=dpi)
 
 	## HMTK wrappers
 
