@@ -570,12 +570,16 @@ class EQCatalog(object):
 		else:
 			return tab.get_string()
 
-	def print_list(self, as_html=False, max_name_width=30, lonlat_decimals=3,
+	def print_list(self, out_file=None, max_name_width=30, lonlat_decimals=3,
 					depth_decimals=1, mag_decimals=1, padding_width=1):
 		"""
 		Print list of earthquakes in catalog
 
-		:param as_html:
+		:param out_file:
+			str, full path to output file
+			If extension starts with .htm, the list is exported in HTML
+			format, else plain text
+			(default: None, will print list to screen)
 		:param max_name_width:
 		:param lonlat_decimals:
 		:param depth_decimals:
@@ -597,8 +601,13 @@ class EQCatalog(object):
 			tab = self.get_formatted_table(max_name_width=max_name_width,
 						lonlat_decimals=lonlat_decimals, depth_decimals=depth_decimals,
 						mag_decimals=mag_decimals, padding_width=padding_width)
-			if as_html:
-				return tab.get_html_string()
+			if out_file:
+				of = open(out_file, 'w')
+				if os.path.splitext(out_file)[-1].lower()[:4] == '.htm':
+					of.write(tab.get_html_string())
+				else:
+					of.write(tab.get_string())
+				of.close()
 			else:
 				print(tab)
 
