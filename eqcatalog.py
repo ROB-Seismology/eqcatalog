@@ -720,11 +720,11 @@ class EQCatalog(object):
 	## Time methods
 	@property
 	def start_year(self):
-		return tf.to_year(self.start_date)
+		return int(tf.to_year(self.start_date))
 
 	@property
 	def end_year(self):
-		return tf.to_year(self.end_date)
+		return int(tf.to_year(self.end_date))
 
 	def get_datetimes(self):
 		"""
