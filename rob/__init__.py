@@ -34,7 +34,7 @@ try:
 	from seismogis_root import SEISMOGIS_ROOT
 except ImportError:
 	try:
-		from mapping.seismogis.seismo_gis import SEISMOGIS_ROOT
+		from mapping.seismogis import SEISMOGIS_ROOT
 	except ImportError:
 		SEISMOGIS_ROOT = ''
 
