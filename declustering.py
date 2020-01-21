@@ -2100,10 +2100,19 @@ def get_window_by_name(window_name):
 def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 	"""
 	Plot time and distance windows of available declustering windows
+
+	:param fig_filespec:
+		str, full path to output file
+		(default: None, will plot to screen)
+	:param dpi:
+		int, resolution in DPI
+		(default: 300)
+	:param **kwargs:
+		see :func:`plotting.generic_mpl.plot_xy`
 	"""
 	import matplotlib.pyplot as plt
 	from .time_functions_np import fractional_time_delta
-	from .plot import plot_xy
+	from plotting.generic_mpl import (plot_xy, create_multi_plot, show_or_save_plot)
 	#from .moment import calc_rupture_radius
 
 	dc_windows = get_available_windows()
@@ -2111,9 +2120,9 @@ def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 	Mmin, Mmax, dM = 0., 9., 0.1
 	mags = np.arange(Mmin, Mmax, dM)
 
-	fig = plt.figure()
-	ax1 = fig.add_subplot(121)
-	ax2 = fig.add_subplot(122)
+	fig = create_multi_plot(num_rows=1, num_cols=2, wspace=0.3, share_ylabel=False,
+							col_titles=('Time window', 'Distance window'))
+	ax1, ax2 = fig.axes[:2]
 
 	tlines, dlines = [], []
 	labels = []
@@ -2126,37 +2135,30 @@ def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 			dlines.append((mags, dw))
 			labels.append(dc_window_name)
 
-	xlabel ='Magnitude ($M_W$)'
-	xgrid = ygrid = 1
-	xtick_interval = (1.0, 0.5)
+	xlabel = kwargs.pop('xlabel', 'Magnitude ($M_W$)')
+	xgrid = kwargs.pop('xgrid', 1)
+	ygrid = kwargs.pop('ygrid', 1)
+	xtick_interval = kwargs.pop('xtick_interval', (1.0, 0.5))
 
 	## Plot time windows
 	ylabel = 'Time (days)'
 	ytick_interval = (250, 50)
 	ymax = 1500
-	title = 'Time window'
-	legend_location = 2
+	title = None
+	legend_location = kwargs.pop('legend_location', 2)
 	plot_xy(tlines, labels=labels, linewidths=[2], xlabel=xlabel, ylabel=ylabel,
 			ytick_interval=ytick_interval, ymax=ymax, xgrid=xgrid, ygrid=ygrid,
-			title=title, ax=ax1, legend_location=legend_location, **kwargs)
+			title=title, ax=ax1, legend_location=legend_location,
+			fig_filespec='wait', **kwargs)
 
 	## Plot space windows
 	ylabel = 'Distance (km)'
 	ytick_interval = (25, 5)
 	ymax = 150
-	title = 'Distance window'
-	plot_xy(tlines, linewidths=[2], xlabel=xlabel, ylabel=ylabel, ytick_interval=ytick_interval,
-			ymax=ymax, xgrid=xgrid, ygrid=ygrid, title=title, ax=ax2, **kwargs)
+	plot_xy(dlines, linewidths=[2], xlabel=xlabel, ylabel=ylabel, ytick_interval=ytick_interval,
+			ymax=ymax, xgrid=xgrid, ygrid=ygrid, title=title, ax=ax2,**kwargs)
 
-	fig.subplots_adjust(wspace=0.5)
-	#fig.legend(lines, labels, 9, bbox_to_anchor=(0.50,0.95), ncol=2, prop={'size': 12})
-	#plt.tight_layout(pad=0.25, w_pad=1.0)
-
-	if fig_filespec:
-		plt.savefig(fig_filespec, dpi=dpi)
-		plt.clf()
-	else:
-		plt.show()
+	return show_or_save_plot(fig, fig_filespec, dpi=dpi)
 
 
 def generate_linked_cluster(dc_window, Mrange=(1, 6), num_events=50):
