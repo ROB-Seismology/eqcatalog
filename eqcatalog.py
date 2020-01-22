@@ -1454,7 +1454,7 @@ class EQCatalog(object):
 			point = ogr.Geometry(ogr.wkbPoint)
 			point.AssignSpatialReference(WGS84)
 
-			if poly_obj.GetGeometryName() in ("POLYGON", "LINESTRING"):
+			if poly_obj.GetGeometryName() in ("MULTIPOLYGON", "POLYGON", "LINESTRING"):
 				## Objects other than polygons or closed polylines will be skipped
 				if poly_obj.GetGeometryName() == "LINESTRING":
 					line_obj = poly_obj
@@ -1474,11 +1474,19 @@ class EQCatalog(object):
 						eq_list.append(eq)
 
 				## Determine bounding box (region)
+				envelope = poly_obj.GetEnvelope()
+				lons, lats = envelope[:2], envelope[2:]
+				"""
 				linear_ring = poly_obj.GetGeometryRef(0)
 				## Note: in some versions of ogr, GetPoints method does not exist
 				#points = linear_ring.GetPoints()
 				points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
 				lons, lats = zip(*points)[:2]
+				"""
+			else:
+				msg = 'Warning: %s not a polygon geometry!'
+				msg %= poly_obj.GetGeometryName()
+				print(msg)
 
 		else:
 			import openquake.hazardlib as oqhazlib
