@@ -971,6 +971,38 @@ class EQCatalog(object):
 					Mtype_counts[comb_Mtype] = 1
 		return Mtype_counts
 
+	def subselect_Mtype(self, Mtypes, catalog_name=""):
+		"""
+		Subselect earthquakes according to their magnitude type(s)
+
+		:param Mtypes:
+			str or list, one or more magnitude types
+		:param catalog_name:
+			str, name of output catalog
+			(default: "")
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		if isinstance(Mtypes, basestring):
+			Mtypes = [Mtypes]
+		else:
+			Mtypes = sorted(Mtypes)
+
+		eq_list = []
+		for eq in self:
+			eq_Mtypes = set(eq.get_Mtypes())
+			if sorted(eq_Mtypes.intersection(Mtypes)) == Mtypes:
+				eq_list.append(eq)
+
+		if not catalog_name:
+			catalog_name = self.name + " (%s)" % ', '.join(Mtypes)
+
+		subcat = EQCatalog(eq_list, self.start_date, self.end_date, self.region,
+						catalog_name, default_Mrelations=self.default_Mrelations,
+						default_completeness=self.default_completeness)
+		return subcat
+
 	def get_M0(self, Mrelation={}):
 		"""
 		Return array with seismic moments for all earthquakes in catalog.
