@@ -113,10 +113,8 @@ def as_np_timedelta(td, unit=None):
 	:return:
 		instance of :class:`np.timedelta64` or array of type timedelta64
 	"""
-	## Note: it is not possible to specify dtype for np.timedelta64
-	## in the same way as for np.datetime64, hence it is not possible
-	## to convert timedelta64 units (this would not be recommended anyway,
-	## as timedelta64 can't be floats, so precision could be lost...)
+	## Note: we do not allow conversion of timedelta64 units because precision
+	## could be lost as timedelta64 can't be floats
 	if is_np_timedelta(td):
 		return td
 	elif isinstance(td, datetime.timedelta):
