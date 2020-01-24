@@ -96,23 +96,40 @@ def as_np_datetime(dt, unit='s'):
 		return np.datetime64(dt.datetime, unit)
 
 
-def as_np_timedelta(td):
+def as_np_timedelta(td, unit=None):
 	"""
 	Convert to numpy timedelta64
 
 	:param td:
 		instance of :class:`datetime.timedelta` or list with such instances
 		or instance of :class:`np.timedelta64` or array of type timedelta64
+		or integer or integer array
+	:param unit:
+		str, one of 'D', 'h', 'm', 's', 'ms', 'us'
+		(day|hour|minute|second|millisecond|microsecond)
+		Only needed if :param:`td` is integer (array)
+		(default: None)
 
 	:return:
 		instance of :class:`np.timedelta64` or array of type timedelta64
 	"""
+	## Note: it is not possible to specify dtype for np.timedelta64
+	## in the same way as for np.datetime64, hence it is not possible
+	## to convert timedelta64 units (this would not be recommended anyway,
+	## as timedelta64 can't be floats, so precision could be lost...)
 	if is_np_timedelta(td):
 		return td
 	elif isinstance(td, datetime.timedelta):
 		return np.timedelta64(td)
 	elif isinstance(td, list):
 		return np.array(td, dtype=np.timedelta64)
+	else:
+		## integers or integer arrays, will throw error if float
+		assert unit in ('W', 'D', 'h', 'm', 's', 'ms', 'us')
+		if isinstance(td, np.ndarray):
+			dtype = 'timedelta64[%s]' % unit
+			return td.astype(dtype)
+		return np.timedelta64(td, unit)
 
 
 def get_datetime_unit(dt64):
