@@ -100,6 +100,10 @@ def as_np_timedelta(td, unit=None):
 	"""
 	Convert to numpy timedelta64
 
+	Note: we do not allow conversion of timedelta64 units because
+	precision could be lost as timedelta64 can't be floats
+	Use :func:`fractional_time_delta` instead
+
 	:param td:
 		instance of :class:`datetime.timedelta` or list with such instances
 		or instance of :class:`np.timedelta64` or array of type timedelta64
@@ -113,8 +117,6 @@ def as_np_timedelta(td, unit=None):
 	:return:
 		instance of :class:`np.timedelta64` or array of type timedelta64
 	"""
-	## Note: we do not allow conversion of timedelta64 units because precision
-	## could be lost as timedelta64 can't be floats
 	if is_np_timedelta(td):
 		return td
 	elif isinstance(td, datetime.timedelta):
