@@ -19,7 +19,7 @@ import eqcatalog.time_functions_np as tf
 
 
 __all__ = ['plot_time_magnitude', 'plot_cumulated_moment', 'plot_depth_statistics',
-			'plot_depth_histogram', 'plot_map']
+			'plot_depth_histogram', 'plot_poisson_test', 'plot_map']
 
 
 def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
@@ -946,6 +946,164 @@ def plot_depth_histogram(catalogs, labels=[], colors=[], stacked=False,
 						xlabel=xlabel, ylabel=ylabel, yscaling=yscaling,
 						ymin=min_depth, ymax=max_depth,
 						title=title, legend_location=legend_location,
+						fig_filespec=fig_filespec, dpi=dpi, ax=ax, **kwargs)
+
+
+def plot_poisson_test(catalogs,
+	Mmin, interval=100,
+	Mtype='MW', Mrelation={},
+	completeness=None,
+	labels=[], bar_colors=None, line_colors=None, title=None,
+	fig_filespec=None, dpi=300, ax=None,
+	verbose=True,
+	**kwargs):
+	"""
+	Plot catalog distribution versus Poisson distribution
+	p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
+
+	First, the specified completeness constraint is applied to the catalog.
+	The completeness-constrained catalog is then truncated to the
+	specified minimum magnitude and corresponding year of completeness.
+	The resulting catalog is divided into intervals of the specified
+	length, the number of events in each interval is counted, and a
+	histogram is computed of the number of intervals having the same
+	number of events up to nmax.
+	This histogram is compared to the theoretical Poisson distribution.
+	It seems to work best if :param:`interval` is larger (2 to 4 times)
+	than tau, the average return period.
+
+	:param catalogs:
+		list containing instances of :class:`EQCatalog`
+	:param Mmin:
+		Float, minimum magnitude to consider in analysis (ideally
+		corresponding to one of the completeness magnitudes)
+	:param interval:
+		Int, length of interval (number of days)
+		(default: 100)
+	:param Mtype:
+		String, magnitude type: "ML", "MS" or "MW"
+		(default: "MW")
+	:param Mrelation:
+		{str: str} dict, mapping name of magnitude conversion relation
+		to magnitude type ("MW", "MS" or "ML")
+		(default: {})
+	:param completeness:
+		instance of :class:`Completeness` containing initial years of
+		completeness and corresponding minimum magnitudes.
+		If None, use start year of catalog
+		(default: None)
+	:param labels:
+		list of strings, labels corresponding to each catalog
+		(default: [])
+	:param bar_colors:
+		list of matplotlib color specs, histogram color for each catalog
+		(default: None)
+	:param line_colors:
+		list of matplotlib color specs, line color for each catalog
+		(default: None, will use same colors as :param:`bar_colors`)
+	:param title:
+		String, plot title. (None = default title, "" = no title)
+		(default: None)
+	:param fig_filespec:
+		String, full path of image to be saved.
+		If None (default), histogram is displayed on screen.
+		:param dpi:
+			int, resolution of output figure in DPI
+			(default: 300)
+	:param ax:
+		matplotlib axes instance in which graph should be plotted
+		(default: None)
+	:param verbose:
+		Bool, whether or not to print additional information
+		(bool True)
+	:param **kwargs:
+		additional keyword arguments to be passed to
+		:func:`plotting.generic_mpl.plot_ax_frame`
+
+	:return:
+		matplotlib axes instance
+	"""
+	from plotting.generic_mpl import plot_histogram, plot_xy
+	from hazard.rshalib.poisson import PoissonT
+
+	PT = PoissonT(interval)
+	time_delta = np.timedelta64(interval, 'D')
+
+	histogram_datasets = []
+	xy_datasets = []
+	catalog_taus = []
+	nmax = 0
+	for catalog in catalogs:
+		## Apply completeness constraint, and truncate result to
+		## completeness year for specified minimum magnitude
+		completeness = completeness or catalog.default_completeness
+		if completeness:
+			min_date = completeness.get_initial_completeness_date(Mmin)
+			cc_catalog = catalog.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation,
+													completeness=completeness)
+		else:
+			min_date = catalog.start_date
+			cc_catalog = catalog
+		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin,
+									Mtype=Mtype, Mrelation=Mrelation)
+
+		num_events = len(catalog)
+		td = catalog.get_time_delta(from_events=False)
+		catalog_num_days = tf.fractional_time_delta(td, 'D')
+		num_intervals = np.floor(catalog_num_days / interval)
+
+		## Compute number of events in each interval
+		start_date, end_date = catalog.start_date, catalog.end_date
+		bins_N, _ = catalog.bin_by_time_interval(start_date, end_date,
+								time_delta=time_delta, include_incomplete=False,
+								Mmin=Mmin, Mrelation=Mrelation)
+		histogram_datasets.append(bins_N)
+
+		nmax = max(nmax, bins_N.max())
+
+		## Theoretical Poisson distribution
+		n = np.arange(nmax + 1)
+		tau = catalog_num_days / float(num_events)
+		if verbose:
+			print(catalog.name)
+			print("Number of events in catalog: %d" % num_events)
+			print("Number of days in catalog: %s" % catalog_num_days)
+			print("Number of %d-day intervals: %d" % (interval, num_intervals))
+			print("Average return period for M>=%s: %d days" % (Mmin, tau))
+		poisson_probs = PT.get_prob_n(n, tau)
+		poisson_n = poisson_probs * num_intervals
+		if poisson_n.max() < 1:
+			print('Warning: Poisson max. intervals < 1: consider longer interval!')
+		xy_datasets.append((n, poisson_n))
+		catalog_taus.append(tau)
+
+	## Plot
+	xmin = kwargs.pop('xmin', -0.5)
+	xmax = kwargs.pop('xmax', nmax + 0.5)
+	xlabel = kwargs.pop('xlabel', "Number of events per interval")
+	ylabel = kwargs.pop('ylabel', "Number of intervals")
+	if title is None:
+		title = (r"Poisson test for $M\geq%.1f$ (t=%d d., nt=%d)"
+				% (Mmin, interval, num_intervals))
+
+	## Histogram of number of intervals having n events
+	histogram_labels = ['%s (catalog)' % label for label in labels]
+	bins = np.arange(nmax + 2) - 0.5
+	ax = plot_histogram(histogram_datasets, bins=bins,
+						labels=histogram_labels, colors=bar_colors,
+						align='mid', stacked=False,
+						fig_filespec='wait', skip_frame=True, ax=ax, **kwargs)
+
+	if line_colors is None:
+		line_colors = bar_colors
+	plot_xy(xy_datasets, linewidths=[3], colors=['w'], labels=['_nolegend_'],
+			skip_frame=True, fig_filespec='wait', ax=ax)
+	xy_labels = [r'%s (Poisson, $\tau=%.1f$ d.)' % (label, tau)
+				for (label, tau) in zip(labels, catalog_taus)]
+	return plot_xy(xy_datasets, linewidths=[2],
+						labels=xy_labels, colors=line_colors,
+						xlabel=xlabel, ylabel=ylabel, xmin=xmin, xmax=xmax,
+						title=title,
 						fig_filespec=fig_filespec, dpi=dpi, ax=ax, **kwargs)
 
 
