@@ -776,14 +776,22 @@ class EQCatalog(object):
 		except ValueError:
 			return (None, None)
 
-	def get_time_delta(self):
+	def get_time_delta(self, from_events=False):
 		"""
 		Return duration of catalog as timedelta object
+
+		:param from_events:
+			bool, if True, compute time between first and last event
+			else use start and end date of catalog
+			(default: False)
 
 		:return:
 			instance of :class:`np.timedelta64`
 		"""
-		Tmin, Tmax = self.Tminmax()
+		if from_events:
+			Tmin, Tmax = self.Tminmax()
+		else:
+			Tmin, Tmax = self.start_date, self.end_date
 		return Tmax - Tmin
 
 	def get_time_deltas(self, start_datetime=None):
@@ -1876,11 +1884,12 @@ class EQCatalog(object):
 	## Various binning methods
 
 	def bin_by_time_interval(self,
-		start_datetime, end_datetime, time_delta,
+		start_datetime, end_datetime, time_delta, include_incomplete=True,
 		Mmin=None, Mmax=None,
 		Mtype="MW", Mrelation={}):
 		"""
 		Bin earthquakes into time intervals.
+		Note that this may include an incomplete interval at the end!
 
 		:param start_datetime:
 			str or instance of :class:`datetime.date` or :class:`datetime.datetime`
@@ -1892,6 +1901,10 @@ class EQCatalog(object):
 			instance of :class:`datetime.timedelta` or :class:`np.timedelta64`,
 			time interval
 			Note that datetimes and time_delta must have compatible base time units!
+		:param include_incomplete:
+			bool, whether or not last interval should be included if it
+			is empty
+			(default: True)
 		:param Mmin:
 			Float, minimum magnitude (inclusive)
 		:param Mmax:
@@ -1920,6 +1933,10 @@ class EQCatalog(object):
 		bins_N = np.zeros(len(bins_times))
 		for i in range(len(bins_N)):
 			bins_N[i] = np.sum(bin_idxs == i)
+		if not include_incomplete:
+			if subcatalog.end_date - bins_times[-1] < time_delta:
+				bins_N = bins_N[:-1]
+				bins_times = bins_times[:-1]
 		return (bins_N, bins_times)
 
 	def bin_M0_by_time_interval(self,
@@ -2450,6 +2467,45 @@ class EQCatalog(object):
 			min_mag = np.min(magnitudes)
 			completeness = self.get_uniform_completeness(min_mag, Mtype="MW")
 		return completeness.get_completeness_timespans(magnitudes, self.end_date, unit=unit)
+
+	def calc_return_period(self, Mmin, Mtype='MW', Mrelation={},
+							completeness=None, time_unit='D'):
+		"""
+		Compute return period for magnitudes above given lower value
+
+		:param Mmin:
+			float, lower magnitude
+		:param Mtype:
+		:param Mrelation:
+		:param completeness:
+			see ...
+		:param time_unit:
+			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+			(year|week|day|hour|minute|second|millisecond|microsecond)
+			(default: 'D')
+
+		:return:
+			float, return period
+		"""
+		## Apply completeness constraint, and truncate result to
+		## completeness year for specified minimum magnitude
+		completeness = completeness or self.default_completeness
+		if completeness:
+			min_date = completeness.get_initial_completeness_date(Mmin)
+			cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation,
+													completeness=completeness)
+		else:
+			min_date = self.start_date
+			cc_catalog = self
+		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin,
+									Mtype=Mtype, Mrelation=Mrelation)
+
+		num_events = len(catalog)
+		td = catalog.get_time_delta(from_events=False)
+		td_units = tf.fractional_time_delta(td, time_unit)
+		tau = td_units / float(num_events)
+
+		return tau
 
 	## MFD methods
 
@@ -4961,12 +5017,13 @@ class EQCatalog(object):
 		return cls(eq_list, name=table_name)
 
 	def plot_poisson_test(self,
-		Mmin, interval=100, nmax=0,
+		Mmin, interval=100,
 		Mtype='MW', Mrelation={},
 		completeness=None,
-		title=None,
-		fig_filespec=None,
-		verbose=True):
+		label=None, bar_color=None, line_color='r', title=None,
+		fig_filespec=None, dpi=300, ax=None,
+		verbose=True,
+		**kwargs):
 		"""
 		Plot catalog distribution versus Poisson distribution
 		p(n, t, tau) = (t / tau)**n * exp(-t/tau) / n!
@@ -4988,9 +5045,6 @@ class EQCatalog(object):
 		:param interval:
 			Int, length of interval (number of days)
 			(default: 100)
-		:param nmax:
-			Int, maximum number of earthquakes in an interval to test
-			(default: 0, will determine automatically)
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW"
 			(default: "MW")
@@ -5003,80 +5057,48 @@ class EQCatalog(object):
 			completeness and corresponding minimum magnitudes.
 			If None, use start year of catalog
 			(default: None)
+		:param label:
+			str, label to use for catalog
+			(default: None = use catalog name)
+		:param bar_color:
+			matplotlib color spec for histogram
+			(default: None)
+		:param line_color:
+			matplotlib color spec for theoretical Poisson curve
+			(default: 'r')
 		:param title:
 			String, plot title. (None = default title, "" = no title)
 			(default: None)
 		:param fig_filespec:
 			String, full path of image to be saved.
 			If None (default), histogram is displayed on screen.
+		:param dpi:
+			int, resolution of output figure in DPI
+			(default: 300)
+		:param ax:
+			matplotlib axes instance
+			(default: None)
 		:param verbose:
 			Bool, whether or not to print additional information
+		:param **kwargs:
+			additional keyword arguments to be passed to
+			:func:`plotting.generic_mpl.plot_ax_frame`
+
+		:return:
+			matplotlib axes instance
 		"""
-		from scipy.misc import factorial
+		from .plot import plot_poisson_test
 
-		def poisson(n, t, tau):
-			## Probability of n events in period t
-			## given average recurrence interval tau
-			return (t / tau)**n * np.exp(-t/tau) / factorial(n)
-
-		## Apply completeness constraint, and truncate result to completeness
-		## year for specified minimum magnitude
-		completeness = completeness or self.default_completeness
-		if completeness:
-			min_date = completeness.get_initial_completeness_date(Mmin)
-			cc_catalog = self.subselect_completeness(Mtype=Mtype, Mrelation=Mrelation,
-													completeness=completeness)
-		else:
-			min_date = self.start_date
-			cc_catalog = self
-		catalog = cc_catalog.subselect(start_date=min_date, Mmin=Mmin)
-
-		num_events = len(catalog)
-		td = catalog.get_time_delta()
-		catalog_num_days = tf.fractional_time_delta(td, 'D')
-		num_intervals = np.ceil(catalog_num_days / interval)
-
-		## Real catalog distribution
-		## Compute interval index for each event
-		time_deltas = catalog.get_time_deltas()
-		time_delta_days = np.array([tf.fractional_time_delta(td, 'D') for td in time_deltas])
-		interval_indexes = np.floor(time_delta_days / interval)
-		## Compute number of events in each interval
-		num_events_per_interval, _ = np.histogram(interval_indexes, np.arange(num_intervals))
-		if not nmax:
-			nmax = num_events_per_interval.max()
-		## Compute number of intervals having n events
-		#bins_num_events, _ = np.histogram(num_events_per_interval, bins=np.arange(nmax+1))
-
-		## Theoretical Poisson distribution
-		n = np.arange(nmax)
-		tau = catalog_num_days / float(num_events)
-		if verbose:
-			print("Number of events in catalog: %d" % num_events)
-			print("Number of days in catalog: %s" % catalog_num_days)
-			print("Number of %d-day intervals: %d" % (interval, num_intervals))
-			print("Average return period for M>=%s: %d days" % (Mmin, tau))
-		poisson_probs = poisson(n, interval, tau)
-		poisson_n = poisson_probs * num_intervals
-
-		## Plot
-		from plotting.generic_mpl import plot_histogram, plot_xy
-
-		xlabel = "Number of events per interval"
-		ylabel = "Number of intervals"
-		if title is None:
-			title = (r"Poisson test for $M\geq%.1f$ (t=%d, $\tau$=%.1f days, nt=%d)"
-					% (Mmin, interval, tau, num_intervals))
-
-		## Histogram of number of intervals having n events
-		ax = plot_histogram([num_events_per_interval], bins=np.arange(nmax+1)-0.5,
-							labels=["Catalog distribution"], align='mid',
-							fig_filespec='wait')
-		return plot_xy([(n, poisson_n)], colors=['r'], linewidths=[2],
-							labels=["Poisson distribution"],
-							xlabel=xlabel, ylabel=ylabel, xmin=-0.5, xmax=nmax,
-							title=title,
-							fig_filespec=fig_filespec, ax=ax)
+		if label is None:
+			label = self.name
+		bar_colors = None if bar_color is None else [bar_color]
+		line_colors = None if line_color is None else [line_color]
+		return plot_poisson_test([self], Mmin, interval, Mtype=Mtype,
+								Mrelation=Mrelation, completeness=completeness,
+								labels=[label], bar_colors=bar_colors,
+								line_colors=line_colors, title=title,
+								fig_filespec=fig_filespec, dpi=dpi, ax=ax,
+								verbose=verbose, **kwargs)
 
 	def plot_3d(self, limits=None, Mtype=None, Mrelation={}):
 		"""
