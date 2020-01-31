@@ -16,6 +16,9 @@ Completeness_Leynaud = Completeness([1350, 1911, 1985],
 Completeness_Rosset = Completeness([1350, 1926, 1960, 1985],
 									[5.0, 4.0, 3.0, 1.8], "MS")
 
+Completeness_MS_2020 = Completeness([1350, 1750, 1900, 1960, 1985],
+									[4.9, 4.5, 4.0, 3.0, 1.9], "MS")
+
 ## Following relation is for MW based on conversion from ML using Ahorner (1983)
 Completeness_MW_201303a = Completeness([1350, 1750, 1860, 1905, 1960, 1985],
 										[5.2, 4.9, 4.5, 4.0, 3.0, 2.2], "MW")
