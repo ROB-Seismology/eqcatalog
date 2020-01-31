@@ -2439,7 +2439,7 @@ class EQCatalog(object):
 		:return:
 			instance of :class:`Completeness`
 		"""
-		min_date = tf.to_year(self.start_date)
+		min_date = self.start_year
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
 	def get_completeness_timespans(self, magnitudes,
@@ -2469,7 +2469,7 @@ class EQCatalog(object):
 		return completeness.get_completeness_timespans(magnitudes, self.end_date, unit=unit)
 
 	def calc_return_period(self, Mmin, Mtype='MW', Mrelation={},
-							completeness=None, time_unit='D'):
+							completeness=None, time_unit='Y'):
 		"""
 		Compute return period for magnitudes above given lower value
 
@@ -2482,7 +2482,7 @@ class EQCatalog(object):
 		:param time_unit:
 			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
 			(year|week|day|hour|minute|second|millisecond|microsecond)
-			(default: 'D')
+			(default: 'Y')
 
 		:return:
 			float, return period
@@ -5320,7 +5320,7 @@ class EQCatalog(object):
 		from string import ascii_lowercase
 		from plotting.generic_mpl import (create_multi_plot, show_or_save_plot)
 
-		num_plots = len(completeness) - 1
+		num_plots = len(completeness)
 		num_rows = int(np.ceil(num_plots / float(num_cols)))
 
 		if fig_filespec is None:
@@ -5332,13 +5332,16 @@ class EQCatalog(object):
 								share_xlabel=True, share_ylabel=True,
 								xlabel='Time (years)',
 								ylabel='Cumulative number of earthquakes',
-								labels=labels, label_loc=4, ax_size=(7.5, 5.),
+								labels=labels, label_location=4, ax_size=(7.5, 5.),
 								dpi=dpi, **multi_params)
 
 		for i in range(num_plots):
 			ax = fig.axes[i]
 			year1 = completeness.min_years[i]
-			year2 = completeness.min_years[i+1]
+			if i < (len(completeness) - 1):
+				year2 = completeness.min_years[i+1]
+			else:
+				year2 = self.end_year
 			if i > 0:
 				start_year = completeness.min_years[i-1]
 			else:
@@ -5366,6 +5369,11 @@ class EQCatalog(object):
 											xlabel='', ylabel='',
 											title='', legend_location=2,
 											fig_filespec='wait', **ax_params)
+
+		## Hide unused axes
+		if num_plots < num_cols * num_rows:
+			for i in range(num_plots, num_cols * num_rows):
+				fig.axes[i].axis('off')
 
 		return show_or_save_plot(fig, fig_filespec, dpi=dpi)
 
