@@ -2120,7 +2120,10 @@ def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 	Mmin, Mmax, dM = 0., 9., 0.1
 	mags = np.arange(Mmin, Mmax, dM)
 
-	fig = create_multi_plot(num_rows=1, num_cols=2, wspace=0.3, share_ylabel=False,
+	xlabel = kwargs.pop('xlabel', 'Magnitude ($M_W$)')
+
+	fig = create_multi_plot(num_rows=1, num_cols=2, wspace=0.3,
+							xlabel=xlabel, share_xlabel=True, share_ylabel=False,
 							col_titles=('Time window', 'Distance window'))
 	ax1, ax2 = fig.axes[:2]
 
@@ -2135,7 +2138,6 @@ def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 			dlines.append((mags, dw))
 			labels.append(dc_window_name)
 
-	xlabel = kwargs.pop('xlabel', 'Magnitude ($M_W$)')
 	xgrid = kwargs.pop('xgrid', 1)
 	ygrid = kwargs.pop('ygrid', 1)
 	xtick_interval = kwargs.pop('xtick_interval', (1.0, 0.5))
@@ -2146,7 +2148,7 @@ def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 	ymax = 1500
 	title = None
 	legend_location = kwargs.pop('legend_location', 2)
-	plot_xy(tlines, labels=labels, linewidths=[2], xlabel=xlabel, ylabel=ylabel,
+	plot_xy(tlines, labels=labels, linewidths=[2], xlabel=None, ylabel=ylabel,
 			ytick_interval=ytick_interval, ymax=ymax, xgrid=xgrid, ygrid=ygrid,
 			title=title, ax=ax1, legend_location=legend_location,
 			fig_filespec='wait', **kwargs)
@@ -2155,7 +2157,7 @@ def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 	ylabel = 'Distance (km)'
 	ytick_interval = (25, 5)
 	ymax = 150
-	plot_xy(dlines, linewidths=[2], xlabel=xlabel, ylabel=ylabel, ytick_interval=ytick_interval,
+	plot_xy(dlines, linewidths=[2], xlabel=None, ylabel=ylabel, ytick_interval=ytick_interval,
 			ymax=ymax, xgrid=xgrid, ygrid=ygrid, title=title, ax=ax2,**kwargs)
 
 	return show_or_save_plot(fig, fig_filespec, dpi=dpi)
