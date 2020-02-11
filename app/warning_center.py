@@ -335,7 +335,7 @@ class WarningCenter():
 			subject = "WarningCenter message log"
 			msg_lines = ["The following warning messages have been sent:"]
 			for eq_id in sorted(sent_messages.keys()):
-				eq = subcatalog.get_event_by_id(eq_id)
+				eq = catalog.get_event_by_id(eq_id)
 				msg_lines.append("- Event #%s (ML=%.1f, %s)" % (eq_id, eq.ML, eq.datetime))
 				clients = self.get_warning_clients(id=sorted(sent_messages[eq_id]))
 				for client in clients:
