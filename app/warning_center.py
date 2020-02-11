@@ -302,6 +302,7 @@ class WarningCenter():
 
 		## Loop over all criteria and flagged events,
 		## and determine if warning needs to be sent
+		sent_messages = {}
 		for criterion in warning_criteria:
 			subcatalog = criterion.filter_catalog(catalog)
 			for client in criterion.get_clients():
@@ -319,10 +320,29 @@ class WarningCenter():
 							## (should not be necessary)
 							#if criterion.event_type in ('all', eq.event_type):
 							client.send_warning(eq, dry_run=dry_run)
+							if not dry_run:
+								if not eq.ID in sent_messages:
+									sent_messages[eq.ID] = [client.id]
+								else:
+									sent_messages[eq.ID].append(client.id)
 							if verbose:
 								msg = "Message sent for event #%d to client %s"
 								msg %= (eq.ID, client.name)
 								print(msg)
+
+		## Send mail to manager (client with id=0) if messages have been sent
+		if sent_messages:
+			subject = "WarningCenter message log"
+			msg_lines = ["The following warning messages have been sent:"]
+			for eq_id in sorted(sent_messages.keys()):
+				eq = subcatalog.get_event_by_id(eq_id)
+				msg_lines.append("- Event #%s (ML=%.1f, %s)" % (eq_id, eq.ML, eq.datetime))
+				clients = self.get_warning_clients(id=sorted(sent_messages[eq_id]))
+				for client in clients:
+					msg_lines.append("\t- Client %s" % client.name)
+			msg = '\n'.join(msg_lines)
+			[list_manager] = self.get_warning_clients(id=[0])
+			self.send_email(list_manager, msg, subject=subject, dry_run=False)
 
 	def send_manual_warning(self, id_earth, client_ids, dry_run=True):
 		"""
