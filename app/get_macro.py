@@ -7,6 +7,7 @@ import os
 import datetime
 import shutil
 import argparse
+from distutils.util import strtobool
 
 import numpy as np
 
@@ -31,12 +32,30 @@ parser = argparse.ArgumentParser(description="ROB macroseismic map generator")
 
 parser.add_argument("--id_earth", help="Force creating maps for given earthquake ID",
 					nargs=1, type=int)
+parser.add_argument("--data_type", help="Type of macroseismic data",
+					choices=["dyfi", "official", "historical", "traditional"],
+					default="dyfi")
 parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data points",
 					choices=["", "commune", "main commune", "grid5", "grid10"], default="commune")
 parser.add_argument("--agg_method", help="Aggregation method",
-                    choices=["mean", "aggregated"], default="mean")
+                    choices=["mean", "aggregated", "min", "max", "median"], default="mean")
+parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
+                    choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
+parser.add_argument("--bel_admin_level", help="Level of administrtive boundaries in Belgium",
+                    choices=["","country", "region", "province", "commune"], default="default")
+parser.add_argument("--show_main_cities", help="Whether or not to plot main cities",
+                    type=strtobool, default="true")
+#parser.add_argument("--epicenter_marker", help="Which symbol to use for epicenter",
+#                    choices=["", "o", "s", "v", "^", "p", "*", "h", "D"], default="*")
+parser.add_argument("--show_epicenter", help="Whether or not to plot epicenter",
+					type=strtobool, default="true")
+parser.add_argument("--cmap", help="Color map",
+					choices=["rob", "usgs"], default="rob")
+parser.add_argument("--color_gradient", help="Color gradient",
+                    choices=["discrete", "continuous"], default="discrete")
+parser.add_argument("--copyright_label", help="Label to use as copyright",
+                    type=str, default="Collaborative project of ROB and BNS")
 args = parser.parse_args()
-
 
 ## Retrieve earthquakes
 if args.id_earth:
@@ -51,19 +70,30 @@ for eq in catalog:
 	id_earth = eq.ID
 	## Fetch macroseismic enquiries for event
 	print("Getting data for event #%d" % id_earth)
-	dyfi = eq.get_online_macro_enquiries(min_fiability=MIN_FIABILITY)
-	if len(dyfi) > MIN_NUM_REPLIES:
-		if np.isnan(dyfi.latitudes).all():
-			dyfi.set_locations_from_communes()
-		minlon, maxlon, minlat, maxlat = dyfi.get_region()
-		## Note: NULL submit_time values are automatically replaced with event time
-		lastmod = dyfi.get_datetimes()
-		maxlastmod = np.max(lastmod)
+	if args.data_type == "dyfi":
+		macro_data = eq.get_online_macro_enquiries(min_fiability=MIN_FIABILITY)
+	else:
+		macro_data = eq.get_aggregated_traditional_macro_info(data_type=args.data_type,
+							aggregate_by=args.aggregate_by or "commune",
+							agg_method=args.agg_method, min_fiability=MIN_FIABILITY)
+		MIN_NUM_REPLIES = 0
+
+	if len(macro_data) > MIN_NUM_REPLIES:
+		if args.data_type == "dyfi":
+			if np.isnan(macro_data.latitudes).all():
+				macro_data.set_locations_from_communes()
+			## Note: NULL submit_time values are automatically replaced with event time
+			lastmod = macro_data.get_datetimes()
+			maxlastmod = np.max(lastmod)
+		else:
+			# TODO
+			maxlastmod = np.datetime64('now')
+		minlon, maxlon, minlat, maxlat = macro_data.get_region()
 
 		print("id_earth = %i | ML=%.1f | %s " % (id_earth, eq.ML, eq.name))
 		print("  datetime = %s" % eq.datetime)
 		print("  lastmod = %s" % maxlastmod)
-		print("  count = %i" % len(dyfi))
+		print("  count = %i" % len(macro_data))
 		print("  Bounds : %.4f/%.4f/%.4f/%.4f" % (minlat, maxlat, minlon, maxlon))
 
 		## Determine if map has to be generated
@@ -84,13 +114,16 @@ for eq in catalog:
 			plot_map = True
 
 		if plot_map:
-			print("New data found since maps were created! Creating maps!")
+			print("Creating maps!")
 
-			## Aggregate
-			macro_info = dyfi.get_aggregated_info(aggregate_by=args.aggregate_by,
+			## Aggregate DYFI
+			if args.data_type == "dyfi":
+				macro_info = macro_data.get_aggregated_info(aggregate_by=args.aggregate_by,
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
 					fix_records=True, include_other_felt=True,
 					include_heavy_appliance=False, remove_outliers=(2.5, 97.5))
+			else:
+				macro_info = macro_data
 
 			minlon, maxlon, minlat, maxlat = macro_info.get_region()
 
@@ -98,18 +131,28 @@ for eq in catalog:
 			projection = 'merc'
 			graticule_interval = 'auto'
 			plot_info = 'intensity'
-			symbol_style = lbm.PointStyle(shape='D', size=4)
+			if "grid" in args.aggregate_by or args.commune_marker == "polygon":
+				symbol_style = None
+				thematic_num_replies = False
+			else:
+				symbol_style = lbm.PointStyle(shape=args.commune_marker, size=4)
+				thematic_num_replies = True
+
 			line_style = "default"
-			thematic_num_replies = True
-			cmap = "rob"
-			color_gradient = "discrete"
+			cmap = args.cmap
+			color_gradient = args.color_gradient
 			colorbar_style = "default"
-			event_style = "default"
+			if args.show_epicenter:
+				event_style = "default"
+			else:
+				event_style = None
 			country_style = "default"
-			#admin_level = "province"
 			admin_style = lbm.LineStyle(line_width=0.5)
-			city_style = "default"
-			copyright = 'Collaborative project of ROB and BNS'
+			if args.show_main_cities:
+				city_style = "default"
+			else:
+				city_style = None
+			copyright = args.copyright_label
 			dpi = 200
 
 			for agency in ('ROB', 'BNS'):
@@ -121,12 +164,24 @@ for eq in catalog:
 				for size in ('large', 'small'):
 					map_filespec = os.path.join(BASE_FOLDER, agency, size, map_filename)
 					if size == 'large':
-						region = (minlon-1, maxlon+1, minlat-.5, maxlat+.5)
-						admin_level = 'region'
+						region = [minlon-1, maxlon+1, minlat-.5, maxlat+.5]
+						## Ensure epicenter is inside map
+						if args.show_epicenter:
+							region[0] = min(region[0], eq.lon)
+							region[1] = max(region[1], eq.lon)
+							region[2] = min(region[2], eq.lat)
+							region[3] = max(region[3], eq.lat)
+						if args.bel_admin_level == 'default':
+							admin_level = 'region'
+						else:
+							admin_level = args.bel_admin_level
 					else:
 						#region = (eq.lon-1, eq.lon+1, eq.lat-.5, eq.lat+.5)
 						region = (minlon-0.25, maxlon+0.25, minlat-0.1, maxlat+0.1)
-						admin_level = 'main commune'
+						if args.bel_admin_level == 'default':
+							admin_level = 'province'
+						else:
+							admin_level = args.bel_admin_level
 
 					## Plot map
 					if agency == 'ROB':
@@ -147,25 +202,6 @@ for eq in catalog:
 						## Sync ROB and BNS maps rather than plotting them both
 						shutil.copyfile(rob_filespec, map_filespec)
 
-					"""
-					E.EQMapper('/home/seismo/lib/macro_maps/ROB/large/%i'%id_earth,
-						E.GMT_region(minlon-1,maxlon+1,minlat-.5,maxlat+.5),"Mercator",
-						1000,want_macro=True,macro_ID=id_earth,macro_symbol_style='diamond',
-						want_event=True,event_ID=id_earth,event_label=name,want_cities=True,
-						city_labels=True,city_label_size=6,copyright_label='Collaborative project of ROB and BNS',
-						macro_web_symbol_size_fixed=False,macro_cpt='KVN_intensity_ROB',
-						macro_web_minreplies=1, macro_web_minfiability=10.0,
-						land_color=RGB(255,255,255), ocean_color=RGB(255,255,255) )
-					E.EQMapper('/home/seismo/lib/macro_maps/ROB/small/%i'%id_earth,
-						E.GMT_region(longitude-1,longitude+1,latitude-.5,latitude+.5),"Mercator",
-						1000,want_macro=True,macro_ID=id_earth,macro_symbol_style='diamond',
-						want_event=True,event_ID=id_earth,event_label=name,want_cities=True,
-						city_labels=True,city_label_size=6,copyright_label='Collaborative project of ROB and BNS',
-						macro_web_symbol_size_fixed=False,macro_cpt='KVN_intensity_ROB',
-						macro_web_minreplies=1, macro_web_minfiability=10.0,
-						land_color=RGB(255,255,255), ocean_color=RGB(255,255,255) )
-					"""
-
 	else:
 		print("Not enough data to draw a map (<3 replies)")
-	print("--------------------------------------")
+	print("------------------------------------------")
