@@ -1588,6 +1588,56 @@ class EQCatalog(object):
 		fault_catalog.name = catalog_name
 		return fault_catalog
 
+	def subselect_line(self, start_pt, end_pt, distance, catalog_name=''):
+		"""
+		Subselect earthquakes located within given distance from a
+		straight line (or cross section)
+
+		:param start_pt:
+			(lon, lat) tuple
+		:param end_pt:
+			(lon, lat) tuple
+		:param distance:
+			float, distance to line in km
+		:param catalog_name:
+			Str, name of resulting catalog
+			(default: "")
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		import mapping.geotools.geodetic as geodetic
+		from mapping.layeredbasemap import PolygonData
+
+		## Note: we don't use a buffer, as this would also include a region
+		## left and right of the endpoints
+		lon1, lat1 = start_pt[:2]
+		lon2, lat2 = end_pt[:2]
+		line_az = geodetic.spherical_azimuth(lon1, lat1, lon2, lat2)
+		pg_lons, pg_lats = [], []
+		distance *= 1000
+		lons, lats = geodetic.spherical_point_at(np.array([lon1, lon2]),
+								np.array([lat1, lat2]), distance, line_az - 90)
+		pg_lons.extend(lons)
+		pg_lats.extend(lats)
+		pg_lons.append(lon2)
+		pg_lats.append(lat2)
+		lons, lats = geodetic.spherical_point_at(np.array([lon2, lon1]),
+								np.array([lat2, lat1]), distance, line_az + 90)
+		pg_lons.extend(lons)
+		pg_lats.extend(lats)
+		pg_lons.append(lon1)
+		pg_lats.append(lat1)
+		pg_lons.append(pg_lons[0])
+		pg_lats.append(pg_lats[0])
+
+		pg = PolygonData(pg_lons, pg_lats)
+
+		if not catalog_name:
+			catalog_name = self.name + " (along line)"
+
+		return self.subselect_polygon(pg.to_ogr_geom(), catalog_name=catalog_name)
+
 	def split_into_zones(self,
 		source_model_name, ID_colname="",
 		fix_mi_lambert=True,
@@ -4329,6 +4379,188 @@ class EQCatalog(object):
 		layer = lbm.MapLayer(point_data, catalog_style, legend_label=label)
 
 		return layer
+
+	def get_distances_to_line(self, start_pt, end_pt):
+		"""
+		Compute perpendicular distances to straight line defined by two
+		points
+
+		:param start_pt:
+			(lon, lat) tuple of floats, start point of line
+		:param end_pt:
+			(lon, lat) tuple of floats, end point of line
+
+		:return:
+			1-D array, perpendicular distance of each eq to line
+		"""
+		from osgeo import osr
+		import mapping.geotools.coordtrans as ct
+		import mapping.layeredbasemap as lbm
+
+		source_srs = ct.WGS84
+		utm_spec = ct.get_utm_spec(*start_pt)
+		target_srs = ct.get_utm_srs(utm_spec)
+		ct = osr.CoordinateTransformation(source_srs, target_srs)
+
+		line = lbm.LineData([start_pt[0], end_pt[0]], [start_pt[1], end_pt[1]])
+		ogr_line = line.to_ogr_geom()
+		ogr_line.AssignSpatialReference(source_srs)
+		ogr_line.Transform(ct)
+
+		points = lbm.MultiPointData(self.get_longitudes(), self.get_latitudes())
+		ogr_points = points.to_ogr_geom()
+		ogr_points.AssignSpatialReference(source_srs)
+		ogr_points.Transform(ct)
+
+		perpendicular_distances = []
+		for i in range(ogr_points.GetGeometryCount()):
+			ogr_pt = ogr_points.GetGeometryRef(i)
+			d = ogr_pt.Distance(ogr_line)
+			perpendicular_distances.append(d)
+		perpendicular_distances = np.array(perpendicular_distances) / 1000.
+
+		return perpendicular_distances
+
+	def get_distances_along_line(self, start_pt, end_pt, max_pp_dist=None):
+		"""
+		Compute distances along straight line defined by two points
+
+		:param start_pt:
+			(lon, lat) tuple of floats, start point of line
+		:param end_pt:
+			(lon, lat) tuple of floats, end point of line
+		:max_pp_dist:
+			max. distance perpendicular to line to construct perpendicular
+			line through start point, with respect to which distances
+			are computed
+			(default: None, will determine automatically)
+
+		:return:
+			1-D array, distance of each eq along line
+		"""
+		from osgeo import osr
+		import mapping.geotools.geodetic as geodetic
+		import mapping.geotools.coordtrans as ct
+		import mapping.layeredbasemap as lbm
+
+		source_srs = ct.WGS84
+		utm_spec = ct.get_utm_spec(*start_pt)
+		target_srs = ct.get_utm_srs(utm_spec)
+		ct = osr.CoordinateTransformation(source_srs, target_srs)
+
+		lon1, lat1 = start_pt[:2]
+		lon2, lat2 = end_pt[:2]
+		line_az = geodetic.spherical_azimuth(lon1, lat1, lon2, lat2)
+
+		## Construct perpendicular line through start point
+		## Distances will be computed with respect to this line
+		pp_line_lons, pp_line_lats = [], []
+		if max_pp_dist is None:
+			max_pp_dist = self.get_distances_to_line(start_pt, end_pt).max()
+		max_pp_dist *= 1000
+		for daz in (-90, 90):
+			lon, lat = geodetic.spherical_point_at(lon1, lat1, max_pp_dist, line_az + daz)
+			pp_line_lons.append(lon)
+			pp_line_lats.append(lat)
+		pp_line = lbm.LineData(pp_line_lons, pp_line_lats)
+		ogr_pp_line = pp_line.to_ogr_geom()
+		ogr_pp_line.AssignSpatialReference(source_srs)
+		ogr_pp_line.Transform(ct)
+
+		points = lbm.MultiPointData(self.get_longitudes(), self.get_latitudes())
+		ogr_points = points.to_ogr_geom()
+		ogr_points.AssignSpatialReference(source_srs)
+		ogr_points.Transform(ct)
+
+		inline_distances = []
+		for i in range(ogr_points.GetGeometryCount()):
+			ogr_pt = ogr_points.GetGeometryRef(i)
+			d = ogr_pt.Distance(ogr_pp_line)
+			inline_distances.append(d)
+		inline_distances = np.array(inline_distances) / 1000.
+
+		return inline_distances
+
+	def plot_cross_section(self, start_pt, end_pt, distance,
+						marker='o', marker_size=lambda m: 9 + (m - 3) * 3,
+						edge_color='b', fill_color='None',
+						edge_width=0.5, label=None, Mtype="MW", Mrelation={},
+						**kwargs):
+		"""
+		Plot cross-section along a straight line
+
+		:param start_pt:
+			(lon, lat) tuple of floats, start point of cross-section
+		:param end_pt:
+			(lon, lat) tuple of floats, end point of cross-section
+		:param distance:
+			float, maximum distance to line to be included in cross-section
+		:param marker:
+			char, matplotlib marker symbol
+			(default: 'o')
+		:param marker_size:
+			float, array or callable, marker size(s)
+			If callable, sizes will be computed in function of magnitude
+			(default: lambda m: 9 + (m - 3) * 3)
+		:param edge_color:
+			matplotlib color spec, marker edge color
+			(default: 'b')
+		:param fill_color:
+			matplotlib color spec, marker fill color
+			(default: 'None')
+		:param edge_width:
+			float, marker edge width
+			(default: 0.5)
+		:param label:
+			str, dataset label
+			(default: None)
+		:param Mtype:
+			str, magnitude type to use for calculating marker size
+			(default: 'MW')
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML")
+			(default: {})
+		:param **kwargs:
+			additional keyword arguments to be passed to
+			:func:`plotting.generic_mpl.plot_xy
+		"""
+		from plotting.generic_mpl import plot_xy
+
+		subcat = self.subselect_line(start_pt, end_pt, distance)
+
+		distances = subcat.get_distances_along_line(start_pt, end_pt, max_pp_dist=distance)
+		depths = subcat.get_depths()
+
+		xmin = kwargs.pop('xmin', 0)
+		yscaling = kwargs.pop('yscaling', '-lin')
+		ymin = kwargs.pop('ymin', 0)
+		xlabel = kwargs.pop('xlabel', 'Distance (km)')
+		ylabel = kwargs.pop('ylabel', 'Depth (km)')
+
+		markers = [marker]
+		edge_colors = [edge_color] if edge_color else []
+		fill_colors = [fill_color] if fill_color else []
+		edge_widths = [edge_width] if edge_width else []
+		labels = [label] if label else []
+
+		if callable(marker_size):
+			mags = subcat.get_magnitudes(Mtype, Mrelation=Mrelation)
+			marker_sizes = marker_size(mags)
+			marker_sizes = marker_sizes.clip(min=1)
+			marker_sizes[np.isnan(marker_sizes)] = 1
+			marker_sizes = [marker_sizes]
+		else:
+			marker_sizes = [marker_size]
+
+		return plot_xy([(distances, depths)], labels=labels,
+						markers=markers, marker_sizes=marker_sizes,
+						marker_fill_colors=fill_colors, marker_edge_colors=edge_colors,
+						marker_edge_widths=edge_widths,
+						linestyles=[''],
+						xlabel=xlabel, ylabel=ylabel,
+						xmin=xmin, ymin=ymin, yscaling=yscaling,
+						**kwargs)
 
 	## Export methods
 
