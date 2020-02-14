@@ -178,11 +178,11 @@ class MacroInfoCollection():
 
 	@property
 	def longitudes(self):
-		return np.array([rec.lon for rec in self])
+		return np.array([rec.lon if rec.lon is not None else np.nan for rec in self])
 
 	@property
 	def latitudes(self):
-		return np.array([rec.lat for rec in self])
+		return np.array([rec.lat if rec.lat is not None else np.nan for rec in self])
 
 	@property
 	def intensities(self):
@@ -249,7 +249,8 @@ class MacroInfoCollection():
 
 		:param other_macro_info:
 			instance of :class:`MacroInfoCollection`
-		:return:
+
+		:return:
 			None, 'residual' attribute of instances of :class:`MacroseismicInfo`
 			in collection are modified in place
 		"""
@@ -277,8 +278,9 @@ class MacroInfoCollection():
 		percentiles = [0 + dp/2., 100 - dp/2.]
 		lons, lats = [], []
 		for rec in self:
-			lons.extend([rec.lon] * rec.num_replies)
-			lats.extend([rec.lat] * rec.num_replies)
+			if not None in (rec.lon, rec.lat):
+				lons.extend([rec.lon] * rec.num_replies)
+				lats.extend([rec.lat] * rec.num_replies)
 		lonmin, lonmax = np.percentile(lons, percentiles)
 		latmin, latmax = np.percentile(lats, percentiles)
 		return (lonmin, lonmax, latmin, latmax)
