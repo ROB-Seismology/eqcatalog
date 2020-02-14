@@ -1,9 +1,10 @@
+# -*- coding: iso-Latin-1 -*-
 """
 Version of Thomas' get_macro.py script based on eqcatalog
 """
 
 import os
-#import sys
+import sys
 import datetime
 import shutil
 import argparse
@@ -20,14 +21,16 @@ import eqcatalog
 # - more command-line options
 
 
-
-#BASE_FOLDER = '/home/seismo/lib/macro_maps'
-BASE_FOLDER = 'C:\\Temp\\macro_maps'
+if sys.platform == 'win32':
+	BASE_FOLDER = 'C:\\Temp\\macro_maps'
+else:
+	BASE_FOLDER = '/home/seismo/lib/macro_maps'
 
 MIN_FIABILITY = 80
 MIN_NUM_REPLIES = 3
 
 
+## Command-line options
 parser = argparse.ArgumentParser(description="ROB macroseismic map generator")
 
 parser.add_argument("--id_earth", help="Force creating maps for given earthquake ID",
@@ -37,7 +40,7 @@ parser.add_argument("--data_type", help="Type of macroseismic data",
 					default="dyfi")
 parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data points",
 					choices=["", "commune", "main commune", "grid5", "grid10"], default="commune")
-parser.add_argument("--agg_method", help="Aggregation method",
+parser.add_argument("--agg_method", help="Aggregation method (availability depends on data_type option!)",
                     choices=["mean", "aggregated", "min", "max", "median"], default="mean")
 parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
                     choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
@@ -45,17 +48,22 @@ parser.add_argument("--bel_admin_level", help="Level of administrtive boundaries
                     choices=["","country", "region", "province", "commune"], default="default")
 parser.add_argument("--show_main_cities", help="Whether or not to plot main cities",
                     type=strtobool, default="true")
-#parser.add_argument("--epicenter_marker", help="Which symbol to use for epicenter",
-#                    choices=["", "o", "s", "v", "^", "p", "*", "h", "D"], default="*")
-parser.add_argument("--show_epicenter", help="Whether or not to plot epicenter",
-					type=strtobool, default="true")
-parser.add_argument("--cmap", help="Color map",
+parser.add_argument("--epicenter_marker", help="Which symbol to use for epicenter",
+                    choices=["", "o", "s", "v", "^", "p", "*", "h", "D"], default="*")
+parser.add_argument("--cmap", help="Intensity color map",
 					choices=["rob", "usgs"], default="rob")
 parser.add_argument("--color_gradient", help="Color gradient",
                     choices=["discrete", "continuous"], default="discrete")
+parser.add_argument("--map_region", help="Size of map region wrt intensity data",
+                    choices=["wide", "tight", "both"], default="both")
 parser.add_argument("--copyright_label", help="Label to use as copyright",
                     type=str, default="Collaborative project of ROB and BNS")
+parser.add_argument("--base_folder", help="Base folder for generated maps",
+                    type=str, default=BASE_FOLDER)
+parser.add_argument("--verbose", help="Whether or not to print progress information",
+					type=strtobool, default="true")
 args = parser.parse_args()
+
 
 ## Retrieve earthquakes
 if args.id_earth:
@@ -69,16 +77,17 @@ else:
 for eq in catalog:
 	id_earth = eq.ID
 	## Fetch macroseismic enquiries for event
-	print("Getting data for event #%d" % id_earth)
+	if args.verbose:
+		print("Getting data for event #%d" % id_earth)
 	if args.data_type == "dyfi":
 		macro_data = eq.get_online_macro_enquiries(min_fiability=MIN_FIABILITY)
 	else:
 		macro_data = eq.get_aggregated_traditional_macro_info(data_type=args.data_type,
 							aggregate_by=args.aggregate_by or "commune",
 							agg_method=args.agg_method, min_fiability=MIN_FIABILITY)
-		MIN_NUM_REPLIES = 0
+		MIN_NUM_REPLIES = 1
 
-	if len(macro_data) > MIN_NUM_REPLIES:
+	if len(macro_data) >= MIN_NUM_REPLIES:
 		if args.data_type == "dyfi":
 			if np.isnan(macro_data.latitudes).all():
 				macro_data.set_locations_from_communes()
@@ -90,22 +99,25 @@ for eq in catalog:
 			maxlastmod = np.datetime64('now')
 		minlon, maxlon, minlat, maxlat = macro_data.get_region()
 
-		print("id_earth = %i | ML=%.1f | %s " % (id_earth, eq.ML, eq.name))
-		print("  datetime = %s" % eq.datetime)
-		print("  lastmod = %s" % maxlastmod)
-		print("  count = %i" % len(macro_data))
-		print("  Bounds : %.4f/%.4f/%.4f/%.4f" % (minlat, maxlat, minlon, maxlon))
+		if args.verbose:
+			print("id_earth = %i | ML=%.1f | %s " % (id_earth, eq.ML, eq.name))
+			print("  datetime = %s" % eq.datetime)
+			print("  lastmod = %s" % maxlastmod)
+			print("  count = %i" % len(macro_data))
+			print("  Bounds : %.4f/%.4f/%.4f/%.4f" % (minlat, maxlat, minlon, maxlon))
 
 		## Determine if map has to be generated
 		plot_map = False
-		map_filespec = os.path.join(BASE_FOLDER, 'ROB', 'large', '%i.png' % id_earth)
+		map_filespec = os.path.join(args.base_folder, 'ROB', 'large',
+									'%i.png' % id_earth)
 		if os.path.exists(map_filespec) and not overwrite_map:
 			## Convert creation_time to np.datetime64
 			creation_time = os.stat(map_filespec)[-1]
 			creation_time = datetime.datetime.fromtimestamp(creation_time)
 			creation_time = eqcatalog.time_functions.as_np_datetime(creation_time)
 			if maxlastmod > creation_time:
-				print("New data available for mapping !")
+				if args.verbose:
+					print("New data available for mapping !")
 				plot_map = True
 			else:
 				print("No new data available !")
@@ -114,7 +126,8 @@ for eq in catalog:
 			plot_map = True
 
 		if plot_map:
-			print("Creating maps!")
+			if args.verbose:
+				print("Creating maps!")
 
 			## Aggregate DYFI
 			if args.data_type == "dyfi":
@@ -142,10 +155,8 @@ for eq in catalog:
 			cmap = args.cmap
 			color_gradient = args.color_gradient
 			colorbar_style = "default"
-			if args.show_epicenter:
-				event_style = "default"
-			else:
-				event_style = None
+			event_style = lbm.PointStyle(shape=args.epicenter_marker, size=14,
+										fill_color='magenta', line_color='k')
 			country_style = "default"
 			admin_style = lbm.LineStyle(line_width=0.5)
 			if args.show_main_cities:
@@ -153,7 +164,15 @@ for eq in catalog:
 			else:
 				city_style = None
 			copyright = args.copyright_label
+			if copyright:
+				copyright = '© ' + copyright
 			dpi = 200
+
+			map_sizes = []
+			if args.map_region in ('wide', 'both'):
+				map_sizes.append('large')
+			if args.map_region in ('tight', 'both'):
+				map_sizes.append('small')
 
 			for agency in ('ROB', 'BNS'):
 				if agency == 'ROB':
@@ -161,12 +180,12 @@ for eq in catalog:
 				elif agency == 'BNS':
 					dt_string = str(eq.datetime).replace('T', '_').replace(':', '')[:15]
 					map_filename = '%s.png' % dt_string
-				for size in ('large', 'small'):
-					map_filespec = os.path.join(BASE_FOLDER, agency, size, map_filename)
+				for size in map_sizes:
+					map_filespec = os.path.join(args.base_folder, agency, size, map_filename)
 					if size == 'large':
 						region = [minlon-1, maxlon+1, minlat-.5, maxlat+.5]
-						## Ensure epicenter is inside map
-						if args.show_epicenter:
+						## Ensure epicenter is inside map if marker is specified
+						if args.epicenter_marker:
 							region[0] = min(region[0], eq.lon)
 							region[1] = max(region[1], eq.lon)
 							region[2] = min(region[2], eq.lat)
@@ -197,11 +216,12 @@ for eq in catalog:
 							city_style=city_style, colorbar_style=colorbar_style,
 							radii=[], plot_pie=None,
 							title='', fig_filespec=map_filespec, copyright=copyright,
-							text_box={}, dpi=dpi, verbose=False)
+							text_box={}, dpi=dpi, verbose=args.verbose)
 					else:
 						## Sync ROB and BNS maps rather than plotting them both
 						shutil.copyfile(rob_filespec, map_filespec)
 
 	else:
-		print("Not enough data to draw a map (<3 replies)")
-	print("------------------------------------------")
+		print("Not enough data to draw a map (<%d replies)" % MIN_NUM_REPLIES)
+	if args.verbose:
+		print("------------------------------------------")
