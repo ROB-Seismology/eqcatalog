@@ -167,7 +167,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return aggregate_traditional_macro_info(self.ID, **kwargs)
 
 	def get_aggregated_official_macro_info(self, id_com=None, min_or_max='max',
-			group_by_main_commune=False, agg_method="mean", min_fiability=80,
+			aggregate_by="commune", agg_method="mean", min_fiability=80,
 			verbose=False):
 		"""
 		Get official macroseismic information (possibly aggregated by
@@ -179,7 +179,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return self.get_aggregated_traditional_macro_info(data_type='official', **kwargs)
 
 	def get_aggregated_historical_macro_info(self, id_com=None, min_or_max='max',
-			group_by_main_commune=False, agg_method="mean", min_fiability=80,
+			aggregate_by="commune", agg_method="mean", min_fiability=80,
 			verbose=False):
 		"""
 		Get historical macroseismic information (possibly aggregated by
