@@ -208,6 +208,37 @@ class MacroInfoCollection():
 		intensities = self.intensities
 		return (np.nanmin(intensities), np.nanmax(intensities))
 
+	def get_eq_catalog(self):
+		"""
+		Fetch catalog of earthquakes linked to this MacroInfoCollection
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
+		from ..rob.seismodb import query_local_eq_catalog_by_id
+
+		return query_local_eq_catalog_by_id(id_earth=self.id_earth)
+
+	def get_epicentral_distances(self):
+		"""
+		Compute epicentral distances of macroseismic data points
+
+		:return:
+			1-D array, epicentral distances (in km)
+		"""
+		eq = self.get_eq_catalog()[0]
+		return eq.epicentral_distance((self.longitudes, self.latitudes))
+
+	def get_hypocentral_distances(self):
+		"""
+		Compute hypocentral distances of macroseismic data points
+
+		:return:
+			1-D array, hypocentral distances (in km)
+		"""
+		eq = self.get_eq_catalog()[0]
+		return eq.hypocentral_distance((self.longitudes, self.latitudes))
+
 	def to_commune_info_dict(self):
 		"""
 		Convert to dictionary mapping commune IDs to instances of
