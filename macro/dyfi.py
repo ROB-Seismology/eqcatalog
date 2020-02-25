@@ -1136,11 +1136,14 @@ class MacroseismicEnquiryEnsemble():
 
 		ensemble = self
 		if fix_records:
-			ensemble.fix_all()
+			ensemble = ensemble.fix_all()
 
 		ensemble = ensemble[ensemble.fiability >= min_fiability]
 		if filter_floors:
 			ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
+
+		if len(ensemble) == 0:
+			return MacroInfoCollection([], aggregate_by, 'internet')
 
 		if aggregate_by == 'commune':
 			aggregate_by = 'id_com'
@@ -1302,7 +1305,8 @@ class MacroseismicEnquiryEnsemble():
 		ensemble.fix_felt_is_none()
 		ensemble.fix_not_felt()
 		ensemble.fix_commune_ids()
-		ensemble.set_main_commune_ids()
+		if len(ensemble) > 0:
+			ensemble.set_main_commune_ids()
 		ensemble = ensemble.remove_duplicate_records(verbose=verbose)
 		ensemble.set_prop_values('fiability', ensemble.calc_fiability(include_other_felt=False,
 													include_heavy_appliance=True))
@@ -1527,6 +1531,8 @@ class MacroseismicEnquiryEnsemble():
 			## If all values are masked, index is set to zero
 
 			# TODO: do not take into account records where felt_index is masked!
+			# TODO: remove outliers by only taking into account an index if a
+			# given percentage (e.g., 10%) is not masked
 			felt_index = ensemble.calc_felt_index(include_other_felt).mean()
 			if np.ma.is_masked(felt_index) and felt_index.mask:
 				felt_index = 0.
