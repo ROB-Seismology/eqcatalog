@@ -21,6 +21,10 @@ DEFAULT_MRELATIONS = {
 
 class ROBLocalEarthquake(LocalEarthquake):
 
+	@property
+	def id_earth(self):
+		return self.ID
+
 	def get_MW(self, Mrelation='default'):
 		if Mrelation == 'default':
 			Mrelation = DEFAULT_MRELATIONS['MW']
