@@ -49,7 +49,7 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_online_macro_catalog_aggregated",
 			"get_num_online_macro_enquiries",
 			"get_num_official_enquiries",
-			"get_earthquakes_with_official_enquiries",
+			"get_earthquakes_with_traditional_enquiries",
 			"get_earthquakes_with_online_enquiries",
 			"query_stations", "get_station_coordinates",
 			"get_station_catalog", "query_phase_picks",
@@ -1168,10 +1168,10 @@ def get_num_official_enquiries(id_earth):
 	return num_enquiries
 
 
-def get_earthquakes_with_official_enquiries():
+def get_earthquakes_with_traditional_enquiries():
 	"""
-	Create catalog of earthquakes that have official enquiries
-	associated with them.
+	Create catalog of earthquakes that have traditional (official or
+	historical) enquiries associated with them.
 
 	:return:
 		instance of :class:`EQCatalog`
