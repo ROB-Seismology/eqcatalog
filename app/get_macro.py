@@ -114,7 +114,7 @@ for eq in catalog:
 			## Convert creation_time to np.datetime64
 			creation_time = os.stat(map_filespec)[-1]
 			creation_time = datetime.datetime.fromtimestamp(creation_time)
-			creation_time = eqcatalog.time_functions.as_np_datetime(creation_time)
+			creation_time = eqcatalog.time.as_np_datetime(creation_time)
 			if maxlastmod > creation_time:
 				if args.verbose:
 					print("New data available for mapping !")

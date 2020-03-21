@@ -43,11 +43,11 @@ else:
 	reload(earthquake_types)
 from .earthquake_types import *
 
-## time_functions (no internal dependencies)
+## time (no internal dependencies)
 if not reloading:
-	from . import time_functions_np as time_functions
+	from . import time as time
 else:
-	reload(time_functions)
+	reload(time)
 
 ## completeness (no internal dependencies)
 if not reloading:
@@ -56,7 +56,7 @@ else:
 	reload(completeness)
 from .completeness import *
 
-## calcGR, depends on time_functions
+## calcGR, depends on time
 if not reloading:
 	from . import calcGR
 else:
@@ -99,14 +99,14 @@ if not reloading:
 else:
 	reload(macro)
 
-## eqrecord (depends on time_functions, msc)
+## eqrecord (depends on time, msc)
 if not reloading:
 	from . import eqrecord
 else:
 	reload(eqrecord)
 from .eqrecord import (LocalEarthquake, FocMecRecord)
 
-## eqcatalog (depends on time_functions, completeness eqrecord, declustering, source_models)
+## eqcatalog (depends on time, completeness eqrecord, declustering, source_models)
 if not reloading:
 	from . import eqcatalog
 else:
@@ -120,7 +120,7 @@ else:
 	reload(composite_catalog)
 from .composite_catalog import CompositeEQCatalog
 
-## io submodule (depends on eqrecord, eqcatalog, time_functions_np)
+## io submodule (depends on eqrecord, eqcatalog, time)
 if not reloading:
 	from . import io
 else:

@@ -8,7 +8,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import numpy as np
 import pylab
 import eqcatalog.harvard_cmt as cmt
-from eqcatalog.time_functions import fractional_year
+from eqcatalog.time import fractional_year
 
 
 db_file = "D:\\seismo-gis\\collections\\Harvard_CMT\\SQLite\\HarvardCMT.sqlite"

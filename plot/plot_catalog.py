@@ -15,7 +15,7 @@ import matplotlib
 from matplotlib.dates import AutoDateLocator, DateFormatter
 
 from plotting.generic_mpl import plot_xy
-import eqcatalog.time_functions_np as tf
+import eqcatalog.time as timelib
 
 
 __all__ = ['plot_time_magnitude', 'plot_cumulated_moment', 'plot_depth_statistics',
@@ -99,25 +99,25 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 	else:
 		if isinstance(start_date, int):
 			start_date = str(start_date)
-		start_date = tf.as_np_datetime(start_date)
+		start_date = timelib.as_np_datetime(start_date)
 	if end_date is None:
 		end_date = np.max([cat.end_date for cat in catalogs])
 	else:
 		if isinstance(end_date, int):
 			end_date = str(end_date)
-		end_date = tf.as_np_datetime(end_date)
+		end_date = timelib.as_np_datetime(end_date)
 
 	## Define axis ranges
 	if rel_time_unit:
 		key = {True: 'xmin', False: 'ymin'}[x_is_time]
 		kwargs[key] = 0
 		key = {True: 'xmax', False: 'ymax'}[x_is_time]
-		kwargs[key] = tf.timespan(start_date, end_date, rel_time_unit)
+		kwargs[key] = timelib.timespan(start_date, end_date, rel_time_unit)
 	else:
 		key = {True: 'xmin', False: 'ymin'}[x_is_time]
-		kwargs[key] = tf.to_py_datetime(start_date)
+		kwargs[key] = timelib.to_py_datetime(start_date)
 		key = {True: 'xmax', False: 'ymax'}[x_is_time]
-		kwargs[key] = tf.to_py_datetime(end_date)
+		kwargs[key] = timelib.to_py_datetime(end_date)
 
 	min_mag, max_mag = Mrange
 	if min_mag is not None:
@@ -139,12 +139,12 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 		Mtype = Mtypes[i]
 		mags = catalog.get_magnitudes(Mtype, Mrelation)
 		if rel_time_unit:
-			dates = tf.timespan(start_date, catalog.get_datetimes(), rel_time_unit)
+			dates = timelib.timespan(start_date, catalog.get_datetimes(), rel_time_unit)
 			idxs = (dates >= 0)
 			dates = dates[idxs]
 			mags = mags[idxs]
 		else:
-			dates = tf.to_py_datetime(catalog.get_datetimes())
+			dates = timelib.to_py_datetime(catalog.get_datetimes())
 		if x_is_time:
 			datasets.append((dates, mags))
 		else:
@@ -167,10 +167,10 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 				"fr": u"Magnitude de complétude",
 				"nlfr": u"Compleetheid / Complétude"}[lang]
 		dates, mags = completeness.min_dates, completeness.min_mags
-		#dates = np.concatenate([dates[:1], np.repeat(dates[1:], 2), [tf.to_fractional_year(end_date)]])
-		dates = np.concatenate([dates[:1], np.repeat(dates[1:], 2), [tf.to_py_datetime(end_date)]])
+		#dates = np.concatenate([dates[:1], np.repeat(dates[1:], 2), [timelib.to_fractional_year(end_date)]])
+		dates = np.concatenate([dates[:1], np.repeat(dates[1:], 2), [timelib.to_py_datetime(end_date)]])
 		if rel_time_unit:
-			dates = tf.timespan(start_date, dates, rel_time_unit)
+			dates = timelib.timespan(start_date, dates, rel_time_unit)
 		mags = np.repeat(mags, 2)
 		if x_is_time:
 			datasets.append((dates, mags))
@@ -221,8 +221,8 @@ def plot_time_magnitude(catalogs, Mtype, Mrelation, rel_time_unit=None,
 		for tick in kwargs[keys]:
 			if isinstance(tick, int):
 				tick = str(tick)
-			tick = tf.as_np_datetime(tick)
-			date_ticks.append(tf.to_py_datetime(tick))
+			tick = timelib.as_np_datetime(tick)
+			date_ticks.append(timelib.to_py_datetime(tick))
 		kwargs[key] = date_ticks
 		## If ticks are datetimes, we need to explicitly set a date formatter
 		## for the labels
@@ -271,13 +271,13 @@ def plot_cumulated_moment(catalogs,
 	else:
 		if isinstance(start_date, (int)):
 			start_date = str(start_date)
-		start_date = tf.as_np_datetime(start_date)
+		start_date = timelib.as_np_datetime(start_date)
 	if end_date is None:
 		end_date = np.max([cat.end_date for cat in catalogs])
 	else:
 		if isinstance(end_date, (int)):
 			end_date = str(end_date)
-		end_date = tf.as_np_datetime(end_date)
+		end_date = timelib.as_np_datetime(end_date)
 
 	datasets = []
 	for i, catalog in enumerate(catalogs):
@@ -289,12 +289,12 @@ def plot_cumulated_moment(catalogs,
 		M0 = M0[~nan_idxs]
 
 		if rel_time_unit:
-			dates = tf.timespan(start_date, catalog.get_datetimes(), rel_time_unit)
+			dates = timelib.timespan(start_date, catalog.get_datetimes(), rel_time_unit)
 			idxs = (dates >= 0)
 			dates = dates[idxs]
 			M0 = M0[idxs]
 		else:
-			dates = tf.to_py_datetime(catalog.get_datetimes())
+			dates = timelib.to_py_datetime(catalog.get_datetimes())
 
 		M0_cumul = np.cumsum(M0)
 
@@ -317,10 +317,10 @@ def plot_cumulated_moment(catalogs,
 
 	if rel_time_unit:
 		xmin = 0
-		xmax = tf.timespan(start_date, end_date, rel_time_unit)
+		xmax = timelib.timespan(start_date, end_date, rel_time_unit)
 	else:
-		xmin = tf.to_py_datetime(start_date)
-		xmax = tf.to_py_datetime(end_date)
+		xmin = timelib.to_py_datetime(start_date)
+		xmax = timelib.to_py_datetime(end_date)
 	kwargs['xmin'] = kwargs.get('xmin', xmin)
 	kwargs['xmax'] = kwargs.get('xmax', xmax)
 
@@ -1049,7 +1049,7 @@ def plot_poisson_test(catalogs,
 
 		num_events = len(catalog)
 		td = catalog.get_time_delta(from_events=False)
-		catalog_num_days = tf.fractional_time_delta(td, 'D')
+		catalog_num_days = timelib.fractional_time_delta(td, 'D')
 		num_intervals = np.floor(catalog_num_days / interval)
 
 		## Compute number of events in each interval

@@ -7,7 +7,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import numpy as np
 
-from . import time_functions_np as tf
+from . import time as timelib
 
 
 
@@ -30,10 +30,10 @@ class Completeness(object):
 
 		## Convert years to dates if necessary
 		if isinstance(min_dates[0], int):
-			min_dates = [tf.time_tuple_to_np_datetime(yr, 1, 1) for yr in min_dates]
+			min_dates = [timelib.time_tuple_to_np_datetime(yr, 1, 1) for yr in min_dates]
 			self.min_dates = np.array(min_dates)
 		else:
-			self.min_dates = tf.as_np_datetime(min_dates)
+			self.min_dates = timelib.as_np_datetime(min_dates)
 
 		self.min_mags = np.array(min_mags)
 		self.Mtype = Mtype
@@ -92,7 +92,7 @@ class Completeness(object):
 
 	@property
 	def start_year(self):
-		return tf.to_year(self.start_date)
+		return timelib.to_year(self.start_date)
 
 	@property
 	def min_mag(self):
@@ -100,7 +100,7 @@ class Completeness(object):
 
 	@property
 	def min_years(self):
-		return tf.to_fractional_year(self.min_dates)
+		return timelib.to_fractional_year(self.min_dates)
 
 	def are_mags_monotonously_decreasing(self):
 		"""
@@ -123,7 +123,7 @@ class Completeness(object):
 			Float, completeness magnitude
 		"""
 		if isinstance(date, int):
-			date = tf.time_tuple_to_np_datetime(date, 1, 1)
+			date = timelib.time_tuple_to_np_datetime(date, 1, 1)
 		try:
 			index = np.where(self.min_dates <= date)[0][-1]
 		except IndexError:
@@ -146,7 +146,7 @@ class Completeness(object):
 			Float, completeness magnitude
 		"""
 		if isinstance(date, int):
-			date = tf.time_tuple_to_np_datetime(date, 1, 1)
+			date = timelib.time_tuple_to_np_datetime(date, 1, 1)
 		return self.min_mags[self.min_dates <= date].min()
 
 	def get_initial_completeness_date(self, M):
@@ -164,7 +164,7 @@ class Completeness(object):
 		except:
 			## Magnitude below smallest completeness magnitude
 			## Return date very far in the future
-			return tf.time_tuple_to_np_datetime(1000000, 1, 1)
+			return timelib.time_tuple_to_np_datetime(1000000, 1, 1)
 		else:
 			return self.min_dates[index]
 
@@ -204,7 +204,7 @@ class Completeness(object):
 		:return:
 			Int, initial year of completeness for given magnitude
 		"""
-		return tf.to_year(self.get_initial_completeness_date(M))
+		return timelib.to_year(self.get_initial_completeness_date(M))
 
 	def get_completeness_timespans(self, magnitudes, end_date, unit='Y'):
 		"""
@@ -251,10 +251,10 @@ class Completeness(object):
 			numpy float array, completeness timespans in fractions of :param:`unit`
 		"""
 		if isinstance(end_date, int):
-			end_date = tf.time_tuple_to_np_datetime(end_date, 12, 31)
+			end_date = timelib.time_tuple_to_np_datetime(end_date, 12, 31)
 		completeness_dates = [self.get_initial_completeness_date(M) for M in magnitudes]
 		completeness_dates = np.array(completeness_dates)
-		completeness_timespans = tf.timespan(completeness_dates, end_date, unit=unit)
+		completeness_timespans = timelib.timespan(completeness_dates, end_date, unit=unit)
 		## Replace negative timespans with zeros
 		completeness_timespans[np.where(completeness_timespans < 0)] = 0
 		return completeness_timespans
@@ -279,7 +279,7 @@ class Completeness(object):
 			numpy float array, completeness timespans in fractions of :param:`unit`
 		"""
 		if isinstance(end_date, int):
-			end_date = tf.time_tuple_to_np_datetime(end_date, 12, 31)
+			end_date = timelib.time_tuple_to_np_datetime(end_date, 12, 31)
 		are_mags_complete = np.zeros((len(self.min_mags), len(magnitudes)), dtype=bool)
 		for i, min_mag in enumerate(self.min_mags):
 			are_mags_complete[i] = (magnitudes >= min_mag)
@@ -299,7 +299,7 @@ class Completeness(object):
 						interval_end = self.min_dates[i+1] - np.timedelta64(1, resolution)
 					else:
 						interval_end = end_date
-					ts += tf.timespan(interval_start, interval_end, unit=unit)
+					ts += timelib.timespan(interval_start, interval_end, unit=unit)
 			completeness_timespans[m] = ts
 		return completeness_timespans
 
@@ -319,8 +319,8 @@ class Completeness(object):
 			float, timespan in fractions of :param:`unit`
 		"""
 		if isinstance(end_date, int):
-			end_date = tf.time_tuple_to_np_datetime(end_date, 12, 31)
-		return tf.timespan(self.start_date, end_date, unit=unit)
+			end_date = timelib.time_tuple_to_np_datetime(end_date, 12, 31)
+		return timelib.timespan(self.start_date, end_date, unit=unit)
 
 	def to_hmtk_table(self, Mmax=None):
 		"""

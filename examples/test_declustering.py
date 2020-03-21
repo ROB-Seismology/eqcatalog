@@ -26,16 +26,16 @@ time_deltas = np.cumsum(time_delta_days).astype('m8[D]')
 datetimes = start_date + time_deltas
 
 print(datetimes)
-print(eqcatalog.time_functions_np.fractional_time_delta(np.diff(datetimes), 'D'))
-print(eqcatalog.time_functions_np.fractional_time_delta(dc_window.get_time_window(mags), 'D'))
+print(eqcatalog.time.fractional_time_delta(np.diff(datetimes), 'D'))
+print(eqcatalog.time.fractional_time_delta(dc_window.get_time_window(mags), 'D'))
 
 
 eq_list = []
 for i in range(len(mags)):
 	mag = mags[i]
 	datetime = datetimes[i]
-	date = eqcatalog.time_functions_np.as_np_date(datetime)
-	time = eqcatalog.time_functions_np.to_py_time(datetime)
+	date = eqcatalog.time.as_np_date(datetime)
+	time = eqcatalog.time.to_py_time(datetime)
 	eq = eqcatalog.LocalEarthquake(i, date, time, lon, lat, depth, mag={'MW': mag})
 	eq_list.append(eq)
 catalog = eqcatalog.EQCatalog(eq_list)

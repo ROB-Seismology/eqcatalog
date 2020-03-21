@@ -34,7 +34,7 @@ if not reloading:
 else:
 	reload(HY4)
 
-## read_catalog (depends on ..eqrecord, ..eqcatalog, ..time_functions_np)
+## read_catalog (depends on ..eqrecord, ..eqcatalog, ..time)
 if not reloading:
 	from . import read_catalog
 else:

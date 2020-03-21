@@ -27,7 +27,7 @@ import mapping.geotools.geodetic as geodetic
 
 ## Import package submodules
 from . import msc
-from . import time_functions_np as tf
+from . import time as timelib
 
 
 __all__ = ["LocalEarthquake", "FocMecRecord"]
@@ -47,6 +47,7 @@ class LocalEarthquake(object):
 	:param date:
 		instance of :class:`np.datetime64` or :class:`datetime.date`
 		or ISO-8601 formatted string, date when the earthquake occurred
+		Note: if :param:`time` is None, date is interpreted as datetime
 	:param time:
 		instance of :class:`datetime.time`, time when earthquake occurred
 	:param lon:
@@ -123,14 +124,21 @@ class LocalEarthquake(object):
 			agency="",
 			event_type="ke"):
 		self.ID = ID
-		try:
-			date = tf.as_np_date(date)
-		except:
-			raise TypeError("date not of correct type")
-		try:
-			self.datetime = tf.combine_np_date_and_py_time(date, time, unit='ms')
-		except:
-			raise TypeError("time not of correct type")
+
+		if time is None:
+			try:
+				self.datetime = timelib.as_np_datetime(date)
+			except:
+				raise TypeError("datetime not of correct type")
+		else:
+			try:
+				date = timelib.as_np_date(date)
+			except:
+				raise TypeError("date not of correct type")
+			try:
+				self.datetime = timelib.combine_np_date_and_py_time(date, time, unit='ms')
+			except:
+				raise TypeError("time not of correct type")
 
 		self.lon = lon
 		self.lat = lat
@@ -230,16 +238,16 @@ class LocalEarthquake(object):
 			Dictionary
 		"""
 		if 'datetime' in dct:
-			dt = tf.as_np_datetime(dct['datetime'])
-			dct['date'] = tf.as_np_date(dt)
-			dct['time'] = tf.to_py_time(dt)
+			dt = timelib.as_np_datetime(dct['datetime'])
+			dct['date'] = timelib.as_np_date(dt)
+			dct['time'] = timelib.to_py_time(dt)
 			del dct['datetime']
 		else:
 			if 'time' in dct:
 				dct['time'] = datetime.time(*dct['time'])
 			if 'date' in dct:
 				#dct['date'] = datetime.date(*dct['date'])
-				dct['date'] = tf.time_tuple_to_np_datetime(*dct['date'])
+				dct['date'] = timelib.time_tuple_to_np_datetime(*dct['date'])
 		if not 'mag' in dct:
 			dct['mag'] = {}
 			for key in dct.keys():
@@ -286,9 +294,9 @@ class LocalEarthquake(object):
 
 		datetime_key = column_map.get('datetime', 'datetime')
 		if datetime_key in rec:
-			dt = tf.as_np_datetime(rec[datetime_key])
-			date = tf.as_np_date(dt)
-			time = tf.to_py_time(dt)
+			dt = timelib.as_np_datetime(rec[datetime_key])
+			date = timelib.as_np_date(dt)
+			time = timelib.to_py_time(dt)
 
 		else:
 			date_key = column_map.get('date', 'date')
@@ -317,7 +325,7 @@ class LocalEarthquake(object):
 				day_key = column_map.get('day', 'day')
 				day = max(1, int(rec.get(day_key, 1) or 1))
 			try:
-				date = tf.time_tuple_to_np_datetime(year, month, day)
+				date = timelib.time_tuple_to_np_datetime(year, month, day)
 			except:
 				print("Invalid date in rec %s: %s-%s-%s"
 					% (ID, year, month, day))
@@ -523,7 +531,7 @@ class LocalEarthquake(object):
 
 		latitude = int(round(self.lat * 3600 / 0.001))
 		longitude = int(round(self.lon * 3600 / 0.001))
-		year, month, day, tm_hour, tm_min, tm_sec = tf.to_time_tuple(self.datetime)
+		year, month, day, tm_hour, tm_min, tm_sec = timelib.to_time_tuple(self.datetime)
 		minutes = int(round(tm_hour * 60 + tm_min))
 		tseconds = int(round(tm_sec / 0.1))
 		depth = int(round(np.nan_to_num(self.depth) * 100000))
@@ -613,15 +621,15 @@ class LocalEarthquake(object):
 
 	@property
 	def date(self):
-		return tf.as_np_date(self.datetime)
+		return timelib.as_np_date(self.datetime)
 
 	@property
 	def time(self):
-		return tf.to_py_time(self.datetime)
+		return timelib.to_py_time(self.datetime)
 
 	@property
 	def year(self):
-		return tf.to_year(self.datetime)
+		return timelib.to_year(self.datetime)
 
 	def get_fractional_year(self):
 		"""
@@ -630,8 +638,8 @@ class LocalEarthquake(object):
 		:return:
 			Float, fractional year
 		"""
-		#from .time_functions import fractional_year
-		return tf.to_fractional_year(self.datetime)
+		#from .time import fractional_year
+		return timelib.to_fractional_year(self.datetime)
 
 	def get_fractional_hour(self):
 		"""
@@ -640,7 +648,7 @@ class LocalEarthquake(object):
 		:return:
 			Float, fractional hour
 		"""
-		return tf.py_time_to_fractional_hours(self.time)
+		return timelib.py_time_to_fractional_hours(self.time)
 
 	## Magnitude-related methods
 

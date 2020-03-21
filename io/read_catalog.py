@@ -23,7 +23,7 @@ import numpy as np
 import db.simpledb as simpledb
 
 ## Import submodules
-from .. import time_functions_np as tf
+from ..time import time_tuple_to_np_datetime
 from ..eqrecord import LocalEarthquake
 from ..eqcatalog import EQCatalog
 from ..rob import GIS_ROOT
@@ -525,7 +525,7 @@ def read_catalogTXT(filespec, column_map={"id": 0, "date": 1, "time": 2, "name":
 		instance of :class:`EQCatalog`
 	"""
 	import csv
-	#from .time_functions import parse_isoformat_datetime
+	#from .time import parse_isoformat_datetime
 
 	date_order = date_order.upper()
 	earthquakes = []

@@ -24,7 +24,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-from .time_functions_np import SECS_PER_DAY
+from .time import SECS_PER_DAY
 from .moment import (moment_to_mag, mag_to_moment)
 from .eqrecord import LocalEarthquake
 from .eqcatalog import EQCatalog
@@ -189,7 +189,7 @@ class Reasenberg1985Window(DeclusteringWindow):
 		:return:
 			numpy timedelta64
 		"""
-		from .time_functions_np import fractional_time_delta, is_np_timedelta
+		from .time import fractional_time_delta, is_np_timedelta
 
 		is_scalar = np.isscalar(mag)
 		if is_scalar:
@@ -597,7 +597,7 @@ class Cluster():
 			instance of :class:`LocalEarthquake`
 		"""
 		from .eqrecord import LocalEarthquake
-		from .time_functions_np import (as_np_date, to_py_time)
+		from .time import (as_np_date, to_py_time)
 
 		## Use datetime and error parameters from largest event in cluster
 		mainshock = self.get_mainshock()
@@ -2111,7 +2111,7 @@ def plot_declustering_windows(fig_filespec=None, dpi=300, **kwargs):
 		see :func:`plotting.generic_mpl.plot_xy`
 	"""
 	import matplotlib.pyplot as plt
-	from .time_functions_np import fractional_time_delta
+	from .time import fractional_time_delta
 	from plotting.generic_mpl import (plot_xy, create_multi_plot, show_or_save_plot)
 	#from .moment import calc_rupture_radius
 
@@ -2187,7 +2187,7 @@ def generate_linked_cluster(dc_window, Mrange=(1, 6), num_events=50):
 	from mapping.geotools.geodetic import spherical_point_at
 	from .eqrecord import LocalEarthquake
 	from .eqcatalog import EQCatalog
-	from .time_functions_np import (to_py_date, to_py_time)
+	from .time import (to_py_date, to_py_time)
 
 	mags = np.random.random(num_events)
 	min_mag, max_mag = Mrange

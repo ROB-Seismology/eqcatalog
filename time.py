@@ -322,13 +322,41 @@ def to_fractional_year(dt):
 	years = to_year(dt)
 	if np.isscalar(dt):
 		num_days_per_year = days_in_year(years)
-		start_of_year = np.datetime64('%s-01-01' % years, dtype='M8[D]')
+		start_of_year = np.datetime64('%d-01-01' % years, dtype='M8[D]')
 	else:
 		num_days_per_year = np.array([days_in_year(yr) for yr in years])
-		start_of_year = np.array(['%s-01-01' % yr for yr in years], dtype='M8[D]')
+		start_of_year = np.array(['%d-01-01' % yr for yr in years], dtype='M8[D]')
 	elapsed_days = timespan(start_of_year, dt, 'D')
 	fraction = (elapsed_days / num_days_per_year)
 	return years + fraction
+
+
+def date_from_fractional_year(frac_year):
+	"""
+	Reconstruct date from fractional year
+
+	:param frac_year:
+		float or 1D array, fractional year, e.g. 2020.428
+
+	:return:
+		instance of :class:`np.datetime64` or array of type datetime64
+	"""
+	year = np.floor(frac_year)
+	if np.isscalar(frac_year):
+		start_date = np.datetime64('%d-01-01' % year, dtype='M8[D]')
+		num_days_in_year = days_in_year(year)
+	else:
+		start_date = np.array(['%d-01-01' % yr for yr in year], dtype='M8[D]')
+		num_days_in_year = np.array([days_in_year(yr) for yr in year])
+
+	num_days = (frac_year - year) * num_days_in_year
+	num_microsecs = np.round(num_days * 24 * 60 * 60 * 1E+6)
+	if np.isscalar(frac_year):
+		time_delta = np.timedelta64(np.int(num_microsecs), 'us')
+	else:
+		time_delta = num_microsecs.astype('<m8[us]')
+
+	return start_date + time_delta
 
 
 def to_ymd_tuple(dt):
@@ -469,8 +497,8 @@ def days_in_year(year):
 	:return:
 		int, number of days
 	"""
-	start_of_year = np.datetime64('%s-01-01' % year, 'D')
-	start_of_next_year = np.datetime64('%s-01-01' % (year + 1), 'D')
+	start_of_year = np.datetime64('%d-01-01' % year, 'D')
+	start_of_next_year = np.datetime64('%d-01-01' % (year + 1), 'D')
 	num_days = (start_of_next_year - start_of_year).astype('m8[D]').astype('int')
 	return num_days
 

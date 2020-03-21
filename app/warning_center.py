@@ -292,7 +292,7 @@ class WarningCenter():
 				flagged_event_ids = [fe.id_earth for fe in flagged_events]
 				for eq in subcatalog:
 					if not eq.ID in flagged_event_ids:
-						origin_time = eqcatalog.time_functions.to_py_datetime(
+						origin_time = eqcatalog.time.to_py_datetime(
 																	eq.datetime)
 						criterion.flag_event(eq.ID, origin_time)
 						if verbose:
@@ -396,7 +396,7 @@ class WarningCenter():
 		else:
 			msg += "%s: %s\n" % (MSG_FIELDS['event_type'][lang], eq.event_type)
 
-		dt = eqcatalog.time_functions.to_py_datetime(eq.datetime)
+		dt = eqcatalog.time.to_py_datetime(eq.datetime)
 		msg += ("%s: %d-%02d-%02d %02d:%02d:%02d\n"
 				% (MSG_FIELDS['time'][lang], dt.year, dt.month, dt.day,
 				dt.hour, dt.minute, int(round(dt.second))))

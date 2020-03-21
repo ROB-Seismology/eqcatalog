@@ -198,7 +198,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	from .eqrecord import (ROBLocalEarthquake, DEFAULT_MRELATIONS)
 	from .completeness import DEFAULT_COMPLETENESS
 	from ..eqcatalog import EQCatalog
-	from .. import time_functions_np as tf
+	from ..time import (as_np_datetime, combine_np_date_and_py_time)
 
 	## Convert input arguments, if necessary
 	if isinstance(id_earth, (int, basestring)):
@@ -210,18 +210,18 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 			start_date = '%d-01-01' % start_date
 		elif start_date is None:
 			start_date = '1350-01-01'
-		start_date = tf.as_np_datetime(start_date)
+		start_date = as_np_datetime(start_date)
 
 		if isinstance(end_date, int):
 			end_date = '%d-12-31T23:59:59.999999' % end_date
 		elif end_date is None:
 			end_date = np.datetime64('now')
-		end_date = tf.as_np_datetime(end_date)
+		end_date = as_np_datetime(end_date)
 		## If start_date and end_date are the same,
 		## set time of end date to end of the day
 		if start_date and end_date and end_date - start_date == np.timedelta64(0):
 			end_time = datetime.time(23, 59, 59, 999999)
-			end_date = tf.combine_np_date_and_py_time(end_date, end_time)
+			end_date = combine_np_date_and_py_time(end_date, end_time)
 
 	## Construct SQL query
 	table_clause = "earthquakes"
@@ -1087,7 +1087,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 		where_clause = 'web_analyse.id_earth = 0'
 		if isinstance(id_earth, (str, datetime.date, np.datetime64)):
 			## Interpret id_earth as a date
-			from ..time_functions_np import to_ymd_tuple
+			from ..time import to_ymd_tuple
 			year, month, day = to_ymd_tuple(id_earth)
 			where_clause += ' AND web_input.time_year = %d' % year
 			where_clause += ' AND web_input.time_month = %d' % month
