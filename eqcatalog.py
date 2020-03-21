@@ -1080,7 +1080,7 @@ class EQCatalog(object):
 		:return:
 			1-D numpy array, maximum intensities
 		"""
-		return np.array([eq.intensity_max for eq in self])
+		return np.array([eq.intensity_max or np.nan for eq in self])
 
 	def get_macro_radii(self):
 		"""
@@ -1089,7 +1089,7 @@ class EQCatalog(object):
 		:return:
 			1-D numpy array, macroseismic radii
 		"""
-		return np.array([eq.macro_radius for eq in self])
+		return np.array([eq.macro_radius or np.nan for eq in self])
 
 	## Coordinate-related methods
 
