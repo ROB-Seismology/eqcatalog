@@ -650,6 +650,15 @@ class LocalEarthquake(object):
 		"""
 		return timelib.py_time_to_fractional_hours(self.time)
 
+	def get_weekday(self):
+		"""
+		Determine day of week
+
+		:return:
+			int, day of week  (0=Monday)
+		"""
+		return timelib.to_py_date(self.datetime).weekday()
+
 	## Magnitude-related methods
 
 	@property
