@@ -108,6 +108,11 @@ class EQCatalog(object):
 		self.default_Mrelations = default_Mrelations
 		self.default_completeness = default_completeness
 
+	def __repr__(self):
+		txt = '<EQCatalog "%s" | %s - %s | n=%d>'
+		txt %= (self.name, self.start_date, self.end_date, len(self))
+		return txt
+
 	def __len__(self):
 		"""
 		Return number of earthquakes in collection.
