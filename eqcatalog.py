@@ -1830,9 +1830,9 @@ class EQCatalog(object):
 		Decluster catalog using the given method and window definition
 
 		:param dc_method:
-			instance of :class:`declustering.DeclusteringMethod`
+			str or instance of :class:`declustering.DeclusteringMethod`
 		:param dc_window:
-			instance of :class:`declustering.DeclusteringWindow`
+			str or instance of :class:`declustering.DeclusteringWindow`
 		:param Mrelation:
 			dict specifying how to convert catalog magnitudes to MW
 			(default: {})
@@ -1843,7 +1843,21 @@ class EQCatalog(object):
 		:return:
 			instance of :class:`EQCatalog`, declustered catalog
 		"""
-		dc_cat = dc_method.decluster_catalog(self, dc_window, Mrelation)
+		if isinstance(dc_method, basestring):
+			from . import declustering
+			if not 'Method' in dc_method:
+				dc_method += 'Method'
+			dc_method = getattr(declustering, dc_method)()
+
+		if isinstance(dc_window, basestring):
+			from . import declustering
+			if not 'Window' in dc_window:
+				dc_window += 'Window'
+			dc_window = getattr(declustering, dc_window)()
+
+		#dc_cat = dc_method.decluster_catalog(self, dc_window, Mrelation)
+		dc_result = dc_method.analyze_clusters(self, dc_window, Mrelation)
+		dc_cat = dc_result.get_declustered_catalog()
 		if catalog_name != None:
 			dc_cat.name = catalog_name
 		return dc_cat
@@ -2758,7 +2772,7 @@ class EQCatalog(object):
 			- stda: standard deviation on a value
 			- stdb: standard deviation on b value
 		"""
-		from hazard.rshalib.mfd import get_a_separation
+		from hazard.rshalib.mfd.truncated_gr import get_a_separation
 		from .calcGR import calcGR_LSQ
 
 		completeness = completeness or self.default_completeness
@@ -3126,7 +3140,7 @@ class EQCatalog(object):
 			Bool, whether some messages should be printed or not
 			(default: False)
 		"""
-		from hazard.rshalib.mfd import plot_MFD
+		from hazard.rshalib.mfd import plot_mfds
 
 		mfd_list, labels, colors, styles = [], [], [], []
 		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation,
@@ -3177,7 +3191,7 @@ class EQCatalog(object):
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
 		end_year = timelib.to_year(self.end_date)
-		plot_MFD(mfd_list, colors=colors, styles=styles, labels=labels,
+		plot_mfds(mfd_list, colors=colors, styles=styles, labels=labels,
 				completeness=completeness_limits, end_year=end_year,
 				Mrange=Mrange, Freq_range=Freq_range,
 				title=title, lang=lang,
@@ -3261,36 +3275,42 @@ class EQCatalog(object):
 			if not eq.ML in (None, np.nan):
 				ML[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.ML,
 													errM, size=num_samples)
+			else:
+				ML[i,:] = np.nan
 			if not eq.MS in (None, np.nan):
 				MS[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MS,
 													errM, size=num_samples)
+			else:
+				MS[i,:] = np.nan
 			if not eq.MW in (None, np.nan):
 				MW[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.MW,
 													errM, size=num_samples)
+			else:
+				MW[i,:] = np.nan
 			lons[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lon,
 													errlon, size=num_samples)
 			lats[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma, eq.lat,
 													errlat, size=num_samples)
 			depths[i,:] = scipy.stats.truncnorm.rvs(-num_sigma, num_sigma,
 								np.nan_to_num(eq.depth), errz, size=num_samples)
-		depths.clip(min=0.)
+		depths = depths.clip(min=0.)
 
 		synthetic_catalogs = []
 		for n in range(num_samples):
 			eq_list = []
 			for i, eq in enumerate(self):
 				new_eq = copy.deepcopy(eq)
-				new_eq.ML = ML[i,n]
-				new_eq.MS = MS[i,n]
-				new_eq.MW = MW[i,n]
+				new_eq.mag['ML'] = ML[i,n]
+				new_eq.mag['MS'] = MS[i,n]
+				new_eq.mag['MW'] = MW[i,n]
 				new_eq.lon = lons[i,n]
 				new_eq.lat = lats[i,n]
 				new_eq.depth = depths[i,n]
 				eq_list.append(new_eq)
 			synthetic_catalogs.append(EQCatalog(eq_list, self.start_date,
 									self.end_date, region=self.region,
-									default_Mrelations=self.default_Mrelations),
-									default_completeness=self.default_completeness)
+									default_Mrelations=self.default_Mrelations,
+									default_completeness=self.default_completeness))
 
 		return synthetic_catalogs
 
@@ -5888,37 +5908,43 @@ def concatenate_catalogs(catalog_list, name=""):
 	## Remove empty catalogs
 	catalog_list = [catalog for catalog in catalog_list if catalog and len(catalog)]
 
-	catalog0 = catalog_list[0]
-	eq_list = catalog0.eq_list[:]
-	start_date = catalog0.start_date
-	end_date = catalog0.end_date
-	default_Mrelations = catalog0.default_Mrelations
-	default_completeness = catalog0.default_completeness
-	try:
-		region = list(catalog0.region)
-	except TypeError:
-		region = list(catalog0.get_region())
-	for catalog in catalog_list[1:]:
-		eq_list.extend(catalog.eq_list)
-		if catalog.start_date < start_date:
-			start_date = catalog.start_date
-		if catalog.end_date > end_date:
-			end_date = catalog.end_date
+	if len(catalog_list):
+		catalog0 = catalog_list[0]
+		eq_list = catalog0.eq_list[:]
+		start_date = catalog0.start_date
+		end_date = catalog0.end_date
+		default_Mrelations = catalog0.default_Mrelations
+		default_completeness = catalog0.default_completeness
 		try:
-			w, e, s, n = catalog.region
-		except:
-			w, e, s, n = catalog.get_region()
-		if w < region[0]:
-			region[0] = w
-		if e > region[1]:
-			region[1] = e
-		if s < region[2]:
-			region[2] = s
-		if n > region[3]:
-			region[3] = n
-	return EQCatalog(eq_list, start_date=start_date, end_date=end_date, region=region,
-					name=name, default_Mrelations=default_Mrelations,
-					default_completeness=default_completeness)
+			region = list(catalog0.region)
+		except TypeError:
+			region = list(catalog0.get_region())
+		for catalog in catalog_list[1:]:
+			eq_list.extend(catalog.eq_list)
+			if catalog.start_date < start_date:
+				start_date = catalog.start_date
+			if catalog.end_date > end_date:
+				end_date = catalog.end_date
+			try:
+				w, e, s, n = catalog.region
+			except:
+				w, e, s, n = catalog.get_region()
+			if w < region[0]:
+				region[0] = w
+			if e > region[1]:
+				region[1] = e
+			if s < region[2]:
+				region[2] = s
+			if n > region[3]:
+				region[3] = n
+
+		return EQCatalog(eq_list, start_date=start_date, end_date=end_date,
+						region=region, name=name,
+						default_Mrelations=default_Mrelations,
+						default_completeness=default_completeness)
+
+	else:
+		return EQCatalog([], name=name)
 
 
 # TODO: this function is now obsolete
@@ -6345,7 +6371,7 @@ def read_zonesTXT(filespec, fixed_depth=None):
 ### The following functions are obsolete or have moved to other modules
 
 def format_zones_CRISIS(zone_model, Mc=3.5, smooth=False, fixed_depth=None):
-	from hazard.rshalib.mfd import alphabetalambda
+	from hazard.rshalib.mfd.truncated_gr import alphabetalambda
 	import mapping.MIPython as MI
 
 	app = MI.Application(maximize=False)
