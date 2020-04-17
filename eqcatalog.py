@@ -3071,10 +3071,9 @@ class EQCatalog(object):
 		color_observed="b",
 		color_estimated="r",
 		plot_completeness_limits=True,
-		Mrange=(), Freq_range=(),
 		title=None, lang="en",
-		fig_filespec=None, fig_width=0, dpi=300,
-		verbose=False):
+		fig_filespec=None, dpi=300,
+		verbose=False, **kwargs):
 		"""
 		Compute GR MFD from observed MFD, and plot result
 
@@ -3113,13 +3112,6 @@ class EQCatalog(object):
 		:param plot_completeness_limits:
 			Bool, whether or not to plot completeness limits
 			(default: True)
-		:param Mrange:
-			(Mmin, Mmax) tuple, minimum and maximum magnitude in X axis
-			(default: ())
-		:param Freq_range:
-			(Freq_min, Freq_max) tuple, minimum and maximum values in frequency
-			(Y) axis
-			(default: ())
 		:param title:
 			String, plot title. If None, title will be automatically generated
 			(default: None)
@@ -3129,16 +3121,18 @@ class EQCatalog(object):
 		:param fig_filespec:
 			String, full path to output image file, if None plot to screen
 			(default: None)
-		:param fig_width:
-			Float, figure width in cm, used to recompute :param:`dpi` with
-			respect to default figure width
-			(default: 0)
 		:param dpi:
 			Int, image resolution in dots per inch
 			(default: 300)
 		:param verbose:
 			Bool, whether some messages should be printed or not
 			(default: False)
+		:kwargs:
+			additional keyword arguments understood by
+			:func:`generic_mpl.plot_xy`
+
+		:return:
+			matplotlib Axes instance
 		"""
 		from hazard.rshalib.mfd import plot_mfds
 
@@ -3191,11 +3185,11 @@ class EQCatalog(object):
 			title = "%s (%d events, Mmax=%.2f)" % (self.name, num_events, Mmax_obs)
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
 		end_year = timelib.to_year(self.end_date)
-		plot_mfds(mfd_list, colors=colors, styles=styles, labels=labels,
-				completeness=completeness_limits, end_year=end_year,
-				Mrange=Mrange, Freq_range=Freq_range,
-				title=title, lang=lang,
-				fig_filespec=fig_filespec, fig_width=fig_width, dpi=dpi)
+
+		return plot_mfds(mfd_list, colors=colors, styles=styles, labels=labels,
+						completeness=completeness_limits, end_year=end_year,
+						title=title, lang=lang,
+						fig_filespec=fig_filespec, dpi=dpi, **kwargs)
 
 	## Random catalogs
 
