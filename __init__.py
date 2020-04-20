@@ -87,6 +87,12 @@ else:
 	reload(source_models)
 #from .source_models import (read_source_model, rob_source_models_dict)
 
+## harvard_cmt (depends on moment)
+if not reloading:
+	from . import harvard_cmt
+else:
+	reload(harvard_cmt)
+
 ## rob (depends on completeness, indirectly on eqrecord, eqcatalog, macrorecord)
 if not reloading:
 	from . import rob
