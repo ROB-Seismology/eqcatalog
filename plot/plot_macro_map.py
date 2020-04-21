@@ -13,9 +13,7 @@ import numpy as np
 import matplotlib
 
 
-from ..rob import SEISMOGIS_ROOT
-GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB", "TAB")
-#GIS_FOLDER = "D:\\seismo-gis\\collections\\Bel_administrative_ROB\\TAB"
+from ..rob import SEISMOGIS
 
 
 
@@ -371,16 +369,27 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	## Admin layer
 	admin_data = None
-	if admin_level.lower() == 'province':
-		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_provinces.TAB"))
-	elif admin_level.lower() == 'region':
-		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_regions.TAB"))
-	elif admin_level.lower() == 'country':
-		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_border.TAB"))
-	elif admin_level.lower() == 'commune':
-		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_communes_avant_fusion.TAB"))
-	elif admin_level.lower() == 'main commune':
-		admin_data = lbm.GisData(os.path.join(GIS_FOLDER, "Bel_villages_polygons.TAB"))
+	if admin_level:
+	if SEISMOGIS is not None:
+		coll = SEISMOGIS.read_collection('Bel_administrative_ROB')
+		if admin_level.lower() == 'province':
+			ds_name ="Bel_provinces.TAB"
+		elif admin_level.lower() == 'region':
+			ds_name = "Bel_regions.TAB"
+		elif admin_level.lower() == 'country':
+			ds_name = "Bel_border.TAB"
+		elif admin_level.lower() == 'commune':
+			ds_name = "Bel_communes_avant_fusion.TAB"
+		elif admin_level.lower() == 'main commune':
+			ds_name = "Bel_villages_polygons.TAB"
+		try:
+			[ds] = coll.find_datasets(ds_name)
+		except:
+			print("%s dataset not found in seismogis!" % ds_name
+		else:
+			admin_data = lbm.GisData(ds.get_gis_filespec())
+	else:
+		print('Please install mapping.seismogis module for admin data!')
 
 	if admin_data:
 		if admin_style == "default":
@@ -400,11 +409,19 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			sizes = city_symbol_size + np.log10(population / 500000) * city_symbol_size
 			ts = lbm.ThematicStyleGradient(population, sizes, value_key="Population_agglomeration")
 			city_style = lbm.PointStyle('s', size=ts, fill_color='k', label_style=city_label_style)
-		gis_file = os.path.join(SEISMOGIS_ROOT, "collections", "UN_Cities",
-								"TAB", "UN Cities.TAB")
-		city_data = lbm.GisData(gis_file, label_colname="Name")
-		city_layer = lbm.MapLayer(city_data, city_style)
-		layers.append(city_layer)
+		if SEISMOGIS is not None:
+			coll = SEISMOGIS.read_collection('UN_Cities')
+			try:
+				[ds] = coll.find_datasets('UN Cities')
+			except:
+				print('UN_Cities dataset not found in seismogis!')
+			else:
+				gis_file = ds.get_gis_filespec()
+				city_data = lbm.GisData(gis_file, label_colname="Name")
+				city_layer = lbm.MapLayer(city_data, city_style)
+				layers.append(city_layer)
+		else:
+			print('Please install mapping.seismogis module for city data!')
 
 	## Pie charts
 	# TODO: legend
