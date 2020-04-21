@@ -6,17 +6,14 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import os
 
-from . import SEISMOGIS_ROOT
 
 __all__ = ["get_communes_gis_file", "read_commune_polygons"]
 
 
-GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB", "TAB")
-
 
 def get_communes_gis_file(country='BE', main_communes=False):
 	"""
-	Get path to GIS file containing commune polygons
+	Get path to GIS file in seismogis containing commune polygons
 
 	:param country:
 		2-char string, country code.
@@ -25,18 +22,27 @@ def get_communes_gis_file(country='BE', main_communes=False):
 	:return:
 		str, full path to GIS file
 	"""
+	from . import SEISMOGIS
+
+	if SEISMOGIS is None:
+		print('Please install mapping.seismogis module!')
+		return
+
 	country = country.upper()
 	if country == 'BE':
-		if main_communes == True:
-			gis_filename = "Bel_villages_polygons_fixed.TAB"
-		else:
-			gis_filename = "Bel_communes_avant_fusion.TAB"
+		coll = SEISMOGIS.read_collection('Bel_administrative_ROB')
+		if coll is not None:
+			if main_communes == True:
+				[ds] = coll.find_datasets("Bel_villages_polygons")
+			else:
+				[ds] = coll.find_datasets("Bel_communes_avant_fusion")
 	else:
 		raise NotImplementedError
 
 	#gis_filespec = "http://seishaz.oma.be:8080/geoserver/rob/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=rob:bel_villages_polygons&outputFormat=application%2Fjson"
+	#gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
+	gis_filespec = ds.get_gis_filespec()
 
-	gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
 	return gis_filespec
 
 
