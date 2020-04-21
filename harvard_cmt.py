@@ -30,6 +30,8 @@ from .moment import (moment_to_mag, mag_to_moment)
 
 ROOT_FOLDER = "D:\\seismo-gis\\collections\\Harvard_CMT"
 
+BASE_URL = "http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog"
+
 
 HarvardCMTColDef = [
 	dict(name='ID', type='STRING', notnull=1, pk=1),
@@ -90,7 +92,10 @@ def get_coltype(colname):
 			return col_def['type']
 
 def cnv_coltype(colname, value):
-	func = {'INTEGER': int, 'REAL': float, 'STRING': str, 'TIMESTAMP': lambda x:x}[get_coltype(colname)]
+	func = {'INTEGER': int,
+			'REAL': float,
+			'STRING': str,
+			'TIMESTAMP': lambda x:x}[get_coltype(colname)]
 	return func(value)
 
 
@@ -160,14 +165,19 @@ class HarvardCMTRecord:
 		self.mrf_type = cnv_coltype('mrf_type', mrf_type)
 		self.mrf_duration = cnv_coltype('mrf_duration', mrf_duration)
 		self.centroid_reltime = cnv_coltype('centroid_reltime', centroid_reltime)
-		self.centroid_reltime_sigma = cnv_coltype('centroid_reltime_sigma', centroid_reltime_sigma)
+		self.centroid_reltime_sigma = cnv_coltype('centroid_reltime_sigma',
+												centroid_reltime_sigma)
 		self.centroid_lon = cnv_coltype('centroid_lon', centroid_lon)
-		self.centroid_lon_sigma = cnv_coltype('centroid_lon_sigma', centroid_lon_sigma)
+		self.centroid_lon_sigma = cnv_coltype('centroid_lon_sigma',
+											centroid_lon_sigma)
 		self.centroid_lat = cnv_coltype('centroid_lat', centroid_lat)
-		self.centroid_lat_sigma = cnv_coltype('centroid_lat_sigma', centroid_lat_sigma)
+		self.centroid_lat_sigma = cnv_coltype('centroid_lat_sigma',
+											centroid_lat_sigma)
 		self.centroid_depth = cnv_coltype('centroid_depth', centroid_depth)
-		self.centroid_depth_sigma = cnv_coltype('centroid_depth_sigma', centroid_depth_sigma)
-		self.centroid_depth_type = cnv_coltype('centroid_depth_type', centroid_depth_type)
+		self.centroid_depth_sigma = cnv_coltype('centroid_depth_sigma',
+												centroid_depth_sigma)
+		self.centroid_depth_type = cnv_coltype('centroid_depth_type',
+											centroid_depth_type)
 		self.exp = cnv_coltype('exp', exp)
 		self.Mrr = cnv_coltype('Mrr', Mrr)
 		self.Mrr_sigma = cnv_coltype('Mrr_sigma', Mrr_sigma)
@@ -293,7 +303,7 @@ class HarvardCMTRecord:
 
 	def to_local_eq(self):
 		"""
-		Convert to earthquake record understood by eqrecord
+		Convert to earthquake record understood by eqcatalog
 
 		:return:
 			instance of :class:`eqcatalog.LocalEarthquake`
@@ -308,7 +318,9 @@ class HarvardCMTRecord:
 		depth = self.hypo_depth
 		mag = {'MW': self.MW, 'MS': self.ref_MS, 'mb': self.ref_mb}
 		name = self.location
-		return LocalEarthquake(ID, date, time, lon, lat, depth, mag=mag, name=name)
+		agency = self.ref_catalog
+		return LocalEarthquake(ID, date, time, lon, lat, depth, mag=mag, name=name,
+								agency=agency)
 
 
 class HarvardCMTCatalog:
@@ -327,8 +339,30 @@ class HarvardCMTCatalog:
 	def __len__(self):
 		return self.db.get_num_rows(self.table_name)
 
-	@classmethod
-	def parse_ndk_file(cls, ndk_filespec_or_url):
+	def __del__(self):
+		self.db.close()
+
+	def __getitem__(self, idx):
+		"""
+		:param idx:
+			int, record index
+
+		:return:
+			instance of :class:`HarvardCMTRecord`
+		"""
+		if idx < 0:
+			idx = len(self) + idx
+		query = 'SELECT * FROM %s WHERE rowid = %d'
+		query %= (self.table_name, idx + 1)
+		try:
+			[result] = list(self.query_generic(query))
+		except ValueError:
+			pass
+		else:
+			return result
+
+	@staticmethod
+	def parse_ndk_file(ndk_filespec_or_url):
 		"""
 		Parse NDK file or URL
 
@@ -362,31 +396,83 @@ class HarvardCMTCatalog:
 		return cmt_records
 
 	def clear_db(self):
+		"""
+		Clear database
+		"""
 		if self.table_name in self.db.list_tables():
-			self.db.discard_geometry_column(self.table_name)
-			self.db.drop_table(self.table_name)
+			self.db.drop_geo_table(self.table_name)
 		if not self.table_name in self.db.list_tables():
 			self.db.create_table(self.table_name, HarvardCMTColDef)
 
 	def import_records(self, cmt_records, clear_db=False):
+		"""
+		Import CMT records in the database
+
+		:param cmt_records:
+			list with instances of :class:`HarvardCMTRecord`
+		:param clear_db:
+			bool, whether or not to clear the database first
+			(default: False)
+		"""
 		if clear_db:
 			self.clear_db()
-		self.db.add_records(self.table_name, [rec.to_dict() for rec in cmt_records])
+		try:
+			self.db.add_records(self.table_name, [rec.to_dict() for rec in cmt_records])
+		except:
+			print('You may need to discard spatial geometries first!')
+			raise
 
 	def import_ndk(self, ndk_filespecs, start_date=datetime.date(1900, 1, 1),
-					clear_db=False):
+					clear_db=False, verbose=False):
+		"""
+		Import CMT records from one or more NDK files in the database
+
+		:param ndk_filespecs:
+			list of strings, full paths to NDK files
+		:param start_date:
+			instance of :class:`datetime.date`, start date for importing
+			records (older records will be skipped)
+			(default: datetime.date(1900, 1, 1))
+		:param clear_db:
+			bool, whether or not to clear the database first
+			(default: False)
+
+		:return:
+			int, number of records imported
+		"""
 		if clear_db:
 			self.clear_db()
+		num_recs = 0
 		for ndk_filespec in ndk_filespecs:
-			print(ndk_filespec)
 			recs = self.parse_ndk_file(ndk_filespec)
-			recs = [rec for rec in recs if rec.hypo_date >= start_date]
+			if start_date:
+				recs = [rec for rec in recs if rec.hypo_date >= start_date]
+			if verbose:
+				filename = os.path.split(ndk_filespec)[-1]
+				num_recs += len(recs)
+				print('%s: %d records' % (filename, len(recs)))
 			if recs:
 				self.import_records(recs, clear_db=False)
+				num_recs += len(recs)
 			else:
 				break
 
-	def download_ndk_file(self, url, overwrite=False):
+		return num_recs
+
+	@staticmethod
+	def download_ndk_file(url, overwrite=False):
+		"""
+		Download NDK file from given URL
+
+		:param url:
+			string, URL pointing to NDK file
+		:param overwrite:
+			bool, whether or not an existing NDK file with the same
+			name will be overwritten
+
+		:return:
+			str, full path to NDK file on local filesystem
+		"""
 		filename = url.split('/')[-1]
 		filespec = os.path.join(ROOT_FOLDER, "NDK", filename)
 		if not os.path.exists(filespec) or overwrite:
@@ -400,17 +486,59 @@ class HarvardCMTCatalog:
 				f.close()
 		return filespec
 
-	def read_from_web(self, clear_db=False):
-		base_url = "http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog"
+	@staticmethod
+	def get_ndk_url(year, month):
+		"""
+		Construct URL to NDK file for a particular year and month
+
+		:param year:
+			int, year
+		:param month:
+			int, month (zero-based!)
+
+		:return:
+			str, URL
+		"""
+		MONTHS = ["jan", "feb", "mar", "apr", "may", "jun",
+					"jul", "aug", "sep", "oct", "nov", "dec"]
+
+		url = "NEW_MONTHLY/%d/%s%d.ndk" % (year, MONTHS[month], year-2000)
+		url = BASE_URL + '/' + url
+
+		return url
+
+	def reload(self, clear_db=False, start_date=None,
+				include_quick_cmt_solutions=False,
+				create_spatial_geometries=True, verbose=False):
+		"""
+		Read entire Harvard CMT catalog from NDK files, automatically
+		downloaded from the internet if necessary
+
+		:param clear_db:
+			bool, whether or not to clear the database first
+			(default: False)
+		:param start_date:
+			int (year) or instance of :class:`datetime.date`
+			start date from which onwards to import records
+			(only applies if :param:`clear_db` is False)
+			(default: None)
+		:param include_quick_cmt_solutions:
+			bool, whether or not to include Quick CMT solutions
+			(default: True)
+		:param create_spatial_geometries:
+			bool, whether or not to create spatial geometries
+			(default: True)
+		"""
 		today = datetime.date.today()
 		current_year, current_month = today.year, today.month
+		## Harvard CMT catalog is always 4 months behind
 		if current_month > 4:
 			current_month -= 4
 		else:
 			current_year -= 1
 			current_month += (12 - 4)
 
-		ndk_urls = ["jan76_dec13.ndk"]
+		ndk_urls = [BASE_URL + '/' + "jan76_dec13.ndk"]
 		months = ["jan", "feb", "mar", "apr", "may", "jun",
 					"jul", "aug", "sep", "oct", "nov", "dec"]
 		for year in range(2014, current_year+1):
@@ -419,49 +547,169 @@ class HarvardCMTCatalog:
 			else:
 				end_month = 12
 			for m in range(end_month):
-				url = "NEW_MONTHLY/%d/%s%d.ndk" % (year, months[m], year-2000)
+				url = self.get_ndk_url(year, m)
 				ndk_urls.append(url)
 
 		## Download NDK files if necessary, then import them
-		ndk_urls = [base_url + '/' + url for url in ndk_urls]
 		ndk_files = []
 		for ndk_url in ndk_urls:
 			ndk_filespec = self.download_ndk_file(ndk_url)
 			if ndk_filespec:
 				ndk_files.append(ndk_filespec)
 			else:
-				basename = os.path.splitext(ndk_url.split('/')[-1])[0]
-				m, yr = basename[:3], int(basename[3:])
-				m = months.index(m) + 1
-				yr += 2000
-				start_date = datetime.date(yr, m, 1)
-		self.import_ndk(ndk_files, clear_db=clear_db)
+				filename = ndk_url.split('/')[-1]
+				print("Warning: NDK file %s missing!" % filename)
+				#basename = os.path.splitext(ndk_url.split('/')[-1])[0]
+				#m, yr = basename[:3], int(basename[3:])
+				#m = months.index(m) + 1
+				#yr += 2000
+				#start_date = datetime.date(yr, m, 1)
+
+		if clear_db:
+			self.clear_db()
+
+		elif start_date:
+			## Remove more recent records
+			if isinstance(start_date, int):
+				## year
+				start_date = datetime.date(start_date, 1, 1)
+			else:
+				## Always start from beginning of month
+				start_date = datetime.date(start_date.year, start_date.month, 1)
+			where_clause = "julianday(hypo_date_time) >= julianday('%s')"
+			where_clause %= start_date
+			self.db.delete_records(self.table_name, where_clause)
+
+		self.import_ndk(ndk_files, start_date=start_date, clear_db=False,
+						verbose=verbose)
 
 		## Add Quick CMTs
-		ndk_url = base_url + '/NEW_QUICK/qcmt.ndk'
-		"""
-		if current_month == 12:
-			start_month = 1
-			start_year = current_year + 1
-		else:
-			start_month = current_month + 1
-			start_year = current_year
-		start_date = datetime.date(start_year, start_month, 1)
-		"""
-		self.import_ndk([ndk_url], start_date=start_date)
+		if include_quick_cmt_solutions:
+			self.import_quick_cmt_solutions(verbose=verbose)
 
 		## Create SpatiaLite geometries
+		if create_spatial_geometries:
+			self.create_spatialite_geometries()
+
+	def import_quick_cmt_solutions(self, verbose=False):
+		"""
+		Import Quick CMT solutions
+		"""
+		ndk_url = BASE_URL + '/NEW_QUICK/qcmt.ndk'
+		start_date = self.get_end_datetime().date() + datetime.timedelta(1)
+		self.import_ndk([ndk_url], start_date=start_date, verbose=verbose)
+
+	def create_spatialite_geometries(self):
+		"""
+		Create spatialite geometries (points defined by hypo_lon and
+		hypo_lat columns)
+		"""
 		if self.db.HAS_SPATIALITE:
 			if not 'spatial_ref_sys' in self.db.list_tables():
 				self.db.init_spatialite()
 			self.db.add_geometry_column(self.table_name, 'geom')
-			self.db.create_points_from_columns(self.table_name, 'hypo_lon', 'hypo_lat')
+			self.db.create_points_from_columns(self.table_name, 'hypo_lon',
+												'hypo_lat')
+
+	def drop_spatialite_geometries(self):
+		"""
+		Drop spatialite geometries, keeping database intact
+		"""
+		if 'geom' in self.db.list_table_columns(self.table_name):
+			self.db.discard_geometry_column(self.table_name, 'geom')
+
+	def query_generic(self, query, verbose=False):
+		"""
+		Perform generic query on the database
+
+		:param query:
+			string, SQL query
+		:param verbose:
+			whether or not to print the query
+			(default: False)
+
+		:return:
+			generator yielding instances of class:`HarvardCMTRecord`
+		"""
+		for rec in self.db.query_generic(query, verbose=verbose):
+			rec = rec.to_dict()
+			rec.pop('geom', None)
+			yield HarvardCMTRecord.from_sql_record(rec)
+
+	def query(self, column_clause='*', join_clause='',
+				where_clause='', having_clause='', order_clause='',
+				group_clause='', verbose=False):
+		"""
+		Query the main harvard_cmt table using separate clauses
+
+		:param column_clause:
+			str or list of strings, column clause or list of columns
+			(default: "*")
+		:param join_clause:
+			str or list of (join_type, table_name, condition) tuples,
+			join clause
+			(default: "")
+		:param where_clause:
+			str, where clause
+			(default: "")
+		:param having_clause:
+			str, having clause
+			(default: "")
+		:param order_clause:
+			str, order clause
+			(default: "")
+		:param group_clause:
+			str, group clause
+			(default: "")
+
+		:return:
+			generator yielding instances of class:`HarvardCMTRecord`
+		"""
+		table_clause = self.table_name
+
+		for rec in self.db.query(table_clause, column_clause=column_clause,
+								join_clause=join_clause, where_clause=where_clause,
+								having_clause=having_clause, order_clause=order_clause,
+								group_clause=group_clause, verbose=verbose):
+			rec = rec.to_dict()
+			rec.pop('geom', None)
+			yield HarvardCMTRecord.from_sql_record(rec)
 
 	def get_records(self, region=None, start_date=None, end_date=None,
 					Mmin=None, Mmax=None, min_depth=None, max_depth=None,
-					verbose=False):
-		table_clause = self.table_name
+					ref_catalog='', verbose=False):
+		"""
+		Fetch records corresponding to given criteria
 
+		:param region:
+			(west, east, south, north) defining limits of rectangular
+			geographic region
+			(default: None)
+		:param start_date:
+			instance of :class:`datetime.date`, start date
+			(default: None)
+		:param end_date:
+			instance of :class:`datetime.date`, end date
+			(default: None)
+		:param Mmin:
+			float, minimum magnitude
+			(default: None)
+		:param Mmax:
+			float, maximum magnitude
+			(default: None)
+		:param min_depth:
+			float, minimum depth
+			(default: None)
+		:param max_depth:
+			float, maximum depth
+			(default: None)
+		:param verbose:
+			bool, whether or not to print query
+			(default: False)
+
+		:return:
+			generator yielding instances of class:`HarvardCMTRecord`
+		"""
 		where_clauses = []
 		if region:
 			clause = "(hypo_lon BETWEEN %f AND %f) AND (hypo_lat BETWEEN %f AND %f)"
@@ -492,22 +740,92 @@ class HarvardCMTCatalog:
 			max_moment = mag_to_moment(Mmax, unit='dyn.cm')
 			clause = "(moment * POWER(10, exp)) <= %E" % max_moment
 			where_clauses.append(clause)
+		if ref_catalog:
+			clause = "ref_catalog = '%s'" % ref_catalog
+			where_clauses.append(clause)
 
 		where_clause = " AND ".join(where_clauses)
 
-		for rec in self.db.query(table_clause, where_clause=where_clause, verbose=verbose):
-			rec = rec.to_dict()
-			if 'geom' in rec:
-				del rec['geom']
-			yield HarvardCMTRecord.from_sql_record(rec)
+		return self.query(where_clause=where_clause, verbose=verbose)
+
+	def subselect(self, db_filespec=':memory:', region=None, start_date=None,
+					end_date=None, Mmin=None, Mmax=None, min_depth=None,
+					max_depth=None, ref_catalog='', verbose=False):
+		"""
+		Similar to :meth:`get_records`, but returns a new CMT catalog,
+		stored in memory
+
+		:param db_filespec:
+			str, full path to output database file
+			(default: ':memory:')
+
+		:return:
+			instance of :class:`HarvardCMTCatalog` (without spatial
+			tables and columns)
+		"""
+		hcmt = HarvardCMTCatalog(':memory:')
+		hcmt.clear_db()
+		hcmt.import_records(self.get_records(region=region, start_date=start_date,
+							end_date=end_date, Mmin=Mmin, min_depth=min_depth,
+							max_depth=max_depth, ref_catalog=ref_catalog,
+							verbose=verbose))
+		return hcmt
+
+	def copy(self, db_filespec=':memory:'):
+		"""
+		Copy CMT catalog to another database file or to memory
+
+		:param db_filespec:
+			see :meth:`subselect`
+
+		:return:
+			instance of :class:`HarvardCMTCatalog` (without spatial
+			tables and columns)
+		"""
+		return self.subselect(db_filespec=db_filespec, verbose=False)
+
+	def get_end_datetime(self):
+		"""
+		Determine datetime of most recent record in the database
+
+		:return:
+			instance of :class:`datetime.datetime`
+		"""
+		query = "SELECT * FROM '%s' ORDER BY hypo_date_time DESC LIMIT 1"
+		query %= self.table_name
+		[rec] = list(self.query_generic(query))
+		return rec.hypo_date_time
+
+	def get_total_moment(self, unit='dyn.cm'):
+		"""
+		Compute total seismic moment in catalog
+
+		:return:
+			float,
+		"""
+		query = 'SELECT SUM(moment * POWER(10,exp)) AS "total_moment" from %s'
+		query %= self.table_name
+		[result] = list(self.db.query_generic(query))
+		total_moment = result['total_moment']
+		if unit == 'N.m':
+			total_moment *= 1E-7
+
+		return total_moment
 
 	def to_eq_catalog(self):
+		"""
+		Convert to generic earthquake catalog
+
+		:return:
+			instance of :class:`EQCatalog`
+		"""
 		from .eqcatalog import EQCatalog
 
 		eq_list = []
 		for rec in self.get_records():
 			eq_list.append(rec.to_local_eq())
-		return EQCatalog(eq_list, name="Harvard CMT", start_date=datetime.date(1976, 1, 1))
+		return EQCatalog(eq_list, name="Harvard CMT",
+						start_date=datetime.date(1976, 1, 1))
 
 
 def update_harvard_cmt_catalog():
@@ -516,7 +834,7 @@ def update_harvard_cmt_catalog():
 	"""
 	db_filespec = os.path.join(ROOT_FOLDER, "SQLite", "HarvardCMT.sqlite")
 	harvard_cmt = HarvardCMTCatalog(db_filespec)
-	harvard_cmt.read_from_web(clear_db=True)
+	harvard_cmt.reload(clear_db=True, verbose=True)
 
 
 
