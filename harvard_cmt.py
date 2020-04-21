@@ -28,7 +28,10 @@ import db.simpledb as simpledb
 
 from .moment import (moment_to_mag, mag_to_moment)
 
-ROOT_FOLDER = "D:\\seismo-gis\\collections\\Harvard_CMT"
+
+__all__ = ['HarvardCMTCatalog', 'HarvardCMTRecord',
+			'get_harvard_cmt_catalog', 'update_harvard_cmt_catalog']
+
 
 BASE_URL = "http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog"
 
@@ -828,12 +831,37 @@ class HarvardCMTCatalog:
 						start_date=datetime.date(1976, 1, 1))
 
 
+def get_harvard_cmt_catalog():
+	"""
+	Get Harvard CMT catalog from seismogis
+
+	:return:
+		instance of :class:`HarvardCMTCatalog`
+	"""
+	from .rob import SEISMOGIS
+
+	GCMT_DB_FILE = ''
+	if SEISMOGIS is not None:
+		coll = SEISMOGIS.read_collection('Harvard_CMT')
+		try:
+			[ds] = coll.datasets
+		except:
+			print('Harvard CMT catalog not found in seismogis!')
+		else:
+			GCMT_DB_FILE = ds.get_gis_filespec()
+	else:
+		print('Please install mappping.seismogis module')
+
+	if GCMT_DB_FILE:
+		hcmt_cat = HarvardCMTCatalog(GCMT_DB_FILE)
+		return hcmt_cat
+
+
 def update_harvard_cmt_catalog():
 	"""
 	Update local database containing Harvard CMT catalog
 	"""
-	db_filespec = os.path.join(ROOT_FOLDER, "SQLite", "HarvardCMT.sqlite")
-	harvard_cmt = HarvardCMTCatalog(db_filespec)
+	harvard_cmt = get_harvard_cmt_catalog()
 	harvard_cmt.reload(clear_db=True, verbose=True)
 
 
@@ -890,7 +918,7 @@ if __name__ == "__main__":
 
 	cmt_catalog = HarvardCMTCatalog(':memory:')
 	ndk_filespec = "C:\\Users\\kris\\Downloads\\jan76_dec13.ndk"
-	ndk_url = "http://www.ldeo.columbia.edu/~gcmt/projects/CMT/catalog/jan76_dec13.ndk"
+	ndk_url = BASE_URL + "/jan76_dec13.ndk"
 	cmt_records = cmt_catalog.parse_ndk_file(ndk_filespec)
 	print(len(cmt_records))
 	rec = cmt_records[-1]
