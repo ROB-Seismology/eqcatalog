@@ -26,7 +26,7 @@ import db.simpledb as simpledb
 from ..time import time_tuple_to_np_datetime
 from ..eqrecord import LocalEarthquake
 from ..eqcatalog import EQCatalog
-from ..rob import GIS_ROOT
+from ..rob import SEISMOGIS, GIS_ROOT
 
 
 # TODO: use seismo-gis
@@ -64,10 +64,11 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 									null_value=null_value, verbose=verbose)
 
 	elif catalog_name.upper() in ("HARVARD_CMT", "HARVARD CMT"):
-		from ..harvard_cmt import ROOT_FOLDER
-		sql_file = os.path.join(ROOT_FOLDER, "SQLite", "HarvardCMT.sqlite")
-		#harvard_cmt = HarvardCMTCatalog(sql_file)
-		#return harvard_cmt.to_eq_catalog()
+		from ..harvard_cmt import get_harvard_cmt_catalog
+
+		hcmt_cat = get_harvard_cmt_catalog()
+		sql_file = hcmt_cat.db_filespec
+		#return hcmt_cat.to_eq_catalog()
 		sqldb = simpledb.SQLiteDB(sql_file)
 		table_name = 'harvard_cmt'
 		if not sqldb.HAS_SPATIALITE:
@@ -82,12 +83,24 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 								null_value=null_value, verbose=verbose)
 
 	elif catalog_name.upper() == "EMEC":
-		csv_file = "D:\\seismo-gis\\collections\\EMEC\TXT\EMEC.txt"
-		column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
-					'lat': 5, 'lon': 6, 'depth': 7, 'intensity_max': 8,
-					'Mag': 9, 'Mtype': 10, 'MW': 11, 'errM': 12, 'agency': 13}
-		return read_catalog_csv(csv_file, column_map, has_header=False,
-							ID_prefix='EMEC', delimiter=';', null_value=null_value)
+		csv_file = ''
+		if SEISMOGIS is not None:
+			coll = SEISMOGIS.read_collection('EMEC')
+			try:
+				[ds] = coll.datasets
+			except:
+				print('EMEC catalog not found in seismogis!')
+			else:
+				csv_file = ds.get_gis_filespec()
+		else:
+			print('Please install mapping.seismogis module!')
+
+		if csv_file:
+			column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
+						'lat': 5, 'lon': 6, 'depth': 7, 'intensity_max': 8,
+						'Mag': 9, 'Mtype': 10, 'MW': 11, 'errM': 12, 'agency': 13}
+			return read_catalog_csv(csv_file, column_map, has_header=False,
+								ID_prefix='EMEC', delimiter=';', null_value=null_value)
 
 	else:
 		date_sep = '/'
