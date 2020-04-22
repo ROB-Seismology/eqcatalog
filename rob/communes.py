@@ -1,5 +1,5 @@
 """
-Interface to GIS data containing commune polygons
+Interface to GIS data on seismogis
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -7,8 +7,42 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 
-__all__ = ["get_communes_gis_file", "read_commune_polygons"]
+try:
+	from mapping.seismogis import SeismoGisCatalog as SEISMOGIS
+except ImportError:
+	SEISMOGIS = None
 
+
+
+__all__ = ["SEISMOGIS", "get_dataset_file_on_seismogis",
+			"get_communes_gis_file", "read_commune_polygons"]
+
+
+
+def get_dataset_file_on_seismogis(collection_name, dataset_name):
+	"""
+	Determine full path to dataset file in native format on seismogis
+
+	:param collection_name:
+		str, name of collection the dataset belongs to
+	:param dataset_name:
+		str, name of dataset
+
+	:return:
+		str, full path to GIS file containing dataset
+	"""
+	ds_file = ''
+	if SEISMOGIS is not None:
+		try:
+			[ds] = SEISMOGIS.find_datasets(dataset_name, collection_name)
+		except:
+			print('%s not found in seismogis!' % dataset_name)
+		else:
+			ds_file = ds.get_gis_filespec()
+	else:
+		print('Please install mapping.seismogis module!')
+
+	return ds_file
 
 
 def get_communes_gis_file(country='BE', main_communes=False):
@@ -22,26 +56,20 @@ def get_communes_gis_file(country='BE', main_communes=False):
 	:return:
 		str, full path to GIS file
 	"""
-	from . import SEISMOGIS
-
-	if SEISMOGIS is None:
-		print('Please install mapping.seismogis module!')
-		return
-
 	country = country.upper()
 	if country == 'BE':
-		coll = SEISMOGIS.read_collection('Bel_administrative_ROB')
-		if coll is not None:
-			if main_communes == True:
-				[ds] = coll.find_datasets("Bel_villages_polygons")
-			else:
-				[ds] = coll.find_datasets("Bel_communes_avant_fusion")
+		collection_name = 'Bel_administrative_ROB'
+		if main_communes:
+			gis_filespec = get_dataset_file_on_seismogis(collection_name,
+													"Bel_villages_polygons")
+		else:
+			gis_filespec = get_dataset_file_on_seismogis(collection_name,
+													"Bel_communes_avant_fusion")
 	else:
 		raise NotImplementedError
 
 	#gis_filespec = "http://seishaz.oma.be:8080/geoserver/rob/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=rob:bel_villages_polygons&outputFormat=application%2Fjson"
 	#gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
-	gis_filespec = ds.get_gis_filespec()
 
 	return gis_filespec
 
