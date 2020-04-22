@@ -30,11 +30,6 @@ if platform.uname()[0] == "Windows":
 else:
 	GIS_ROOT = os.path.join(os.environ.get("HOME", ""), "gis-data")
 
-try:
-	from mapping.seismogis import SeismoGisCatalog as SEISMOGIS
-except ImportError:
-	SEISMOGIS = None
-
 
 ## Import submodules
 
@@ -45,7 +40,14 @@ else:
 	reload(completeness)
 from .completeness import *
 
-## source_models (no internal dependencies)
+## seismo_gis (no internal dependencies)
+if not reloading:
+	from . import seismo_gis
+else:
+	reload(seismo_gis)
+from .seismo_gis import *
+
+## source_models (depends on seismo_gis)
 if not reloading:
 	from . import source_models
 else:
@@ -66,11 +68,4 @@ if not reloading:
 else:
 	reload(seismodb)
 from .seismodb import *
-
-## communes (no internal dependencies)
-if not reloading:
-	from . import communes
-else:
-	reload(communes)
-from .communes import *
 
