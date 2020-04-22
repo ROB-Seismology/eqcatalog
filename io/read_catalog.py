@@ -26,7 +26,7 @@ import db.simpledb as simpledb
 from ..time import time_tuple_to_np_datetime
 from ..eqrecord import LocalEarthquake
 from ..eqcatalog import EQCatalog
-from ..rob import SEISMOGIS, GIS_ROOT
+from ..rob import get_dataset_file_on_seismogis, GIS_ROOT
 
 
 # TODO: use seismo-gis
@@ -83,17 +83,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 								null_value=null_value, verbose=verbose)
 
 	elif catalog_name.upper() == "EMEC":
-		csv_file = ''
-		if SEISMOGIS is not None:
-			coll = SEISMOGIS.read_collection('EMEC')
-			try:
-				[ds] = coll.datasets
-			except:
-				print('EMEC catalog not found in seismogis!')
-			else:
-				csv_file = ds.get_gis_filespec()
-		else:
-			print('Please install mapping.seismogis module!')
+		csv_file = get_dataset_file_on_seismogis('EMEC', 'EMEC')
 
 		if csv_file:
 			column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
@@ -131,8 +121,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'errz': 'unc', 'errM': 'unc_2', 'agency': 'ISC-GEM'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "CEUS-SCR":
-			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-										"CEUS-SCR", "CEUS_SCR_Catalog_2012.TAB")
+			gis_filespec = get_dataset_file_on_seismogis('CEUS_SSC_SCR',
+														'CEUS_SCR_Catalog_2012')
 			column_map = {'lon': 'Longitude', 'lat': 'Latitude',
 						'year': 'Year', 'month': 'Month', 'day': 'Day',
 						'hour': 'Hour', 'minute': 'Minute', 'second': 'Second',
@@ -332,7 +322,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 		if not has_header:
 			## If there is no header, column_map should map standard
 			## LocalEarthquake property names to integer column numbers
-			assert column_map and isinstance(column_map.values()[0], int)
+			assert column_map and isinstance(list(column_map.values())[0], int)
 			cm2 = {val:key for key,val in column_map.items()}
 			fieldnames = [cm2.get(k) for k in range(0, max(cm2.keys())+1)]
 			column_map = {}
