@@ -370,26 +370,26 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	## Admin layer
 	admin_data = None
 	if admin_level:
-	if SEISMOGIS is not None:
-		coll = SEISMOGIS.read_collection('Bel_administrative_ROB')
-		if admin_level.lower() == 'province':
-			ds_name ="Bel_provinces.TAB"
-		elif admin_level.lower() == 'region':
-			ds_name = "Bel_regions.TAB"
-		elif admin_level.lower() == 'country':
-			ds_name = "Bel_border.TAB"
-		elif admin_level.lower() == 'commune':
-			ds_name = "Bel_communes_avant_fusion.TAB"
-		elif admin_level.lower() == 'main commune':
-			ds_name = "Bel_villages_polygons.TAB"
-		try:
-			[ds] = coll.find_datasets(ds_name)
-		except:
-			print("%s dataset not found in seismogis!" % ds_name
+		if SEISMOGIS is not None:
+			coll = SEISMOGIS.read_collection('Bel_administrative_ROB')
+			if admin_level.lower() == 'province':
+				ds_name ="Bel_provinces"
+			elif admin_level.lower() == 'region':
+				ds_name = "Bel_regions"
+			elif admin_level.lower() == 'country':
+				ds_name = "Bel_border"
+			elif admin_level.lower() == 'commune':
+				ds_name = "Bel_communes_avant_fusion"
+			elif admin_level.lower() == 'main commune':
+				ds_name = "Bel_villages_polygons"
+			try:
+				[ds] = coll.find_datasets(ds_name)
+			except:
+				print("%s dataset not found in seismogis!" % ds_name)
+			else:
+				admin_data = lbm.GisData(ds.get_gis_filespec())
 		else:
-			admin_data = lbm.GisData(ds.get_gis_filespec())
-	else:
-		print('Please install mapping.seismogis module for admin data!')
+			print('Please install mapping.seismogis module for admin data!')
 
 	if admin_data:
 		if admin_style == "default":
