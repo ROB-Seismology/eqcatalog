@@ -7,10 +7,8 @@ Provides interface to Harvard CMT catalog:
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-try:
-	## Python 2
-	basestring
-except:
+import sys
+if sys.version[0] == '3':
 	## Python 3
 	basestring = str
 	from urllib.request import urlopen, HTTPError
@@ -838,19 +836,9 @@ def get_harvard_cmt_catalog():
 	:return:
 		instance of :class:`HarvardCMTCatalog`
 	"""
-	from .rob import SEISMOGIS
+	from .rob import get_dataset_file_on_seismogis
 
-	GCMT_DB_FILE = ''
-	if SEISMOGIS is not None:
-		coll = SEISMOGIS.read_collection('Harvard_CMT')
-		try:
-			[ds] = coll.datasets
-		except:
-			print('Harvard CMT catalog not found in seismogis!')
-		else:
-			GCMT_DB_FILE = ds.get_gis_filespec()
-	else:
-		print('Please install mappping.seismogis module')
+	GCMT_DB_FILE = get_dataset_file_on_seismogis('Harvard_CMT', 'Harvard_CMT')
 
 	if GCMT_DB_FILE:
 		hcmt_cat = HarvardCMTCatalog(GCMT_DB_FILE)
