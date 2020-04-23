@@ -19,7 +19,7 @@ __all__ = ["SEISMOGIS", "get_dataset_file_on_seismogis",
 
 
 
-def get_dataset_file_on_seismogis(collection_name, dataset_name):
+def get_dataset_file_on_seismogis(collection_name, dataset_name, strict=False):
 	"""
 	Determine full path to dataset file on seismogis
 
@@ -29,6 +29,11 @@ def get_dataset_file_on_seismogis(collection_name, dataset_name):
 		str, name of dataset
 		If name does not include an extension, the file corresponding
 		to native format will be returned.
+	:param strict:
+		bool, whether or not name matching should be strict
+		If False and more than 1 dataset matches the given pattern,
+		the first result will be returned
+		(default: False)
 
 	:return:
 		str, full path to GIS file containing dataset
@@ -38,8 +43,9 @@ def get_dataset_file_on_seismogis(collection_name, dataset_name):
 	format = format.replace('.', '').upper()
 	if SEISMOGIS is not None:
 		try:
-			[ds] = SEISMOGIS.find_datasets(dataset_name, collection_name)
-		except:
+			ds = SEISMOGIS.find_datasets(dataset_name, collection_name,
+											strict=strict)[0]
+		except IndexError:
 			print('%s not found in seismogis!' % dataset_name)
 		else:
 			ds_file = ds.get_gis_filespec(format=format)
