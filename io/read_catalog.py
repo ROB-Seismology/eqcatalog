@@ -28,7 +28,7 @@ import db.simpledb as simpledb
 from ..time import time_tuple_to_np_datetime
 from ..eqrecord import LocalEarthquake
 from ..eqcatalog import EQCatalog
-from ..rob import get_dataset_file_on_seismogis, GIS_ROOT
+from ..rob import get_dataset_file_on_seismogis
 
 
 # TODO: use seismo-gis
@@ -85,7 +85,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 								null_value=null_value, verbose=verbose)
 
 	elif catalog_name.upper() == "EMEC":
-		csv_file = get_dataset_file_on_seismogis('EMEC', 'EMEC')
+		csv_file = get_dataset_file_on_seismogis('Gruenthal_catalogs', 'EMEC')
 
 		if csv_file:
 			column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
@@ -136,7 +136,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 	else:
 		date_sep = '/'
 		if catalog_name.upper() == "SHEEC":
-			gis_filespec = os.path.join(GIS_ROOT, "SHARE", "SHEEC", "Ver3.3", "SHAREver3.3.shp")
+			gis_filespec = get_dataset_file_on_seismogis('SHARE_ESHM13',
+														'SHAREver3.3.shp')
 			column_map = {'lon': 'Lon', 'lat': 'Lat',
 						'year': 'Year', 'month': 'Mo', 'day': 'Da',
 						'hour': 'Ho', 'minute': 'Mi', 'second': 'Se',
@@ -144,8 +145,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'errh': 'LatUnc', 'errz': 'HUnc', 'errM': 'MwUnc'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "CENEC":
-			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-										"CENEC", "CENEC 2008.TAB")
+			gis_filespec = get_dataset_file_on_seismogis('Gruenthal_catalogs',
+													'CENEC 2008.TAB')
 			column_map = {'lon': 'lon', 'lat': 'lat',
 						'year': 'year', 'month': 'month', 'day': 'day',
 						'hour': 'hour', 'minute': 'minute',
@@ -395,8 +396,8 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 				if stripped_key != key:
 					del row[key]
 					key = stripped_key
-					if val:
-						row[key] = val.strip()
+				if val:
+					row[key] = val.strip()
 
 			## If no ID is present, use record number
 			ID_key = column_map.get('ID', 'ID')
