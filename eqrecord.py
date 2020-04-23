@@ -397,20 +397,16 @@ class LocalEarthquake(object):
 		## Specific magnitude type column
 		## takes precedence over value/magnitude type columns
 		ML_key = column_map.get('ML', 'ML')
-		#ML = float(rec.get(ML_key, np.nan) or np.nan)
-		ML = float(rec.get(ML_key, mag.get('ML', np.nan)))
+		ML = float(rec.get(ML_key, mag.get('ML', np.nan)) or np.nan)
 		mag['ML'] = ML
 		MS_key = column_map.get('MS', 'MS')
-		#MS = float(rec.get(MS_key, np.nan) or np.nan)
-		MS = float(rec.get(MS_key, mag.get('MS', np.nan)))
+		MS = float(rec.get(MS_key, mag.get('MS', np.nan)) or np.nan)
 		mag['MS'] = MS
 		MW_key = column_map.get('MW', 'MW')
-		#MW = float(rec.get(MW_key, np.nan) or np.nan)
-		MW = float(rec.get(MW_key, mag.get('MW', np.nan)))
+		MW = float(rec.get(MW_key, mag.get('MW', np.nan)) or np.nan)
 		mag['MW'] = MW
 		mb_key = column_map.get('mb', 'mb')
-		#mb = float(rec.get(mb_key, np.nan) or np.nan)
-		mb = float(rec.get(mb_key, mag.get('mb', np.nan)))
+		mb = float(rec.get(mb_key, mag.get('mb', np.nan)) or np.nan)
 		mag['mb'] = mb
 
 		name_key = column_map.get('name', 'name')
