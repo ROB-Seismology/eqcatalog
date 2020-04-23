@@ -1,3 +1,5 @@
+# -*- coding: iso-Latin-1 -*-
+
 """
 Read earthquake catalogs from various sources
 """
@@ -42,7 +44,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 
 	:param catalog_name:
 		str, name of catalog ("ROB", HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
-		"CEUS-SCR", "BGS", "EMEC")
+		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
@@ -102,6 +104,34 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 			return read_catalog_csv(csv_file, column_map, has_header=True,
 								ID_prefix='BGS', null_value=null_value,
 								ignore_chars= '>+F')
+
+	elif catalog_name.upper() == 'LDG':
+		csv_file = get_dataset_file_on_seismogis('EDF', 'LDG1962-2014.csv')
+		if csv_file:
+			column_map = {'id': 'num', 'date': 'date', 'time': 'heure',
+						'lat': 'lat', 'lon': 'long', 'depth': 'prof',
+						'ML': 'ml', 'MS': 'ms'}
+
+			return read_catalog_csv(csv_file, column_map, date_sep='/',
+									date_order='DMY', has_header=True)
+
+	elif catalog_name.upper() == 'SIHEX':
+		csv_file = get_dataset_file_on_seismogis('EDF', 'SIHEXV2-catalogue-final.csv')
+		if csv_file:
+			column_map = {'id': 'ID NUMBER', 'date': 'DATE', 'time': 'TIME (UTC)',
+						'lat': 'LATITUDE', 'lon': 'LONGITUDE',
+						'depth': 'DEPTH (km)', 'MW': 'Mw'}
+			return read_catalog_csv(csv_file, column_map, date_sep='/',
+									date_order='DMY', has_header=True)
+
+	elif catalog_name.upper() == 'RENASS':
+		csv_file = get_dataset_file_on_seismogis('EDF', 'RÈNaSS-1980-2015.csv')
+		if csv_file:
+			column_map = {'date': 'date', 'time': 'heure', 'lat': 'lat',
+						'lon': 'long', 'depth': 'prof', 'Mag': 'mag',
+						'Mtype': 'type', 'name': 'lieu'}
+			return read_catalog_csv(csv_file, column_map, date_sep='/',
+									date_order='DMY', has_header=True)
 
 	else:
 		date_sep = '/'
