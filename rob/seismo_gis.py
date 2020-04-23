@@ -21,24 +21,28 @@ __all__ = ["SEISMOGIS", "get_dataset_file_on_seismogis",
 
 def get_dataset_file_on_seismogis(collection_name, dataset_name):
 	"""
-	Determine full path to dataset file in native format on seismogis
+	Determine full path to dataset file on seismogis
 
 	:param collection_name:
 		str, name of collection the dataset belongs to
 	:param dataset_name:
 		str, name of dataset
+		If name does not include an extension, the file corresponding
+		to native format will be returned.
 
 	:return:
 		str, full path to GIS file containing dataset
 	"""
 	ds_file = ''
+	dataset_name, format = os.path.splitext(dataset_name)
+	format = format.replace('.', '').upper()
 	if SEISMOGIS is not None:
 		try:
 			[ds] = SEISMOGIS.find_datasets(dataset_name, collection_name)
 		except:
 			print('%s not found in seismogis!' % dataset_name)
 		else:
-			ds_file = ds.get_gis_filespec()
+			ds_file = ds.get_gis_filespec(format=format)
 	else:
 		print('Please install mapping.seismogis module!')
 
