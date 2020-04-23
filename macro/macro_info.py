@@ -332,7 +332,7 @@ class MacroInfoCollection():
 		"""
 		import mapping.layeredbasemap as lbm
 
-		from ..rob.communes import get_communes_gis_file
+		from ..rob.seismo_gis import get_communes_gis_file
 
 		if len(self) == 0:
 			return []
