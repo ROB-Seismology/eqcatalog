@@ -1,7 +1,23 @@
 # -*- coding: iso-Latin-1 -*-
 """
 Version of Thomas' get_macro.py script based on eqcatalog
+
+Intended to be run as cron job on seisweb server
+Set up crontab as follows:
+
+## Run cronjobs via bash instead of sh
+SHELL=/bin/bash
+## Source conda snippet to bash run by crontab
+## This is necessary to activate the right conda environment
+BASH_ENV=~/.conda_env
+## Send mail if an error occurs
+MAILTO=seismo.info@seismology.be
+MAILFROM=seis
+
+*/5 * * * * conda activate eqcatalog; python ~/python/seismo/eqcatalog/app/get_macro.py  >> ~/log/do_macro.log 2>&1
 """
+
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import os
 import sys
@@ -104,7 +120,7 @@ for eq in catalog:
 			print("  datetime = %s" % eq.datetime)
 			print("  lastmod = %s" % maxlastmod)
 			print("  count = %i" % len(macro_data))
-			print("  Bounds : %.4f/%.4f/%.4f/%.4f" % (minlat, maxlat, minlon, maxlon))
+			print("  bounds : %.4f/%.4f/%.4f/%.4f" % (minlat, maxlat, minlon, maxlon))
 
 		## Determine if map has to be generated
 		plot_map = False
