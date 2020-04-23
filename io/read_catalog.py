@@ -92,6 +92,17 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 			return read_catalog_csv(csv_file, column_map, has_header=False,
 								ID_prefix='EMEC', delimiter=';', null_value=null_value)
 
+	elif catalog_name.upper() == "BGS":
+		csv_file = get_dataset_file_on_seismogis('BGS_Seismology',
+												'BGS earthquake catalog.csv')
+
+		if csv_file:
+			column_map = {'date': 'yyyy-mm-dd', 'time': 'hh:mm:ss.ss',
+						'intensity_max': 'intensity', 'name': 'locality'}
+			return read_catalog_csv(csv_file, column_map, has_header=True,
+								ID_prefix='BGS', null_value=null_value,
+								ignore_chars= '>+F')
+
 	else:
 		date_sep = '/'
 		if catalog_name.upper() == "SHEEC":
@@ -113,8 +124,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'agency': 'ref'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "ISC-GEM":
-			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-										"ISC-GEM", "isc-gem-cat.TAB")
+			gis_filespec = get_dataset_file_on_seismogis('ISC-GEM',
+														'isc-gem-cat')
 			column_map = {'ID': 'eventid', 'lon': 'lon', 'lat': 'lat',
 						'date': 'date', 'time': 'time',
 						'MW': 'mw', 'depth': 'depth',
@@ -127,14 +138,6 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'year': 'Year', 'month': 'Month', 'day': 'Day',
 						'hour': 'Hour', 'minute': 'Minute', 'second': 'Second',
 						'MW': 'E_M_', 'errM': 'sigma_M', 'zone': 'DN'}
-			#convert_zero_magnitudes = True
-		elif catalog_name.upper() == "BGS":
-			gis_filespec = os.path.join(GIS_ROOT, "Seismology", "Earthquake Catalogs",
-										"BGS", "Selection of SE-UK-BGS-earthquakes.TAB")
-			column_map = {'ID': 'ID', 'lon': 'LON', 'lat': 'LAT', 'date': 'DY_MO_YEAR',
-						'hour': 'HR', 'minute': 'MN', 'second': 'SECS',
-						'depth': 'DEP', 'ML': 'ML', 'MS': 'MGMC', 'name': 'LOCALITY',
-						'intensity_max': 'INT', 'agency': 'BGS'}
 			#convert_zero_magnitudes = True
 		else:
 			raise Exception("Catalog not recognized: %s" % catalog_name)
@@ -270,7 +273,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 		(default: '-')
 	:param time_sep:
 		str, character separating time elements
-		(default: ':'
+		(default: ':')
 	:param date_order:
 		str, order of year (Y), month (M), day (D) in date string
 		(default: 'YMD')
@@ -351,16 +354,19 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 			## Remove ignore_chars from record values
 			for ic in ignore_chars:
 				for key, val in row.items():
-					row[key] = val.replace(ic, '')
+					if val and not key.isalpha():
+						row[key] = val.replace(ic, '')
 
 			## Strip leading/traling white space
-			for key, val in row.items():
+			## Note: list(row.items()) because altering of keys during loop
+			## not allowed in PY3
+			for key, val in list(row.items()):
 				stripped_key = key.strip()
 				if stripped_key != key:
 					del row[key]
-				key = stripped_key
-				if val:
-					row[key] = val.strip()
+					key = stripped_key
+					if val:
+						row[key] = val.strip()
 
 			## If no ID is present, use record number
 			ID_key = column_map.get('ID', 'ID')
@@ -372,6 +378,8 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 					null_value=null_value)
 			except:
 				if not ignore_errors:
+					print("Error in record #%d" % r)
+					print(row)
 					raise
 				else:
 					num_skipped += 1
