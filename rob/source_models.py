@@ -8,12 +8,33 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 import os
 
 from ..source_models import SourceModelDefinition
-from . import GIS_ROOT
+from .seismo_gis import get_dataset_file_on_seismogis
 
-ROB_directory = os.path.join(GIS_ROOT, "KSB-ORB", "Source Zone Models")
-SHARE_directory = os.path.join(GIS_ROOT, "SHARE")
-SHARE_CSS_directory = os.path.join(SHARE_directory, "Task 3.2", "DATA")
 
+
+__all__ = ['rob_source_models_dict', 'read_source_model',
+			'ROBSourceModelDefinition']
+
+
+class ROBSourceModelDefinition(SourceModelDefinition):
+	"""
+	ROB source model definition
+
+	:param name:
+		see :class:`SourceModelDefinition`
+	:param seismogis_path:
+		(collection_name, dataset_name) tuple, path in seismogis
+	:param column_map:
+		see :class:`SourceModelDefinition`
+	"""
+	def __init__(self, name, seismogis_path, column_map):
+		self.name = name
+		self.seismogis_path = seismogis_path
+		self.column_map = column_map
+
+	@property
+	def gis_filespec(self):
+		return get_dataset_file_on_seismogis(*self.seismogis_path, strict=True)
 
 
 ## Dictionary with data for ROB source models
@@ -21,7 +42,7 @@ rob_source_models_dict = {}
 
 ## Seismotectonic
 name = 'Seismotectonic'
-gis_filespec = os.path.join(ROB_directory, 'seismotectonic zones 1.2.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/Seismotectonic_v1.2.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -45,13 +66,13 @@ column_map = {
 	'Nf': 'Nf',
 	'Tf': 'Tf',
 	'area': 'Area'}
-Seismotectonic = SourceModelDefinition(name, gis_filespec, column_map)
+Seismotectonic = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = Seismotectonic
 
 
 ## TwoZone
 name = 'TwoZone'
-gis_filespec = os.path.join(ROB_directory, 'SLZ+RVG.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/TwoZone.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -74,12 +95,12 @@ column_map = {
 	'Nf': 'Nf',
 	'Tf': 'Tf',
 	'area': 'Area'}
-TwoZone = SourceModelDefinition(name, gis_filespec, column_map)
+TwoZone = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = TwoZone
 
 ## TwoZone_split
 name = 'TwoZone_split'
-gis_filespec = os.path.join(ROB_directory, 'SLZ+RVG_split.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/TwoZone_split.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -101,12 +122,12 @@ column_map = {
 	'Ss': 34,
 	'Nf': 33,
 	'Tf': 33}
-TwoZone_split = SourceModelDefinition(name, gis_filespec, column_map)
+TwoZone_split = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = TwoZone_split
 
 ## TwoZonev2
 name = 'TwoZonev2'
-gis_filespec = os.path.join(ROB_directory, 'TwoZone_v2.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/TwoZone_v2.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -130,12 +151,12 @@ column_map = {
 	'Nf': 'Nf',
 	'Tf': 'Tf',
 	'area': 'Area'}
-TwoZonev2 = SourceModelDefinition(name, gis_filespec, column_map)
+TwoZonev2 = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = TwoZonev2
 
 ## Leynaud
 name = 'Leynaud'
-gis_filespec = os.path.join(ROB_directory, 'ROB Seismic Source Model (Leynaud, 2000).TAB')
+seismogis_path = ('ROB_SHA', 'source_models/Leynaud_Model2.TAB')
 # Note: leave min_mag at 3.5 (Eurocode 8)
 column_map = {
 	'id': 'ShortName',
@@ -158,12 +179,12 @@ column_map = {
 	'Ss': 34,
 	'Nf': 33,
 	'Tf': 33}
-Leynaud = SourceModelDefinition(name, gis_filespec, column_map)
+Leynaud = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = Leynaud
 
 ## Leynaud_extended
 name = 'Leynaud_extended'
-gis_filespec = os.path.join(ROB_directory, 'Leynaud extended.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/Leynaud_extended.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -187,12 +208,12 @@ column_map = {
 	'Nf': 'Nf',
 	'Tf': 'Tf',
 	'area': 'Area'}
-Leynaud_extended = SourceModelDefinition(name, gis_filespec, column_map)
+Leynaud_extended = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = Leynaud_extended
 
 ## Leynaud_updated
 name = 'Leynaud_updated'
-gis_filespec = os.path.join(ROB_directory, 'Leynaud updated.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/Leynaud_Model2_updated.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -214,12 +235,12 @@ column_map = {
 	'Ss': 34,
 	'Nf': 33,
 	'Tf': 33}
-Leynaud_updated = SourceModelDefinition(name, gis_filespec, column_map)
+Leynaud_updated = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = Leynaud_updated
 
 ## RVRS_area
 name = 'RVRS_area'
-gis_filespec = os.path.join(ROB_directory, 'RVRS_area_v2.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/RVRS_area_v2.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -242,12 +263,12 @@ column_map = {
 	'Ss': 'Ss',
 	'Nf': 'Nf',
 	'Tf': 'Tf'}
-RVRS_area = SourceModelDefinition(name, gis_filespec, column_map)
+RVRS_area = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = RVRS_area
 
 ## RVRS_CSS
 name = 'RVRS_CSS'
-gis_filespec = os.path.join(SHARE_CSS_directory, 'CSS_SurfaceTrace.TAB')
+seismogis_path = ('ROB_SHA', 'RVRS_CSS/CSS_SurfaceTrace.TAB')
 column_map = {
 	'id': 'IDSource',
 	'name': 'SourceName',
@@ -267,12 +288,12 @@ column_map = {
 	'slip_rate_distribution': [('SlipRateMin', 0.5),
 								('SlipRateMax', 0.5)],
 	'bg_zone': None}
-RVRS_CSS = SourceModelDefinition(name, gis_filespec, column_map)
+RVRS_CSS = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = RVRS_CSS
 
 ## Seismotectonic Hybrid
 name = 'Seismotectonic_Hybrid'
-gis_filespec = os.path.join(ROB_directory, 'Seismotectonic Hybrid.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/Seismotectonic Hybrid.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -304,12 +325,12 @@ column_map = {
 								('max_slip_rate', 0.5)],
 	'bg_zone': 'BG_zone',
 	'area': 'Area'}
-Seismotectonic_Hybrid = SourceModelDefinition(name, gis_filespec, column_map)
+Seismotectonic_Hybrid = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = Seismotectonic_Hybrid
 
 ## Seismotectonic Hybrid (including Hockai fault)
 name = 'Seismotectonic_Hybrid_v2'
-gis_filespec = os.path.join(ROB_directory, 'Seismotectonic Hybrid + Hockai.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/Seismotectonic Hybrid + Hockai.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -341,12 +362,12 @@ column_map = {
 								('max_slip_rate', 0.5)],
 	'bg_zone': 'BG_zone',
 	'area': 'Area'}
-Seismotectonic_Hybrid_v2 = SourceModelDefinition(name, gis_filespec, column_map)
+Seismotectonic_Hybrid_v2 = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = Seismotectonic_Hybrid_v2
 
 ## RVRS SHARE AS model
 name = 'RVRS_SHARE_AS'
-gis_filespec = os.path.join(ROB_directory, 'RVRS_SHARE_v4alpha.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/RVRS_SHARE_v4alpha.TAB')
 column_map = {
 	'id': 'Idas',
 	'name': 'Idas',
@@ -368,13 +389,12 @@ column_map = {
 	'Tf': 0,
 	'min_hypo_depth': 'Mindepth',
 	'max_hypo_depth': 'Maxdepth'}
-RVRS_SHARE_AS = SourceModelDefinition(name, gis_filespec, column_map)
+RVRS_SHARE_AS = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = RVRS_SHARE_AS
 
 ## SHARE AS model
 name = 'SHARE_AS'
-gis_filespec = os.path.join(SHARE_directory, 'ASModel', 'Ver6.1', 'ASModelVer61.shp')
-#gis_filespec = os.path.join(SHARE_directory, 'ASModel', 'Ver4alpha', 'AsModel_ver4_alpha.shp')
+seismogis_path = ('SHARE_ESHM13', 'ASModel/Ver6.1/ASModelVer61.shp')
 column_map = {
 	'id': 'IDAS',
 	'name': 'IDAS',
@@ -407,12 +427,12 @@ column_map = {
 	'Ss': 'SS',
 	'Nf': 'NF',
 	'Tf': 'TF'}
-SHARE_AS = SourceModelDefinition(name, gis_filespec, column_map)
+SHARE_AS = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = SHARE_AS
 
 ## SHARE AS model around Belgium
 name = 'SHARE_AS_Belgium'
-gis_filespec = os.path.join(ROB_directory, 'SHARE_ASv61_Belgium.TAB')
+seismogis_path = ('ROB_SHA', 'source_models/SHARE_ASv61_Belgium.TAB')
 column_map = {
 	'id': 'Idas',
 	'name': 'Idas',
@@ -434,7 +454,7 @@ column_map = {
 	'Ss': 'Ss',
 	'Nf': 'Nf',
 	'Tf': 'Tf'}
-SHARE_AS_Belgium = SourceModelDefinition(name, gis_filespec, column_map)
+SHARE_AS_Belgium = ROBSourceModelDefinition(name, seismogis_path, column_map)
 rob_source_models_dict[name] = SHARE_AS_Belgium
 
 
