@@ -42,7 +42,7 @@ rob_source_models_dict = {}
 
 ## Seismotectonic
 name = 'Seismotectonic'
-seismogis_path = ('ROB_SHA', 'source_models/Seismotectonic_v1.2.TAB')
+seismogis_path = ('ROB_SHA', 'Seismotectonic_v1.2.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -72,7 +72,7 @@ rob_source_models_dict[name] = Seismotectonic
 
 ## TwoZone
 name = 'TwoZone'
-seismogis_path = ('ROB_SHA', 'source_models/TwoZone.TAB')
+seismogis_path = ('ROB_SHA', 'TwoZone.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -100,7 +100,7 @@ rob_source_models_dict[name] = TwoZone
 
 ## TwoZone_split
 name = 'TwoZone_split'
-seismogis_path = ('ROB_SHA', 'source_models/TwoZone_split.TAB')
+seismogis_path = ('ROB_SHA', 'TwoZone_split.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -127,7 +127,7 @@ rob_source_models_dict[name] = TwoZone_split
 
 ## TwoZonev2
 name = 'TwoZonev2'
-seismogis_path = ('ROB_SHA', 'source_models/TwoZone_v2.TAB')
+seismogis_path = ('ROB_SHA', 'TwoZone_v2.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -156,7 +156,7 @@ rob_source_models_dict[name] = TwoZonev2
 
 ## Leynaud
 name = 'Leynaud'
-seismogis_path = ('ROB_SHA', 'source_models/Leynaud_Model2.TAB')
+seismogis_path = ('ROB_SHA', 'Leynaud_Model2.TAB')
 # Note: leave min_mag at 3.5 (Eurocode 8)
 column_map = {
 	'id': 'ShortName',
@@ -184,7 +184,7 @@ rob_source_models_dict[name] = Leynaud
 
 ## Leynaud_extended
 name = 'Leynaud_extended'
-seismogis_path = ('ROB_SHA', 'source_models/Leynaud_extended.TAB')
+seismogis_path = ('ROB_SHA', 'Leynaud_extended.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -213,7 +213,7 @@ rob_source_models_dict[name] = Leynaud_extended
 
 ## Leynaud_updated
 name = 'Leynaud_updated'
-seismogis_path = ('ROB_SHA', 'source_models/Leynaud_Model2_updated.TAB')
+seismogis_path = ('ROB_SHA', 'Leynaud_Model2_updated.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -240,7 +240,7 @@ rob_source_models_dict[name] = Leynaud_updated
 
 ## RVRS_area
 name = 'RVRS_area'
-seismogis_path = ('ROB_SHA', 'source_models/RVRS_area_v2.TAB')
+seismogis_path = ('ROB_SHA', 'RVRS_area_v2.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -293,7 +293,7 @@ rob_source_models_dict[name] = RVRS_CSS
 
 ## Seismotectonic Hybrid
 name = 'Seismotectonic_Hybrid'
-seismogis_path = ('ROB_SHA', 'source_models/Seismotectonic Hybrid.TAB')
+seismogis_path = ('ROB_SHA', 'Seismotectonic Hybrid.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -330,7 +330,7 @@ rob_source_models_dict[name] = Seismotectonic_Hybrid
 
 ## Seismotectonic Hybrid (including Hockai fault)
 name = 'Seismotectonic_Hybrid_v2'
-seismogis_path = ('ROB_SHA', 'source_models/Seismotectonic Hybrid + Hockai.TAB')
+seismogis_path = ('ROB_SHA', 'Seismotectonic Hybrid + Hockai.TAB')
 column_map = {
 	'id': 'ShortName',
 	'name': 'Name',
@@ -367,7 +367,7 @@ rob_source_models_dict[name] = Seismotectonic_Hybrid_v2
 
 ## RVRS SHARE AS model
 name = 'RVRS_SHARE_AS'
-seismogis_path = ('ROB_SHA', 'source_models/RVRS_SHARE_v4alpha.TAB')
+seismogis_path = ('ROB_SHA', 'RVRS_SHARE_v4alpha.TAB')
 column_map = {
 	'id': 'Idas',
 	'name': 'Idas',
@@ -394,7 +394,7 @@ rob_source_models_dict[name] = RVRS_SHARE_AS
 
 ## SHARE AS model
 name = 'SHARE_AS'
-seismogis_path = ('SHARE_ESHM13', 'ASModel/Ver6.1/ASModelVer61.shp')
+seismogis_path = ('SHARE_ESHM13', 'ASModelVer61.shp')
 column_map = {
 	'id': 'IDAS',
 	'name': 'IDAS',
@@ -432,7 +432,7 @@ rob_source_models_dict[name] = SHARE_AS
 
 ## SHARE AS model around Belgium
 name = 'SHARE_AS_Belgium'
-seismogis_path = ('ROB_SHA', 'source_models/SHARE_ASv61_Belgium.TAB')
+seismogis_path = ('ROB_SHA', 'SHARE_ASv61_Belgium.TAB')
 column_map = {
 	'id': 'Idas',
 	'name': 'Idas',
