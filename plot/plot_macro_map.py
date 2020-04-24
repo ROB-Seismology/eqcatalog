@@ -368,7 +368,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			#layers.append(country_layer)
 			#coll_name = 'DCW_Countries'
 
-		coll_name = 'DCW_Countries'
+		coll_name = 'DCW_countries'
 		for ds_name in ('france', 'germany', 'netherlands', 'united_kingdom'):
 			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 			if gis_file:
