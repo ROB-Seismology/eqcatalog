@@ -6,9 +6,8 @@ from __future__ import absolute_import, division, print_function#, unicode_liter
 
 import os
 
-from ..rob import seismodb, SEISMOGIS_ROOT
+from ..rob import seismodb
 
-#GIS_FOLDER = os.path.join(SEISMOGIS_ROOT, "collections", "Bel_administrative_ROB", "TAB")
 GIS_FOLDER = "D:\\GIS-data\\KSB-ORB\\HistoricalEQ"
 
 
