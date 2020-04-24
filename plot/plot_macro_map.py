@@ -362,27 +362,47 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if country_style == 'default':
 		country_style = lbm.LineStyle(line_width=1.0)
 	if country_style:
-		for feature in ('coastlines', 'countries'):
-			country_data = lbm.BuiltinData(feature)
+		#for feature in ('coastlines', 'countries'):
+			#country_data = lbm.BuiltinData(feature)
+			#country_layer = lbm.MapLayer(country_data, country_style)
+			#layers.append(country_layer)
+			#coll_name = 'DCW_Countries'
+
+		coll_name = 'DCW_Countries'
+		for ds_name in ('france', 'germany', 'netherlands', 'united_kingdom'):
+			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+			if gis_file:
+				country_data = lbm.GisData(gis_file)
 			country_layer = lbm.MapLayer(country_data, country_style)
 			layers.append(country_layer)
+		coll_name, ds_name = 'STATBEL', 'Country'
+		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+		if gis_file:
+			country_data = lbm.GisData(gis_file)
+		country_layer = lbm.MapLayer(country_data, country_style)
+		layers.append(country_layer)
 
 	## Admin layer
 	admin_data = None
 	if admin_level:
 		if admin_level.lower() == 'province':
-			ds_name ="Bel_provinces"
+			#coll_name, ds_name = "Bel_administrative_ROB", "Bel_provinces"
+			coll_name, ds_name = 'STATBEL', 'Provinces'
 		elif admin_level.lower() == 'region':
-			ds_name = "Bel_regions"
+			#coll_name, ds_name = "Bel_administrative_ROB", "Bel_regions"
+			coll_name, ds_name = 'STATBEL', 'Regions'
 		elif admin_level.lower() == 'country':
-			ds_name = "Bel_border"
+			#coll_name, ds_name = "Bel_administrative_ROB", "Bel_border"
+			coll_name, ds_name = 'STATBEL', 'Country'
 		elif admin_level.lower() == 'commune':
-			ds_name = "Bel_communes_avant_fusion"
+			coll_name, ds_name = "Bel_administrative_ROB", "Bel_communes_avant_fusion"
 		elif admin_level.lower() == 'main commune':
-			ds_name = "Bel_villages_polygons"
+			coll_name, ds_name = "Bel_administrative_ROB", "Bel_villages_polygons"
+			#coll_name, ds_name = 'STATBEL', 'Municipalities'
+		elif admin_level.lower() == 'sector':
+			coll_name, ds_name = 'STATBEL', 'scbel01012011_gen13.shp'
 
-		gis_file = get_dataset_file_on_seismogis('Bel_administrative_ROB',
-													ds_name)
+		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 		if gis_file:
 			admin_data = lbm.GisData(gis_file)
 
