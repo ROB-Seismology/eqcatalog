@@ -373,14 +373,14 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 			if gis_file:
 				country_data = lbm.GisData(gis_file)
-			country_layer = lbm.MapLayer(country_data, country_style)
-			layers.append(country_layer)
+				country_layer = lbm.MapLayer(country_data, country_style)
+				layers.append(country_layer)
 		coll_name, ds_name = 'STATBEL', 'Country'
 		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 		if gis_file:
 			country_data = lbm.GisData(gis_file)
-		country_layer = lbm.MapLayer(country_data, country_style)
-		layers.append(country_layer)
+			country_layer = lbm.MapLayer(country_data, country_style)
+			layers.append(country_layer)
 
 	## Admin layer
 	admin_data = None
