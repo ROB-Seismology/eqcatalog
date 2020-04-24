@@ -12,7 +12,7 @@ SHELL=/bin/bash
 BASH_ENV=~/.conda_env
 ## Send mail if an error occurs
 MAILTO=seismo.info@seismology.be
-MAILFROM=seis
+MAILFROM=seisweb3
 
 */5 * * * * conda activate eqcatalog; python ~/python/seismo/eqcatalog/app/get_macro.py  >> ~/log/do_macro.log 2>&1
 """
@@ -27,6 +27,10 @@ import argparse
 from distutils.util import strtobool
 
 import numpy as np
+
+## Avoid 'Invalid DISPLAY variable' error on headless server
+import matplotlib
+matplotlib.use('Agg')
 
 import mapping.layeredbasemap as lbm
 import eqcatalog
