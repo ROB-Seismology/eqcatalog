@@ -80,6 +80,8 @@ parser.add_argument("--copyright_label", help="Label to use as copyright",
                     type=str, default="Collaborative project of ROB and BNS")
 parser.add_argument("--base_folder", help="Base folder for generated maps",
                     type=str, default=BASE_FOLDER)
+parser.add_argument("--dry_run", help="Run script without actually plotting anything",
+					type=strtobool, default="false")
 parser.add_argument("--verbose", help="Whether or not to print progress information",
 					type=strtobool, default="true")
 args = parser.parse_args()
@@ -223,23 +225,24 @@ for eq in catalog:
 							admin_level = args.bel_admin_level
 
 					## Plot map
-					if agency == 'ROB':
-						rob_filespec = map_filespec
-						macro_info.plot_map(region=region, projection=projection,
-							graticule_interval=graticule_interval, plot_info=plot_info,
-							int_conversion='round', symbol_style=symbol_style,
-							line_style=line_style, thematic_num_replies=thematic_num_replies,
-							interpolate_grid={}, cmap=cmap,
-							color_gradient=color_gradient, event_style=event_style,
-							country_style=country_style,
-							admin_level=admin_level, admin_style=admin_style,
-							city_style=city_style, colorbar_style=colorbar_style,
-							radii=[], plot_pie=None,
-							title='', fig_filespec=map_filespec, copyright=copyright,
-							text_box={}, dpi=dpi, verbose=args.verbose)
-					else:
-						## Sync ROB and BNS maps rather than plotting them both
-						shutil.copyfile(rob_filespec, map_filespec)
+					if not args.dry_run:
+						if agency == 'ROB':
+							rob_filespec = map_filespec
+							macro_info.plot_map(region=region, projection=projection,
+								graticule_interval=graticule_interval, plot_info=plot_info,
+								int_conversion='round', symbol_style=symbol_style,
+								line_style=line_style, thematic_num_replies=thematic_num_replies,
+								interpolate_grid={}, cmap=cmap,
+								color_gradient=color_gradient, event_style=event_style,
+								country_style=country_style,
+								admin_level=admin_level, admin_style=admin_style,
+								city_style=city_style, colorbar_style=colorbar_style,
+								radii=[], plot_pie=None,
+								title='', fig_filespec=map_filespec, copyright=copyright,
+								text_box={}, dpi=dpi, verbose=args.verbose)
+						else:
+							## Sync ROB and BNS maps rather than plotting them both
+							shutil.copyfile(rob_filespec, map_filespec)
 
 	else:
 		print("Not enough data to draw a map (<%d replies)" % MIN_NUM_REPLIES)
