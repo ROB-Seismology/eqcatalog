@@ -39,6 +39,13 @@ else:
 	reload(macro_info)
 from .macro_info import *
 
+## mdp (depends on macro_info)
+if not reloading:
+	from . import mdp
+else:
+	reload(mdp)
+from .mdp import *
+
 ## dyfi (no internal dependencies)
 if not reloading:
 	from . import dyfi
