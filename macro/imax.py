@@ -138,21 +138,16 @@ def get_eq_intensities_for_commune_traditional(id_com, data_type='',
 	"""
 	from ..rob.seismodb import query_traditional_macro_catalog
 
-	macro_rec_dict = query_traditional_macro_catalog(id_earth=None, id_com=id_com,
+	mdp_collection = query_traditional_macro_catalog(id_earth=None, id_com=id_com,
 					data_type=data_type, group_by_main_commune=as_main_commune,
 					min_fiability=min_fiability)
 
 	eq_intensities = {}
-	for id_earth, macro_recs in macro_rec_dict.items():
-		for mrec in macro_recs:
-			Imin, Imax = mrec['Imin'], mrec['Imax']
-			I = {'min': Imin, 'max': Imax, 'mean': np.nanmean([Imin, Imax])}[min_or_max]
-			## Discard nan values
-			if not np.isnan(I):
-				if id_earth in eq_intensities:
-					eq_intensities[id_earth].append(I)
-				else:
-					eq_intensities[id_earth] = [I]
+	mdpc_dict = mdp_collection.split_by_attribute('id_earth')
+	for id_earth, mdpc in mdpc_dict.items():
+		I = mdpc.get_intensities(min_or_max)
+		## Discard nan values
+		eq_intensities[id_earth] = list(I[~np.isnan(I)])
 
 	return eq_intensities
 
