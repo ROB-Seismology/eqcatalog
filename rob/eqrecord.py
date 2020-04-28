@@ -195,8 +195,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return self.get_aggregated_traditional_macro_info(data_type='historical', **kwargs)
 
 	def get_traditional_macroseismic_info(self, id_com=None, data_type='',
-					group_by_main_commune=False, min_fiability=80,
-					verbose=False, errf=None):
+									group_by_main_commune=False, min_fiability=80,
+									verbose=False, errf=None):
 		"""
 		Get traditional macroseismic information for this earthquake
 
@@ -219,9 +219,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			File object, where to print errors
 
 		:return:
-			dict, mapping commune IDs (if :param:`id_earth` is not None) or
-			earthquake IDs (if :param:`id_earth` is None) to lists of
-			database records (1 or more depending on :param:`group_by_main_commune`)
+			instance of :class:`eqcatalog.macro.MDPCollection`
 		"""
 		kwargs = locals().copy()
 		kwargs.pop('self')
@@ -229,8 +227,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return query_traditional_macro_catalog(self.ID, **kwargs)
 
 	def get_official_macroseismic_info(self, id_com=None,
-					group_by_main_commune=False, min_fiability=80,
-					verbose=False, errf=None):
+								group_by_main_commune=False, min_fiability=80,
+								verbose=False, errf=None):
 		"""
 		Get official macroseismic information for this earthquake
 		This is a wrapper for :meth:`get_traditional_macroseismic_info`
@@ -240,8 +238,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return self.get_traditional_macroseismic_info(data_type='official', **kwargs)
 
 	def get_historical_macroseismic_info(self, id_com=None,
-					group_by_main_commune=False, min_fiability=80,
-					verbose=False, errf=None):
+								group_by_main_commune=False, min_fiability=80,
+								verbose=False, errf=None):
 		"""
 		Get historical macroseismic information for this earthquake
 		This is a wrapper for :meth:`get_traditional_macroseismic_info`
