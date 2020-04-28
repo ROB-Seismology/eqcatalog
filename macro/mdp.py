@@ -5,6 +5,7 @@ Macroseismic data point(s)
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 
+import operator
 import sys
 if sys.version[0] == '3':
 	basestring = str
@@ -151,18 +152,28 @@ class MDPCollection():
 	def get_latitudes(self):
 		return np.array([mdp.lat for mdp in self])
 
-	def get_aggregated_intensity(self, Imin_or_max, agg_function):
+	def get_region(self):
 		"""
-		Compute aggregated intensity of MDP collection
-
-		:param Imin_or_max:
-			str, either 'min', 'mean' or 'max', to select between minimum,
-			mean or maximum intensitiy of each MDP
-		:param agg_function:
-			str, aggregation function, one of 'min', 'max', 'mean', 'median'
+		Determine bounding region
 
 		:return:
-			float, aggregated intensity
+			(lonmin, lonmax, latmin, latmax) tuple of floats
+		"""
+		lons = self.get_longitudes()
+		lats = self.get_latitudes()
+
+		return (np.nanmin(lons), np.nanmax(lons), np.nanmin(lats), np.nanmax(lats))
+
+	def get_intensities(self, Imin_or_max):
+		"""
+		Get intensities
+
+		:param Imin_or_max:
+			str, either 'min', 'mean', 'median' or 'max', to select
+			between minimum, mean, median or maximum intensitiy of each MDP
+
+		:return:
+			1D float array
 		"""
 		if Imin_or_max == 'min':
 			intensities = self.Imin
@@ -171,9 +182,61 @@ class MDPCollection():
 		elif Imin_or_max == 'mean':
 			intensities = self.Imean
 
+		return intensities
+
+	def Iminmax(self, Imin_or_max):
+		"""
+		Return minimum and maximum intensity
+
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		"""
+		intensities = self.get_intensities(Imin_or_max)
+		return (np.nanmin(intensities), np.nanmax(intensities))
+
+	def get_aggregated_intensity(self, Imin_or_max, agg_function):
+		"""
+		Compute aggregated intensity of MDP collection
+
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		:param agg_function:
+			str, aggregation function, one of 'min', 'max', 'mean', 'median'
+
+		:return:
+			float, aggregated intensity
+		"""
+		intensities = self.get_intensities(Imin_or_max)
 		agg_func = getattr(np, 'nan'+agg_function)
 
 		return agg_func(intensities)
+
+	def remove_outliers(self, Imin_or_max, min_pct=2.5, max_pct=97.5):
+		"""
+		Remove outliers (with intensity outside of confidence range)
+		from collection
+
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		:param min_pct:
+			float, lower percentile
+			(default: 2.5)
+		:param max_pct:
+			float, upper percentile
+			(default: 97.5)
+
+		:return:
+			instance of :class:`MDPCollection`
+		"""
+		intensities = self.get_intensities(Imin_or_max)
+		pct0 = np.percentile(intensities, min_pct)
+		pct1 = np.percentile(intensities, max_pct)
+		within_confidence = (intensities >= pct0) & (intensities <= pct1)
+		mdp_list = []
+		for idx in np.where(within_confidence)[0]:
+			mdp_list.append(self.mdp_list[idx])
+
+		return self.__class__(mdp_list)
 
 	def calc_distances(self, lon, lat, depth=0):
 		"""
@@ -203,7 +266,31 @@ class MDPCollection():
 
 		return d_hypo
 
-	def subselect_by_property(self, prop_name, prop_val):
+	def get_prop_values(self, prop_name):
+		"""
+		Get values corresponding to given property
+
+		:param prop_name:
+			str, property name
+
+		:return:
+			1D array
+		"""
+		return np.array([getattr(mdp, prop_name) for mdp in self])
+
+	def get_unique_prop_values(self, prop_name):
+		"""
+		Get unique values corresponding to given property
+
+		:pram prop_name:
+			str, property name
+
+		:return:
+			1D array
+		"""
+		return np.unique(self.get_prop_values(prop_name))
+
+	def subselect_by_property(self, prop_name, prop_val, comparator=operator.eq):
 		"""
 		Select MDPs based on the value of a particular property
 
@@ -211,13 +298,16 @@ class MDPCollection():
 			str, property name
 		:param prop_val:
 			property value
+		:param comparator:
+			comparison function
+			(default: operator.eq)
 
 		:return:
 			instance of :class:`MDPCollection`
 		"""
 		mdp_list = []
 		for mdp in self:
-			if getattr(mdp, prop_name) == prop_val:
+			if comparator(getattr(mdp, prop_name), prop_val):
 				mdp_list.append(mdp)
 
 		return self.__class__(mdp_list)
@@ -244,7 +334,7 @@ class MDPCollection():
 		return mdpc_dict
 
 	def aggregate_by_property(self, prop_name, Imin_or_max, agg_function,
-							min_fiability=80):
+							min_fiability=80, min_num_mdp=1):
 		"""
 		Aggregate MDPs based on values of a particular property
 
@@ -253,31 +343,92 @@ class MDPCollection():
 		:param Imin_or_max:
 		:param agg_function:
 			see :meth:`get_aggregated_intensity`
+		:param min_fiability:
+			int, minimum fiability
+			(default: 80)
+		:param min_num_mdp:
+			int, minimum number of MDPs needed to define an aggregate
+			(default: 1)
+
+		:return:
+			instance of :class:`MacroInfoCollection`
 		"""
-		# TODO: min_fiability
-		#mdpc = self.subselect_by_property('fiability')
-		mdpc_dict = self.split_by_property(prop_name)
+		from ..rob import get_communes
+
+		if prop_name == 'id_main':
+			communes = get_communes(main_communes=True)
+			commune_coords = {rec['id']: (rec['longitude'], rec['latitude'])
+							for rec in communes}
+
+		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc_dict = mdpc.split_by_property(prop_name)
 		macro_info_list = []
 		for agg_key, mdpc in mdpc_dict.items():
-			if len(mdpc):
-				mdp0 = mdpc[0]
-				id_earth = mdp0.id_earth
-				id_com = mdp0.id_com
+			if len(mdpc) >= min_num_mdp:
+				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
+				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
+				unique_id_coms = mdpc.get_unique_prop_values('id_com')
+				id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
 				intensity = mdpc.get_aggregated_intensity(Imin_or_max, agg_function)
 				agg_type = prop_name
-				data_type = mdp0.data_type
+				unique_data_types = mdpc.get_unique_prop_values('data_type')
+				data_type = unique_data_types[0] if len(unique_data_types) == 1 else 'mixed'
 				num_replies = len(mdpc)
-				lon, lat = 0., 0.
+				if prop_name == 'id_com':
+					mdp0 = mdpc[0]
+					lon, lat = mdp0.lon, mdp0.lat
+				elif prop_name == 'id_main':
+					id_main = mdpc[0].id_main
+					lon, lat = commune_coords.get(id_main, (0., 0.))
+					id_com = id_main
+				else:
+					lon, lat = 0., 0.
 				db_ids = [mdp.id for mdp in mdpc]
 				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
 											data_type, num_replies, lon, lat,
-											db_ids=db_ids)
+											db_ids=db_ids, geom_key_val=agg_key)
 				macro_info_list.append(macro_info)
 
-		# TODO: proc_info
-		proc_info = {}
-		# TODO: geometries
-		return MacroInfoCollection(macro_info_list, agg_type, data_type, proc_info)
+		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
+					min_or_max=Imin_or_max)
+		return MacroInfoCollection(macro_info_list, agg_type, data_type,
+									proc_info=proc_info)
+
+	def aggregate_by_nothing(self, Imin_or_max, min_fiability=80):
+		"""
+		Turn MDP collection in aggregated macro information, with
+		each MDP corresponding to an aggregate
+
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		:param min_fiability:
+			int, minimum fiability
+			(default: 80)
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		intensities = self.get_intensities(Imin_or_max)
+		macro_info_list = []
+		for m, mdp in enumerate(mdpc):
+			id_earth = mdp.id_earth
+			id_com = mdp.id_com
+			intensity = intensities[m]
+			agg_type = ''
+			data_type = mdp.data_type
+			num_replies = 1
+			lon, lat = mdp.lon, mdp.lat
+			db_ids = [mdp.id]
+			macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+										data_type, num_replies, lon, lat,
+										db_ids=db_ids)
+			macro_info_list.append(macro_info)
+
+		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
+					min_or_max=Imin_or_max)
+		return MacroInfoCollection(macro_info_list, agg_type, data_type,
+									proc_info=proc_info)
 
 	def subselect_by_polygon(self, poly_obj):
 		"""
@@ -295,22 +446,94 @@ class MDPCollection():
 		mdp_list = filter_collection_by_polygon(self, poly_obj)
 		return self.__class__(mdp_list)
 
-	def split_by_polygon_set(self, poly_dict):
+	def split_by_polygon_data(self, poly_data, value_key):
 		"""
 		Split MDP collection according to a set of polygons
 
-		:param poly_dict:
-			dict, mapping polygon IDs to polygon objects
+		:param poly_data:
+			instance of :class:`layeredbasemap.MultiPolygonData`
+			or str, full path to GIS file containing polygon data
+		:param value_key:
+			str, key in values dict of :param:`poly_data` that should
+			be used to link MDP collections to polygons
 
 		:return:
 			dict, mapping polygon IDs to instances of
 			:class:`MDPCollection`
 		"""
+		import mapping.layeredbasemap as lbm
+
+		if isinstance(poly_data, basestring):
+			gis_data = lbm.GisData(poly_data)
+			_, _, poly_data = gis_data.get_data()
+
 		mdpc_dict = {}
-		for poly_id, poly_obj in poly_dict.items():
+		if len(poly_data) != len(np.unique(poly_data.values[value_key])):
+			print("Warning: Polygon data values not unique for key %s!"
+					% value_key)
+		for poly_obj in poly_data:
+			poly_id = poly_obj.value[value_key]
 			mdpc_dict[poly_id] = self.subselect_by_polygon(poly_obj)
 
 		return mdpc_dict
+
+	def aggregate_by_polygon_data(self, poly_data, value_key,
+								Imin_or_max, agg_function,
+								min_fiability=80, min_num_mdp=3):
+		"""
+		Aggregate MDP collection according to a set of polygons
+
+		:param poly_data:
+		:param value_key:
+			see :meth:`split_by_polygon_data`
+		:param Imin_or_max:
+		:param agg_function:
+			see :meth:`get_aggregated_intensity`
+		:param min_fiability:
+			int, minimum fiability
+			(default: 80)
+		:param min_num_mdp:
+			int, minimum number of MDPs needed to define an aggregate
+			(default: 3)
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		import mapping.layeredbasemap as lbm
+
+		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc_dict = mdpc.split_by_polygon_data(poly_data, value_key)
+		macro_info_list = []
+		polygon_list = []
+		for geom_key_val, mdpc in mdpc_dict.items():
+			poly_idx = poly_data.values[geom_key].index(geom_key_val)
+			poly_obj = poly_data[poly_idx]
+			if len(mdpc) >= min_num_mdp:
+				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
+				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
+				unique_id_coms = mdpc.get_unique_prop_values('id_com')
+				id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
+				intensity = mdpc.get_aggregated_intensity(Imin_or_max, agg_function)
+				agg_type = 'polygon'
+				unique_data_types = mdpc.get_unique_prop_values('data_type')
+				data_type = unique_data_types[0] if len(unique_data_types) == 1 else 'mixed'
+				num_replies = len(mdpc)
+				centroid = poly_obj.get_centroid()
+				lon, lat = centroid.lon, centroid.lat
+				db_ids = [mdp.id for mdp in mdpc]
+				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+											data_type, num_replies, lon, lat,
+											db_ids=db_ids, geom_key_val=geom_key_val)
+				macro_info_list.append(macro_info)
+				polygon_list.append(poly_obj)
+
+		macro_geoms = lbm.MultiPolygonData.from_polygons(polygon_list)
+
+		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
+					min_or_max=Imin_or_max)
+		return MacroInfoCollection(macro_info_list, 'polygon', data_type,
+									macro_geoms=macro_geoms, geom_key=value_key,
+									proc_info=proc_info)
 
 	@staticmethod
 	def _parse_pt(pt):
@@ -392,13 +615,92 @@ class MDPCollection():
 
 		return mdpc_dict
 
-	def split_by_grid_cells(self, grid_spacing=5, srs='LAMBERT1972'):
+	def aggregate_by_distance(self, ref_pt, distance_interval, Imin_or_max,
+							agg_function, min_fiability=80, min_num_mdp=3,
+							create_polygons=True):
+		"""
+		Aggregate MDPs by distance with respect to a reference point
+
+		:param ref_pt:
+		:param distance_interval:
+			see :meth:`split_by_distance`
+		:param Imin_or_max:
+		:param agg_function:
+			see :meth:`get_aggregated_intensity`
+		:param min_fiability:
+			int, minimum fiability
+			(default: 80)
+		:param min_num_mdp:
+			int, minimum number of MDPs needed to define an aggregate
+			(default: 3)
+		:param create_polygons:
+			bool, whether or not to create polygon objects necessary
+			for plotting on a map
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		from mapping.geotools.geodetic import spherical_point_at
+		import mapping.layeredbasemap as lbm
+
+		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
+		macro_info_list = []
+		if create_polygons:
+			polygon_list = []
+			azimuths = np.linspace(0, 360, 361)
+		geom_key = 'max_radius'
+		agg_type = 'distance'
+		for max_radius, mdpc in self.split_by_distance(ref_pt, distance_interval):
+			if len(mdpc) >= min_num_mdp:
+				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
+				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
+				unique_id_coms = mdpc.get_unique_prop_values('id_com')
+				id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
+				intensity = mdpc.get_aggregated_intensity(Imin_or_max, agg_function)
+				unique_data_types = mdpc.get_unique_prop_values('data_type')
+				data_type = unique_data_types[0] if len(unique_data_types) == 1 else 'mixed'
+				num_replies = len(mdpc)
+				lon, lat, _ = self._parse_pt(ref_pt)
+				db_ids = [mdp.id for mdp in mdpc]
+				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+											data_type, num_replies, lon, lat,
+											db_ids=db_ids, geom_key_val=max_radius)
+				macro_info_list.append(macro_info)
+
+				## Create polygon
+				if create_polygons:
+					lons, lats = spherical_point_at(lon, lat, max_radius, azimuths)
+					min_radius = max_radius - distance_interval
+					if min_radius:
+						interior_lons, interior_lats = spherical_point_at(lon, lat,
+																min_radius, azimuths)
+					else:
+						interior_lons, interior_lats = None
+
+					value = {'min_radius': min_radius, 'max_radius': max_radius}
+					poly_obj = lbm.PolygonData(lons, lats, interior_lons=interior_lons,
+												interior_lats=interior_lats,
+												value=value)
+					polygon_list.append(poly_obj)
+
+		if create_polygons:
+			macro_geoms = lbm.MultiPolygonData.from_polygons(polygon_list)
+		else:
+			macro_geoms = None
+
+		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
+					min_or_max=Imin_or_max)
+		return MacroInfoCollection(macro_info_list, agg_type, data_type,
+									macro_geoms=macro_geoms, geom_key=geom_key,
+									proc_info=proc_info)
+
+	def split_by_grid_cells(self, grid_spacing, srs='LAMBERT1972'):
 		"""
 		Split MDP collection according to a regular kilometric grid
 
 		:param grid_spacing:
 			grid spacing (in km)
-			(default: 5)
 		:param srs:
 			osr spatial reference system or str, name of known srs
 			(default: 'LAMBERT1972')
@@ -437,15 +739,54 @@ class MDPCollection():
 
 		return mdpc_dict
 
-	def aggregate_by_nothing(self):
+	def aggregate_by_grid_cells(self, grid_spacing, Imin_or_max, agg_function,
+								srs='LAMBERT1972', min_fiability=80,
+								min_num_mdp=3):
 		"""
-		"""
-		pass
+		Aggregate MDPs in grid cells
 
-	def remove_outliers(self):
+		:param grid_spacing:
+			see :meth:`split_gy_grid_cells`
+		:param Imin_or_max:
+		:param agg_function:
+			see :meth:`get_aggregated_intensity`
+		:param srs:
+			see :meth:`split_by_grid_cells`
+		:param min_fiability:
+			int, minimum fiability
+			(default: 80)
+		:param min_num_mdp:
+			int, minimum number of MDPs needed to define an aggregate
+			(default: 3)
+
+		:return:
+			instance of :class:`MacroInfoCollection`
 		"""
-		"""
-		pass
+		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
+		macro_info_list = []
+		agg_type = 'grid_%d' % grid_spacing
+		for grid_key, mdpc in mdpc_dict.items():
+			if len(mdpc) >= min_num_mdp:
+				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
+				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
+				unique_id_coms = mdpc.get_unique_prop_values('id_com')
+				id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
+				intensity = mdpc.get_aggregated_intensity(Imin_or_max, agg_function)
+				unique_data_types = mdpc.get_unique_prop_values('data_type')
+				data_type = unique_data_types[0] if len(unique_data_types) == 1 else 'mixed'
+				num_replies = len(mdpc)
+				lon, lat = grid_key
+				db_ids = [mdp.id for mdp in mdpc]
+				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+											data_type, num_replies, lon, lat,
+											db_ids=db_ids)
+				macro_info_list.append(macro_info)
+
+		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
+					min_or_max=Imin_or_max)
+		return MacroInfoCollection(macro_info_list, agg_type, data_type,
+									proc_info=proc_info)
 
 	def plot_intensity_vs_distance(self, ref_pt, Imin_or_max, marker='.',
 									**kwargs):
@@ -455,8 +796,7 @@ class MDPCollection():
 		:param ref_pt:
 			see :meth:`subselect_by_distance`
 		:param Imin_or_max:
-			str, either 'min', 'mean' or 'max', to select between minimum,
-			mean or maximum intensitiy of each MDP
+			see :meth:`get_intensities`
 		:**kwargs:
 			additional keyword arguments understood by
 			:func:`generic_mpl.plot_xy`
@@ -468,14 +808,9 @@ class MDPCollection():
 
 		lon, lat, depth = self._parse_pt(ref_pt)
 		distances = self.calc_distances(lon, lat, depth)
-		if Imin_or_max == 'min':
-			intensities = self.Imin
-		elif Imin_or_max == 'mean':
-			intensities = self.Imean
-		elif Imin_or_max == 'max':
-			intensities = self.Imax
+		intensities = self.get_intensities(Imin_or_max)
 
-		xlabel = kxargs.pop('xlabel', 'Distance (km)')
+		xlabel = kwargs.pop('xlabel', 'Distance (km)')
 		ylabel = kwargs.pop('ylabel', 'Intensity (%s)' % self.mdp_list[0].imt)
 		ymin = kwargs.pop('ymin', 1)
 		xmin = kwargs.pop('xmin', 0)
@@ -487,5 +822,27 @@ class MDPCollection():
 						xlabel=xlabel, ylabel=ylabel, xmin=xmin, ymin=ymin,
 						**kwargs)
 
-	def plot_histogram(self):
-		pass
+	def plot_histogram(self, Imin_or_max, **kwargs):
+		"""
+		Plot intensity histogram
+
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		:**kwargs:
+			additional keyword arguments understood by
+			:func:`generic_mpl.plot_histogram`
+
+		:return:
+			matplotlib Axes instance
+		"""
+		from plotting.generic_mpl import plot_histogram
+
+		intensities = self.get_intensities(Imin_or_max)
+		bins = np.arange(-0.5, 13)
+
+		xlabel = kwargs.pop('xlabel', 'Intensity (%s)' % self.mdp_list[0].imt)
+		xmin = kwargs.pop('xmin', 0)
+		xmax = kwargs.pop('xmax', 12)
+
+		return plot_histogram([intensities], bins, xmin=xmin, xmax=xmax,
+							xlabel=xlabel, **kwargs)
