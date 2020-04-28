@@ -63,13 +63,15 @@ AGG_FUNC_DICT = {"average": "AVG", "mean": "AVG",
 
 def query_seismodb_table_generic(query, verbose=False, print_table=False, errf=None):
 	"""
-	Query MySQL table using clause components, returning each record as a dict
+	Query MySQL table using generic clause, returning each record as a dict
 
 	:param query:
 		str, SQL query
 	:param verbose:
-		bool, whether or not to print the query (default: False)
+		bool, whether or not to print the query
+		(default: False)
 	:param print_table:
+		bool, whether or not to print results of query in a table
 		rather than returning records
 		(default: False)
 	:param errf:
@@ -543,8 +545,8 @@ def query_focal_mechanisms(region=None, start_date=None, end_date=None,
 
 
 def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
-					group_by_main_commune=False, min_fiability=80,
-					verbose=False, errf=None):
+								group_by_main_commune=False, min_fiability=80,
+								verbose=False, errf=None):
 	"""
 	Query ROB traditional macroseismic catalog
 	This includes both "official" communal inquiries and historical
@@ -576,10 +578,10 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 		File object, where to print errors
 
 	:return:
-		dict, mapping commune IDs (if :param:`id_earth` is not None) or
-		earthquake IDs (if :param:`id_earth` is None) to lists of
-		database records (1 or more depending on :param:`group_by_main_commune`)
+		instance of :class:`eqcatalog.macro.MDPCollection`
 	"""
+	from ..macro import MDP, MDPCollection
+
 	assert not (id_earth is None and
 				(id_com is None or isinstance(id_com, (list, np.ndarray))))
 
@@ -640,27 +642,20 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 				join_clause=join_clause, where_clause=where_clause,
 				verbose=verbose, errf=errf)
 
-	## Construct result dictionary
-	macro_rec_dict = {}
+	## Construct MDP Collection
+	mdp_list = []
 	for rec in macro_recs:
 		## Convert None Imin/Imax values to np.nan
 		rec['Imin'] = rec['Imin'] or np.nan
 		rec['Imax'] = rec['Imax'] or np.nan
 
-		if id_earth is not None:
-			if group_by_main_commune:
-				key = rec['id_main']
-			else:
-				key = rec['id_com']
-		else:
-			key = rec['id_earth']
+		mdp = MDP(rec.pop('id_macro_detail'), rec.pop('id_earth'), rec.pop('Imin'),
+				rec.pop('Imax'), 'EMS98', rec.pop('longitude'), rec.pop('latitude'),
+				data_type or 'traditional', rec.pop('id_com'), rec.pop('id_main'),
+				rec.pop('fiability'), **rec)
+		mdp_list.append(mdp)
 
-		if not key in macro_rec_dict:
-			macro_rec_dict[key] = [rec]
-		else:
-			macro_rec_dict[key].append(rec)
-
-	return macro_rec_dict
+	return MDPCollection(mdp_list)
 
 
 def query_official_macro_catalog(id_earth, id_com=None, group_by_main_commune=False,
@@ -674,7 +669,7 @@ def query_official_macro_catalog(id_earth, id_com=None, group_by_main_commune=Fa
 
 
 def query_historical_macro_catalog(id_earth, id_com=None, group_by_main_commune=False,
-								min_fiability=80, verbose=False, errf=None):
+									min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB catalog of historical macroseismic data
 	This is a wrapper for :func:`query_traditional_macro_catalog`
@@ -872,7 +867,7 @@ def query_official_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='m
 					min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB catalog of official communal macroseismic enquiries
-	This is a wrapper for :func:`query_traditional_macro_catalog`
+	This is a wrapper for :func:`query_traditional_macro_catalog_aggregated`
 	"""
 	kwargs = locals().copy()
 	return query_traditional_macro_catalog_aggregated(data_type='official', **kwargs)
@@ -883,7 +878,7 @@ def query_historical_macro_catalog_aggregated(id_earth, id_com=None, min_or_max=
 					min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB catalog of historical macroseismic data
-	This is a wrapper for :func:`query_traditional_macro_catalog`
+	This is a wrapper for :func:`query_traditional_macro_catalog_aggregated`
 	"""
 	kwargs = locals().copy()
 	return query_traditional_macro_catalog_aggregated(data_type='historical', **kwargs)
