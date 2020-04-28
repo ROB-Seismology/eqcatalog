@@ -69,9 +69,13 @@ class MacroseismicInfo():
 		(default: 0)
 	:param db_ids:
 		list of ints, IDs of database records represented in aggregate
+	:param geom_key_val:
+		int or str, value corresponding to geometry key in
+		MacroInfoCollection geometries
+		(default: None)
 	"""
 	def __init__(self, id_earth, id_com, intensity, agg_type, data_type, num_replies=1,
-				lon=0, lat=0, residual=0, db_ids=[]):
+				lon=0, lat=0, residual=0, db_ids=[], geom_key_val=None):
 		self.id_earth = id_earth
 		self.id_com = id_com
 		self.intensity = intensity
@@ -82,6 +86,7 @@ class MacroseismicInfo():
 		self.lat = lat
 		self.residual = residual
 		self.db_ids = db_ids
+		self.geom_key_val = geom_key_val
 
 	@property
 	def I(self):
@@ -155,16 +160,40 @@ class MacroInfoCollection():
 		- 'historical'
 		- 'official'
 		- 'isoseismal'
+	:param macro_geoms:
+		instance of :class:`layeredbasemap.base.MultiData`,
+		geometries corresponding to aggregated macroseismic records
+		(required if :param:`agg_type` not in ('id_com', 'commune',
+		'id_main', 'main commune', 'grid_X', '' or None)
+		(default: None)
+	:param geom_key:
+		str, name of geometry key used to link macroseismic records to
+		geometries in :param:`macro_geoms`
+		(default: '')
 	:proc_info:
 		dict, containing processing parameters
 		(default: {})
 	"""
-	def __init__(self, macro_infos, agg_type, data_type, proc_info={}):
+	def __init__(self, macro_infos, agg_type, data_type,
+				macro_geoms=None, geom_key='',
+				proc_info={}):
 		self.macro_infos = macro_infos
 		self.agg_type = agg_type
 		if not data_type and len(macro_infos):
 			data_type = macro_infos[0].data_type
 		self.data_type = data_type
+		if (agg_type not in ('id_com', 'commune', 'id_main', 'main commune',
+							'', None) and agg_type[:4] != 'grid'):
+			assert macro_geoms is not None
+		self.macro_geoms = macro_geoms
+		if macro_geoms is not None:
+			assert geom_key
+		elif agg_type in ('id_com', 'commune', 'id_main', 'main commune'):
+			geom_key = 'ID_ROB'
+			for macro_info in self.macro_infos:
+				if macro_info.geom_key_val is None:
+					macro_info.geom_key_val = macro_info.id_com
+		self.geom_key = geom_key
 		self.proc_info = proc_info
 
 	def __len__(self):
@@ -367,22 +396,19 @@ class MacroInfoCollection():
 			for attrib in attributes:
 				values[attrib] = [getattr(rec, attrib) for rec in self]
 		else:
-			join_key = "ID_ROB"
 			for attrib in attributes:
-				values[attrib] = {'key': join_key, 'values':
-							{rec.id_com: getattr(rec, attrib) for rec in self}}
+				values[attrib] = {'key': self.geom_key, 'values':
+							{rec.geom_key_val: getattr(rec, attrib) for rec in self}}
 
 		## Select GIS file with commune polygons in function of aggregation type
 		#if polygons_as_points:
 		#	gis_filename = "Bel_villages_points.TAB"
-		gis_filename = ""
+		gis_filespec = ''
 		if not polygons_as_points:
 			if aggregate_by == 'id_main':
 				gis_filespec = get_communes_gis_file('BE', main_communes=True)
 			elif aggregate_by == 'id_com':
 				gis_filespec = get_communes_gis_file('BE', main_communes=False)
-		if gis_filename:
-			gis_filespec = os.path.join(GIS_FOLDER, gis_filename)
 
 		## Grid
 		if aggregate_by == 'grid':
@@ -413,10 +439,14 @@ class MacroInfoCollection():
 			macro_geoms = lbm.MultiPointData(lons, lats, values=values)
 
 		## Commune polygons
-		else:
+		elif gis_filespec:
 			gis_data = lbm.GisData(gis_filespec, joined_attributes=values)
 			_, _, polygon_data = gis_data.get_data()
 			macro_geoms = polygon_data
+
+		else:
+			macro_geoms = self.macro_geoms
+			macro_geoms.values = values
 
 		return macro_geoms
 
