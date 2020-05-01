@@ -439,12 +439,13 @@ class MDPCollection():
 			or oqhazlib.geo.polygon.Polygon object)
 
 		:return:
-			instance of :class:`MDPCollection`
+			(mpds_inside, mdps_outside) tuple:
+			instances of :class:`MDPCollection`
 		"""
 		from mapping.geotools.pt_in_polygon import filter_collection_by_polygon
 
-		mdp_list = filter_collection_by_polygon(self, poly_obj)
-		return self.__class__(mdp_list)
+		mdps_inside, mdps_outside = filter_collection_by_polygon(self, poly_obj)
+		return (self.__class__(mdps_inside), self.__class__(mdps_outside))
 
 	def split_by_polygon_data(self, poly_data, value_key):
 		"""
@@ -471,15 +472,19 @@ class MDPCollection():
 		if len(poly_data) != len(np.unique(poly_data.values[value_key])):
 			print("Warning: Polygon data values not unique for key %s!"
 					% value_key)
+
+		mdps_outside = self
 		for poly_obj in poly_data:
 			poly_id = poly_obj.value[value_key]
-			mdpc_dict[poly_id] = self.subselect_by_polygon(poly_obj)
+			mdps_inside, mdps_outside = mdps_outside.subselect_by_polygon(poly_obj)
+			mdpc_dict[poly_id] = mdps_inside
 
 		return mdpc_dict
 
 	def aggregate_by_polygon_data(self, poly_data, value_key,
 								Imin_or_max, agg_function,
-								min_fiability=80, min_num_mdp=3):
+								min_fiability=80, min_num_mdp=3,
+								include_unmatched_polygons=True):
 		"""
 		Aggregate MDP collection according to a set of polygons
 
@@ -495,32 +500,44 @@ class MDPCollection():
 		:param min_num_mdp:
 			int, minimum number of MDPs needed to define an aggregate
 			(default: 3)
+		:param include_unmatched_polygons:
+			bool, whether or not unmatched polygons should be included
+			in the result (their intensity will be set to nan!)
+			(default: True)
 
 		:return:
 			instance of :class:`MacroInfoCollection`
 		"""
 		import mapping.layeredbasemap as lbm
 
+		if isinstance(poly_data, basestring):
+			gis_data = lbm.GisData(poly_data)
+			_, _, poly_data = gis_data.get_data()
+
 		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
 		mdpc_dict = mdpc.split_by_polygon_data(poly_data, value_key)
 		macro_info_list = []
 		polygon_list = []
 		for geom_key_val, mdpc in mdpc_dict.items():
-			poly_idx = poly_data.values[geom_key].index(geom_key_val)
+			poly_idx = poly_data.values[value_key].index(geom_key_val)
 			poly_obj = poly_data[poly_idx]
+
+			unique_id_earths = mdpc.get_unique_prop_values('id_earth')
+			id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
+			unique_id_coms = mdpc.get_unique_prop_values('id_com')
+			id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
 			if len(mdpc) >= min_num_mdp:
-				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
-				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
-				unique_id_coms = mdpc.get_unique_prop_values('id_com')
-				id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
 				intensity = mdpc.get_aggregated_intensity(Imin_or_max, agg_function)
-				agg_type = 'polygon'
-				unique_data_types = mdpc.get_unique_prop_values('data_type')
-				data_type = unique_data_types[0] if len(unique_data_types) == 1 else 'mixed'
-				num_replies = len(mdpc)
-				centroid = poly_obj.get_centroid()
-				lon, lat = centroid.lon, centroid.lat
-				db_ids = [mdp.id for mdp in mdpc]
+			else:
+				intensity = np.nan
+			agg_type = 'polygon'
+			unique_data_types = mdpc.get_unique_prop_values('data_type')
+			data_type = unique_data_types[0] if len(unique_data_types) == 1 else 'mixed'
+			num_replies = len(mdpc)
+			centroid = poly_obj.get_centroid()
+			lon, lat = centroid.lon, centroid.lat
+			db_ids = [mdp.id for mdp in mdpc]
+			if len(mdpc) >= min_num_mdp or include_unmatched_polygons:
 				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
 											data_type, num_replies, lon, lat,
 											db_ids=db_ids, geom_key_val=geom_key_val)
