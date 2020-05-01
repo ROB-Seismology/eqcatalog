@@ -389,13 +389,15 @@ class MacroInfoCollection():
 		if not np.allclose(residuals, 0):
 			attributes += ['residual']
 		attributes += ['agg_type', 'data_type']
-		if aggregate_by == 'grid' or polygons_as_points:
+		if aggregate_by in ('grid', 'polygon') or polygons_as_points:
+			## Intensity attributes already matched with polygons
 			if aggregate_by in ('id_main', 'id_com'):
 				attributes += ['id_com']
 			attributes += ['lon', 'lat']
 			for attrib in attributes:
 				values[attrib] = [getattr(rec, attrib) for rec in self]
 		else:
+			## Intensity attributes need to be joined with GIS data
 			for attrib in attributes:
 				values[attrib] = {'key': self.geom_key, 'values':
 							{rec.geom_key_val: getattr(rec, attrib) for rec in self}}
@@ -446,7 +448,7 @@ class MacroInfoCollection():
 
 		else:
 			macro_geoms = self.macro_geoms
-			macro_geoms.values = values
+			macro_geoms.values.update(values)
 
 		return macro_geoms
 
