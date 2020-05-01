@@ -895,7 +895,7 @@ class DYFIEnsemble(object):
 
 		if prop == "num_replies":
 			## Histogram of number of communes / number of replies
-			comm_rec_dict = self.aggregate_by_commune(comm_key='id_com')
+			comm_rec_dict = self.split_by_commune(comm_key='id_com')
 			ar = np.array([ensemble.num_replies for ensemble in comm_rec_dict.values()])
 			bin_edges = self.bins['num_replies']
 		else:
@@ -977,9 +977,9 @@ class DYFIEnsemble(object):
 
 		return MDPCollection(mdp_list)
 
-	def aggregate_by_grid(self, grid_spacing=5, srs='LAMBERT1972'):
+	def split_by_grid(self, grid_spacing=5, srs='LAMBERT1972'):
 		"""
-		Aggregate enquiries into rectangular grid cells
+		Split enquiries into rectangular grid cells
 
 		:param grid_spacing:
 			grid spacing (in km)
@@ -1004,8 +1004,8 @@ class DYFIEnsemble(object):
 		lats = np.ma.array(lats, mask=mask)
 		X, Y = ct.transform_array_coordinates(ct.WGS84, srs, lons, lats)
 
-		bin_rec_dict = {}
-		for r, rec in enumerate(self.recs):
+		agg_idx_dict = {}
+		for r in range(len(self)):
 			x, y = X[r], Y[r]
 			## Center X, Y
 			x_bin = np.floor(x / grid_spacing) * grid_spacing + grid_spacing/2.
@@ -1014,19 +1014,19 @@ class DYFIEnsemble(object):
 			[(lon_bin, lat_bin)] = ct.transform_coordinates(srs, ct.WGS84,
 															[(x_bin, y_bin)])
 			key = (lon_bin, lat_bin)
-			if not key in bin_rec_dict:
-				bin_rec_dict[key] = [rec]
+			if not key in agg_idx_dict:
+				agg_idx_dict[key] = [r]
 			else:
-				bin_rec_dict[key].append(rec)
+				agg_idx_dict[key].append(r)
 
-		for key in bin_rec_dict.keys():
-			bin_rec_dict[key] = self.__class__(self.id_earth, bin_rec_dict[key])
+		for key, idxs in agg_idx_dict.items():
+			agg_idx_dict[key] = self.__getitem__(idxs)
 
-		return bin_rec_dict
+		return agg_idx_dict
 
-	def aggregate_by_distance(self, lon, lat, distance_interval):
+	def split_by_distance(self, lon, lat, distance_interval):
 		"""
-		Aggregate enquiries in different distance bins
+		Split enquiries in different distance bins
 
 		:param lon:
 			float, longitude of point to compute distance to
@@ -1041,29 +1041,51 @@ class DYFIEnsemble(object):
 		"""
 		distances = self.calc_distances(lon, lat)
 		binned_distances = np.floor(distances / distance_interval) * distance_interval
-		bin_rec_dict = {}
-		for r, rec in enumerate(self.recs):
+		binned_distances += distance_interval
+
+		agg_idx_dict = {}
+		for r in range(len(self)):
 			bin = binned_distances[r]
 			if np.isnan(bin):
 				bin = None
-			if not bin in bin_rec_dict:
-				bin_rec_dict[bin] = [rec]
+			if not bin in agg_idx_dict:
+				agg_idx_dict[bin] = [r]
 			else:
-				bin_rec_dict[bin].append(rec)
+				agg_idx_dict[bin].append(r)
 
-		for key in bin_rec_dict.keys():
-			bin_rec_dict[key] = self.__class__(self.id_earth, bin_rec_dict[key])
+		for key, idxs in agg_idx_dict.items():
+			agg_idx_dict[key] = self.__getitem__(idxs)
 
-		return bin_rec_dict
+		return agg_idx_dict
 
-	def aggregate_by_property(self, prop):
-		# event_ids, commune_ids
-		pass
+	def split_by_property(self, prop):
+		"""
+		Split enquiries in different sets based on property values
+
+		:param prop:
+			str, property name (e.g., 'event_ids', 'commune_ids')
+
+		:return:
+			dict, mapping property values to instances of
+			:class:`DYFIEnsemble` or subclasses thereof
+		"""
+		agg_idx_dict = {}
+		prop_values = self.get_prop_values(prop)
+		for r, prop_val in enumerate(prop_values):
+			if not prop_val in agg_idx_dict:
+				agg_idx_dict[prop_val] = [r]
+			else:
+				agg_idx_dict[prop_val].append(r)
+
+		for key, idxs in agg_idx_dict.items():
+			agg_idx_dict[key] = self.__getitem__(idxs)
+
+		return agg_idx_dict
 
 	def subselect_polygon(self, poly_obj):
 		pass
 
-	def aggregate_by_polygon(self, poly_obj):
+	def split_by_polygon(self, poly_obj):
 		pass
 
 	def remove_outliers(self, min_pct=2.5, max_pct=97.5):
@@ -2573,9 +2595,9 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		bad_zip_country_tuples = self.get_bad_zip_country_tuples()
 		return self.subselect_by_zip_country_tuples(bad_zip_country_tuples)
 
-	def aggregate_by_commune(self, comm_key='id_com'):
+	def split_by_commune(self, comm_key='id_com'):
 		"""
-		Aggregate enquiries by commune
+		Split enquiries by commune
 
 		:param comm_key:
 			see :meth:`get_communes_from_db`
@@ -2596,11 +2618,11 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			comm_ensemble_dict[comm_key_val] = ensemble
 		return comm_ensemble_dict
 
-	def get_aggregated_info(self, aggregate_by='id_com', min_replies=3,
-							min_fiability=80, filter_floors=(0, 4),
-							agg_info='cii', agg_method='mean', fix_records=True,
-							include_other_felt=True, include_heavy_appliance=False,
-							remove_outliers=(2.5, 97.5)):
+	def aggregate(self, aggregate_by='id_com', min_replies=3,
+					min_fiability=80, filter_floors=(0, 4),
+					agg_info='cii', agg_method='mean', fix_records=True,
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=(2.5, 97.5)):
 		"""
 		Get aggregated macroseismic information.
 
@@ -2676,7 +2698,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			comm_key = aggregate_by
 			ensemble.set_locations_from_communes(comm_key=comm_key, max_quality=10,
 												keep_unmatched=False)
-			agg_ensemble_dict = ensemble.aggregate_by_commune(comm_key=comm_key)
+			agg_ensemble_dict = ensemble.split_by_commune(comm_key=comm_key)
 		elif not aggregate_by:
 			min_replies = 1
 			## If there are no locations, get them from the communes
@@ -2697,7 +2719,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 				grid_spacing = float(grid_spacing)
 			else:
 				grid_spacing = 5
-			agg_ensemble_dict = ensemble.aggregate_by_grid(grid_spacing)
+			agg_ensemble_dict = ensemble.split_by_grid(grid_spacing)
 
 		try:
 			unassigned = agg_ensemble_dict.pop(0)
@@ -2774,7 +2796,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 
 		return macro_info_coll
 
-	def aggregate_by_zip(self):
+	def split_by_zip(self):
 		# TODO: can be removed
 		all_zip_country_tuples = self.get_zip_country_tuples()
 		unique_zip_country_tuples = set(all_zip_country_tuples)
@@ -2785,7 +2807,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			zip_ensemble_dict[zip_country] = ensemble
 		return zip_ensemble_dict
 
-	def aggregate_by_main_zip(self):
+	def split_by_main_zip(self):
 		# TODO: can be removed
 		comm_recs = self.get_communes_from_db()
 		zip_main_id_dict = {}
@@ -2912,7 +2934,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		from prettytable import PrettyTable
 
 		table = PrettyTable(["Commune", "ID", "Num replies", "Mean CII", "Aggregated CII"])
-		comm_ensemble_dict = self.aggregate_by_commune(comm_key)
+		comm_ensemble_dict = self.split_by_commune(comm_key)
 		comm_rec_dict = self.get_communes_from_db(comm_key)
 		for comm_id, ensemble in comm_ensemble_dict.items():
 			comm_name = comm_rec_dict[comm_id]['name']
