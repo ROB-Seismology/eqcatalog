@@ -1,7 +1,7 @@
 # -*- coding: iso-Latin-1 -*-
 
 """
-Processing of macroseismic and DYFI data
+Processing of online 'Did You Feel It?' (DYFI) data
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -282,8 +282,9 @@ class DYFIEnsemble(object):
 
 	bins['num_replies'] = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000])
 
-	def __init__(self, ids, event_ids, event_times, event_longitudes,
-				event_latitudes, submit_times, longitudes, latitudes, commune_ids,
+	def __init__(self, ids, event_ids, event_times,
+				event_longitudes, event_latitudes, event_depths,
+				submit_times, longitudes, latitudes, commune_ids,
 				asleep, felt, other_felt, motion, duration, reaction, response,
 				stand, sway, creak, shelf, picture, furniture, heavy_appliance,
 				walls, damage,
@@ -297,6 +298,7 @@ class DYFIEnsemble(object):
 		self.event_times = as_np_datetime(event_times)
 		self.event_longitudes = np.asarray(event_longitudes)
 		self.event_latitudes = np.asarray(event_latitudes)
+		self.event_depths = np.asarray(event_depths)
 
 		## Locations and times
 		assert len(submit_times) == len(longitudes) == len(latitudes)
@@ -366,6 +368,9 @@ class DYFIEnsemble(object):
 			assert len(MI) == len(self)
 			self.MI = np.asarray(MI)
 
+	def __repr__(self):
+		return '<DYFIEnsemble (n=%d)>' % len(self)
+
 	def __len__(self):
 		return len(self.ids)
 
@@ -377,11 +382,16 @@ class DYFIEnsemble(object):
 		"""
 		Note: slicing results in a view, fancy indexing in a copy !
 		"""
+		if isinstance(spec, (int, np.integer, slice)):
+			## Turn index in a slice
+			spec = slice(spec, spec + 1)
+
 		ids = self.ids.__getitem__(spec)
 		event_ids = self.event_ids.__getitem__(spec)
 		event_times = self.event_times.__getitem__(spec)
 		event_longitudes = self.event_longitudes.__getitem__(spec)
 		event_latitudes = self.event_latitudes.__getitem__(spec)
+		event_depths = self.event_depths.__getitem__(spec)
 
 		submit_times = self.submit_times.__getitem__(spec)
 		longitudes = self.longitudes.__getitem__(spec)
@@ -418,8 +428,9 @@ class DYFIEnsemble(object):
 		CDI = self.CDI.__getitem__(spec) if self.CDI is not None else None
 		MI = self.MI.__getitem__(spec) if self.MI is not None else None
 
-		return self.__class__(ids, event_ids, event_times, event_longitudes,
-				event_latitudes, submit_times, longitudes, latitudes, commune_ids,
+		return self.__class__(ids, event_ids, event_times,
+				event_longitudes, event_latitudes, event_depths,
+				submit_times, longitudes, latitudes, commune_ids,
 				asleep, felt, other_felt, motion, duration, reaction, response,
 				stand, sway, creak, shelf, picture, furniture, heavy_appliance,
 				walls, damage,
@@ -438,6 +449,7 @@ class DYFIEnsemble(object):
 		event_times = self.event_times.copy()
 		event_longitudes = self.event_longitudes.copy()
 		event_latitudes = self.event_latitudes.copy()
+		event_depths = self.event_depths.copy()
 
 		submit_times = self.submit_times.copy()
 		longitudes = self.longitudes.copy()
@@ -474,8 +486,9 @@ class DYFIEnsemble(object):
 		CDI = self.CDI.copy() if self.CDI is not None else None
 		MI = self.MI.copy() if self.MI is not None else None
 
-		return DYFIEnsemble(ids, event_ids, event_times, event_longitudes,
-				event_latitudes, submit_times, longitudes, latitudes, commune_ids,
+		return DYFIEnsemble(ids, event_ids, event_times,
+				event_longitudes, event_latitudes, event_depths,
+				submit_times, longitudes, latitudes, commune_ids,
 				asleep, felt, other_felt, motion, duration, reaction, response,
 				stand, sway, creak, shelf, picture, furniture, heavy_appliance,
 				walls, damage,
@@ -588,7 +601,7 @@ class DYFIEnsemble(object):
 		pylab.grid(True)
 		pylab.show()
 
-	def calc_distances(self, lon, lat, z=0):
+	def calc_distances(self, lon, lat, depth=0):
 		"""
 		Compute distances with respect to a particular point
 
@@ -596,7 +609,7 @@ class DYFIEnsemble(object):
 			float, longitude of point (in degrees)
 		:param lat:
 			float, latitude of point (in degrees)
-		:param z:
+		:param depth:
 			float, depth of point (in km)
 			(default: 0)
 
@@ -608,21 +621,57 @@ class DYFIEnsemble(object):
 		rec_lons = self.longitudes
 		rec_lats = self.latitudes
 		dist = geodetic.spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
-		dist = np.sqrt(dist**2 + z**2)
+		dist = np.sqrt(dist**2 + depth**2)
 		return dist
 
-	def subselect_by_distance(self, lon, lat, radius):
+	def calc_epicentral_distances(self):
+		"""
+		Compute epicentral distances
+
+		:return:
+			array, distances (in km)
+		"""
+		lon, lat = self.event_longitudes, self.event_latitudes
+		return self.calc_distances(lon, lat, depth=0)
+
+	def calc_hypocentral_distances(self):
+		"""
+		Compute hypocentral distances
+
+		:return:
+			array, distances (in km)
+		"""
+		lon, lat = self.event_longitudes, self.event_latitudes
+		depth = self.event_depths
+		return self.calc_distances(lon, lat, depth=depth)
+
+	def subselect_by_distance(self, ref_pt, radius):
 		"""
 		Select part of ensemble situated inside given radius around
 		given point
 
-		:param lon:
-		:param lat:
-			see :meth:`calc_distances`
+		:param ref_pt:
+			reference point, either (lon, lat, [depth]) tuple or
+			object having 'lon', 'lat' and optionally 'depth' properties
+			If None, :prop:`event_longitudes` and :prop:`event_latitudes`
+			will be used
 		:param radius:
 			float, radius (in km)
 		"""
-		all_distances = self.calc_distances(lon, lat)
+		if ref_pt is None:
+			lon, lat = self.event_longitudes, self.event_latitudes
+			depth = self.event_depths
+		elif hasattr(ref_pt, 'lon'):
+			lon, lat = ref_pt.lon, ref_pt.lat
+			depth = getattr(ref_pt, 'depth', 0.)
+		else:
+			lon, lat = ref_pt[:2]
+			if len(ref_pt) > 2:
+				depth = ref_pt[2]
+			else:
+				depth = 0
+
+		all_distances = self.calc_distances(lon, lat, depth=depth)
 		idxs = np.where(all_distances <= radius)[0]
 		return self.__getitem__(idxs)
 
@@ -665,10 +714,12 @@ class DYFIEnsemble(object):
 
 		:param region:
 			(W, E, S, N) tuple
+
+		:return:
+			instance of :class:`DYFIEnsemble` or subclass
 		"""
 		lonmin, lonmax, latmin, latmax = region
-		longitudes = self.longitudes
-		latitudes = self.latitudes
+		longitudes, latitudes = self.longitudes, self.latitudes
 		lon_idxs = (lonmin <= longitudes) & (longitudes <= lonmax)
 		lat_idxs = (latmin <= latitudes) & (latitudes <= latmax)
 		return self.__getitem__(lon_idxs & lat_idxs)
@@ -1024,14 +1075,12 @@ class DYFIEnsemble(object):
 
 		return agg_idx_dict
 
-	def split_by_distance(self, lon, lat, distance_interval):
+	def split_by_distance(self, ref_pt, distance_interval):
 		"""
 		Split enquiries in different distance bins
 
-		:param lon:
-			float, longitude of point to compute distance to
-		:param lat:
-			float, latitude of point to compute distance to
+		:param ref_pt:
+			see :meth:`subselect_by_distance`
 		:param distance_interval:
 			float, distance interval for binning (in km)
 
@@ -1039,7 +1088,20 @@ class DYFIEnsemble(object):
 			dict, mapping distance bins to instances of
 			:class:`MacroseismicEnquiryEnsemble`
 		"""
-		distances = self.calc_distances(lon, lat)
+		if ref_pt is None:
+			lon, lat = self.event_longitudes, self.event_latitudes
+			depth = self.event_depths
+		elif hasattr(ref_pt, 'lon'):
+			lon, lat = ref_pt.lon, ref_pt.lat
+			depth = getattr(ref_pt, 'depth', 0.)
+		else:
+			lon, lat = ref_pt[:2]
+			if len(ref_pt) > 2:
+				depth = ref_pt[2]
+			else:
+				depth = 0
+
+		distances = self.calc_distances(lon, lat, depth=depth)
 		binned_distances = np.floor(distances / distance_interval) * distance_interval
 		binned_distances += distance_interval
 
@@ -1082,11 +1144,465 @@ class DYFIEnsemble(object):
 
 		return agg_idx_dict
 
-	def subselect_polygon(self, poly_obj):
-		pass
+	def subselect_by_polygon(self, poly_obj):
+		"""
+		Select DYFI records that are situated inside given polygon
 
-	def split_by_polygon(self, poly_obj):
-		pass
+		:param poly_obj:
+			polygon or closed linestring object (ogr geometry object
+			or oqhazlib.geo.polygon.Polygon object)
+
+		:return:
+			(dyfi_inside, dyfi_outside) tuple:
+			instances of :class:`DYFIEnsemble` or subclass
+		"""
+		from mapping.geotools.pt_in_polygon import filter_points_by_polygon
+
+		idxs_inside, idxs_outside = filter_points_by_polygon(self.longitudes,
+													self.latitudes, poly_obj)
+		return (self.__getitem__(idxs_inside), self.__getitem__(idxs_outside))
+
+	def split_by_polygon_data(self, poly_data, value_key):
+		"""
+		Split DYFI ensemble according to a set of polygons
+
+		:param poly_data:
+			instance of :class:`layeredbasemap.MultiPolygonData`
+			or list of instances of :class:`osgeo.ogr.Geometry`
+			or str, full path to GIS file containing polygon data
+		:param value_key:
+			str, key in values dict of :param:`poly_data` that should
+			be used to link DYFI records to polygons
+			If None, use sequential number
+
+		:return:
+			dict, mapping polygon IDs to instances of
+			:class:`DYFIEnsemble` or subclass
+		"""
+		import mapping.layeredbasemap as lbm
+
+		if isinstance(poly_data, basestring):
+			gis_data = lbm.GisData(poly_data)
+			_, _, poly_data = gis_data.get_data()
+
+		if value_key is not None:
+			if len(poly_data) != len(np.unique(poly_data.values[value_key])):
+				print("Warning: Polygon data values not unique for key %s!"
+						% value_key)
+
+		dyfi_dict = {}
+		dyfi_outside = self
+		for p, poly_obj in enumerate(poly_data):
+			try:
+				poly_id = poly_obj.value.get(value_key, p)
+			except:
+				poly_id = p
+			dyfi_inside, dyfi_outside = dyfi_outside.subselect_by_polygon(poly_obj)
+			dyfi_dict[poly_id] = dyfi_inside
+
+		return dyfi_dict
+
+	def get_aggregated_intensity(self, agg_info='cii', agg_method='mean',
+								include_other_felt=True,
+								include_heavy_appliance=False,
+								remove_outliers=(2.5, 97.5), max_nan_pct=100):
+		"""
+		Compute aggregated intensity, and optionally the residual
+		(difference) between two methods
+
+		:param agg_info:
+			str, info to aggregate, either 'cii' or 'cdi'
+			(default: 'cii')
+		:param agg_method:
+			str, how to aggregate individual enquiries,
+			either 'mean' (= ROB practice), 'dyfi' (= DYFI/USGS practice),
+			'mean-dyfi' or 'dyfi-mean'
+			(default: 'mean')
+		:param include_other_felt:
+			bool, whether or not to take into acoount the replies to the
+			question "Did others nearby feel the earthquake ?"
+			(DYFI/USGS practice, but not taken into account in ROB forms)
+			(default: True)
+		:param include_heavy_appliance:
+			bool, whether or not to take heavy_appliance into account
+			as well (not standard, but occurs with ROB forms)
+			(default: False)
+		:param remove_outliers:
+			(min_pct, max_pct) tuple, percentile range to use.
+			Applies to both aggregation methods (in a different way)
+			(default: 2.5, 97.5)
+		:param max_nan_pct:
+			int, maximum percentage of nan (i.e. unanswered) values
+			to accept for each index in aggregated calculation
+			Only applies if :param:`agg_method` == 'dyfi'!
+			(default: 100)
+
+		:return:
+			(intensity, residual) tuple of floats
+		"""
+		if agg_info == 'cii':
+			if 'dyfi' in agg_method:
+				Iagg = self.calc_cii(aggregate=True,
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance,
+								remove_outliers=remove_outliers,
+								max_nan_pct=max_nan_pct)
+			if 'mean' in agg_method:
+				Imean = self.calc_mean_cii_or_cdi('cii',
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance,
+								remove_outliers=remove_outliers)
+		elif agg_info == 'cdi':
+			if 'dyfi' in agg_method:
+				Iagg = self.calc_cdi(include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance,
+								remove_outliers=remove_outliers,
+								max_nan_pct=max_nan_pct)
+			if 'mean' in agg_method:
+				Imean = self.calc_mean_cii_or_cdi('cdi',
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance,
+								remove_outliers=remove_outliers)
+
+		residual = 0
+		if agg_info in ('cii', 'cdi'):
+			if agg_method in ('mean', 'mean-dyfi'):
+				I = Imean
+			elif agg_method in ('dyfi', 'dyfi-mean'):
+				I = Iagg
+			if agg_method == 'mean-dyfi':
+				residual = Imean - Iagg
+			elif agg_method == 'dyfi-mean':
+				residual = Iagg - Imean
+		else:
+			raise Exception("Don't know how to compute %s" % agg_info)
+
+		return (I, residual)
+
+	def aggregate(self, aggregate_by='id_com', min_replies=3,
+					min_fiability=80, filter_floors=(0, 4),
+					agg_info='cii', agg_method='mean',
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+		"""
+		Get aggregated macroseismic information.
+
+		:param aggregate_by:
+			str, type of aggregation, specifying how macroseismic data
+			should be aggregated, one of:
+			- 'id_com' or 'commune'
+			- 'id_main' or 'main commune'
+			- 'grid_X' (where X is grid spacing in km)
+			- None or '' (= no aggregation, i.e. info is returned for
+			  all replies individually)
+			- 'polygon': requires 'poly_data' and 'value_key' kwargs,
+				and optionally 'include_unmatched_polygons'
+			- 'distance': requires 'ref_pt' and 'distance_interval' kwargs
+			(default: 'id_com')
+		:param min_replies:
+			int, minimum number of replies to use for aggregating
+			(default: 3)
+		:param min_fiability:
+			int, minimum fiability of enquiries to include in aggregate
+			(default: 80)
+		:param filter_floors:
+			(lower_floor, upper_floor) tuple, floors outside this range
+			(basement floors and upper floors) are filtered out
+			(default: (0, 4))
+		:param agg_info:
+		:param agg_method:
+		:param include_other_felt:
+		:param include_heavy_appliance:
+		:param remove_outliers:
+		:param max_nan_pct:
+			see :meth:`get_aggregated_intensity`
+
+		:**kwargs:
+			additional keyword arguments required by some aggregation
+			methods
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		from mapping.geotools.geodetic import spherical_point_at
+		import mapping.layeredbasemap as lbm
+		from .macro_info import MacroseismicInfo, MacroInfoCollection
+
+		if agg_method[:3] in ('min', 'max'):
+			print("Warning: aggregation method %s not supported!" % agg_method)
+			return
+
+		ensemble = self
+
+		ensemble = ensemble[ensemble.fiability >= min_fiability]
+		if filter_floors:
+			ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
+
+		if aggregate_by == 'commune':
+			aggregate_by = 'id_com'
+		elif aggregate_by == 'main commune':
+			aggregate_by = 'id_main'
+
+		if len(ensemble) == 0:
+			return MacroInfoCollection([], aggregate_by, 'internet')
+
+		macro_geoms, geom_key = None, ''
+
+		if aggregate_by in ('id_com', 'id_main', 'zip'):
+			## Note: correct commune_ids should have been set when converting
+			## ROBDYFIEnsemble to DYFIEnsemble
+			agg_ensemble_dict = ensemble.split_by_property('commune_ids')
+			try:
+				unassigned = agg_ensemble_dict.pop(0)
+			except KeyError:
+				unassigned = None
+			else:
+				print("Note: %d enquiries are not assigned to a commune"
+						% unassigned.num_replies)
+
+		elif not aggregate_by:
+			min_replies = 1
+			agg_ensemble_dict = {}
+			for subensemble in ensemble:
+				if subensemble.is_geo_located()[0]:
+					id_web = subensemble.ids[0]
+					agg_ensemble_dict[id_web] = subensemble
+
+		elif aggregate_by[:4] == 'grid':
+			if '_' in aggregate_by:
+				_, grid_spacing = aggregate_by.split('_')
+				grid_spacing = float(grid_spacing)
+			else:
+				grid_spacing = 5
+			agg_ensemble_dict = ensemble.split_by_grid(grid_spacing)
+
+		elif aggregate_by == 'polygon':
+			poly_data, value_key = kwargs['poly_data'], kwargs['value_key']
+			include_unmatched_polygons = kwargs.get('include_unmatched_polygons',
+													False)
+
+			if isinstance(poly_data, basestring):
+				gis_data = lbm.GisData(poly_data)
+				_, _, poly_data = gis_data.get_data()
+
+			agg_ensemble_dict = ensemble.split_by_polygon_data(poly_data, value_key)
+
+			geom_key = value_key
+			if include_unmatched_polygons:
+				macro_geoms = poly_data
+			else:
+				polygon_list = []
+				for geom_key_val in agg_ensemble_dict.keys():
+					poly_idx = poly_data.values[value_key].index(geom_key_val)
+					poly_obj = poly_data[poly_idx]
+					polygon_list.append(poly_obj)
+				macro_geoms = lbm.MultiPolygonData.from_polygons(polygon_list)
+
+		elif aggregate_by == 'distance':
+			ref_pt = kwargs['ref_pt']
+			distance_interval = kwargs['distance_interval']
+			create_polygons = kwargs.get('create_polygons', True)
+
+			agg_ensemble_dict = ensemble.split_by_distance(ref_pt, distance_interval)
+
+			## Create macro_geoms
+			if create_polygons:
+				geom_key = 'max_radius'
+				polygon_list = []
+				azimuths = np.linspace(0, 360, 361)
+				if hasattr(ref_pt, 'lon'):
+					lon, lat = ref_pt.lon, ref_pt.lat
+				else:
+					lon, lat = ref_pt[:2]
+				for max_radius in agg_ensemble_dict.keys():
+					lons, lats = spherical_point_at(lon, lat, max_radius, azimuths)
+					min_radius = max_radius - distance_interval
+					if min_radius:
+						interior_lons, interior_lats = spherical_point_at(lon, lat,
+																min_radius, azimuths)
+						interior_lons, interior_lats = [interior_lons], [interior_lats]
+					else:
+						interior_lons, interior_lats = None, None
+
+					value = {'min_radius': min_radius, 'max_radius': max_radius}
+					poly_obj = lbm.PolygonData(lons, lats, interior_lons=interior_lons,
+												interior_lats=interior_lats,
+												value=value)
+					polygon_list.append(poly_obj)
+
+				macro_geoms = lbm.MultiPolygonData.from_polygons(polygon_list)
+
+		## Compute aggregated intensity and convert to aggregated macro info
+		macro_infos = []
+		for key in agg_ensemble_dict.keys():
+			num_replies = agg_ensemble_dict[key].num_replies
+			if num_replies < min_replies:
+				agg_ensemble_dict.pop(key)
+				continue
+
+			I, residual = agg_ensemble_dict[key].get_aggregated_intensity(
+								agg_info=agg_info, agg_method=agg_method,
+								include_other_felt=include_other_felt,
+								include_heavy_appliance=include_heavy_appliance,
+								remove_outliers=remove_outliers,
+								max_nan_pct=max_nan_pct)
+			if agg_info == "num_replies":
+				I = 1
+
+			unique_id_coms = np.unique(agg_ensemble_dict[key].commune_ids)
+			id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
+			unique_id_earths = np.unique(agg_ensemble_dict[key].event_ids)
+			id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
+			web_ids = agg_ensemble_dict[key].ids
+
+			if aggregate_by in ('distance', 'polygon'):
+				geom_key_val = key
+			else:
+				geom_key_val = None
+
+			if aggregate_by in ('id_com', 'id_main') or not aggregate_by:
+				lon = agg_ensemble_dict[key].longitudes[0]
+				lat = agg_ensemble_dict[key].latitudes[0]
+			elif aggregate_by[:4] == 'grid':
+				lon, lat = key
+			elif aggregate_by == 'polygon':
+				poly_idx = poly_data.values[geom_key].index(geom_key_val)
+				poly_obj = poly_data[poly_idx]
+				centroid = poly_obj.get_centroid()
+				lon, lat = centroid.lon, centroid.lat
+			else:
+				lon, lat = 0, 0
+
+			macro_info = MacroseismicInfo(id_earth, id_com, I, aggregate_by,
+									'internet', num_replies, lon=lon, lat=lat,
+									residual=residual, db_ids=web_ids,
+									geom_key_val=geom_key_val)
+			macro_infos.append(macro_info)
+
+		proc_info = dict(min_replies=min_replies, min_fiability=min_fiability,
+						filter_floors=filter_floors, agg_method=agg_method,
+						include_other_felt=include_other_felt,
+						include_heavy_appliance=include_heavy_appliance,
+						remove_outliers=remove_outliers)
+
+		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet',
+										macro_geoms=macro_geoms, geom_key=geom_key,
+										proc_info=proc_info)
+
+		return macro_info_coll
+
+	def aggregate_by_nothing(self, min_replies=3, min_fiability=80,
+					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+		"""
+		Turn DYFI collection in aggregated macro information, with
+		each enquiry corresponding to an aggregate
+
+		See :meth:`aggregate` for parameters
+
+		:**kwargs:
+			additional keyword arguments for :class:`ROBDYFIEnsemble`
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		aggregate_by = ''
+		return self.aggregate(aggregate_by, min_replies=min_replies,
+					min_fiability=min_fiability, filter_floors=filter_floors,
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance,
+					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					**kwargs)
+
+	def aggregate_by_commune(self, min_replies=3, min_fiability=80,
+					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=(2.5, 97.5), max_nan_pct=100):
+		"""
+		Aggregate DYFI collection by commune
+
+		See :meth:`aggregate` for other parameters
+
+		:**kwargs:
+			additional keyword arguments for :class:`ROBDYFIEnsemble`
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		# Note: no **kwargs needed because ROBDYFIEnsemble has method with same name
+		aggregate_by = 'id_com'
+		return self.aggregate(aggregate_by, min_replies=min_replies,
+					min_fiability=min_fiability, filter_floors=filter_floors,
+					agg_info=agg_info, agg_method=agg_method,
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance,
+					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct)
+
+	def aggregate_by_distance(self, ref_pt, distance_interval, create_polygons=True,
+					min_replies=3, min_fiability=80, filter_floors=(0, 4),
+					agg_info='cii', agg_method='mean',
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+		"""
+		Aggregate DYFI ensemble by distance
+
+		:param ref_pt:
+		:param distance_interval:
+			see :meth:`split_by_distance`
+		:param create_polygons:
+			bool, whether or not to create polygon objects necessary
+			for plotting on a map
+			(default: True)
+		:**kwargs:
+			additional keyword arguments for :class:`ROBDYFIEnsemble`
+
+		See :meth:`aggregate` for other parameters
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		aggregate_by = 'distance'
+		return self.aggregate(aggregate_by, min_replies=min_replies,
+					min_fiability=min_fiability, filter_floors=filter_floors,
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance,
+					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					ref_pt=ref_pt,  distance_interval=distance_interval,
+					create_polygons=create_polygons, **kwargs)
+
+	def aggregate_by_polygon_data(self, poly_data, value_key,
+					include_unmatched_polygons=False,
+					min_replies=3, min_fiability=80, filter_floors=(0, 4),
+					agg_info='cii', agg_method='mean',
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+		"""
+		Aggregate DYFI ensemble according to a set of polygons
+
+		:param poly_data:
+		:param value_key:
+			see :meth:`split_by_polygon_data`
+		:param include_unmatched_polygons:
+			bool, whether or not unmatched polygons should be included
+			in the result (their intensity will be set to nan!)
+			(default: True)
+		:**kwargs:
+			additional keyword arguments for :class:`ROBDYFIEnsemble`
+
+		See :meth:`aggregate` for other parameters
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		aggregate_by = 'polygon'
+		return self.aggregate(aggregate_by, min_replies=min_replies,
+					min_fiability=min_fiability, filter_floors=filter_floors,
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance,
+					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					poly_data=poly_data, value_key=value_key,
+					include_unmatched_polygons=include_unmatched_polygons, **kwargs)
 
 	def remove_outliers(self, min_pct=2.5, max_pct=97.5):
 		"""
@@ -1133,10 +1649,14 @@ class DYFIEnsemble(object):
 			condition |= np.isnan(self.floor)
 		return self.__getitem__(condition)
 
-	def fix_felt_is_none(self):
+	def fix_felt_is_none(self, verbose=True):
 		"""
 		Fix enquiries where 'felt' has not been filled out, based on
 		reply to 'asleep', 'motion' and 'stand' questions.
+
+		:param verbose:
+			bool, whether or not to print information about the operation
+			(default: True)
 
 		:return:
 			None, 'felt' values of :prop:`recs` are modified in place
@@ -1152,12 +1672,17 @@ class DYFIEnsemble(object):
 		idxs = (felt_is_none & (self.asleep == 0) & (self.motion > 0)
 				& (self.stand > 1))
 		self.set_prop_values('felt', 1, idxs=idxs, regenerate_arrays=True)
-		print('Fixed %d values' % np.sum(felt_is_none))
+		if verbose:
+			print('Fixed %d felt values' % np.sum(felt_is_none))
 
-	def fix_not_felt(self):
+	def fix_not_felt(self, verbose=True):
 		"""
 		For 'not felt' enquiries, set motion, reaction and stand to 0
 		to avoid bias in the aggregated computation
+
+		:param verbose:
+			bool, whether or not to print information about the operation
+			(default: True)
 
 		:return:
 			None, 'motion', 'reaction' and 'stand' values of :prop:`recs`
@@ -1167,7 +1692,8 @@ class DYFIEnsemble(object):
 		self.set_prop_values('motion', 0, idxs=not_felt, regenerate_arrays=False)
 		self.set_prop_values('reaction', 0, idxs=not_felt, regenerate_arrays=False)
 		self.set_prop_values('stand', 0, idxs=not_felt, regenerate_arrays=True)
-		print('Fixed %d values' % np.sum(not_felt))
+		if verbose:
+			print('Set %d motion/reaction/stand values' % np.sum(not_felt))
 
 	def calc_felt_index(self, include_other_felt=True):
 		"""
@@ -1312,8 +1838,10 @@ class DYFIEnsemble(object):
 				damage_index[i] = 0.
 		return damage_index
 
-	def calc_cws(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True,
-				include_heavy_appliance=False, overwrite=False):
+	def calc_cws(self, aggregate=True, filter_floors=(0, 4),
+				include_other_felt=True, include_heavy_appliance=False,
+				remove_outliers=None, max_nan_pct=100,
+				overwrite=False):
 		"""
 		Compute Community Weighted Sum (CWS) following Wald et al. (1999)
 
@@ -1329,6 +1857,16 @@ class DYFIEnsemble(object):
 			see :meth:`calc_felt_index`
 		:param include_heavy_appliance:
 			see :meth:`calc_furniture_index`
+		:param remove_outliers:
+			(min_pct, max_pct) tuple, percentile range of non-aggregated
+			intensities to use for calculating aggregated CWS
+			Only applies if :param:`aggregate` is True!
+			(default: None)
+		:param max_nan_pct:
+			int, maximum percentage of nan (i.e. unanswered) values
+			to accept for each index to calculate aggregated CWS
+			Only applies if :param:`aggregate` is True!
+			(default: 100)
 		:param overwrite:
 			bool, whether or not :prop:`CWS` should be overwritten
 			Only applies if :param:`aggregate` is False
@@ -1353,24 +1891,25 @@ class DYFIEnsemble(object):
 		damage_indexes = ensemble.calc_damage_index()
 
 		## Masked (NaN) values are replaced with zeros (including felt)
-		cws_individual = (5 * felt_indexes.filled(0)
-						+ motion_indexes.filled(0)
-						+ reaction_indexes.filled(0)
-						+ 2 * stand_indexes.filled(0)
-						+ 5 * shelf_indexes.filled(0)
-						+ 2 * picture_indexes.filled(0)
-						+ 3 * furniture_indexes.filled(0)
-						+ 5 * damage_indexes)
+		with np.errstate(invalid='ignore'):
+			cws_individual = (5 * felt_indexes.filled(0)
+							+ motion_indexes.filled(0)
+							+ reaction_indexes.filled(0)
+							+ 2 * stand_indexes.filled(0)
+							+ 5 * shelf_indexes.filled(0)
+							+ 2 * picture_indexes.filled(0)
+							+ 3 * furniture_indexes.filled(0)
+							+ 5 * damage_indexes)
 
 		if aggregate:
 			## Aggregate calculation may be affected by biases
 			## It is not possible to remove outliers for individual indexes,
 			## but we can compute non-aggregated intensities first,
 			## and determine outliers from that distribution
-			remove_outliers = (2.5, 97.5)
 			if remove_outliers:
 				min_pct, max_pct = remove_outliers
-				cii = 3.40 * np.log(cws_individual) - 4.38
+				with np.errstate(invalid='ignore', divide='ignore'):
+					cii = 3.40 * np.log(cws_individual) - 4.38
 				pct0 = np.percentile(cii, min_pct)
 				pct1 = np.percentile(cii, max_pct)
 				idxs = (cii >= pct0) & (cii <= pct1)
@@ -1388,8 +1927,8 @@ class DYFIEnsemble(object):
 
 			## In addition, we can remove outliers by only taking into account
 			## an index if not more than a given percentage (e.g., 80%) is masked
-			max_nan_pct = 0.8
-
+			if max_nan_pct > 1:
+				max_nan_pct /= 100.
 			felt_index = felt_indexes.mean()
 			if ((np.ma.is_masked(felt_index) and felt_index.mask)
 				or np.sum(felt_indexes.mask)/float(len(felt_indexes)) > max_nan_pct):
@@ -1408,7 +1947,8 @@ class DYFIEnsemble(object):
 				stand_index = 0.
 			shelf_index = shelf_indexes.mean()
 			if ((np.ma.is_masked(shelf_index) and shelf_index.mask)
-				or np.sum(shelf_indexes.mask)/float(len(ensemble)) > max_nan_pct):
+				#or np.sum(shelf_indexes.mask)/float(len(shelf_indexes)) > max_nan_pct)):
+				or np.sum(np.isnan(ensemble.shelf)/float(len(ensemble)) > max_nan_pct)):
 				shelf_index = 0.
 			picture_index = picture_indexes.mean()
 			if ((np.ma.is_masked(picture_index) and picture_index.mask)
@@ -1440,8 +1980,10 @@ class DYFIEnsemble(object):
 
 		return cws
 
-	def calc_cdi(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True,
-				include_heavy_appliance=False, overwrite=False):
+	def calc_cdi(self, aggregate=True, filter_floors=(0, 4),
+				include_other_felt=True, include_heavy_appliance=False,
+				remove_outliers=None, max_nan_pct=100,
+				overwrite=False):
 		"""
 		Compute original Community Decimal Intensity sensu Dengler &
 		Dewey (1998)
@@ -1450,6 +1992,8 @@ class DYFIEnsemble(object):
 		:param filter_floors:
 		:param include_other_felt:
 		:param include_heavy_appliance:
+		:param remove_outliers:
+		:param max_nan_pct:
 		:param overwrite:
 			see :meth:`calc_cws`
 
@@ -1459,6 +2003,7 @@ class DYFIEnsemble(object):
 		cws = self.calc_cws(aggregate=aggregate, filter_floors=filter_floors,
 							include_other_felt=include_other_felt,
 							include_heavy_appliance=include_heavy_appliance,
+							remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
 							overwrite=overwrite)
 		cdi = 3.3 + 0.13 * cws
 		if overwrite and aggregate is False:
@@ -1466,8 +2011,10 @@ class DYFIEnsemble(object):
 
 		return cdi
 
-	def calc_cii(self, aggregate=True, filter_floors=(0, 4), include_other_felt=True,
-				include_heavy_appliance=False, overwrite=False):
+	def calc_cii(self, aggregate=True, filter_floors=(0, 4),
+				include_other_felt=True, include_heavy_appliance=False,
+				remove_outliers=None, max_nan_pct=100,
+				overwrite=False):
 		"""
 		Compute Community Internet Intensity following Wald et al. (1999),
 		later renamed into Community Decimal Intensity (CDI)
@@ -1476,6 +2023,8 @@ class DYFIEnsemble(object):
 		:param filter_floors:
 		:param include_other_felt:
 		:param include_heavy_appliance:
+		:param remove_outliers:
+		:param max_nan_pct:
 		:param overwrite:
 			see :meth:`calc_cws`
 
@@ -1485,8 +2034,10 @@ class DYFIEnsemble(object):
 		cws = self.calc_cws(aggregate=aggregate, filter_floors=filter_floors,
 							include_other_felt=include_other_felt,
 							include_heavy_appliance=include_heavy_appliance,
+							remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
 							overwrite=overwrite)
-		cii = 3.40 * np.log(cws) - 4.38
+		with np.errstate(invalid='ignore', divide='ignore'):
+			cii = 3.40 * np.log(cws) - 4.38
 
 		## Needed to recompute felt index
 		if filter_floors:
@@ -1521,16 +2072,20 @@ class DYFIEnsemble(object):
 
 		if overwrite and aggregate is False:
 			self.set_prop_values('CII', cii)
+			self.set_prop_values('MI', np.round(cii))
 
 		return cii
 
-	def calc_mean_cii(self, filter_floors=(0, 4), include_other_felt=True,
-					include_heavy_appliance=False, remove_outliers=(2.5, 97.5)):
+	def calc_mean_cii_or_cdi(self, which='cii', filter_floors=(0, 4),
+						include_other_felt=True, include_heavy_appliance=False,
+						remove_outliers=(2.5, 97.5)):
 		"""
 		Compute mean CII value from CII values of individual enquiries,
 		ignoring outliers. This is an alternative to the aggregated
 		CII computation in :meth:`calc_cii`
 
+		:param which:
+			str, either 'cii' or 'cdi'
 		:param filter_floors:
 		:param include_other_felt:
 		:param include_heavy_appliance:
@@ -1540,22 +2095,24 @@ class DYFIEnsemble(object):
 			(default: 2.5, 97.5)
 
 		:return:
-			float, mean CII
+			float, mean CII or CDI
 		"""
-		cii = self.calc_cii(aggregate=False, filter_floors=filter_floors,
+		func = getattr(self, 'calc_%s' % which.lower())
+		cii_or_cdi = func(aggregate=False, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance)
 		min_pct, max_pct = remove_outliers
-		pct0 = np.percentile(cii, min_pct)
-		pct1 = np.percentile(cii, max_pct)
-		cii = cii[(cii >= pct0) & (cii <= pct1)]
-		if len(cii):
-			return cii.mean()
+		pct0 = np.percentile(cii_or_cdi, min_pct)
+		pct1 = np.percentile(cii_or_cdi, max_pct)
+		cii_or_cdi = cii_or_cdi[(cii_or_cdi >= pct0) & (cii_or_cdi <= pct1)]
+		if len(cii_or_cdi):
+			return cii_or_cdi.mean()
 		else:
 			return 0.
 
 	def evaluate_cws_calculation(self, aggregate=False, include_other_felt=True,
-							include_heavy_appliance=False, filter_floors=(0, 4)):
+							include_heavy_appliance=False, filter_floors=(0, 4),
+							remove_outliers=None, max_nan_pct=100):
 		"""
 		Print values of properties used for CWS calculation, and the
 		derived indexes.
@@ -1564,27 +2121,38 @@ class DYFIEnsemble(object):
 		:param include_other_felt:
 		:param include_heavy_appliance:
 		:param filter_floors:
+		:param remove_outliers:
+		:param max_nan_pct:
 			see :meth:`calc_cws`
 		"""
 		print("felt:")
 		print("  Values: %s" % self.felt)
 		felt_index = self.calc_felt_index(include_other_felt=False)
 		if aggregate:
-			felt_index = felt_index.mean()
+			if np.sum(felt_index.mask)/float(len(felt_index)) > max_nan_pct:
+				felt_index = 0.
+			else:
+				felt_index = felt_index.mean()
 		print("  Felt index (without other_felt) [x5]: %s" % (5 * felt_index))
 
 		print("other_felt:")
 		print("  Values: %s" % self.other_felt)
 		felt_index = self.calc_felt_index(include_other_felt=True)
 		if aggregate:
-			felt_index = felt_index.mean()
+			if np.sum(felt_index.mask)/float(len(felt_index)) > max_nan_pct:
+				felt_index = 0.
+			else:
+				felt_index = felt_index.mean()
 		print("  Felt index (incl. other_felt) [x5]: %s" % (5 * felt_index))
 
 		print("motion:")
 		print("  Values: %s" % self.motion)
 		motion_index = self.calc_motion_index()
 		if aggregate:
-			motion_index = motion_index.mean()
+			if np.sum(motion_index.mask)/float(len(motion_index)) > max_nan_pct:
+				motion_index = 0.
+			else:
+				motion_index = motion_index.mean()
 		else:
 			motion_index = motion_index.filled(0)
 		print("  Motion index [x1]: %s" % motion_index)
@@ -1593,7 +2161,10 @@ class DYFIEnsemble(object):
 		print("  Values: %s" % self.reaction)
 		reaction_index = self.calc_reaction_index()
 		if aggregate:
-			reaction_index = reaction_index.mean()
+			if np.sum(reaction_index.mask)/float(len(reaction_index)) > max_nan_pct:
+				reaction_index = 0.
+			else:
+				reaction_index = reaction_index.mean()
 		else:
 			reaction_index = reaction_index.filled(0)
 		print("  Reaction index [x1]: %s" % reaction_index)
@@ -1602,7 +2173,10 @@ class DYFIEnsemble(object):
 		print("  Values: %s" % self.stand)
 		stand_index = self.calc_stand_index()
 		if aggregate:
-			stand_index = stand_index.mean()
+			if np.sum(stand_index.mask)/float(len(stand_index)) > max_nan_pct:
+				stand_index = 0.
+			else:
+				stand_index = stand_index.mean()
 		else:
 			stand_index = stand_index.filled(0)
 		print("  Stand index [x2]: %s" % (2 * stand_index))
@@ -1611,7 +2185,10 @@ class DYFIEnsemble(object):
 		print("  Values: %s" % self.shelf)
 		shelf_index = self.calc_shelf_index()
 		if aggregate:
-			shelf_index = shelf_index.mean()
+			if np.sum(np.isnan(self.shelf))/float(len(self.shelf)) > max_nan_pct:
+				shelf_index = 0.
+			else:
+				shelf_index = shelf_index.mean()
 		else:
 			shelf_index = shelf_index.filled(0)
 		print("  Shelf index [x5]: %s" % (5 * shelf_index))
@@ -1620,7 +2197,10 @@ class DYFIEnsemble(object):
 		print("  Values: %s" % self.picture)
 		picture_index = self.calc_picture_index()
 		if aggregate:
-			picture_index = picture_index.mean()
+			if np.sum(picture_index.mask)/float(len(picture_index)) > max_nan_pct:
+				picture_index = 0.
+			else:
+				picture_index = picture_index.mean()
 		else:
 			picture_index = picture_index.filled(0)
 		print("  Picture index [x2]: %s" % (2 * picture_index))
@@ -1629,13 +2209,19 @@ class DYFIEnsemble(object):
 		print("  Values: %s" % self.furniture)
 		furniture_index = self.calc_furniture_index()
 		if aggregate:
-			furniture_index = furniture_index.mean()
+			if np.sum(furniture_index.mask)/float(len(furniture_index)) > max_nan_pct:
+				furniture_index = 0.
+			else:
+				furniture_index = furniture_index.mean()
 		else:
 			furniture_index = furniture_index.filled(0)
 		print("  Furniture index [x3]: %s" % (3 * furniture_index))
 		furniture_index = self.calc_furniture_index(include_heavy_appliance=True)
 		if aggregate:
-			furniture_index = furniture_index.mean()
+			if np.sum(furniture_index.mask)/float(len(furniture_index)) > max_nan_pct:
+				furniture_index = 0.
+			else:
+				furniture_index = furniture_index.mean()
 		else:
 			furniture_index = furniture_index.filled(0)
 		print("  Furniture index (incl. heavy_appliance) [x3]: %s" %
@@ -1645,7 +2231,10 @@ class DYFIEnsemble(object):
 		print("  Values: %s" % self.get_prop_values('d_text'))
 		damage_index = self.calc_damage_index()
 		if aggregate:
-			damage_index = damage_index.mean()
+			if np.sum(damage_indexes == 0)/float(len(damage_indexes)) > max_nan_pct:
+				damage_index = 0.
+			else:
+				damage_index = damage_index.mean()
 		print("  Damage index [x5]: %s" % (5 * damage_index))
 
 		print("CWS:")
@@ -1655,11 +2244,13 @@ class DYFIEnsemble(object):
 		print("  Database: %s" % cws)
 		print("  Recomputed: %s" % self.calc_cws(aggregate=aggregate,
 			filter_floors=filter_floors, include_other_felt=include_other_felt,
-			include_heavy_appliance=include_heavy_appliance))
+			include_heavy_appliance=include_heavy_appliance,
+			remove_outliers=remove_outliers, max_nan_pct=max_nan_pct))
 		if not aggregate:
 			print("  Aggregated: %s" % self.calc_cws(filter_floors=filter_floors,
 								include_other_felt=include_other_felt,
-								include_heavy_appliance=include_heavy_appliance))
+								include_heavy_appliance=include_heavy_appliance,
+								remove_outliers=remove_outliers, max_nan_pct=max_nan_pct))
 
 	def plot_analysis_comparison(self, prop='CWS', include_other_felt=True,
 								include_heavy_appliance=False):
@@ -1761,6 +2352,9 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 
 	def __len__(self):
 		return len(self.recs)
+
+	def __repr__(self):
+		return '<ROBDYFIEnsemble (n=%d)>' % len(self)
 
 	def __getitem__(self, spec):
 		## Note: recs are shared!
@@ -1898,14 +2492,59 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			recs = [rec.copy() for rec in self.recs]
 			return self.__class__(self.id_earth, recs)
 
-	def to_simple_dyfi_ensemble(self):
+	def to_simple_dyfi_ensemble(self, comm_key='id_com', fix_commune_ids=True,
+								override_commune_locations=False, fix_felt=True):
 		"""
 		Convert to simple DYFI ensemble
+
+		Note that, depending on the options specified, the instance
+		is modified in place!
+
+		:param comm_key:
+			string, commune key to use for setting commune IDs,
+			one of "id_com', 'id_main', 'zip'
+			(default: 'id_com')
+		:param fix_commune_ids:
+			bool, whether or not to try fixing missing commune IDs
+			(default: True)
+		:param override_commune_locations:
+			bool, whether or not to override commune locations with
+			those from the database. This option should be used when
+			not aggregating by commune
+			(default: False)
+		:param fix_felt:
+			bool, whether or not to fix issues where 'felt' property
+			is None or zero
+			See :meth:`fix_felt_is_none` and :meth:`fix_not_felt`
+			(default: True)
 
 		:return:
 			instance of :class:`DYFIEnsemble`
 		"""
-		return super(ROBMacroseismicEnquiryEnsemble, self).copy()
+		if fix_commune_ids:
+			self.fix_commune_ids(keep_existing=True, keep_unmatched=True)
+		if comm_key == 'id_main':
+			self.set_main_commune_ids()
+		if comm_key in ('id_com', 'id_main', 'zip'):
+			self.set_locations_from_communes(comm_key=comm_key, max_quality=10,
+											keep_unmatched=False)
+		if override_commune_locations:
+			#if (~self.is_geo_located()).all():
+			#	self.set_locations_from_communes(comm_key='id_com', max_quality=5,
+			#								keep_unmatched=True)
+			self.set_locations_from_geolocation(keep_unmatched=True)
+		if fix_felt:
+			self.fix_felt_is_none()
+			self.fix_not_felt()
+
+		dyfi = super(ROBDYFIEnsemble, self).copy()
+
+		if comm_key == 'id_main':
+			dyfi.commune_ids = np.array(self.get_prop_values('id_main'))
+		elif comm_key == 'zip':
+			dyfi.commune_ids = np.array(self.get_zip_country_tuples())
+
+		return dyfi
 
 	def get_prop_values(self, prop):
 		"""
@@ -2026,11 +2665,11 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 
 	@property
 	def event_ids(self):
-		return self.get_prop_values('id_earth')
+		return np.array(self.get_prop_values('id_earth'))
 
 	@property
 	def commune_ids(self):
-		return self.get_prop_values('id_com')
+		return np.array(self.get_prop_values('id_com'))
 
 	def get_catalog(self):
 		"""
@@ -2064,6 +2703,12 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		idxs = self.get_catalog_indexes()
 		catalog = self.get_catalog()
 		return catalog.lats[idxs]
+
+	@property
+	def event_depths(self):
+		idxs = self.get_catalog_indexes()
+		catalog = self.get_catalog()
+		return catalog.get_depths()[idxs]
 
 	@property
 	def event_times(self):
@@ -2151,6 +2796,10 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		"""
 		Return list of addresses for each record
 
+		:param exclude_empty_streets:
+			bool, whether or not to exclude records with empty address field
+			(default: True)
+
 		:return:
 			list of strings
 		"""
@@ -2234,7 +2883,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		:return:
 			list of (ZIP, country) tuples
 		"""
-		zips = self.get_prop_values('zip')
+		zips = map(int, self.get_prop_values('zip'))
 		countries = self.get_prop_values('country')
 		zip_country_tuples = list(zip(zips, countries))
 		return zip_country_tuples
@@ -2246,8 +2895,10 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		:return:
 			list of (ZIP, country) tuples
 		"""
+		import operator
+
 		zip_country_tuples = set(self.get_zip_country_tuples())
-		return sorted(zip_country_tuples)
+		return sorted(zip_country_tuples, key=operator.itemgetter(1, 0))
 
 	def get_communes_from_db(self, comm_key='id_com', verbose=False):
 		"""
@@ -2392,7 +3043,8 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					"""
 		return comm_rec_dict
 
-	def fix_commune_ids(self, keep_existing=True, keep_unmatched=False):
+	def fix_commune_ids(self, keep_existing=True, keep_unmatched=False,
+						verbose=True):
 		"""
 		Reset commune ID of all records based on ZIP and country
 
@@ -2403,11 +3055,15 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			bool, whether or not to keep current commune id of unmatched
 			records
 			(default: False)
+		:param verbose:
+			bool, whether or not to print information about operation
+			(default: True)
 
 		:return:
 			None, 'id_com' values of :prop:`recs` are modified in place
 		"""
 		comm_rec_dict = self.get_communes_from_db(comm_key='zip')
+		num_zip_name_fixed, num_zip_fixed, num_unmatched = 0, 0, 0
 		for rec in self.recs:
 			if not (rec['id_com'] and keep_existing):
 				#comm_rec = comm_rec_dict.get((rec['zip'], rec['country']))
@@ -2418,14 +3074,21 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 				if comm_rec:
 					## Zip and name matched
 					rec['id_com'] = comm_rec['id_com']
+					num_zip_name_fixed += 1
 				else:
 					comm_rec = comm_rec_dict.get((rec['country'], rec['zip'], u''))
 					if comm_rec:
 						## Only zip matched
 						rec['id_com'] = comm_rec['id_com']
+						num_zip_fixed += 1
 					elif not keep_unmatched:
 						## Nothing matched
 						rec['id_com'] = 0
+						num_unmatched += 1
+
+		if verbose:
+			print('Fixed %d communes by zip/name, %d by zip only, %d unmatched'
+					% (num_zip_name_fixed, num_zip_fixed, num_unmatched))
 
 	def get_main_commune_ids(self):
 		"""
@@ -2459,7 +3122,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 				rec['id_main'] = main_commune_ids[r]
 
 	def set_locations_from_communes(self, comm_key="id_com", keep_unmatched=True,
-									max_quality=5):
+									max_quality=5, verbose=True):
 		"""
 		Set location of all records from corresponding communes
 
@@ -2472,12 +3135,17 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			int, maximum location quality, only overwrite location
 			if location quality is <= max_quality
 			(default: 5)
+		:param verbose:
+			bool, whether or not to print information about operation
+			(default: True)
 
 		:return:
 			None, 'longitude' and 'latitude' values of :prop:`recs`
 			are created or modified in place
 		"""
 		comm_rec_dict = self.get_communes_from_db(comm_key=comm_key)
+		location_quality_dict = {'id_com': 5, 'zip': 5, 'id_main': 4}
+		num_located, num_zeroed = 0, 0
 		for rec in self.recs:
 			if not rec['location_quality'] or rec['location_quality'] <= max_quality:
 				if comm_key in ("id_com", "id_main"):
@@ -2489,11 +3157,15 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					rec['longitude'] = comm_rec['longitude']
 					rec['latitude'] = comm_rec['latitude']
 					# TODO: decide on location quality
-					rec['location_quality'] = {'id_com': 5,
-										'zip': 5,
-										'id_main': 4}[comm_key]
+					rec['location_quality'] = location_quality_dict[comm_key]
+					num_located += 1
 				elif not keep_unmatched:
 					rec['longitude'] = rec['latitude'] = rec['location_quality'] = np.nan
+					num_zeroed += 1
+
+		if verbose:
+			print('Set location for %d records, removed location for %d unmatched records'
+					% (num_located, num_zeroed))
 
 	def read_locations_from_db(self):
 		"""
@@ -2515,7 +3187,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		db_rec_dict = {rec['id_web']: rec for rec in db_recs}
 		return db_rec_dict
 
-	def set_locations_from_geolocation(self, keep_unmatched=True):
+	def set_locations_from_geolocation(self, keep_unmatched=True, verbose=True):
 		"""
 		Set location of all records from geolocation in database
 
@@ -2523,20 +3195,30 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			bool, keep unmatched records untouched (True) or set to nan
 			(False)
 			(default: True)
+		:param verbose:
+			bool, whether or not to print information about operation
+			(default: True)
 
 		:return:
 			None, 'longitude' and 'latitude' values of :prop:`recs`
 			are created or modified in place
 		"""
 		db_rec_dict = self.read_locations_from_db()
+		num_located, num_zeroed = 0, 0
 		for rec in self.recs:
 			db_rec = db_rec_dict.get('id_web')
 			if db_rec:
 				rec['longitude'] = db_rec['longitude']
 				rec['latitude'] = db_rec['latitude']
 				rec['location_quality'] = db_rec['quality']
+				num_located += 1
 			elif not keep_unmatched:
 				rec['longitude'] = rec['latitude'] = rec['location_quality'] = np.nan
+				num_zeroed += 1
+
+		if verbose:
+			print('Set location for %d records, removed location for %d unmatched records'
+					% (num_located, num_zeroed))
 
 	def write_locations_to_db(self, user, passwd, min_quality=6, overwrite=False,
 							dry_run=False):
@@ -2560,7 +3242,6 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		"""
 		import db.simpledb as simpledb
 		from secrets.seismodb import host, database
-		#from ..rob.seismodb import query_seismodb_table
 
 		db_rec_dict = self.read_locations_from_db()
 		recs_to_add, recs_to_modify = [], []
@@ -2585,11 +3266,27 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 				seismodb.update_rows(table_name, recs_to_modify, 'id_web')
 
 	def get_bad_zip_country_tuples(self):
-		zip_country_tuples = set(self.get_unique_zip_country_tuples())
+		"""
+		Get list of (ZIP, country) tuples that cannot be matched
+		with database
+
+		Note that this is not necessarily problematic, as the 'communes'
+		table seems to be missing some ZIP values that are present
+		in com_zip_BE_nl...
+
+		:return:
+			list with (ZIP, country) tuples
+		"""
+		import operator
+
+		zip_country_tuples = self.get_unique_zip_country_tuples()
+		zip_country_tuples = set([(str(zip), country)
+									for zip, country in zip_country_tuples])
 		comm_recs = self.get_communes_from_db().values()
 		db_zip_country_tuples = set([(rec['code_p'], rec['country']) for rec in comm_recs])
 		bad_zip_country_tuples = zip_country_tuples.difference(db_zip_country_tuples)
-		return list(bad_zip_country_tuples)
+		bad_zip_country_tuples = sorted(bad_zip_country_tuples, key=operator.itemgetter(1, 0))
+		return [(int(zip), country) for zip, country in bad_zip_country_tuples]
 
 	def get_bad_zip_ensemble(self):
 		bad_zip_country_tuples = self.get_bad_zip_country_tuples()
@@ -2620,184 +3317,89 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 
 	def aggregate(self, aggregate_by='id_com', min_replies=3,
 					min_fiability=80, filter_floors=(0, 4),
-					agg_info='cii', agg_method='mean', fix_records=True,
+					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5)):
+					remove_outliers=(2.5, 97.5), max_nan_pct=100,
+					fix_commune_ids=True, fix_felt=True, **kwargs):
 		"""
 		Get aggregated macroseismic information.
 
 		:param aggregate_by:
-			str, type of aggregation, specifying how macroseismic data
-			should be aggregated, one of:
-			- 'id_com' or 'commune'
-			- 'id_main' or 'main commune'
-			- 'grid_X' (where X is grid spacing in km)
-			- None or '' (= no aggregation, i.e. info is returned for
-			  all replies individually)
-			(default: 'id_com')
 		:param min_replies:
-			int, minimum number of replies to use for aggregating
-			(default: 3)
 		:param min_fiability:
-			int, minimum fiability of enquiries to include in aggregate
-			(default: 80)
 		:param filter_floors:
-			(lower_floor, upper_floor) tuple, floors outside this range
-			(basement floors and upper floors) are filtered out
-			(default: (0, 4))
 		:param agg_info:
-			str, info to aggregate, either 'cii', 'cdi' or 'num_replies'
-			(default: 'cii')
 		:param agg_method:
-			str, how to aggregate individual enquiries,
-			either 'mean' (= ROB practice), 'aggregated' (= DYFI practice),
-			'mean-aggregated' or 'aggregated-mean'
-			(default: 'mean')
-		:param fix_records:
-			bool, whether or not to fix various issues (see :meth:`fix_all`)
-			(default: True)
 		:param include_other_felt:
-			bool, whether or not to take into acoount the replies to the
-			question "Did others nearby feel the earthquake ?"
-			(default: True)
 		:param include_heavy_appliance:
-			bool, whether or not to take heavy_appliance into account
-			as well (not standard, but occurs with ROB forms)
-			(default: False)
 		:param remove_outliers:
-			(min_pct, max_pct) tuple, percentile range to use.
-			Only applies if :param:`agg_method` = 'mean'
-			and if :param:`agg_info` = 'cii'
-			(default: 2.5, 97.5)
+		:param max_nan_pct:
+		:**kwargs:
+			see :meth:`DYFIEnsemble.aggregate`
+		:param fix_commune_ids:
+		:param fix_felt:
+			see :meth:`to_simple_dyfi_ensemble`
 
 		:return:
 			instance of :class:`MacroInfoCollection`
 		"""
-		from .macro_info import MacroseismicInfo, MacroInfoCollection
-
-		if agg_method[:3] in ('min', 'max'):
-			print("Warning: aggregation method %s not supported!" % agg_method)
-			return
-
-		ensemble = self
-		if fix_records:
-			ensemble = ensemble.fix_all()
-
-		ensemble = ensemble[ensemble.fiability >= min_fiability]
-		if filter_floors:
-			ensemble = ensemble.filter_floors(*filter_floors, keep_nan_values=True)
-
-		if len(ensemble) == 0:
-			return MacroInfoCollection([], aggregate_by, 'internet')
-
 		if aggregate_by == 'commune':
 			aggregate_by = 'id_com'
 		elif aggregate_by == 'main commune':
 			aggregate_by = 'id_main'
-		if aggregate_by in ('id_com', 'id_main'):
+
+		if aggregate_by in ('id_com', 'id_main', 'zip'):
 			comm_key = aggregate_by
-			ensemble.set_locations_from_communes(comm_key=comm_key, max_quality=10,
-												keep_unmatched=False)
-			agg_ensemble_dict = ensemble.split_by_commune(comm_key=comm_key)
-		elif not aggregate_by:
-			min_replies = 1
-			## If there are no locations, get them from the communes
-			if (~ensemble.is_geo_located()).all():
-				ensemble.set_locations_from_communes(comm_key='id_com')
-			agg_ensemble_dict = {}
-			for subensemble in ensemble:
-				if subensemble.is_geo_located()[0]:
-					id_web = subensemble.recs[0]['id_web']
-					agg_ensemble_dict[id_web] = subensemble
-		elif aggregate_by[:4] == 'grid':
-			## Include non-geocoded enquiries
-			# TODO: should this be an option?
-			ensemble.set_locations_from_communes(comm_key='id_com', max_quality=5,
-												keep_unmatched=False)
-			if '_' in aggregate_by:
-				_, grid_spacing = aggregate_by.split('_')
-				grid_spacing = float(grid_spacing)
-			else:
-				grid_spacing = 5
-			agg_ensemble_dict = ensemble.split_by_grid(grid_spacing)
-
-		try:
-			unassigned = agg_ensemble_dict.pop(0)
-		except KeyError:
-			unassigned = None
+			override_commune_locations = False
 		else:
-			print("Note: %d enquiries are not assigned to a commune"
-					% unassigned.num_replies)
+			comm_key = 'id_com'
+			override_commune_locations = True
 
-		macro_infos = []
-		for key in list(agg_ensemble_dict.keys()):
-			num_replies = agg_ensemble_dict[key].num_replies
-			if num_replies < min_replies:
-				agg_ensemble_dict.pop(key)
-				continue
-			if aggregate_by in ('id_com', 'id_main'):
-				id_com = agg_ensemble_dict[key].recs[0][comm_key]
-			else:
-				id_com = key
-			if aggregate_by in ('id_com', 'id_main') or not aggregate_by:
-				lon = agg_ensemble_dict[key].longitudes[0]
-				lat = agg_ensemble_dict[key].latitudes[0]
-			elif aggregate_by[:4] == 'grid':
-				lon, lat = key
-			web_ids = agg_ensemble_dict[key].ids
+		dyfi = self.to_simple_dyfi_ensemble(comm_key, fix_felt=True,
+											fix_commune_ids=fix_commune_ids)
 
-			if agg_info == 'cii':
-				if 'aggregated' in agg_method:
-					Iagg = agg_ensemble_dict[key].calc_cii(filter_floors=False,
-								include_other_felt=include_other_felt,
-								include_heavy_appliance=include_heavy_appliance)
-				if 'mean' in agg_method:
-					Imean = agg_ensemble_dict[key].calc_mean_cii(filter_floors=False,
-								include_other_felt=include_other_felt,
-								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers)
-			elif agg_info == 'cdi':
-				if 'aggregated' in agg_method:
-					Iagg = agg_ensemble_dict[key].calc_cdi(filter_floors=False,
-								include_other_felt=include_other_felt,
-								include_heavy_appliance=include_heavy_appliance)
-				if 'mean' in agg_method:
-					Imean = np.mean(agg_ensemble_dict[key].calc_cdi(aggregate=False,
-								filter_floors=False, include_other_felt=include_other_felt,
-								include_heavy_appliance=include_heavy_appliance))
-			residual = 0
-			if agg_info in ('cii', 'cdi'):
-				if agg_method in ('mean', 'mean-aggregated'):
-					I = Imean
-				elif agg_method in ('aggregated', 'aggregated-mean'):
-					I = Iagg
-				if agg_method == 'mean-aggregated':
-					residual = Imean - Iagg
-				elif agg_method == 'aggregated-mean':
-					residual = Iagg - Imean
-			elif agg_info == "num_replies":
-				I = 1
-			else:
-				print("Don't know how to compute %s" % agg_info)
-				exit()
-			macro_info = MacroseismicInfo(ensemble.id_earth, id_com, I, aggregate_by,
-									'internet', num_replies, lon=lon, lat=lat,
-									residual=residual, db_ids=web_ids)
-			macro_infos.append(macro_info)
+		return dyfi.aggregate(aggregate_by, min_replies=min_replies,
+					min_fiability=min_fiability, filter_floors=filter_floors,
+					agg_info=agg_info, agg_method=agg_method,
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance,
+					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					**kwargs)
 
-		proc_info = dict(min_replies=min_replies, min_fiability=min_fiability,
-						filter_floors=filter_floors, agg_method=agg_method,
-						fix_records=fix_records, include_other_felt=include_other_felt,
-						include_heavy_appliance=include_heavy_appliance,
-						remove_outliers=remove_outliers)
+	def aggregate_by_commune(self, comm_key='id_main',
+					min_replies=3, min_fiability=80, filter_floors=(0, 4),
+					agg_info='cii', agg_method='mean',
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=(2.5, 97.5), max_nan_pct=100,
+					fix_commune_ids=True, fix_felt=True):
+		"""
+		Aggregate DYFI collection by commune
 
-		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet',
-											proc_info=proc_info)
+		:param comm_key:
+			see :meth:`get_communes_from_db`
 
-		return macro_info_coll
+		See :meth:`aggregate` for other parameters
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		aggregate_by = 'id_com'
+		return self.aggregate(aggregate_by, min_replies=min_replies,
+					min_fiability=min_fiability, filter_floors=filter_floors,
+					agg_info=agg_info, agg_method=agg_method,
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance,
+					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					fix_commune_ids=fix_commune_ids, fix_felt=fix_felt)
 
 	def split_by_zip(self):
-		# TODO: can be removed
+		"""
+		Split DYFI ensemble based on ZIP (and country)
+
+		:return:
+			dict, mapping (ZIP, country) tuples to instances of
+			:class:`ROBDYFIEnsemble`
+		"""
 		all_zip_country_tuples = self.get_zip_country_tuples()
 		unique_zip_country_tuples = set(all_zip_country_tuples)
 		zip_ensemble_dict = {}
@@ -2806,27 +3408,6 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			ensemble = self.__getitem__(idxs)
 			zip_ensemble_dict[zip_country] = ensemble
 		return zip_ensemble_dict
-
-	def split_by_main_zip(self):
-		# TODO: can be removed
-		comm_recs = self.get_communes_from_db()
-		zip_main_id_dict = {}
-		## Note: Store id_main as string property (required for subselect_by_property)
-		for rec in comm_recs:
-			zip_main_id_dict[(rec['zip'], rec['country'])] = str(rec['id_main'])
-		for rec in self.recs:
-			try:
-				rec['id_main'] = zip_main_id_dict[(rec['zip'], rec['country'])]
-			except:
-				rec['id_main'] = '0'
-				print("Warning: id_main not found for ZIP %s-%s" %
-						(rec['country'], rec['zip']))
-		unique_main_ids = np.unique(self.get_prop_values('id_main'))
-		main_id_ensemble_dict = {}
-		for id_main in unique_main_ids:
-			ensemble = self.subselect_by_property('id_main', [id_main])
-			main_id_ensemble_dict[int(id_main)] = ensemble
-		return main_id_ensemble_dict
 
 	def fix_all(self, verbose=False):
 		"""
@@ -2853,8 +3434,9 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		if len(ensemble) > 0:
 			ensemble.set_main_commune_ids()
 		ensemble = ensemble.remove_duplicate_records(verbose=verbose)
-		ensemble.set_prop_values('fiability', ensemble.calc_fiability(include_other_felt=False,
-													include_heavy_appliance=True))
+		fiabilities = ensemble.calc_fiability(include_other_felt=False,
+											include_heavy_appliance=True)
+		ensemble.set_prop_values('fiability', fiabilities)
 		return ensemble
 
 	def calc_fiability(self, include_other_felt=True, include_heavy_appliance=False,
