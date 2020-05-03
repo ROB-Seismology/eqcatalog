@@ -389,11 +389,12 @@ class MacroInfoCollection():
 		if not np.allclose(residuals, 0):
 			attributes += ['residual']
 		attributes += ['agg_type', 'data_type']
-		if aggregate_by in ('grid', 'polygon') or polygons_as_points:
+		if aggregate_by == 'grid' or polygons_as_points or self.macro_geoms:
 			## Intensity attributes already matched with polygons
 			if aggregate_by in ('id_main', 'id_com'):
 				attributes += ['id_com']
-			attributes += ['lon', 'lat']
+			elif self.macro_geoms is None:
+				attributes += ['lon', 'lat']
 			for attrib in attributes:
 				values[attrib] = [getattr(rec, attrib) for rec in self]
 		else:
@@ -451,6 +452,8 @@ class MacroInfoCollection():
 			macro_geoms.values.update(values)
 
 		return macro_geoms
+
+	to_lbm_data = get_geometries
 
 	def to_geojson(self, polygons_as_points=False):
 		"""
