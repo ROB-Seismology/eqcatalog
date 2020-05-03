@@ -125,8 +125,18 @@ class MDPCollection():
 	def __len__(self):
 		return len(self.mdp_list)
 
-	def __getitem__(self, item):
-		return self.mdp_list.__getitem__(item)
+	def __getitem__(self, spec):
+		if isinstance(spec, (int, np.integer, slice)):
+			return self.mdp_list.__getitem__(spec)
+		elif isinstance(spec, (list, np.ndarray)):
+			## spec can contain indexes or bools
+			mdp_list = []
+			if len(spec):
+				idxs = np.arange(len(self))
+				idxs = idxs[np.asarray(spec)]
+				for idx in idxs:
+					mdp_list.append(self.mdp_list[idx])
+			return self.__class__(mdp_list)
 
 	def append(self, mdp):
 		self.mdp_list.append(mdp)
@@ -442,10 +452,11 @@ class MDPCollection():
 			(mpds_inside, mdps_outside) tuple:
 			instances of :class:`MDPCollection`
 		"""
-		from mapping.geotools.pt_in_polygon import filter_collection_by_polygon
+		from mapping.geotools.pt_in_polygon import filter_points_by_polygon
 
-		mdps_inside, mdps_outside = filter_collection_by_polygon(self, poly_obj)
-		return (self.__class__(mdps_inside), self.__class__(mdps_outside))
+		lons, lats = self.get_longitudes(), self.get_latitudes()
+		idxs_inside, idxs_outside = filter_points_by_polygon(lons, lats, poly_obj)
+		return (self.__getitem__(idxs_inside), self.__getitem__(idxs_outside))
 
 	def split_by_polygon_data(self, poly_data, value_key):
 		"""
@@ -453,10 +464,12 @@ class MDPCollection():
 
 		:param poly_data:
 			instance of :class:`layeredbasemap.MultiPolygonData`
+			or list of instances of :class:`osgeo.ogr.Geometry`
 			or str, full path to GIS file containing polygon data
 		:param value_key:
 			str, key in values dict of :param:`poly_data` that should
 			be used to link MDP collections to polygons
+			If None, use sequential number
 
 		:return:
 			dict, mapping polygon IDs to instances of
@@ -468,14 +481,18 @@ class MDPCollection():
 			gis_data = lbm.GisData(poly_data)
 			_, _, poly_data = gis_data.get_data()
 
-		mdpc_dict = {}
-		if len(poly_data) != len(np.unique(poly_data.values[value_key])):
-			print("Warning: Polygon data values not unique for key %s!"
-					% value_key)
+		if value_key is not None:
+			if len(poly_data) != len(np.unique(poly_data.values[value_key])):
+				print("Warning: Polygon data values not unique for key %s!"
+						% value_key)
 
+		mdpc_dict = {}
 		mdps_outside = self
-		for poly_obj in poly_data:
-			poly_id = poly_obj.value[value_key]
+		for p, poly_obj in enumerate(poly_data):
+			try:
+				poly_id = poly_obj.value.get(value_key, p)
+			except:
+				poly_id = p
 			mdps_inside, mdps_outside = mdps_outside.subselect_by_polygon(poly_obj)
 			mdpc_dict[poly_id] = mdps_inside
 
@@ -572,6 +589,22 @@ class MDPCollection():
 
 		return (lon, lat, depth)
 
+	def subselect_by_region(self, region):
+		"""
+		Select part of collection situated inside given geographic extent
+
+		:param region:
+			(W, E, S, N) tuple
+
+		:return:
+			instance of :class:`MDPCollection`
+		"""
+		lonmin, lonmax, latmin, latmax = region
+		longitudes, latitudes = self.get_longitudes(), self.get_latitudes()
+		lon_idxs = (lonmin <= longitudes) & (longitudes <= lonmax)
+		lat_idxs = (latmin <= latitudes) & (latitudes <= latmax)
+		return self.__getitem__(lon_idxs & lat_idxs)
+
 	def subselect_by_distance(self, ref_pt, max_dist, min_dist=0.):
 		"""
 		Select MDPs that are situated within a given distance range
@@ -653,6 +686,7 @@ class MDPCollection():
 		:param create_polygons:
 			bool, whether or not to create polygon objects necessary
 			for plotting on a map
+			(default: True)
 
 		:return:
 			instance of :class:`MacroInfoCollection`
@@ -692,8 +726,9 @@ class MDPCollection():
 					if min_radius:
 						interior_lons, interior_lats = spherical_point_at(lon, lat,
 																min_radius, azimuths)
+						interior_lons, interior_lats = [interior_lons], [interior_lats]
 					else:
-						interior_lons, interior_lats = None
+						interior_lons, interior_lats = None, None
 
 					value = {'min_radius': min_radius, 'max_radius': max_radius}
 					poly_obj = lbm.PolygonData(lons, lats, interior_lons=interior_lons,
