@@ -61,7 +61,7 @@ parser.add_argument("--data_type", help="Type of macroseismic data",
 parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data points",
 					choices=["", "commune", "main commune", "grid5", "grid10"], default="commune")
 parser.add_argument("--agg_method", help="Aggregation method (availability depends on data_type option!)",
-                    choices=["mean", "aggregated", "min", "max", "median"], default="mean")
+                    choices=["mean", "dyfi", "min", "max", "median"], default="mean")
 parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
                     choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
 parser.add_argument("--bel_admin_level", help="Level of administrtive boundaries in Belgium",
@@ -153,7 +153,7 @@ for eq in catalog:
 
 			## Aggregate DYFI
 			if args.data_type == "dyfi":
-				macro_info = macro_data.get_aggregated_info(aggregate_by=args.aggregate_by,
+				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by,
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
 					fix_records=True, include_other_felt=True,
 					include_heavy_appliance=False, remove_outliers=(2.5, 97.5))
