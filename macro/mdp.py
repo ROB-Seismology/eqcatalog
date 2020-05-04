@@ -874,12 +874,20 @@ class MDPCollection():
 						xlabel=xlabel, ylabel=ylabel, xmin=xmin, ymin=ymin,
 						**kwargs)
 
-	def plot_histogram(self, Imin_or_max, **kwargs):
+	def plot_histogram(self, Imin_or_max, color='usgs', label='', **kwargs):
 		"""
 		Plot intensity histogram
 
 		:param Imin_or_max:
 			see :meth:`get_intensities`
+		:param color:
+			matplotlib color specification (uniform color for all bars)
+			or list of colors (one for each bar)
+			or matplotlib color map or string (colormap name)
+			(default: 'usgs')
+		:param label:
+			str, legend label
+			(default: '')
 		:**kwargs:
 			additional keyword arguments understood by
 			:func:`generic_mpl.plot_histogram`
@@ -889,12 +897,30 @@ class MDPCollection():
 		"""
 		from plotting.generic_mpl import plot_histogram
 
-		intensities = self.get_intensities(Imin_or_max)
-		bins = np.arange(-0.5, 13)
+		if color in ('usgs', 'rob'):
+			import mapping.layeredbasemap as lbm
+			colors = lbm.cm.get_cmap('macroseismic', color)
+		elif isinstance(color, (basestring, list)):
+			colors = color
+		else:
+			colors = [color]
 
-		xlabel = kwargs.pop('xlabel', 'Intensity (%s)' % self.mdp_list[0].imt)
 		xmin = kwargs.pop('xmin', 0)
 		xmax = kwargs.pop('xmax', 12)
 
-		return plot_histogram([intensities], bins, xmin=xmin, xmax=xmax,
-							xlabel=xlabel, **kwargs)
+		intensities = self.get_intensities(Imin_or_max)
+		if color == 'rob':
+			Imax = 7
+		elif color == 'usgs':
+			Imax = 9
+		else:
+			Imax = xmax
+		bins = np.arange(1, Imax + 1)
+		xticks = kwargs.pop('xticks', bins)
+
+		labels = kwargs.pop('label', [label])
+		xlabel = kwargs.pop('xlabel', 'Intensity (%s)' % self.mdp_list[0].imt)
+
+		return plot_histogram([intensities], bins, colors=colors, labels=labels,
+							xmin=xmin, xmax=xmax, xlabel=xlabel, xticks=xticks,
+							**kwargs)
