@@ -91,7 +91,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			(default: 'commune')
 		:param agg_method:
 			str, how to aggregate individual enquiries,
-			either 'mean' (= ROB practice) or 'aggregated' (= DYFI practice)
+			either 'mean' (= ROB practice) or 'dyfi' (= DYFI practice)
 			(default: 'mean')
 		:param fix_records:
 			bool, whether or not to fix various issues (see :meth:`fix_all`)
