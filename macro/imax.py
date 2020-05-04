@@ -48,7 +48,7 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 		(default: (0, 4))
 	:param agg_method:
 		str, how to aggregate individual enquiries in a subcommune,
-		either 'mean' (= ROB practice) or 'aggregated' (= DYFI practice)
+		either 'mean' (= ROB practice) or 'dyfi' (= DYFI practice)
 		(default: 'mean')
 	:param fix_records:
 		bool, whether or not to fix various issues (see :meth:`fix_all`)
@@ -63,7 +63,7 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 		(default: False)
 	:param remove_outliers:
 		(min_pct, max_pct) tuple, percentile range to use
-		Only applies if :param:`agg_method` = 'aggregated'
+		Applies to both 'mean' and 'dyfi' aggregation methods
 		(default: 2.5, 97.5)
 
 	:return:
@@ -95,7 +95,7 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 			if filter_floors:
 				eq_dyfi = eq_dyfi.filter_floors(*filter_floors)
 			if len(eq_dyfi) >= min_replies:
-				if agg_method == 'aggregated':
+				if agg_method == 'dyfi':
 					I = eq_dyfi.calc_cii(filter_floors=False,
 						include_other_felt=include_other_felt,
 						include_heavy_appliance=include_heavy_appliance)
