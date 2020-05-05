@@ -156,6 +156,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		print("No macroseismic information provided! Nothing to plot.")
 		return
 
+	## Take a copy, because original intensities may be modified!
+	macro_info_coll = macro_info_coll.copy()
 	if verbose:
 		tot_num_replies = np.sum([rec.num_replies for rec in macro_info_coll])
 		print("Found %d aggregates (%d replies) for event %s:"
