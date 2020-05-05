@@ -53,6 +53,13 @@ else:
 	reload(dyfi)
 from .dyfi import *
 
+## rob_dyfi (depends on dyfi)
+if not reloading:
+	from . import rob_dyfi
+else:
+	reload(rob_dyfi)
+from .rob_dyfi import *
+
 ## imax (no internal dependencies)
 if not reloading:
 	from . import imax
