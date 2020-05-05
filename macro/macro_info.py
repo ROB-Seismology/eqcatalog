@@ -237,6 +237,22 @@ class MacroInfoCollection():
 		intensities = self.intensities
 		return (np.nanmin(intensities), np.nanmax(intensities))
 
+	def copy(self):
+		"""
+		Copy macroinfo collection
+		Note: :prop:`macro_geoms` will not be copied!
+
+		:return:
+			instance of :class:`MacroInfoCollection`
+		"""
+		from copy import deepcopy
+
+		macro_infos = deepcopy(self.macro_infos)
+
+		return self.__class__(macro_infos, self.agg_type, self.data_type,
+							macro_geoms=self.macro_geoms, geom_key=self.geom_key,
+							proc_info=self.proc_info.copy())
+
 	def get_eq_catalog(self):
 		"""
 		Fetch catalog of earthquakes linked to this MacroInfoCollection
