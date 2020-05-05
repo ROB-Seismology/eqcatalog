@@ -1036,7 +1036,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 	:return:
 		instance of :class:`MacroseismicEnquiryEnsemble`
 	"""
-	from ..macro.dyfi import ROBDYFIEnsemble
+	from ..macro import ROBDYFIEnsemble
 
 	table_clause = ['web_input']
 
