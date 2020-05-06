@@ -101,7 +101,7 @@ class MacroseismicInfo():
 		"""
 		from ..rob.seismodb import query_local_eq_catalog_by_id
 
-		if isinstance(self.id_earth, (int, str)):
+		if isinstance(self.id_earth, (int, np.integer, str)):
 			[eq] = query_local_eq_catalog_by_id(self.id_earth)
 			return eq
 
