@@ -203,7 +203,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	from ..time import (as_np_datetime, combine_np_date_and_py_time)
 
 	## Convert input arguments, if necessary
-	if isinstance(id_earth, (int, basestring)):
+	if isinstance(id_earth, (int, np.integer, basestring)):
 		id_earth = [id_earth]
 
 	if not id_earth:
