@@ -980,6 +980,41 @@ class DYFIEnsemble(object):
 				table.add_row(row)
 		print(table)
 
+	def print_form(self, lang='EN', institute='USGS'):
+		"""
+		Print enquiry form for each individual record
+
+		:param lang:
+			str, language
+		:param institute:
+			str, either 'USGS' or 'ROB'
+		"""
+		if institute.upper() == 'USGS':
+			fields = ['asleep', 'felt', 'other_felt', 'stand', 'motion',
+						'duration', 'reaction', 'response', 'stand',
+						'sway', 'creak', 'shelf', 'picture', 'furniture',
+						'heavy_appliance', 'walls', 'damage']
+		elif institute.upper() == 'ROB':
+			fields = ['situation', 'building', 'floor', 'asleep', 'felt',
+					'noise', 'other_felt', 'motion', 'duration', 'reaction',
+					'response', 'stand', 'sway', 'creak', 'shelf', 'picture',
+					'furniture', 'heavy_appliance', 'walls', 'damage']
+
+		for prop in fields:
+			question, labels = self.get_prop_title_and_labels(prop, lang=lang)
+			print(question)
+			for d, dyfi in enumerate(self):
+				if prop in ('duration', 'floor'):
+					print('  [%2d] %s' % (d, getattr(dyfi, prop)[0]))
+				else:
+					bins, counts = dyfi.bincount(prop)
+					if len(labels) < len(bins):
+						labels.append('No answer')
+					for idx, count in enumerate(counts):
+						if count:
+							answer = labels[idx]
+							print('  [%2d] %s' % (d, answer))
+
 	def to_mdp_collection(self):
 		"""
 		Convert to MDP collection
@@ -1795,7 +1830,8 @@ class DYFIEnsemble(object):
 			## ensuring that furniture gets priority over heavy_appliance!
 			heavy_appliance = np.ma.array(self.heavy_appliance,
 											mask=np.isnan(self.heavy_appliance))
-			return ((furniture > 0) | (heavy_appliance.filled(0) > 1)).astype('float')
+			with np.errstate(invalid='ignore'):
+				return ((furniture > 0) | (heavy_appliance.filled(0) > 1)).astype('float')
 		else:
 			return furniture
 
@@ -2107,7 +2143,7 @@ class DYFIEnsemble(object):
 			see :meth:`calc_cws`
 		"""
 		print("felt:")
-		print("  Values: %s" % self.felt)
+		print("  Values: %s" % np.ma.array(self.felt, mask=np.isnan(self.felt)))
 		felt_index = self.calc_felt_index(include_other_felt=False)
 		if aggregate:
 			if np.sum(felt_index.mask)/float(len(felt_index)) > max_nan_pct:
@@ -2117,7 +2153,7 @@ class DYFIEnsemble(object):
 		print("  Felt index (without other_felt) [x5]: %s" % (5 * felt_index))
 
 		print("other_felt:")
-		print("  Values: %s" % self.other_felt)
+		print("  Values: %s" % np.ma.array(self.other_felt, mask=np.isnan(self.other_felt)))
 		felt_index = self.calc_felt_index(include_other_felt=True)
 		if aggregate:
 			if np.sum(felt_index.mask)/float(len(felt_index)) > max_nan_pct:
@@ -2127,7 +2163,7 @@ class DYFIEnsemble(object):
 		print("  Felt index (incl. other_felt) [x5]: %s" % (5 * felt_index))
 
 		print("motion:")
-		print("  Values: %s" % self.motion)
+		print("  Values: %s" % np.ma.array(self.motion, mask=np.isnan(self.motion)))
 		motion_index = self.calc_motion_index()
 		if aggregate:
 			if np.sum(motion_index.mask)/float(len(motion_index)) > max_nan_pct:
@@ -2139,7 +2175,7 @@ class DYFIEnsemble(object):
 		print("  Motion index [x1]: %s" % motion_index)
 
 		print("reaction:")
-		print("  Values: %s" % self.reaction)
+		print("  Values: %s" % np.ma.array(self.reaction, mask=np.isnan(self.reaction)))
 		reaction_index = self.calc_reaction_index()
 		if aggregate:
 			if np.sum(reaction_index.mask)/float(len(reaction_index)) > max_nan_pct:
@@ -2151,7 +2187,7 @@ class DYFIEnsemble(object):
 		print("  Reaction index [x1]: %s" % reaction_index)
 
 		print("stand:")
-		print("  Values: %s" % self.stand)
+		print("  Values: %s" % np.ma.array(self.stand, mask=np.isnan(self.stand)))
 		stand_index = self.calc_stand_index()
 		if aggregate:
 			if np.sum(stand_index.mask)/float(len(stand_index)) > max_nan_pct:
@@ -2163,7 +2199,7 @@ class DYFIEnsemble(object):
 		print("  Stand index [x2]: %s" % (2 * stand_index))
 
 		print("shelf:")
-		print("  Values: %s" % self.shelf)
+		print("  Values: %s" % np.ma.array(self.shelf, mask=np.isnan(self.shelf)))
 		shelf_index = self.calc_shelf_index()
 		if aggregate:
 			if np.sum(np.isnan(self.shelf))/float(len(self.shelf)) > max_nan_pct:
@@ -2175,7 +2211,7 @@ class DYFIEnsemble(object):
 		print("  Shelf index [x5]: %s" % (5 * shelf_index))
 
 		print("picture:")
-		print("  Values: %s" % self.picture)
+		print("  Values: %s" % np.ma.array(self.picture, mask=np.isnan(self.picture)))
 		picture_index = self.calc_picture_index()
 		if aggregate:
 			if np.sum(picture_index.mask)/float(len(picture_index)) > max_nan_pct:
@@ -2187,7 +2223,7 @@ class DYFIEnsemble(object):
 		print("  Picture index [x2]: %s" % (2 * picture_index))
 
 		print("furniture:")
-		print("  Values: %s" % self.furniture)
+		print("  Values: %s" % np.ma.array(self.furniture, mask=np.isnan(self.furniture)))
 		furniture_index = self.calc_furniture_index()
 		if aggregate:
 			if np.sum(furniture_index.mask)/float(len(furniture_index)) > max_nan_pct:
@@ -2209,7 +2245,9 @@ class DYFIEnsemble(object):
 			(3 * furniture_index))
 
 		print("damage:")
-		print("  Values: %s" % self.get_prop_values('d_text'))
+		print("  Values:")
+		for d_text in self.get_prop_values('d_text'):
+			print("\t%s" % ' '.join(d_text))
 		damage_index = self.calc_damage_index()
 		if aggregate:
 			if np.sum(damage_index == 0)/float(len(damage_index)) > max_nan_pct:
@@ -2228,7 +2266,7 @@ class DYFIEnsemble(object):
 			include_heavy_appliance=include_heavy_appliance,
 			remove_outliers=remove_outliers, max_nan_pct=max_nan_pct))
 		if not aggregate:
-			print("  Aggregated: %s" % self.calc_cws(filter_floors=filter_floors,
+			print("  Aggregated: %.2f" % self.calc_cws(filter_floors=filter_floors,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
 								remove_outliers=remove_outliers, max_nan_pct=max_nan_pct))
