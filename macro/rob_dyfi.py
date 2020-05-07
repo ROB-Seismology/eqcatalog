@@ -347,7 +347,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		if hasattr(self, prop):
 			## Regular array
 			values = getattr(self, prop)
-			idxs = np.ones_like(values, dtype='bool')
+			idxs = np.zeros_like(values, dtype='bool')
 			for pv in prop_values:
 				idxs |= np.isclose(values, pv, equal_nan=True)
 			if negate:
