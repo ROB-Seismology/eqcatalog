@@ -1255,6 +1255,9 @@ class DYFIEnsemble(object):
 		:return:
 			(intensity, residual) tuple of floats
 		"""
+		## Allow 'usgs' as alias for 'dyfi'
+		agg_method = agg_method.replace('usgs', 'dyfi')
+
 		if agg_info == 'cii':
 			if 'dyfi' in agg_method:
 				Iagg = self.calc_cii(aggregate=True,
@@ -2118,10 +2121,11 @@ class DYFIEnsemble(object):
 		cii_or_cdi = func(aggregate=False, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance)
-		min_pct, max_pct = remove_outliers
-		pct0 = np.percentile(cii_or_cdi, min_pct)
-		pct1 = np.percentile(cii_or_cdi, max_pct)
-		cii_or_cdi = cii_or_cdi[(cii_or_cdi >= pct0) & (cii_or_cdi <= pct1)]
+		if remove_outliers:
+			min_pct, max_pct = remove_outliers
+			pct0 = np.percentile(cii_or_cdi, min_pct)
+			pct1 = np.percentile(cii_or_cdi, max_pct)
+			cii_or_cdi = cii_or_cdi[(cii_or_cdi >= pct0) & (cii_or_cdi <= pct1)]
 		if len(cii_or_cdi):
 			return cii_or_cdi.mean()
 		else:
