@@ -114,7 +114,7 @@ for eq in catalog:
 			if np.isnan(macro_data.latitudes).all():
 				macro_data.set_locations_from_communes()
 			## Note: NULL submit_time values are automatically replaced with event time
-			lastmod = macro_data.get_datetimes()
+			lastmod = macro_data.submit_times
 			maxlastmod = np.max(lastmod)
 		else:
 			# TODO
