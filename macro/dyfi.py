@@ -2346,7 +2346,7 @@ class DYFIEnsemble(object):
 		if color in ('usgs', 'rob'):
 			import mapping.layeredbasemap as lbm
 			colors = lbm.cm.get_cmap('macroseismic', color)
-		elif isinstance(color, (basestring, list)):
+		elif isinstance(color, (basestring, list, np.ndarray)):
 			colors = color
 		elif color is None:
 			colors = None
@@ -2357,14 +2357,16 @@ class DYFIEnsemble(object):
 							include_heavy_appliance=include_heavy_appliance)
 
 		xmin = kwargs.pop('xmin', 0)
-		xmax = kwargs.pop('xmax', 12)
 
 		if color == 'rob':
 			Imax = 7
+			xmax = kwargs.pop('xmax', Imax + 0.5)
 		elif color == 'usgs':
 			Imax = 9
+			xmax = kwargs.pop('xmax', Imax + 0.5)
 		else:
-			Imax = xmax
+			xmax = kwargs.pop('xmax', 12.5)
+			Imax = np.floor(xmax)
 		bins = np.arange(1, Imax + 1)
 
 		labels = kwargs.pop('label', [label])
