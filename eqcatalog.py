@@ -1489,75 +1489,29 @@ class EQCatalog(object):
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		from osgeo import ogr
+		from mapping.geotools.pt_in_polygon import filter_points_by_polygon
 
-		if isinstance(poly_obj, ogr.Geometry):
-			## Construct WGS84 projection system corresponding to earthquake coordinates
-			from mapping.geotools.coordtrans import WGS84
+		longitudes, latitudes = self.get_longitudes(), self.get_latitudes()
+		idxs_inside, idxs_outside = filter_points_by_polygon(longitudes, latitudes,
+															poly_obj)
+		zone_catalog = self.__getitem__(idxs_inside)
 
-			## Point object that will be used to test if earthquake is inside zone
-			point = ogr.Geometry(ogr.wkbPoint)
-			point.AssignSpatialReference(WGS84)
-
-			if poly_obj.GetGeometryName() in ("MULTIPOLYGON", "POLYGON", "LINESTRING"):
-				## Objects other than polygons or closed polylines will be skipped
-				if poly_obj.GetGeometryName() == "LINESTRING":
-					line_obj = poly_obj
-					if line_obj.IsRing() and line_obj.GetPointCount() > 3:
-						## Note: Could not find a way to convert linestrings to polygons
-						## The following only works for linearrings (what is the difference??)
-						#poly_obj = ogr.Geometry(ogr.wkbPolygon)
-						#poly_obj.AddGeometry(line_obj)
-						wkt = line_obj.ExportToWkt().replace("LINESTRING (", "POLYGON ((") + ")"
-						poly_obj = ogr.CreateGeometryFromWkt(wkt)
-					else:
-						return None
-				eq_list = []
-				for i, eq in enumerate(self.eq_list):
-					point.SetPoint(0, eq.lon, eq.lat)
-					if point.Within(poly_obj):
-						eq_list.append(eq)
-
-				## Determine bounding box (region)
-				envelope = poly_obj.GetEnvelope()
-				lons, lats = envelope[:2], envelope[2:]
-				"""
-				linear_ring = poly_obj.GetGeometryRef(0)
-				## Note: in some versions of ogr, GetPoints method does not exist
-				#points = linear_ring.GetPoints()
-				points = [linear_ring.GetPoint(i) for i in range(linear_ring.GetPointCount())]
-				lons, lats = zip(*points)[:2]
-				"""
-			else:
-				msg = 'Warning: %s not a polygon geometry!'
-				msg %= poly_obj.GetGeometryName()
-				print(msg)
-
+		## Determine bounding box (region)
+		try:
+			envelope = poly_obj.GetEnvelope()
+		except:
+			lons, lats = zone_catalog.get_longitudes(), zone_catalog.get_latitudes()
 		else:
-			import openquake.hazardlib as oqhazlib
-			if isinstance(poly_obj, oqhazlib.geo.Polygon):
-				mesh = oqhazlib.geo.Mesh(self.get_longitudes(), self.get_latitudes(),
-										depths=None)
-				intersects = poly_obj.intersects(mesh)
-				#idxs = np.argwhere(intersects == True)
-				#idxs = [idx[0] for idx in idxs]
-				idxs = np.where(intersects == True)[0]
-				zone_catalog = self.__getitem__(idxs)
-				lons = zone_catalog.get_longitudes()
-				lats = zone_catalog.get_latitudes()
-				eq_list = zone_catalog.eq_list
-			else:
-				raise Exception("poly_obj not recognized!")
+			lons, lats = envelope[:2], envelope[2:]
 
-		if len(eq_list):
-			region = (min(lons), max(lons), min(lats), max(lats))
+		if len(zone_catalog):
+			zone_catalog.region = (min(lons), max(lons), min(lats), max(lats))
 		else:
-			region = None
+			zone_catalog.region = None
 		if not catalog_name:
-			catalog_name = self.name + " (inside polygon)"
-		return EQCatalog(eq_list, self.start_date, self.end_date, region, catalog_name,
-						default_Mrelations=self.default_Mrelations,
-						default_completeness=self.default_completeness)
+			zone_catalog.name = self.name + " (inside polygon)"
+
+		return zone_catalog
 
 	def subselect_fault(self, oq_fault, max_dist, catalog_name=''):
 		"""
