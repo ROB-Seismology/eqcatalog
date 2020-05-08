@@ -1508,8 +1508,10 @@ class EQCatalog(object):
 			zone_catalog.region = (min(lons), max(lons), min(lats), max(lats))
 		else:
 			zone_catalog.region = None
+
 		if not catalog_name:
-			zone_catalog.name = self.name + " (inside polygon)"
+			catalog_name = self.name + " (inside polygon)"
+		zone_catalog.name = catalog_name
 
 		return zone_catalog
 
