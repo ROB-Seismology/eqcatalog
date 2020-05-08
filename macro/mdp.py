@@ -900,22 +900,24 @@ class MDPCollection():
 		if color in ('usgs', 'rob'):
 			import mapping.layeredbasemap as lbm
 			colors = lbm.cm.get_cmap('macroseismic', color)
-		elif isinstance(color, (basestring, list)):
+		elif isinstance(color, (basestring, list, np.ndarray)):
 			colors = color
 		else:
 			colors = [color]
 
 		xmin = kwargs.pop('xmin', 0)
-		xmax = kwargs.pop('xmax', 12)
 
 		intensities = self.get_intensities(Imin_or_max)
 		if color == 'rob':
 			Imax = 7
+			xmax = kwargs.pop('xmax', Imax + 0.5)
 		elif color == 'usgs':
 			Imax = 9
+			xmax = kwargs.pop('xmax', Imax + 0.5)
 		else:
-			Imax = xmax
-		bins = np.arange(1, Imax + 1)
+			xmax = kwargs.pop('xmax', 12.5)
+			Imax = np.floor(xmax)
+		bins = np.arange(1, Imax + 2)
 		xticks = kwargs.pop('xticks', bins)
 
 		labels = kwargs.pop('label', [label])
