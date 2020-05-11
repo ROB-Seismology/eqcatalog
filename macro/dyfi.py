@@ -1340,11 +1340,11 @@ class DYFIEnsemble(object):
 			methods
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		from mapping.geotools.geodetic import spherical_point_at
 		import mapping.layeredbasemap as lbm
-		from .macro_info import MacroseismicInfo, MacroInfoCollection
+		from .macro_info import AggregatedMacroInfo, AggregatedMacroInfoCollection
 
 		if agg_method[:3] in ('min', 'max'):
 			print("Warning: aggregation method %s not supported!" % agg_method)
@@ -1362,7 +1362,7 @@ class DYFIEnsemble(object):
 			aggregate_by = 'id_main'
 
 		if len(ensemble) == 0:
-			return MacroInfoCollection([], aggregate_by, 'internet')
+			return AggregatedMacroInfoCollection([], aggregate_by, 'internet')
 
 		macro_geoms, geom_key = None, ''
 
@@ -1491,7 +1491,7 @@ class DYFIEnsemble(object):
 			else:
 				lon, lat = 0, 0
 
-			macro_info = MacroseismicInfo(id_earth, id_com, I, aggregate_by,
+			macro_info = AggregatedMacroInfo(id_earth, id_com, I, aggregate_by,
 									'internet', num_replies, lon=lon, lat=lat,
 									residual=residual, db_ids=web_ids,
 									geom_key_val=geom_key_val)
@@ -1503,9 +1503,9 @@ class DYFIEnsemble(object):
 						include_heavy_appliance=include_heavy_appliance,
 						remove_outliers=remove_outliers)
 
-		macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, 'internet',
-										macro_geoms=macro_geoms, geom_key=geom_key,
-										proc_info=proc_info)
+		macro_info_coll = AggregatedMacroInfoCollection(macro_infos, aggregate_by,
+										'internet', macro_geoms=macro_geoms,
+										geom_key=geom_key, proc_info=proc_info)
 
 		return macro_info_coll
 
@@ -1523,7 +1523,7 @@ class DYFIEnsemble(object):
 			additional keyword arguments for :class:`ROBDYFIEnsemble`
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		aggregate_by = ''
 		return self.aggregate(aggregate_by, min_replies=min_replies,
@@ -1546,7 +1546,7 @@ class DYFIEnsemble(object):
 			additional keyword arguments for :class:`ROBDYFIEnsemble`
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		# Note: no **kwargs needed because ROBDYFIEnsemble has method with same name
 		aggregate_by = 'id_com'
@@ -1578,7 +1578,7 @@ class DYFIEnsemble(object):
 		See :meth:`aggregate` for other parameters
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		aggregate_by = 'distance'
 		return self.aggregate(aggregate_by, min_replies=min_replies,
@@ -1611,7 +1611,7 @@ class DYFIEnsemble(object):
 		See :meth:`aggregate` for other parameters
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		aggregate_by = 'polygon'
 		return self.aggregate(aggregate_by, min_replies=min_replies,
