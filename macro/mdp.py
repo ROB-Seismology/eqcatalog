@@ -12,7 +12,7 @@ if sys.version[0] == '3':
 
 import numpy as np
 
-from .macro_info import MacroseismicInfo, MacroInfoCollection
+from .macro_info import AggregatedMacroInfo, AggregatedMacroInfoCollection
 
 
 
@@ -361,7 +361,7 @@ class MDPCollection():
 			(default: 1)
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		from ..rob import get_communes
 
@@ -394,15 +394,15 @@ class MDPCollection():
 				else:
 					lon, lat = 0., 0.
 				db_ids = [mdp.id for mdp in mdpc]
-				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, agg_type,
 											data_type, num_replies, lon, lat,
 											db_ids=db_ids, geom_key_val=agg_key)
 				macro_info_list.append(macro_info)
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
 					min_or_max=Imin_or_max)
-		return MacroInfoCollection(macro_info_list, agg_type, data_type,
-									proc_info=proc_info)
+		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
+											proc_info=proc_info)
 
 	def aggregate_by_nothing(self, Imin_or_max, min_fiability=80):
 		"""
@@ -416,7 +416,7 @@ class MDPCollection():
 			(default: 80)
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
 		intensities = self.get_intensities(Imin_or_max)
@@ -430,15 +430,15 @@ class MDPCollection():
 			num_replies = 1
 			lon, lat = mdp.lon, mdp.lat
 			db_ids = [mdp.id]
-			macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
-										data_type, num_replies, lon, lat,
-										db_ids=db_ids)
+			macro_info = AggregatedMacroseismicInfo(id_earth, id_com, intensity,
+												agg_type, data_type, num_replies,
+												lon, lat, db_ids=db_ids)
 			macro_info_list.append(macro_info)
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
 					min_or_max=Imin_or_max)
-		return MacroInfoCollection(macro_info_list, agg_type, data_type,
-									proc_info=proc_info)
+		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
+											proc_info=proc_info)
 
 	def subselect_by_polygon(self, poly_obj):
 		"""
@@ -523,7 +523,7 @@ class MDPCollection():
 			(default: True)
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		import mapping.layeredbasemap as lbm
 
@@ -555,7 +555,7 @@ class MDPCollection():
 			lon, lat = centroid.lon, centroid.lat
 			db_ids = [mdp.id for mdp in mdpc]
 			if len(mdpc) >= min_num_mdp or include_unmatched_polygons:
-				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, agg_type,
 											data_type, num_replies, lon, lat,
 											db_ids=db_ids, geom_key_val=geom_key_val)
 				macro_info_list.append(macro_info)
@@ -565,7 +565,7 @@ class MDPCollection():
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
 					min_or_max=Imin_or_max)
-		return MacroInfoCollection(macro_info_list, 'polygon', data_type,
+		return AggregatedMacroInfoCollection(macro_info_list, 'polygon', data_type,
 									macro_geoms=macro_geoms, geom_key=value_key,
 									proc_info=proc_info)
 
@@ -689,7 +689,7 @@ class MDPCollection():
 			(default: True)
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		from mapping.geotools.geodetic import spherical_point_at
 		import mapping.layeredbasemap as lbm
@@ -714,7 +714,7 @@ class MDPCollection():
 				num_replies = len(mdpc)
 				lon, lat, _ = self._parse_pt(ref_pt)
 				db_ids = [mdp.id for mdp in mdpc]
-				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, agg_type,
 											data_type, num_replies, lon, lat,
 											db_ids=db_ids, geom_key_val=max_radius)
 				macro_info_list.append(macro_info)
@@ -743,7 +743,7 @@ class MDPCollection():
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
 					min_or_max=Imin_or_max)
-		return MacroInfoCollection(macro_info_list, agg_type, data_type,
+		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 									macro_geoms=macro_geoms, geom_key=geom_key,
 									proc_info=proc_info)
 
@@ -759,7 +759,7 @@ class MDPCollection():
 
 		:return:
 			dict, mapping (center_lon, center_lat) tuples to instances of
-			:class:`MacroseismicEnquiryEnsemble`
+			:class:`MDPCollection`
 		"""
 		import mapping.geotools.coordtrans as ct
 
@@ -812,7 +812,7 @@ class MDPCollection():
 			(default: 3)
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
 		mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
@@ -830,15 +830,15 @@ class MDPCollection():
 				num_replies = len(mdpc)
 				lon, lat = grid_key
 				db_ids = [mdp.id for mdp in mdpc]
-				macro_info = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
-											data_type, num_replies, lon, lat,
-											db_ids=db_ids)
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity,
+												agg_type, data_type, num_replies,
+												lon, lat, db_ids=db_ids)
 				macro_info_list.append(macro_info)
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
 					min_or_max=Imin_or_max)
-		return MacroInfoCollection(macro_info_list, agg_type, data_type,
-									proc_info=proc_info)
+		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
+											proc_info=proc_info)
 
 	def plot_intensity_vs_distance(self, ref_pt, Imin_or_max, marker='.',
 									**kwargs):
