@@ -147,9 +147,9 @@ def get_isoseismal_macro_info(id_earth, main_communes=False, min_or_max='mean',
 								as_points=True):
 	"""
 	Similar to :func:`get_commune_intensities_from_isoseismals`,
-	but return instance of :class:`MacroInfoCollection`
+	but return instance of :class:`AggregatedMacroInfoCollection`
 	"""
-	from .macro_info import MacroseismicInfo, MacroInfoCollection
+	from .macro_info import AggregatedMacroInfo, AggregatedMacroInfoCollection
 
 	id_com_intensity_dict = get_commune_intensities_from_isoseismals(id_earth,
 								main_communes=main_communes, min_or_max=min_or_max,
@@ -169,11 +169,11 @@ def get_isoseismal_macro_info(id_earth, main_communes=False, min_or_max='mean',
 			lon, lat = None, None
 		else:
 			lon, lat = lons[idx], lats[idx]
-		mi = MacroseismicInfo(id_earth, id_com, intensity, agg_type,
+		mi = AggregatedMacroInfo(id_earth, id_com, intensity, agg_type,
 							'isoseismal', lon, lat)
 		macro_infos.append(mi)
 
 	proc_info = dict(as_points=as_points)
-	macro_info_col = MacroInfoCollection(macro_infos, agg_type, 'isoseismal',
-										proc_info=proc_info)
+	macro_info_col = AggregatedMacroInfoCollection(macro_infos, agg_type,
+											'isoseismal', proc_info=proc_info)
 	return macro_info_col
