@@ -21,16 +21,16 @@ from collections import OrderedDict
 import numpy as np
 
 
-__all__ = ["MacroseismicInfo", "MacroInfoCollection",
+__all__ = ["AggregatedMacroInfo", "AggregatedMacroInfoCollection",
 			"aggregate_online_macro_info",
 			"aggregate_traditional_macro_info",
 			"aggregate_official_macro_info",
 			"aggregate_historical_macro_info"]
 
 
-class MacroseismicInfo():
+class AggregatedMacroInfo():
 	"""
-	Container class to hold information of (aggregated) records retrieved
+	Container class to hold information of aggregated records retrieved
 	from the historical, official or internet macroseismic enquiry database,
 	and used for plotting maps.
 
@@ -71,7 +71,7 @@ class MacroseismicInfo():
 		list of ints, IDs of database records represented in aggregate
 	:param geom_key_val:
 		int or str, value corresponding to geometry key in
-		MacroInfoCollection geometries
+		AggregatedMacroInfoCollection geometries
 		(default: None)
 	"""
 	def __init__(self, id_earth, id_com, intensity, agg_type, data_type, num_replies=1,
@@ -87,6 +87,11 @@ class MacroseismicInfo():
 		self.residual = residual
 		self.db_ids = db_ids
 		self.geom_key_val = geom_key_val
+
+	def __repr__(self):
+		txt = '<AggregatedMacroInfo | by %s | I=%.1f | %s>'
+		txt %= (self.agg_type, self.intensity, self.data_type)
+		return txt
 
 	@property
 	def I(self):
@@ -145,12 +150,12 @@ class MacroseismicInfo():
 		return query_historical_texts(self.id_earth, self.id_com)
 
 
-class MacroInfoCollection():
+class AggregatedMacroInfoCollection():
 	"""
 	Class representing a collection of aggregated macroseismic records
 
 	:param macro_infos:
-		list with instances of :class:`MacroseismicInfo`
+		list with instances of :class:`AggregatedMacroInfo`
 	:param agg_type:
 		str, aggregation type
 	:param data_type:
@@ -205,6 +210,11 @@ class MacroInfoCollection():
 	def __getitem__(self, item):
 		return self.macro_infos.__getitem__(item)
 
+	def __repr__(self):
+		txt = '<AggregatedMacroInfoCollection | by %s | n=%d | %s>'
+		txt %= (self.agg_type, len(self), self.data_type)
+		return txt
+
 	@property
 	def longitudes(self):
 		return np.array([rec.lon if rec.lon is not None else np.nan for rec in self])
@@ -243,7 +253,7 @@ class MacroInfoCollection():
 		Note: :prop:`macro_geoms` will not be copied!
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		from copy import deepcopy
 
@@ -255,7 +265,7 @@ class MacroInfoCollection():
 
 	def get_eq_catalog(self):
 		"""
-		Fetch catalog of earthquakes linked to this MacroInfoCollection
+		Fetch catalog of earthquakes linked to this AggregatedMacroInfoCollection
 
 		:return:
 			instance of :class:`EQCatalog`
@@ -287,7 +297,7 @@ class MacroInfoCollection():
 	def to_commune_info_dict(self):
 		"""
 		Convert to dictionary mapping commune IDs to instances of
-		:class:`MacroseismicInfo`
+		:class:`AggregatedMacroInfo`
 		"""
 		com_info_dict = {}
 		for rec in self:
@@ -308,7 +318,7 @@ class MacroInfoCollection():
 			int, commune ID
 
 		:return:
-			instance of :class:`MacroseismicInfo`
+			instance of :class:`AggregatedMacroInfo`
 		"""
 		commune_ids = self.get_commune_ids()
 		try:
@@ -324,11 +334,11 @@ class MacroInfoCollection():
 		as self.intensities - other_macro_info.intensities
 
 		:param other_macro_info:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 
 		:return:
-			None, 'residual' attribute of instances of :class:`MacroseismicInfo`
-			in collection are modified in place
+			None, 'residual' attribute of instances of
+			:class:`AggregatedMacroInfo` in collection are modified in place
 		"""
 		for i in range(len(self)):
 			self.macro_infos[i].residual = 0.
@@ -753,7 +763,7 @@ def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
 		bool, if True the query string will be echoed to standard output
 
 	:return:
-		instance of :class:`MacroInfoCollection`
+		instance of :class:`AggregatedMacroInfoCollection`
 	"""
 	from ..rob import query_local_eq_catalog_by_id
 
@@ -835,7 +845,7 @@ def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fi
 		(default: "mean")
 
 	:return:
-		instance of :class:`MacroInfoCollection`
+		instance of :class:`AggregatedMacroInfoCollection`
 	"""
 	from ..rob.seismodb import (query_traditional_macro_catalog,
 								query_seismodb_table_generic)
@@ -884,9 +894,9 @@ def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fi
 			print("Commune #%s has no location!" % id_com)
 			continue
 
-		macro_info = MacroseismicInfo(id_earth, id_com, I, aggregate_by,
-									data_type, num_replies=num_replies,
-									lon=lon, lat=lat, db_ids=db_ids)
+		macro_info = AggregatedMacroInfo(id_earth, id_com, I, aggregate_by,
+										data_type, num_replies=num_replies,
+										lon=lon, lat=lat, db_ids=db_ids)
 		macro_infos.append(macro_info)
 
 	#for i in range(len(macro_info_coll)-1, -1, -1):
@@ -899,8 +909,8 @@ def aggregate_traditional_macro_info(id_earth, id_com=None, data_type='', min_fi
 
 	proc_info = dict(agg_method=agg_method, min_fiability=min_fiability,
 					min_or_max=min_or_max)
-	macro_info_coll = MacroInfoCollection(macro_infos, aggregate_by, data_type,
-										proc_info=proc_info)
+	macro_info_coll = AggregatedMacroInfoCollection(macro_infos, aggregate_by,
+												data_type, proc_info=proc_info)
 
 	return macro_info_coll
 
