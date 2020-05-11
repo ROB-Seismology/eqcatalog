@@ -9,7 +9,7 @@ from builtins import int
 import numpy as np
 
 from ..rob import seismodb
-from .macro_info import MacroseismicInfo, MacroInfoCollection
+from .macro_info import AggregatedMacroInfo, AggregatedMacroInfoCollection
 
 
 __all__ = ["get_eq_intensities_for_commune_online",
@@ -400,7 +400,7 @@ def get_imax_by_commune(data_type='all',
 		(default: False)
 
 	:return:
-		instance of :class:`MacroInfoCollection`,
+		instance of :class:`AggregatedMacroInfoCollection`,
 		with the 'num_replies' property corresponding to the number
 		of earthquakes for which an intensity was reported
 		or the number of earthquakes that exceeded a particular intensity
@@ -446,12 +446,12 @@ def get_imax_by_commune(data_type='all',
 		else:
 			Imax = 0
 
-		## Construct MacroseismicInfo
+		## Construct AggregatedMacroInfo
 		if Imax > 0:
 			id_earth = sorted(eq_ids)
 			agg_type = 'id_main' if by_main_commune else 'id_com'
 			db_ids = []
-			macro_info = MacroseismicInfo(id_earth, id_com, Imax, agg_type,
+			macro_info = AggregatedMacroInfo(id_earth, id_com, Imax, agg_type,
 										data_type, num_replies, lon, lat, db_ids)
 			macro_infos.append(macro_info)
 
@@ -475,8 +475,8 @@ def get_imax_by_commune(data_type='all',
 				## but historical data are more important for this type of map
 				proc_info['agg_method'] = agg_func
 				proc_info['min_or_max'] = min_or_max
-			macro_info_coll = MacroInfoCollection(macro_infos, agg_type, data_type,
-												proc_info=proc_info)
+			macro_info_coll = AggregatedInfoCollection(macro_infos, agg_type,
+												data_type, proc_info=proc_info)
 
 	return macro_info_coll
 
