@@ -1054,7 +1054,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			see :meth:`to_simple_dyfi_ensemble`
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		if aggregate_by == 'commune':
 			aggregate_by = 'id_com'
@@ -1094,7 +1094,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		See :meth:`aggregate` for other parameters
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		aggregate_by = 'id_com'
 		return self.aggregate(aggregate_by, min_replies=min_replies,
