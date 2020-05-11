@@ -720,9 +720,9 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 		File object, where to print errors
 
 	:return:
-		instance of :class:`MacroInfoCollection`
+		instance of :class:`AggregatedMacroInfoCollection`
 	"""
-	from ..macro.macro_info import MacroseismicInfo, MacroInfoCollection
+	from ..macro.macro_info import AggregatedMacroInfo, AggregatedMacroInfoCollection
 
 	assert not (id_earth is None and
 				(id_com is None or isinstance(id_com, (list, np.ndarray))))
@@ -849,15 +849,15 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 			enq_type = 'traditional'
 		else:
 			enq_type = data_type
-		macro_info = MacroseismicInfo(id_earth, id_com, I, agg_type,
-									enq_type, num_replies=num_replies,
-									lon=lon, lat=lat, db_ids=db_ids)
+		macro_info = AggregatedMacroInfo(id_earth, id_com, I, agg_type,
+										enq_type, num_replies=num_replies,
+										lon=lon, lat=lat, db_ids=db_ids)
 		macro_infos.append(macro_info)
 
 	proc_info = dict(agg_method=agg_method, min_fiability=min_fiability,
 					min_or_max=min_or_max)
-	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, enq_type,
-										proc_info=proc_info)
+	macro_info_coll = AggregatedMacroInfoCollection(macro_infos, agg_type, enq_type,
+													proc_info=proc_info)
 
 	return macro_info_coll
 
@@ -920,9 +920,9 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 		File object, where to print errors
 
 	:return:
-		instance of :class:`MacroInfoCollection`
+		instance of :class:`AggregatedMacroInfoCollection`
 	"""
-	from ..macro.macro_info import MacroseismicInfo, MacroInfoCollection
+	from ..macro.macro_info import AggregatedMacroInfo, AggregatedMacroInfoCollection
 
 	## Construct SQL query
 	table_clause = ['web_analyse']
@@ -983,16 +983,16 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 		lon, lat = rec['lon'], rec['lat']
 		num_replies = rec['num_replies']
 		web_ids = list(map(int, rec['id_web'].split(',')))
-		macro_info = MacroseismicInfo(id_earth, id_com, I, agg_type,
-									'internet', num_replies=num_replies,
-									lon=lon, lat=lat, db_ids=web_ids)
+		macro_info = AggregatedMacroInfo(id_earth, id_com, I, agg_type,
+										'internet', num_replies=num_replies,
+										lon=lon, lat=lat, db_ids=web_ids)
 		macro_infos.append(macro_info)
 
 	proc_info = dict(min_replies=min_replies, min_fiability=min_fiability,
 					agg_method=agg_method, filter_floors=filter_floors)
 
-	macro_info_coll = MacroInfoCollection(macro_infos, agg_type, 'internet',
-										proc_info=proc_info)
+	macro_info_coll = AggregatedMacroInfoCollection(macro_infos, agg_type,
+												'internet', proc_info=proc_info)
 
 	return macro_info_coll
 
