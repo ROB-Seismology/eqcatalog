@@ -113,7 +113,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			bool, if True the query string will be echoed to standard output
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		kwargs = locals().copy()
 		kwargs.pop('self')
@@ -161,7 +161,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			Bool, if True the query string will be echoed to standard output
 
 		:return:
-			instance of :class:`MacroInfoCollection`
+			instance of :class:`AggregatedMacroInfoCollection`
 		"""
 		kwargs = locals().copy()
 		kwargs.pop('self')
