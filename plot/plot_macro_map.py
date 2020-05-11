@@ -34,8 +34,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	Plot macroseismic map for given earthquake
 
 	:param macro_info_coll:
-		instance of :class:`MacroInfoCollection`, representing
-		(aggregated) macroseismic information to plot
+		instance of :class:`AggregatedMacroInfoCollection`, representing
+		aggregated macroseismic information to plot
 	:param region:
 		(lonmin, lonmax, latmin, latmax) tuple or str
 		If "auto", region will be determined automatically from 95th
