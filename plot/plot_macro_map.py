@@ -23,7 +23,7 @@ __all__ = ["plot_macroseismic_map"]
 def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				projection="merc", graticule_interval=(1, 1), plot_info="intensity",
 				int_conversion="round", symbol_style=None, line_style="default",
-				thematic_num_replies=False, interpolate_grid={},
+				thematic_num_replies=False, thematic_classes=None, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				country_style="default", admin_level="province", admin_style="default",
 				city_style="default", colorbar_style="default", radii=[],
@@ -69,6 +69,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		number of replies (symbol size for points, transparency for
 		polygons if  color gradient` is discontinuous)
 		(default: False)
+	:param thematic_classes:
+		list or array, thematic classes to use if :param:`plot_info`
+		is not intensity
+		(default: None, will auto-determine)
 	:param interpolate_grid:
 		dict, containing interpolation parameters (resolution or cell size,
 		method, max_dist, and possibly method-dependent parameters)
@@ -211,41 +215,44 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		cmap = matplotlib.cm.get_cmap(cmap_name)
 
 	if plot_info == 'intensity':
-		classes = np.arange(1, min(cmap.N, 12) + 1, dtype='int')
+		thematic_classes = np.arange(1, min(cmap.N, 12) + 1, dtype='int')
 		data_type = macro_info_coll.data_type
 		cb_title = {'internet': "Community Internet Intensity",
 					'online': "Community Internet Intensity",
 					'traditional': "Macroseismic Intensity"}.get(data_type,
 													"Macroseismic Intensity")
 	elif plot_info == 'num_replies':
-		classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000], dtype='int')
+		if thematic_classes is None:
+			thematic_classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000],
+										dtype='int')
 		cb_title = "Number of replies"
 
 	elif plot_info == 'residual':
-		max_residual = np.abs(macro_info_coll.residuals).max()
-		if max_residual <= 1.25:
-			classes = np.arange(-1.25, 1.3, 0.25)
-		elif max_residual <= 2.5:
-			classes = np.arange(-2.5, 2.6, 0.5)
-		else:
-			classes = np.arange(-4, 5, 1)
+		if thematic_classes is None:
+			max_residual = np.abs(macro_info_coll.residuals).max()
+			if max_residual <= 1.25:
+				thematic_classes = np.arange(-1.375, 1.4, 0.25)
+			elif max_residual <= 2.5:
+				thematic_classes = np.arange(-2.75, 2.8, 0.5)
+			else:
+				thematic_classes = np.arange(-4.5, 5, 1)
 		cb_title = "Residual Intensity"
 		cmap = matplotlib.cm.get_cmap('bwr')
 
 	if color_gradient[:4] == "disc":
 		if plot_info == 'intensity':
-			tfc = lbm.ThematicStyleIndividual(classes, cmap, value_key=plot_info,
-										#labels=["%s" % val for val in classes],
+			tfc = lbm.ThematicStyleIndividual(thematic_classes, cmap, value_key=plot_info,
+										#labels=["%s" % val for val in thematic_classes],
 										style_under='w', style_over=cmap(1.),
 										style_bad='w')
 		elif plot_info in ('num_replies', 'residual'):
-			tfc = lbm.ThematicStyleRanges(classes, cmap, value_key=plot_info,
-										#labels=["%s" % val for val in classes],
+			tfc = lbm.ThematicStyleRanges(thematic_classes, cmap, value_key=plot_info,
+										#labels=["%s" % val for val in thematic_classes],
 										style_under='w', style_over=cmap(1.),
 										style_bad='w')
 	elif color_gradient[:4] == "cont":
-		tfc = lbm.ThematicStyleGradient(classes, cmap, value_key=plot_info,
-								#labels=["%s" % val for val in classes],
+		tfc = lbm.ThematicStyleGradient(thematic_classes, cmap, value_key=plot_info,
+								#labels=["%s" % val for val in thematic_classes],
 								style_under='w', style_over=cmap(1.),
 								style_bad='w')
 
@@ -275,7 +282,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 											prop=plot_info,
 											interpolation_method=interpol_method,
 											interpolation_params=interpol_params)
-		vmin, vmax = classes[0], classes[-1] + 1
+		vmin, vmax = thematic_classes[0], thematic_classes[-1] + 1
 		#if cmap_name.lower() in ("usgs", "rob"):
 		#	vmax = {'rob': 8, 'usgs': 10}[cmap_name]
 		#else:
