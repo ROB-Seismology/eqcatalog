@@ -206,7 +206,8 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			return self.__class__(self.id_earth, recs)
 
 	def to_simple_dyfi_ensemble(self, comm_key='id_com', fix_commune_ids=True,
-								override_commune_locations=False, fix_felt=True):
+								override_commune_locations=False, fix_felt=True,
+								remove_duplicates=False):
 		"""
 		Convert to simple DYFI ensemble
 
@@ -230,27 +231,35 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			is None or zero
 			See :meth:`fix_felt_is_none` and :meth:`fix_not_felt`
 			(default: True)
+		:param remove_duplicates:
+			bool, whether or not to automatically remove duplicate
+			records
+			(default: False)
 
 		:return:
 			instance of :class:`DYFIEnsemble`
 		"""
+		if remove_duplicates:
+			ensemble = self.remove_duplicate_records()
+		else:
+			ensemble = self
 		if fix_commune_ids:
-			self.fix_commune_ids(keep_existing=True, keep_unmatched=True)
+			ensemble.fix_commune_ids(keep_existing=True, keep_unmatched=True)
 		if comm_key == 'id_main':
-			self.set_main_commune_ids()
+			ensemble.set_main_commune_ids()
 		if comm_key in ('id_com', 'id_main', 'zip'):
-			self.set_locations_from_communes(comm_key=comm_key, max_quality=10,
+			ensemble.set_locations_from_communes(comm_key=comm_key, max_quality=10,
 											keep_unmatched=False)
 		if override_commune_locations:
 			#if (~self.is_geo_located()).all():
 			#	self.set_locations_from_communes(comm_key='id_com', max_quality=5,
 			#								keep_unmatched=True)
-			self.set_locations_from_geolocation(keep_unmatched=True)
+			ensemble.set_locations_from_geolocation(keep_unmatched=True)
 		if fix_felt:
-			self.fix_felt_is_none()
-			self.fix_not_felt()
+			ensemble.fix_felt_is_none()
+			ensemble.fix_not_felt()
 
-		dyfi = super(ROBDYFIEnsemble, self).copy()
+		dyfi = super(ROBDYFIEnsemble, ensemble).copy()
 
 		if comm_key == 'id_main':
 			dyfi.commune_ids = np.array(self.get_prop_values('id_main'))
@@ -1033,7 +1042,8 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					remove_outliers=(2.5, 97.5), max_nan_pct=100,
-					fix_commune_ids=True, fix_felt=True, **kwargs):
+					fix_commune_ids=True, fix_felt=True, remove_duplicates=False,
+					**kwargs):
 		"""
 		Get aggregated macroseismic information.
 
@@ -1051,6 +1061,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			see :meth:`DYFIEnsemble.aggregate`
 		:param fix_commune_ids:
 		:param fix_felt:
+		:param remove_duplicates:
 			see :meth:`to_simple_dyfi_ensemble`
 
 		:return:
@@ -1069,7 +1080,8 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			override_commune_locations = True
 
 		dyfi = self.to_simple_dyfi_ensemble(comm_key, fix_felt=True,
-											fix_commune_ids=fix_commune_ids)
+											fix_commune_ids=fix_commune_ids,
+											remove_duplicates=remove_duplicates)
 
 		return dyfi.aggregate(aggregate_by, min_replies=min_replies,
 					min_fiability=min_fiability, filter_floors=filter_floors,
@@ -1096,14 +1108,22 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
 		"""
-		aggregate_by = 'id_com'
-		return self.aggregate(aggregate_by, min_replies=min_replies,
-					min_fiability=min_fiability, filter_floors=filter_floors,
-					agg_info=agg_info, agg_method=agg_method,
-					include_other_felt=include_other_felt,
-					include_heavy_appliance=include_heavy_appliance,
-					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
-					fix_commune_ids=fix_commune_ids, fix_felt=fix_felt)
+		aggregate_by = comm_key
+		agg_macro_coll = self.aggregate(aggregate_by, min_replies=min_replies,
+						min_fiability=min_fiability, filter_floors=filter_floors,
+						agg_info=agg_info, agg_method=agg_method,
+						include_other_felt=include_other_felt,
+						include_heavy_appliance=include_heavy_appliance,
+						remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+						fix_commune_ids=fix_commune_ids, fix_felt=fix_felt)
+
+		## Override agg_type, as DYFIEnsemble only knows id_com
+		if comm_key in ('id_main', 'zip'):
+			agg_macro_coll.agg_type = 'id_main'
+			for agg_macro in agg_macro_coll:
+				agg_macro.agg_type = 'id_main'
+
+		return agg_macro_coll
 
 	def split_by_zip(self):
 		"""
