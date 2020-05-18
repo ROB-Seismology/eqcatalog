@@ -1042,7 +1042,7 @@ class EQCatalog(object):
 		:return:
 			Float, total seismic moment in N.m
 		"""
-		return np.sum(self.get_M0(Mrelation=Mrelation))
+		return np.nansum(self.get_M0(Mrelation=Mrelation))
 
 	def get_M0_rate(self, completeness=None, Mrelation={}, time_unit='Y'):
 		"""
