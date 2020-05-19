@@ -1118,7 +1118,7 @@ class DYFIEnsemble(object):
 
 		distances = self.calc_distances(lon, lat, depth=depth)
 		binned_distances = np.floor(distances / distance_interval) * distance_interval
-		binned_distances += distance_interval
+		binned_distances += distance_interval / 2.
 
 		agg_idx_dict = {}
 		for r in range(len(self)):
