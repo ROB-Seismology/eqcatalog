@@ -1076,6 +1076,31 @@ class EQCatalog(object):
 						 	/ subcatalog.timespan(time_unit))
 		return M0rate
 
+	def extrapolate_M0_total(self, end_date=None, completeness=None, Mrelation={}):
+		"""
+		Extrapolate total moment in the catalog up to given date
+		taking into account completeness
+
+		:param end_date:
+			datetime spec, datetime until which to compute seismic moment
+			(default: None, will use :prop:`end_date`)
+		:param completeness:
+		:param Mrelation:
+			see :meth:`get_M0_rate`
+
+		:return:
+			float, total seismic moment in N.m
+		"""
+		end_date = end_date or self.end_date
+		completeness = completeness or self.default_completeness
+		start_date = completeness.start_date
+		time_unit = 's'
+		timespan = timelib.timespan(start_date, end_date, unit=time_unit)
+		M0_rate = self.get_M0_rate(completeness, Mrelation, time_unit=time_unit)
+		M0_total = M0_rate * timespan
+
+		return M0_total
+
 	## Intensity methods
 
 	def get_max_intensities(self):
