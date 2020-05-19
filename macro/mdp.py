@@ -211,13 +211,20 @@ class MDPCollection():
 		:param Imin_or_max:
 			see :meth:`get_intensities`
 		:param agg_function:
-			str, aggregation function, one of 'min', 'max', 'mean', 'median'
+			str, aggregation function, one of 'min', 'max', 'mean',
+			'median', 'std' or 'PXX' (where XX is percentile level)
 
 		:return:
 			float, aggregated intensity
 		"""
+		from functools import partial
+
 		intensities = self.get_intensities(Imin_or_max)
-		agg_func = getattr(np, 'nan'+agg_function)
+		if agg_function[0].upper() == 'P':
+			perc_level = float(agg_function[1:])
+			agg_func = partial(np.nanpercentile, q=perc_level)
+		else:
+			agg_func = getattr(np, 'nan'+agg_function)
 
 		return agg_func(intensities)
 
@@ -612,7 +619,7 @@ class MDPCollection():
 
 		:param ref_pt:
 			(lon, lat, [depth]) tuple or instance having lon, lat, [depth]
-			properties
+			properties. Set depth of ref_pt to zero for epicentral distance
 		:param max_dist:
 			float, maximum distance (in km)
 		:param min_dist:
@@ -626,11 +633,7 @@ class MDPCollection():
 
 		is_in_range = (distances >= min_dist) & (distances < max_dist)
 
-		mdp_list = []
-		for idx in np.where(is_in_range)[0]:
-				mdp_list.append(mdp[idx])
-
-		return self.__class__(mdp_list)
+		return self.__getitem__(is_in_range)
 
 	def split_by_distance(self, ref_pt, distance_interval):
 		"""
@@ -641,17 +644,27 @@ class MDPCollection():
 			see :meth:`subselect_by_distance`
 		:param distance_interval:
 			float, distance interval (in km)
+			or 1D array, distance bin edges
 
 		:return:
 			dict, mapping maximum distance to instances of
 			:class:`MDPCollection`
 		"""
 		lon, lat, depth = self._parse_pt(ref_pt)
-		distances = self.calc_distances(lon, lat)
+		distances = self.calc_distances(lon, lat, depth)
 
-		distance_interval = float(distance_interval)
-		binned_distances = np.floor(distances / distance_interval) * distance_interval
-		binned_distances += distance_interval
+		if np.isscalar(distance_interval):
+			distance_interval = float(distance_interval)
+			binned_distances = np.floor(distances / distance_interval) * distance_interval
+			binned_distances += distance_interval / 2.
+		else:
+			distance_bin_edges = np.asarray(distance_interval)
+			bin_idxs = np.digitize(distances, distance_bin_edges)
+			bin_idxs -= 1
+			distance_bin_centers = (distance_bin_edges[:-1]
+									+ np.diff(distance_bin_edges)/2.)
+			binned_distances = [distance_bin_centers[i] for i in bin_idxs]
+			binned_distances = np.array(binned_distances)
 
 		mdpc_dict = {}
 		for m, mdp in enumerate(self):
@@ -840,8 +853,109 @@ class MDPCollection():
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 											proc_info=proc_info)
 
+	def estimate_intensity_attenuation(self, ref_pt, independent_var='distance',
+									Imin_or_max='mean', bin_interval='default',
+									bin_func='mean', bin_min_num_mdp=3,
+									polyfit_degree=3):
+		"""
+		Estimate intensity-distance relation based on binning
+		followed by polynomial fitting
+
+		:param ref_pt:
+			reference point for distance calculation.
+			(lon, lat, [depth]) tuple or instance having lon, lat, [depth]
+			properties. Set depth of ref_pt to zero for epicentral distance
+		:param independent_var:
+			str, name of independent variable, either 'distance'
+			or 'intensity'
+			(default: 'intensity')
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		:param bin_interval:
+			float, interval for binning independent variable before
+			polynomial fit
+			(default: 'default' = 10 km for distance, 0.5 for intensity)
+		:param bin_func':
+			str, aggregation function to apply to bins before fitting,
+			either 'mean' or 'median'
+			(default: 'mean')
+		:param bin_min_num_mdp:
+			int, minimum number of MDPs in a bin
+			(default: 3)
+		:param polyfit_degree:
+			int, degree of the fitting polynomial
+			see :func:`np.polyfit`
+			If zero, polynomial fitting will be skipped
+			(default: 3)
+
+		:return:
+			tuple of 4 arrays:
+			- independent variable
+			- mean or median of the dependent variable
+			- mean - sigma or 32nd percentile of the dependent variable
+			- mean + sigma or 68th percentile of the dependent variable
+		"""
+		# TODO: support bin_func = 'median'
+		# TODO (in plot): oqhazlib IPE relations
+		if independent_var == 'distance':
+			if bin_interval == 'default':
+				bin_interval = 5.
+			mdpc_dict = self.split_by_distance(ref_pt, bin_interval)
+			distances = np.sort(mdpc_dict.keys())
+			num_mdp = np.array([len(mdpc_dict[d]) for d in distances])
+			distances = distances[num_mdp >= bin_min_num_mdp]
+			Imean = [mdpc_dict[d].get_aggregated_intensity(Imin_or_max, 'mean')
+					for d in distances]
+			Isigma = [mdpc_dict[d].get_aggregated_intensity(Imin_or_max, 'std')
+					for d in distances]
+			if polyfit_degree:
+				Imean_fit = np.polyfit(distances, Imean, polyfit_degree)
+				Isigma_fit = np.polyfit(distances, Isigma, polyfit_degree)
+				Imean = np.poly1d(Imean_fit)(distances)
+				Isigma = np.poly1d(Isigma_fit)(distances)
+
+			return (distances, Imean, Imean - Isigma, Imean + Isigma)
+
+		elif independent_var == 'intensity':
+			if bin_interval == 'default':
+				bin_interval = 0.5
+			distances = self.calc_distances(ref_pt.lon, ref_pt.lat, ref_pt.depth)
+			intensities = self.get_intensities(Imin_or_max)
+			Imax = np.ceil(intensities.max()) + bin_interval
+			Imin = max(0, 1 - bin_interval / 2.)
+			intensity_bins = np.arange(Imin, Imax, bin_interval)
+			idxs = np.digitize(intensities, intensity_bins)
+			idxs -= 1
+			dmean, dsigma = [], []
+			for i in range(len(intensity_bins) - 1):
+				subidxs = (idxs == i)
+				if np.sum(subidxs) >= bin_min_num_mdp:
+					dmean.append(np.nanmean(distances[subidxs]))
+					dsigma.append(np.nanstd(distances[subidxs]))
+				else:
+					dmean.append(np.nan)
+					dsigma.append(np.nan)
+			intensities = intensity_bins[:-1] + np.diff(intensity_bins) / 2.
+			dmean, dsigma = np.array(dmean), np.array(dsigma)
+			nan_idxs = np.isnan(dmean)
+			if nan_idxs.any():
+				dmean[nan_idxs] = np.interp(intensities[nan_idxs],
+											intensities[~nan_idxs],
+											dmean[~nan_idxs])
+				dsigma[nan_idxs] = np.interp(intensities[nan_idxs],
+											intensities[~nan_idxs],
+											dsigma[~nan_idxs])
+
+			if polyfit_degree:
+				dmean_fit = np.polyfit(intensities, dmean, polyfit_degree)
+				dsigma_fit = np.polyfit(intensities, dsigma, polyfit_degree)
+				dmean = np.poly1d(dmean_fit)(intensities)
+				dsigma = np.poly1d(dsigma_fit)(intensities)
+
+			return (intensities, dmean, dmean - dsigma, dmean + dsigma)
+
 	def plot_intensity_vs_distance(self, ref_pt, Imin_or_max, marker='.',
-									**kwargs):
+									marker_size=8, azimuth_cmap=None, **kwargs):
 		"""
 		Plot intensity (Y axis) versus distance (X axis)
 
@@ -857,10 +971,22 @@ class MDPCollection():
 			matplotlib Axes instance
 		"""
 		from plotting.generic_mpl import plot_xy
+		from mapping.geotools.geodetic import spherical_azimuth
 
 		lon, lat, depth = self._parse_pt(ref_pt)
 		distances = self.calc_distances(lon, lat, depth)
 		intensities = self.get_intensities(Imin_or_max)
+		if azimuth_cmap:
+			from matplotlib.colors import Normalize
+			if isinstance(azimuth_cmap, basestring):
+				from matplotlib.cm import get_cmap
+				cmap = get_cmap(azimuth_cmap)
+			norm = Normalize(0, 360)
+			azimuths = spherical_azimuth(lon, lat,
+									self.get_longitudes(), self.get_latitudes())
+			marker_fill_colors = [cmap(norm(azimuths))]
+		else:
+			marker_fill_colors = []
 
 		xlabel = kwargs.pop('xlabel', 'Distance (km)')
 		ylabel = kwargs.pop('ylabel', 'Intensity (%s)' % self.mdp_list[0].imt)
@@ -869,8 +995,12 @@ class MDPCollection():
 		linestyles = ['']
 		linewidths = [0]
 		markers = [marker]
+		marker_sizes = [marker_size]
+
 		return plot_xy([(distances, intensities)], linestyles=linestyles,
 						linewidths=linewidths, markers=markers,
+						marker_sizes=marker_sizes,
+						marker_fill_colors=marker_fill_colors, fill_colors=[None],
 						xlabel=xlabel, ylabel=ylabel, xmin=xmin, ymin=ymin,
 						**kwargs)
 
