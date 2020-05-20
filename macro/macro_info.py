@@ -28,6 +28,8 @@ __all__ = ["AggregatedMacroInfo", "AggregatedMacroInfoCollection",
 			"aggregate_historical_macro_info"]
 
 
+# TODO: add imt property
+
 class AggregatedMacroInfo():
 	"""
 	Container class to hold information of aggregated records retrieved
@@ -148,6 +150,26 @@ class AggregatedMacroInfo():
 		from ..rob.seismodb import query_historical_texts
 
 		return query_historical_texts(self.id_earth, self.id_com)
+
+	def to_mdp(self):
+		"""
+		Convert to macroseismic data point
+
+		:return:
+			instance of :class:`eqcatalog.macro.MDP`
+		"""
+		from .mdp import MDP
+
+		if self.data_type in ('online', 'internet', 'dyfi'):
+			imt = 'CII'
+		else:
+			imt = 'EMS98'
+
+		mdp = MDP(self.db_ids, self.id_earth, self.I, self.I, imt,
+				self.lon, self.lat, self.data_type, self.id_com,
+				self.id_com, 100)
+
+		return mdp
 
 
 class AggregatedMacroInfoCollection():
@@ -493,6 +515,21 @@ class AggregatedMacroInfoCollection():
 		"""
 		multi_data = self.get_geometries(polygons_as_points=polygons_as_points)
 		return multi_data.to_geojson()
+
+	def to_mdp_collection(self):
+		"""
+		Convert to MDP collection
+
+		:return:
+			instance of :class:`eqcatalog.macro.MDPCollection`
+		"""
+		from .mdp import MDPCollection
+
+		mdp_list = []
+		for rec in self:
+			mdp_list.append(rec.to_mdp())
+
+		return MDPCollection(mdp_list)
 
 	def export_gis(self, format, filespec, encoding='latin-1',
 					polygons_as_points=False):
