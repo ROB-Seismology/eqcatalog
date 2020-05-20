@@ -885,7 +885,9 @@ class MDPCollection():
 		:param polyfit_degree:
 			int, degree of the fitting polynomial
 			see :func:`np.polyfit`
-			If zero, polynomial fitting will be skipped
+			A negative value is interpreted as the width (number of bins)
+			for a running average
+			If zero, polynomial fitting or smoothing will be skipped
 			(default: 3)
 
 		:return:
@@ -897,6 +899,9 @@ class MDPCollection():
 		"""
 		# TODO: support bin_func = 'median'
 		# TODO (in plot): oqhazlib IPE relations
+
+		from scipy.ndimage.filters import uniform_filter1d
+
 		if independent_var == 'distance':
 			if bin_interval == 'default':
 				bin_interval = 5.
@@ -908,11 +913,18 @@ class MDPCollection():
 					for d in distances]
 			Isigma = [mdpc_dict[d].get_aggregated_intensity(Imin_or_max, 'std')
 					for d in distances]
-			if polyfit_degree:
+			if polyfit_degree > 0:
 				Imean_fit = np.polyfit(distances, Imean, polyfit_degree)
 				Isigma_fit = np.polyfit(distances, Isigma, polyfit_degree)
 				Imean = np.poly1d(Imean_fit)(distances)
 				Isigma = np.poly1d(Isigma_fit)(distances)
+			elif polyfit_degree < 0:
+				## Running average
+				window_len = int(abs(polyfit_degree))
+				#Imean = np.convolve(np.ones(window_len)/window_len, Imean, "same")
+				#Isigma = np.convolve(np.ones(window_len)/window_len, Isigma, "same")
+				Imean = uniform_filter1d(Imean, size=window_len)
+				Isigma = uniform_filter1d(Isigma, size=window_len)
 
 			return (distances, Imean, Imean - Isigma, Imean + Isigma)
 
@@ -946,11 +958,16 @@ class MDPCollection():
 											intensities[~nan_idxs],
 											dsigma[~nan_idxs])
 
-			if polyfit_degree:
+			if polyfit_degree > 0:
 				dmean_fit = np.polyfit(intensities, dmean, polyfit_degree)
 				dsigma_fit = np.polyfit(intensities, dsigma, polyfit_degree)
 				dmean = np.poly1d(dmean_fit)(intensities)
 				dsigma = np.poly1d(dsigma_fit)(intensities)
+			elif polyfit_degree < 0:
+				## Running average
+				window_len = int(abs(polyfit_degree))
+				dmean = uniform_filter1d(dmean, size=window_len)
+				dsigma = uniform_filter1d(dsigma, size=window_len)
 
 			return (intensities, dmean, dmean - dsigma, dmean + dsigma)
 
@@ -1056,3 +1073,57 @@ class MDPCollection():
 		return plot_histogram([intensities], bins, colors=colors, labels=labels,
 							xmin=xmin, xmax=xmax, xlabel=xlabel, xticks=xticks,
 							**kwargs)
+
+	def plot_distance_histogram(self, ref_pt, bin_width=10, Imin_or_max='mean',
+								label='', **kwargs):
+		"""
+		Plot distance histogram
+
+		:param ref_pt:
+			Reference point for distance calculations
+			see :meth:`subselect_by_distance`
+		:param bin_width:
+			float, distance bin width (in km)
+			(default: 10)
+		:param Imin_or_max:
+			str, 'min', 'max' or 'mean'
+			If specified, separate histograms are drawn for different
+			intensity classes. Note that this will only work if
+			intensities are rounded
+			(default: 'mean')
+		:param label:
+			str, legend label
+			(default: '')
+		:**kwargs:
+			additional keyword arguments understood by
+			:func:`generic_mpl.plot_histogram`
+
+		:return:
+			matplotlib Axes instance
+
+		"""
+		from plotting.generic_mpl import plot_histogram
+
+		lon, lat, depth = self._parse_pt(ref_pt)
+		distances = self.calc_distances(lon, lat, depth)
+
+		if Imin_or_max:
+			datasets, labels = [], []
+			mdpc_dict = self.split_by_property('I' + Imin_or_max)
+			for I in sorted(mdpc_dict.keys()):
+				mdpc = mdpc_dict[I]
+				distances = mdpc.calc_distances(lon, lat, depth)
+				datasets.append(distances)
+				labels.append('I=%s' % I)
+		else:
+			datasets = [distances]
+			labels = kwargs.pop('label', [label])
+
+		bin_width = float(bin_width)
+		dmax = np.floor(distances.max() / bin_width) * bin_width + bin_width
+		distance_bins = np.arange(0, dmax, bin_width)
+
+		xlabel = kwargs.pop('xlabel', 'Distance (km)')
+
+		return plot_histogram(datasets, distance_bins, labels=labels,
+								xlabel=xlabel, **kwargs)
