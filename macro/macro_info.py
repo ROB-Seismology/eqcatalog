@@ -516,9 +516,14 @@ class AggregatedMacroInfoCollection():
 		multi_data = self.get_geometries(polygons_as_points=polygons_as_points)
 		return multi_data.to_geojson()
 
-	def to_mdp_collection(self):
+	def to_mdp_collection(self, skip_missing_pt_locations=True):
 		"""
 		Convert to MDP collection
+
+		:param skip_missing_pt_locations:
+			bool, whether or not records with missing point locations
+			should be skipped
+			(default: True)
 
 		:return:
 			instance of :class:`eqcatalog.macro.MDPCollection`
@@ -527,7 +532,8 @@ class AggregatedMacroInfoCollection():
 
 		mdp_list = []
 		for rec in self:
-			mdp_list.append(rec.to_mdp())
+			if rec.lon is not None or skip_missing_pt_locations is False:
+				mdp_list.append(rec.to_mdp())
 
 		return MDPCollection(mdp_list)
 
