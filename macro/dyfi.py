@@ -1452,7 +1452,7 @@ class DYFIEnsemble(object):
 
 		## Compute aggregated intensity and convert to aggregated macro info
 		macro_infos = []
-		for key in agg_ensemble_dict.keys():
+		for key in list(agg_ensemble_dict.keys()):
 			num_replies = agg_ensemble_dict[key].num_replies
 			if num_replies < min_replies:
 				agg_ensemble_dict.pop(key)
