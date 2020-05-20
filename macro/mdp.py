@@ -99,6 +99,20 @@ class MacroseismicDataPoint():
 
 		return eq
 
+	def round(self, half_unit=False):
+		"""
+		Round Imin / Imax intensity values
+
+		:param half_unit:
+			bool, whether or not to round to half units
+		"""
+		if half_unit:
+			self.Imin = np.round(self.Imin * 2) / 2.
+			self.Imax = np.round(self.Imax * 2) / 2.
+		else:
+			self.Imin = np.round(self.Imin)
+			self.Imax = np.round(self.Imax)
+
 
 MDP = MacroseismicDataPoint
 
@@ -203,6 +217,16 @@ class MDPCollection():
 		"""
 		intensities = self.get_intensities(Imin_or_max)
 		return (np.nanmin(intensities), np.nanmax(intensities))
+
+	def round_intensities(self, half_unit=False):
+		"""
+		Round Imin / Imax intensity values of individual MDPs
+
+		:param half_unit:
+			bool, whether or not to round to half units
+		"""
+		for mdp in self:
+			mdp.round(half_unit=half_unit)
 
 	def get_aggregated_intensity(self, Imin_or_max, agg_function):
 		"""
