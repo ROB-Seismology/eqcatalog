@@ -500,11 +500,12 @@ class ROBLocalEarthquake(LocalEarthquake):
 			dt = rec['datetime'] + datetime.timedelta(microseconds=rec['hund'] * 1E+4)
 			dt = UTCDateTime(dt)
 			component = rec['comp'] if rec['comp'] != 'V' else 'Z'
+			## Note: network may sometimes contain extra spaces...
 			pick = PhasePick(phase_name, dt, self.ID, rec['station_code'],
 							component, rec['movement'], rec['id_mesure_t'],
 							rec['include_in_loc'], rec['amplitude'],
 							rec['periode'], rec['magnitude'], rec['mag_type'],
-							rec['distance'], station_network=rec['network'])
+							rec['distance'], station_network=rec['network'].strip())
 			_station_code = rec['station_code']
 			if station_code:
 				## Trim record station code to length of given station code
