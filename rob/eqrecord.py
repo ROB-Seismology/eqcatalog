@@ -467,12 +467,15 @@ class ROBLocalEarthquake(LocalEarthquake):
 		except IndexError:
 			return None
 
-	def get_phase_picks(self, station_code=None, verbose=False):
+	def get_phase_picks(self, station_code=None, network=None, verbose=False):
 		"""
 		Get phase picks for this earthquake
 
 		:param station_code:
 			str, station code
+			(default: None)
+		:param network:
+			str, network code
 			(default: None)
 		:param verbose:
 			bool, if True the query string will be echoed to standard output
@@ -489,7 +492,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 		from robspy import UTCDateTime
 		from robspy.phase_pick import PhasePick
 
-		recs = query_phase_picks(self.ID, station_code=station_code, verbose=verbose)
+		recs = query_phase_picks(self.ID, station_code=station_code,
+								network=network, verbose=verbose)
 		picks = {}
 		for rec in recs:
 			phase_name = rec['name']
@@ -500,7 +504,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 							component, rec['movement'], rec['id_mesure_t'],
 							rec['include_in_loc'], rec['amplitude'],
 							rec['periode'], rec['magnitude'], rec['mag_type'],
-							rec['distance'])
+							rec['distance'], station_network=rec['network'])
 			_station_code = rec['station_code']
 			if station_code:
 				## Trim record station code to length of given station code
