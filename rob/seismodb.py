@@ -1401,7 +1401,7 @@ def get_station_catalog(station_code, ignore_code_sup=False, verbose=False):
 	return catalog
 
 
-def query_phase_picks(id_earth, station_code=None, verbose=False):
+def query_phase_picks(id_earth, station_code=None, network=None, verbose=False):
 	"""
 	Query phase picks from database
 
@@ -1409,6 +1409,9 @@ def query_phase_picks(id_earth, station_code=None, verbose=False):
 		int or str, earthquake ID
 	:param station_code:
 		str, 3- or 4-character station code
+		(default: None)
+	:param network:
+		str, network code
 		(default: None)
 	:param verbose:
 		bool, if True the query string will be echoed to standard output
@@ -1423,12 +1426,15 @@ def query_phase_picks(id_earth, station_code=None, verbose=False):
 	column_clause += ['mesure_t.id_mesure_t', 'id_earth', 'comp', 'movement',
 					'TIMESTAMP(date, time) AS datetime', 'hund',
 					'include_in_loc', 'periode', 'amplitude', 'distance',
-					'magnitude', 'mag_type', 'lookup_phase.name']
+					'magnitude', 'mag_type', 'lookup_phase.name', 'network']
 	if station_code:
 		station_code, code_sup = station_code[:3], station_code[3:]
 		where_clause += ' AND station_place.code = "%s"' % station_code
 		if code_sup:
 			where_clause += ' AND station.code_sup = "%s"' % code_sup
+	if network:
+		where_clause += ' AND network = "%s"' % network
+
 	join_clause = [('LEFT JOIN', 'mesure_a',
 					'mesure_t.id_mesure_t = mesure_a.id_mesure_t'),
 					('LEFT JOIN', 'lookup_phase',
