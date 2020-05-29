@@ -1682,17 +1682,20 @@ class DYFIEnsemble(object):
 		felt_is_none = np.isnan(self.felt)
 		## Slept through it --> not felt
 		idxs = felt_is_none & (self.asleep == 1)
+		num_fixed = np.sum(idxs)
 		self.set_prop_values('felt', 0, idxs=idxs, regenerate_arrays=False)
 		## Awoken --> felt
 		idxs = felt_is_none & (self.asleep == 2)
+		num_fixed += np.sum(idxs)
 		self.set_prop_values('felt', 1, idxs=idxs, regenerate_arrays=False)
 		## Awake and (difficult to stand or motion) --> felt
 		with np.errstate(invalid='ignore'):
 			idxs = (felt_is_none & (self.asleep == 0) & (self.motion > 0)
 					& (self.stand > 1))
+		num_fixed += np.sum(idxs)
 		self.set_prop_values('felt', 1, idxs=idxs, regenerate_arrays=True)
 		if verbose:
-			print('Fixed %d felt values' % np.sum(felt_is_none))
+			print('Fixed %d felt values' % num_fixed)
 
 	def fix_not_felt(self, verbose=True):
 		"""
@@ -1707,7 +1710,7 @@ class DYFIEnsemble(object):
 			None, 'motion', 'reaction' and 'stand' values of :prop:`recs`
 			are modified in place
 		"""
-		not_felt = self.felt == 0
+		not_felt = (self.felt == 0)
 		self.set_prop_values('motion', 0, idxs=not_felt, regenerate_arrays=False)
 		self.set_prop_values('reaction', 0, idxs=not_felt, regenerate_arrays=False)
 		self.set_prop_values('stand', 0, idxs=not_felt, regenerate_arrays=True)
