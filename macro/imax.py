@@ -143,7 +143,7 @@ def get_eq_intensities_for_commune_traditional(id_com, data_type='',
 					min_fiability=min_fiability)
 
 	eq_intensities = {}
-	mdpc_dict = mdp_collection.split_by_attribute('id_earth')
+	mdpc_dict = mdp_collection.split_by_property('id_earth')
 	for id_earth, mdpc in mdpc_dict.items():
 		I = mdpc.get_intensities(min_or_max)
 		## Discard nan values
