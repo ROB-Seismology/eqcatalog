@@ -86,7 +86,7 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 	if fix_records and len(dyfi):
 		dyfi = dyfi.fix_all()
 	if len(dyfi):
-		all_eq_ids = dyfi.get_prop_values('id_earth')
+		all_eq_ids = np.array(dyfi.get_prop_values('id_earth'))
 		unique_eq_ids = np.unique(all_eq_ids)
 		## Only keep enquiries for earthquakes since 2002 Alsdorf earthquake
 		unique_eq_ids = unique_eq_ids[unique_eq_ids >= 1306]
