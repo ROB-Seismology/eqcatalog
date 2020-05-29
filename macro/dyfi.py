@@ -1695,7 +1695,7 @@ class DYFIEnsemble(object):
 		num_fixed += np.sum(idxs)
 		self.set_prop_values('felt', 1, idxs=idxs, regenerate_arrays=True)
 		if verbose:
-			print('Fixed %d felt values' % num_fixed)
+			print('Fixed %d/%d felt values' % (num_fixed, np.sum(felt_is_none)))
 
 	def fix_not_felt(self, verbose=True):
 		"""
