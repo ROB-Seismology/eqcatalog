@@ -1069,10 +1069,10 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 				id_com_str = ','.join(['%s' % id for id in id_com])
 				where_clause += ' AND web_analyse.id_com IN (%s)' % id_com_str
 		elif zip_code:
-			if isinstance(zip_code, int):
-				where_clause += ' AND web_input.zip=%d' % zip_code
+			if isinstance(zip_code, (int, basestring)):
+				where_clause += ' AND web_input.zip="%s"' % zip_code
 			elif isinstance(zip_code, (list, np.ndarray)):
-				zip_code_str = ','.join(['%s' % zip for zip in zip_code])
+				zip_code_str = ','.join(['"%s"' % zip for zip in zip_code])
 				where_clause += ' AND web_input.zip IN (%s)' % zip_code_str
 
 	elif web_ids:
