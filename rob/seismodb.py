@@ -1048,7 +1048,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 					('LEFT JOIN', 'web_location', 'web_input.id_web=web_location.id_web'
 								' AND web_location.quality >= %d' % min_location_quality)]
 
-	if isinstance(id_earth, (int, basestring)):
+	if isinstance(id_earth, (int, basestring)) and not '-' in str(id_earth):
 		where_clause = 'web_analyse.m_fiability >= %.1f' % float(min_fiability)
 		where_clause += ' AND web_analyse.deleted = false'
 
@@ -1080,7 +1080,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 	else:
 		## Fetch unassigned enquiries
 		where_clause = 'web_analyse.id_earth = 0'
-		if isinstance(id_earth, (str, datetime.date, np.datetime64)):
+		if isinstance(id_earth, (basestring, datetime.date, np.datetime64)):
 			## Interpret id_earth as a date
 			from ..time import to_ymd_tuple
 			year, month, day = to_ymd_tuple(id_earth)
