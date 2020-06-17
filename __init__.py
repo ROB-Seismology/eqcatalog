@@ -56,11 +56,17 @@ else:
 	reload(completeness)
 from .completeness import *
 
-## calcGR, depends on time
+## calcGR (depends on time)
 if not reloading:
 	from . import calcGR
 else:
 	reload(calcGR)
+
+## calcGR_MLE (depends on completeness)
+if not reloading:
+	from . import calcGR_MLE
+else:
+	reload(calcGR_MLE)
 
 ## msc (no internal dependencies)
 if not reloading:
