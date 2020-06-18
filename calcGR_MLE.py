@@ -286,7 +286,7 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 			alpha = np.log(Nj / denom)
 
 		else:
-			exp_term = np.exp(-beta * Mi[idxs]
+			exp_term = np.exp(-beta * Mi[idxs])
 			denom = np.sum(2 * ti[idxs] * np.sinh(beta * dMi[idxs]) * exp_term)
 			alpha = np.log(beta * Nj / denom)
 		alpha_values.append(alpha)
