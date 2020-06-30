@@ -2492,8 +2492,8 @@ class EQCatalog(object):
 		min_date = self.start_year
 		return Completeness([min_date], [Mmin], Mtype=Mtype)
 
-	def get_completeness_timespans(self, magnitudes,
-								completeness=None, unit='Y'):
+	def get_completeness_timespans(self, magnitudes, completeness=None,
+									end_date=None, unit='Y'):
 		"""
 		Compute completeness timespans for list of magnitudes
 
@@ -2504,6 +2504,10 @@ class EQCatalog(object):
 			and corresponding minimum magnitudes. If None, use start year of
 			catalog
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for computing timespans
+			(default: None, will use :prop:`end_date`)
 		:param unit:
 			str, one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
 			(year|week|day|hour|minute|second|millisecond|microsecond)
@@ -2513,10 +2517,11 @@ class EQCatalog(object):
 			numpy float array, completeness timespans in fractions of :param:`unit`
 		"""
 		completeness = completeness or self.default_completeness
+		end_date = end_date or self.end_date
 		if not completeness:
 			min_mag = np.min(magnitudes)
 			completeness = self.get_uniform_completeness(min_mag, Mtype="MW")
-		return completeness.get_completeness_timespans(magnitudes, self.end_date, unit=unit)
+		return completeness.get_completeness_timespans(magnitudes, end_date, unit=unit)
 
 	def calc_return_period(self, Mmin, Mtype='MW', Mrelation={},
 							completeness=None, time_unit='Y'):
@@ -2562,7 +2567,7 @@ class EQCatalog(object):
 	def get_incremental_mag_freqs(self,
 		Mmin, Mmax, dM=0.2,
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		trim=False,
 		verbose=True):
 		"""
@@ -2585,6 +2590,10 @@ class EQCatalog(object):
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -2597,9 +2606,13 @@ class EQCatalog(object):
 			bins_N_incremental: incremental annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
-		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype,
+		end_date = end_date or self.end_date
+		subcatalog = self.subselect(end_date=end_date)
+
+		bins_N, bins_Mag = subcatalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype,
 				Mrelation=Mrelation, completeness=completeness, verbose=verbose)
-		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
+		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness,
+														end_date=end_date)
 
 		bins_N_incremental = bins_N / bins_timespans
 
@@ -2614,7 +2627,7 @@ class EQCatalog(object):
 	def get_incremental_mfd(self,
 		Mmin, Mmax, dM=0.2,
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		trim=False,
 		verbose=True):
 		"""
@@ -2637,6 +2650,10 @@ class EQCatalog(object):
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -2649,7 +2666,7 @@ class EQCatalog(object):
 		"""
 		from hazard.rshalib.mfd import EvenlyDiscretizedMFD
 		bins_N_incremental, bins_Mag = self.get_incremental_mag_freqs(Mmin, Mmax,
-					dM, Mtype, Mrelation, completeness, trim, verbose=verbose)
+					dM, Mtype, Mrelation, completeness, end_date, trim, verbose=verbose)
 		## Mmin may have changed depending on completeness
 		Mmin = bins_Mag[0]
 		return EvenlyDiscretizedMFD(Mmin + dM/2, dM, list(bins_N_incremental),
@@ -2658,7 +2675,7 @@ class EQCatalog(object):
 	def get_cumulative_mag_freqs(self,
 		Mmin, Mmax, dM=0.1,
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		trim=False,
 		verbose=True):
 		"""
@@ -2682,6 +2699,10 @@ class EQCatalog(object):
 			instance of :class:`Completeness` containing initial years of completeness
 			and corresponding minimum magnitudes
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
 		:param trim:
 			Bool, whether empty bins at start and end should be trimmed
 			(default: False)
@@ -2695,17 +2716,18 @@ class EQCatalog(object):
 			bins_Mag: left edges of magnitude bins
 		"""
 		bins_N_incremental, bins_Mag = self.get_incremental_mag_freqs(Mmin, Mmax,
-				dM, Mtype=Mtype, completeness=completeness, trim=trim, verbose=verbose)
+				dM, Mtype=Mtype, completeness=completeness, end_date=end_date,
+				trim=trim, verbose=verbose)
 		## Reverse arrays for calculating cumulative number of events
 		bins_N_incremental = bins_N_incremental[::-1]
 		bins_N_cumulative = np.cumsum(bins_N_incremental)
 		return bins_N_cumulative[::-1], bins_Mag
 
-	def calcGR_LSQ(self,
+	def calc_gr_lsq(self,
 		Mmin, Mmax, dM=0.1,
 		cumul=True,
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		b_val=None,
 		weighted=False,
 		verbose=False):
@@ -2734,6 +2756,9 @@ class EQCatalog(object):
 		:param completeness:
 			instance of :class:`Completeness`
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation
 			(default: None)
@@ -2754,9 +2779,10 @@ class EQCatalog(object):
 			- stdb: standard deviation on b value
 		"""
 		from hazard.rshalib.mfd.truncated_gr import get_a_separation
-		from .calcGR import calcGR_LSQ
+		from .calcGR import calc_gr_lsq
 
 		completeness = completeness or self.default_completeness
+		end_date = end_date or self.end_date
 
 		if weighted:
 			bins_N, _ = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation,
@@ -2774,16 +2800,16 @@ class EQCatalog(object):
 									Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
 									trim=False, verbose=verbose)
 
-		a, b, stda, stdb = calcGR_LSQ(magnitudes, rates, b_val=b_val, weights=weights,
+		a, b, stda, stdb = calc_gr_lsq(magnitudes, rates, b_val=b_val, weights=weights,
 									verbose=verbose)
 		if not cumul:
 			a += get_a_separation(b, dM)
 		return a, b, stda, stdb
 
-	def calcGR_Aki(self,
+	def calc_gr_aki(self,
 		Mmin=None, Mmax=None, dM=0.1,
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		b_val=None,
 		verbose=False):
 		"""
@@ -2807,6 +2833,10 @@ class EQCatalog(object):
 		:param completeness:
 			instance of :class:`Completeness`
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation (ignored)
 		:param verbose:
@@ -2814,20 +2844,22 @@ class EQCatalog(object):
 			(default: False)
 
 		:return:
-			Tuple (a, b, stdb)
+			Tuple (a, b, stda, stdb)
 			- a: a value
 			- b: b value
 			- stdb: standard deviation on b value
 		"""
 		completeness = completeness or self.default_completeness
+		end_date = end_date or self.end_date
 
 		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype,
-								Mrelation=Mrelation, completeness=completeness)
+								Mrelation=Mrelation, completeness=completeness,
+								end_date=end_date)
 
-	def calcGR_Weichert(self,
+	def calc_gr_weichert(self,
 		Mmin, Mmax, dM=0.1,
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		b_val=None,
 		verbose=True):
 		"""
@@ -2855,6 +2887,10 @@ class EQCatalog(object):
 		:param completeness:
 			instance of :class:`Completeness`
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation
 			(default: None)
@@ -2863,7 +2899,7 @@ class EQCatalog(object):
 			(default: False)
 
 		:return:
-			Tuple (a, b, stdb)
+			Tuple (a, b, stda, stdb)
 			- a: a value
 			- b: b value
 			- stda: standard deviation of a value
@@ -2874,115 +2910,100 @@ class EQCatalog(object):
 		are taken into account. It is therefore important to specify Mmax as
 		the evaluated Mmax for the specific region or source.
 		"""
-		from .calcGR import calcGR_Weichert
+		from .calcGR import calc_gr_weichert
 		## Note: don't use get_incremental_mag_freqs here, as completeness
 		## is taken into account in the Weichert algorithm !
 		completeness = completeness or self.default_completeness
+		end_date = end_date or self.end_date
 
-		bins_N, bins_Mag = self.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype, Mrelation=Mrelation,
-										completeness=completeness, verbose=verbose)
-		return calcGR_Weichert(bins_Mag, bins_N, completeness, self.end_date,
+		subcatalog = self.subselect(end_date=end_date)
+		bins_N, bins_Mag = subcatalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype,
+												Mrelation=Mrelation,
+												completeness=completeness,
+												verbose=verbose)
+
+		return calc_gr_weichert(bins_Mag, bins_N, completeness, end_date,
 								b_val=b_val, verbose=verbose)
-
-		"""
-		bins_timespans = self.get_completeness_timespans(bins_Mag, completeness)
-		bins_Mag += dM/2.0
-
-		if not b_val:
-			## Initial trial value
-			BETA = 1.5
-		else:
-			## Fixed beta
-			BETA = b_val * np.log(10)
-		BETL = 0
-		while(np.abs(BETA-BETL)) >= 0.0001:
-			#print(BETA)
-
-			SNM = 0.0
-			NKOUNT = 0.0
-			STMEX = 0.0
-			SUMTEX = 0.0
-			STM2X = 0.0
-			SUMEXP = 0.0
-
-			for k in range(len(bins_N)):
-				SNM += bins_N[k] * bins_Mag[k]
-				NKOUNT += bins_N[k]
-				TJEXP = bins_timespans[k] * np.exp(-BETA * bins_Mag[k])
-				TMEXP = TJEXP * bins_Mag[k]
-				SUMEXP += np.exp(-BETA * bins_Mag[k])
-				STMEX += TMEXP
-				SUMTEX += TJEXP
-				STM2X += bins_Mag[k] * TMEXP
-
-			#print(SNM, NKOUNT, STMEX, SUMTEX, STM2X, SUMEXP)
-
-			try:
-				DLDB = STMEX / SUMTEX
-			except:
-				break
-			else:
-				D2LDB2 = NKOUNT * (DLDB*DLDB - STM2X/SUMTEX)
-				DLDB = DLDB * NKOUNT - SNM
-				BETL = BETA
-				if not b_val:
-					BETA -= DLDB/D2LDB2
-
-		B = BETA / np.log(10)
-		if not b_val:
-			STDBETA = np.sqrt(-1.0/D2LDB2)
-			STDB = STDBETA / np.log(10)
-		else:
-			STDB = 0
-			STDBETA = 0
-		FNGTMO = NKOUNT * SUMEXP / SUMTEX
-		FN0 = FNGTMO * np.exp(BETA * (bins_Mag[0] - dM/2.0))
-		FLGN0 = np.log10(FN0)
-		A = FLGN0
-		STDFN0 = FN0 / np.sqrt(NKOUNT)
-		## Applying error propogation for base-10 logarithm
-		STDA = STDFN0 / (2.303 * FN0)
-		#print(STDA)
-		## Note: the following formula in Philippe Rosset's program is equivalent
-		#A = np.log10(FNGTMO) + B * (bins_Mag[0] - dM/2.0)
-		## This is also equivalent to:
-		#A = np.log10(FNGTMO * np.exp(-BETA * (0. - (bins_Mag[0] - (dM/2.0)))))
-
-		if verbose:
-			FN5 = FNGTMO * np.exp(-BETA * (5. - (bins_Mag[0] - dM/2.0)))
-			STDFN5 = FN5 / np.sqrt(NKOUNT)
-			print("Maximum-likelihood estimation (Weichert)")
-			print("BETA=%.3f +/- %.3f; B=%.3f +/- %.3f" % (BETA, STDBETA, B, STDB))
-			print("Total number of events: %d" % NKOUNT)
-			print("LOG(annual rate above M0): %.3f" % FLGN0)
-			print("Annual rate above M5: %.3f +/- %.3f" % (FN5, STDFN5))
-
-		## Other parameters computed in Philippe Rosset's version
-		#STDA = np.sqrt((bins_Mag[0]-dM/2.0)**2 * STDB**2 - (STDFNGTMO**2 / ((np.log(10)**2 * np.exp(2*(A+B*(bins_Mag[0]-dM/2.0))*np.log(10))))))
-		#STDA = np.sqrt(abs(A)/NKOUNT)
-		#ALPHA = FNGTMO * np.exp(-BETA * (bins_Mag[0] - dM/2.0))
-		#STDALPHA = ALPHA / np.sqrt(NKOUNT)
-		#if Mc !=None:
-		#	LAMBDA_Mc = FNGTMO * np.exp(-BETA * (Mc - (bins_Mag[0] - dM/2.0)))
-		#	STD_LAMBDA_Mc = np.sqrt(LAMBDA_Mc / NKOUNT)
-		#if verbose:
-		#	print("Maximum likelihood: a=%.3f ($\pm$ %.3f), b=%.3f ($\pm$ %.3f), beta=%.3f ($\pm$ %.3f)"
-		# 		% (A, STDA, B, STDB, BETA, STDBETA))
-		#if Mc != None:
-		#	return (A, B, BETA, LAMBDA_Mc, STDA, STDB, STDBETA, STD_LAMBDA_Mc)
-		#else:
-		#	return (A, B, BETA, STDA, STDB, STDBETA)
-
-		return A, B, STDB
-		"""
 
 	#TODO: averaged Weichert method (Felzer, 2007)
 
+	def calc_gr_mle(self,
+		Mmin, Mmax, dM=0.1,
+		Mtype="MW", Mrelation={},
+		completeness=None, end_date=None,
+		b_val=None,
+		verbose=True):
+		"""
+		Calculate a and b values of Gutenberg-Richter relation using
+		maximum-likelihood estimation, following the equations in
+		Stromeyer & Gruenthal (2015)
+
+		:param Mmin:
+			float, minimum magnitude to use for binning
+		:param Mmax:
+			float, maximum magnitude to use for binning
+		:param dM:
+			float, magnitude interval to use for binning
+			(default: 0.1)
+		:param Mtype:
+			string, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
+		:param Mrelation:
+			{str: str} dict, mapping name of magnitude conversion relation
+			to magnitude type ("MW", "MS" or "ML")
+			(default: {})
+		:param completeness:
+			instance of :class:`Completeness`
+			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
+		:param b_val:
+			float, fixed b value to constrain MLE estimation
+			(default: None)
+		:param verbose:
+			bool, whether some messages should be printed or not
+			(default: False)
+
+		:return:
+			tuple (a, b, stda, stdb)
+			- a: a value
+			- b: b value
+			- stda: standard deviation of a value
+			- stdb: standard deviation of b value
+		"""
+		from .calcGR_MLE import estimate_gr_params
+
+		completeness = completeness or self.default_completeness
+		end_date = end_date or self.end_date
+
+		subcatalog = self.subselect(end_date=end_date)
+		bins_N, bins_Mag = subcatalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype,
+												Mrelation=Mrelation,
+												completeness=completeness,
+												verbose=verbose)
+		if b_val:
+			prior_b = b_val
+			prior_weight = 1E+5
+		else:
+			prior_b = 1.
+			prior_weight = 0.
+
+		(a, b, cov) = estimate_gr_params(ni, Mi, dM, completeness, end_date,
+										precise=True, log10=True,
+										prior_b=prior_b, prior_weight=prior_weight)
+
+		## TODO: we should incorporate cov in MFD
+		stda, stdb = cov[0, 0], cov[1, 1]
+
+		return (a, b, stda, stdb)
+
 	def get_estimated_mfd(self,
 		Mmin, Mmax, dM=0.1,
-		method="Weichert",
+		method="MLE",
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		b_val=None,
 		verbose=True):
 		"""
@@ -2997,19 +3018,23 @@ class EQCatalog(object):
 			Float, magnitude interval to use for binning
 			(default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi",
-			"wLSQc" or "wLSQi"
-			(default: "Weichert")
+			String, computation method, either "MLE", "Weichert", "Aki",
+			"LSQc", "LSQi", "wLSQc" or "wLSQi"
+			(default: "MLE")
 		:param Mtype:
 			String, magnitude type: "ML", "MS" or "MW"
 			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
-			(default: {})
+			(default: {}, will use :prop:`default_Mrelations`)
 		:param completeness:
 			instance of :class:`Completeness`
-			(default: None)
+			(default: None, will use :prop:`default_completeness`)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
 		:param b_val:
 			Float, fixed b value to constrain MLE estimation
 			Currently only supported by Weichert method
@@ -3034,19 +3059,22 @@ class EQCatalog(object):
 			else:
 				kwargs['weighted'] = False
 			method = "LSQ"
-		calcGR_func = {"Weichert": self.calcGR_Weichert,
-						"Aki": self.calcGR_Aki,
-						"LSQ": self.calcGR_LSQ}[method]
+		calcGR_func = {"MLE": self.calc_gr_mle,
+						"Weichert": self.calc_gr_weichert,
+						"Aki": self.calc_gr_aki,
+						"LSQ": self.calc_gr_lsq}[method]
 		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype,
 								Mrelation=Mrelation, completeness=completeness,
-								b_val=b_val, verbose=verbose, **kwargs)
+								end_date=end_date, b_val=b_val, verbose=verbose,
+								**kwargs)
+
 		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
 
 	def plot_mfd(self,
 		Mmin, Mmax, dM=0.2,
-		method="Weichert",
+		method="MLE",
 		Mtype="MW", Mrelation={},
-		completeness=None,
+		completeness=None, end_date=None,
 		b_val=None,
 		num_sigma=0,
 		color_observed="b",
@@ -3066,8 +3094,8 @@ class EQCatalog(object):
 			Float, magnitude interval to use for binning
 			(default: 0.1)
 		:param method:
-			String, computation method, either "Weichert", "Aki", "LSQc", "LSQi",
-			"wLSQc" or "wLSQi"
+			String, computation method, either "MLE", "Weichert", "Aki",
+			"LSQc", "LSQi", "wLSQc" or "wLSQi"
 			If None, only observed MFD will be plotted.
 			(default: "Weichert")
 		:param Mtype:
@@ -3080,6 +3108,10 @@ class EQCatalog(object):
 		:param completeness:
 			instance of :class:`Completeness`
 			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
+			(default: None, will use :prop:`end_date`)
 		:param b_val:
 			Float, fixed b value to constrain Weichert estimation
 			(default: None)
@@ -3121,7 +3153,8 @@ class EQCatalog(object):
 		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation,
 												verbose=verbose)
 		observed_mfd = cc_catalog.get_incremental_mfd(Mmin, Mmax, dM=dM, Mtype=Mtype,
-								Mrelation=Mrelation, completeness=completeness)
+								Mrelation=Mrelation, completeness=completeness,
+								end_date=end_date)
 		mfd_list.append(observed_mfd)
 		label = {"en": "Observed", "nl": "Waargenomen"}[lang]
 		labels.append(label)
@@ -3131,7 +3164,7 @@ class EQCatalog(object):
 		if method:
 			estimated_mfd = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
 							Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
-							b_val=b_val, verbose=verbose)
+							end_date=end_date, b_val=b_val, verbose=verbose)
 			mfd_list.append(estimated_mfd)
 			a, b, stdb = estimated_mfd.a_val, estimated_mfd.b_val, estimated_mfd.b_sigma
 			label = {"en": "Computed", "nl": "Berekend"}[lang]
@@ -3145,7 +3178,7 @@ class EQCatalog(object):
 			if num_sigma:
 				sigma_mfd1 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
 								Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
-								b_val=b+num_sigma*stdb, verbose=verbose)
+								end_date=end_date, b_val=b+num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd1)
 				label = {"en": "Computed", "nl": "Berekend"}[lang]
 				label += " $\pm$ %d sigma" % num_sigma
@@ -3154,7 +3187,7 @@ class EQCatalog(object):
 				styles.append('--')
 				sigma_mfd2 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
 								Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
-								b_val=b-num_sigma*stdb, verbose=verbose)
+								end_date=end_date, b_val=b-num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd2)
 				labels.append("_nolegend_")
 				colors.append(color_estimated)
@@ -3362,7 +3395,7 @@ class EQCatalog(object):
 			if not b_val:
 				## Note: using lowest magnitude of completeness to compute Weichert
 				## is more robust than using min_mag
-				a_val, b_val, stda, stdb = self.calcGR_Weichert(Mmin=completeness.min_mag,
+				a_val, b_val, stda, stdb = self.calc_gr_weichert(Mmin=completeness.min_mag,
 						Mmax=mean_Mmax, dM=dM, Mtype=Mtype, Mrelation=Mrelation,
 						completeness=completeness, b_val=b_val, verbose=verbose)
 			mfd = cc_catalog.get_incremental_mfd(Mmin=completeness.min_mag,
@@ -5762,30 +5795,39 @@ class EQCatalog(object):
 		Mmax, Mmax_sigma = maximum_magnitude_analysis(years, Mags, Mag_uncertainties, method, iteration_tolerance, maximum_iterations, len(self), num_samples, num_bootstraps)
 		return Mmax, Mmax_sigma
 
-	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW", Mrelation={}, completeness=None):
+	def analyse_recurrence(self, dM=0.1, method="MLE", aM=0., dt=1., Mtype="MW",
+							Mrelation={}, completeness=None, end_date=None):
 		"""
 		Analyse magnitude-frequency.
 		This method is a wrapper for meth:`recurrence_analysis` in the
 		OQhazard modeller's toolkit.
 
 		:param dM:
-			Float, magnitude bin width (default: 0.1)
+			Float, magnitude bin width
+			(default: 0.1)
 		:param method:
-			String, either "MLE" or "Weichert" (default: "MLE")
+			String, either "MLE" or "Weichert"
+			(default: "MLE")
 		:param aM:
 			Float, reference magnitude for which a value should be computed
 			(default: 0.)
 		:param dt:
-			Float, time bin width in number of years. Only applies to "Weichert"
-			method (default: 1.)
+			Float, time bin width in number of years.
+			Only applies to "Weichert" method
+			(default: 1.)
 		:param Mtype:
-			String, magnitude type: "ML", "MS" or "MW" (default: "MW")
+			String, magnitude type: "ML", "MS" or "MW"
+			(default: "MW")
 		:param Mrelation:
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
 		:param completeness:
-			instance of :class:`Completeness` (default: None)
+			instance of :class:`Completeness`
+			(default: None)
+		:param end_date:
+			int or datetime.date or datetime.datetime, end date to
+			consider for seismicity rate calculation
 
 		:return:
 			Tuple (a, b, stdb)
@@ -5802,14 +5844,18 @@ class EQCatalog(object):
 		"""
 		from mtoolkit.scientific.recurrence import recurrence_analysis
 
-		subcatalog = self.subselect_completeness(completeness, Mtype=Mtype, Mrelation=Mrelation)
-		#years = subcatalog.get_years()
+		subcatalog = self.subselect_completeness(completeness, Mtype=Mtype,
+												Mrelation=Mrelation)
+		if end_date:
+			subcatalog = subcatalog.subselect(end_date=end_date)
+
 		years = subcatalog.get_fractional_years()
 		Mags = subcatalog.get_magnitudes(Mtype, Mrelation)
 		completeness_table = completeness.to_hmtk_table(Mmax=None)
 		if method == "Weichert" and aM == 0.:
 			aM = dM / 2.
-		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table, dM, method, aM, dt)
+		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table,
+												dM, method, aM, dt)
 		return np.log10(a), b, stda, stdb
 
 	def get_hmtk_catalogue(self, Mtype='MW', Mrelation={}):
