@@ -66,6 +66,10 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 		- a/alpha: float, a or alpha value
 		- b/beta: float, b or beta value
 		- cov: 2-D matrix [2,2], covariance matrix
+
+	Note: alpha != a * ln(10)
+	but exp(alpha) / beta = exp(a * ln(10))
+	or a = ln(exp(alpha) / beta) / ln(10)
 	"""
 	I = len(ni)
 
@@ -166,15 +170,23 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 						[cov_alpha_beta, cov_beta]])
 
 	if log10:
-		## From calcGR_Weichert
-		SUMEXP = np.sum(np.exp(-beta * Mi))
-		SUMTEX = np.sum(ti * np.exp(-beta * Mi))
-		FNGTMO = N * SUMEXP / SUMTEX
-		a = np.log10(FNGTMO * np.exp(beta * (Mi[0]-dMi[0])))
 		#a = alpha / np.log(10)
+
+		## From calcGR_Weichert
+		#SUMEXP = np.sum(np.exp(-beta * Mi))
+		#SUMTEX = np.sum(ti * np.exp(-beta * Mi))
+		#FNGTMO = N * SUMEXP / SUMTEX
+		#a = np.log10(FNGTMO * np.exp(beta * (Mi[0]-dMi[0])))
+		a = np.log(np.exp(alpha) / beta) / np.log(10)
 		b = beta / np.log(10)
 		## Note: covariance is probably not correct for log10=True !
-		## (because relation between a and alpha is more complex)
+		## (because relation between a and alpha is more complex),
+		## but I have verified that it is approximately correct
+		## Error propagation for alpha corresponding to a * ln(10)
+		## is almost indistinguishable from sigma_alpha
+		#sigma_alpha, sigma_beta = cov[0, 0], cov[1, 1]
+		#sigma_alpha2 = np.sqrt((sigma_beta / beta)**2 + sigma_alpha**2)
+		#cov[0, 0] = sigma_alpha2
 		cov /= np.log(10)
 		return (a, b, cov)
 
@@ -345,6 +357,7 @@ def calc_gr_sigma(Mi, cov):
 	return sigma_m
 
 
+## Note: the following function could be integrated in rshalib.mfd.TruncatedGRMFD,
 def construct_mfd_at_epsilon(alpha, beta, cov, epsilon, Mmin, Mmax, dM,
 							precise=True, log10=False):
 	"""
@@ -396,11 +409,11 @@ def construct_mfd_at_epsilon(alpha, beta, cov, epsilon, Mmin, Mmax, dM,
 		sigma_m = calc_gr_sigma(Mi, cov)
 		if log10:
 			a_val, b_val = alpha, beta
-			Ndisc = (10**(a_val - b_val * (Mi - dM/2.))
-					-10**(a_val - b_val * (Mi + dM/2.)))
+			Ndisc = (10**(a_val - b_val * (Mi - dM/2.) + sigma_m * epsilon)
+					-10**(a_val - b_val * (Mi + dM/2.) + sigma_m * epsilon))
 		else:
 			Ndisc = 2 * np.exp(alpha - beta * Mi + sigma_m * epsilon)
-			if precise:
+			if not precise:
 				Ndisc *= (dM / 2.)
 			else:
 				## Note: probably need to add uncertainty on beta
@@ -430,7 +443,7 @@ def discretize_normal_distribution(k):
 		- values: 1D array, values of the normalized variable z
 		- weights: 1D array, corresponding weights
 	"""
-	from hazard.rshalib.pmf import MmaxPMF, MFDPMF, NumericPMF
+	from hazard.rshalib.pmf import NumericPMF
 
 	if k == 1:
 		epsilons = np.array([0.])
@@ -501,7 +514,7 @@ def construct_mfd_pmf(alpha, beta, cov, Mmin, Mmax_pmf, dM,
 		  :class:`rshalib.mfd.EvenlyDiscretizedMFD`
 		- weights: 1D array
 	"""
-	from hazard.rshalib.pmf import MmaxPMF, MFDPMF, NumericPMF
+	from hazard.rshalib.pmf import MmaxPMF, MFDPMF
 
 	if np.isscalar(Mmax_pmf):
 		Mmax_pmf = MmaxPMF([Mmax_pmf], [1])
