@@ -358,15 +358,15 @@ def calc_gr_sigma(Mi, cov):
 
 
 ## Note: the following function could be integrated in rshalib.mfd.TruncatedGRMFD,
-def construct_mfd_at_epsilon(alpha, beta, cov, epsilon, Mmin, Mmax, dM,
+def construct_mfd_at_epsilon(a_or_alpha, b_or_beta, cov, epsilon, Mmin, Mmax, dM,
 							precise=True, log10=False):
 	"""
 	Construct magnitude-frequency distribution (MFD) corresponding to a
 	particular epsilon value
 
-	:param alpha:
+	:param a_or_alpha:
 		float, alpha or a value
-	:param beta:
+	:param b_or_beta:
 		float, beta or b value
 	:param cov:
 		2D matrix, covariance matrix
@@ -385,10 +385,10 @@ def construct_mfd_at_epsilon(alpha, beta, cov, epsilon, Mmin, Mmax, dM,
 		Only applies if :param:`log10` is false
 		(default: False)
 	:param log10:
-		bool, whether :param:`alpha` and :param:`beta` of the
-		Gutenberg-Richter relation correspond to log10 notation
-		(i.e., a and b values) or to the natural logarithm notation
-		(i.e., alpha and beta values)
+		bool, whether :param:`a_or_alpha` and :param:`b_or_beta` of the
+		Gutenberg-Richter relation (and :param:`cov`) correspond to
+		log10 notation (i.e., a and b values) or to the natural logarithm
+		notation (i.e., alpha and beta values)
 		(default: False)
 
 	:return:
@@ -401,17 +401,18 @@ def construct_mfd_at_epsilon(alpha, beta, cov, epsilon, Mmin, Mmax, dM,
 	if epsilon == 0 and log10 is True:
 		#Mmin = Mi[0] - dM/2.
 		#Mmax = Mi[-1] + dM/2.
-		a_val, b_val = alpha, beta
+		a_val, b_val = a_or_alpha, b_or_beta
 		mfd = TruncatedGRMFD(Mmin, Mmax, dM, a_val, b_val)
 	else:
 		num_bins = np.round((Mmax - Mmin) / dM)
 		Mi = Mmin + np.arange(num_bins) * dM + dM/2.
 		sigma_m = calc_gr_sigma(Mi, cov)
 		if log10:
-			a_val, b_val = alpha, beta
+			a_val, b_val = a_or_alpha, b_or_beta
 			Ndisc = (10**(a_val - b_val * (Mi - dM/2.) + sigma_m * epsilon)
 					-10**(a_val - b_val * (Mi + dM/2.) + sigma_m * epsilon))
 		else:
+			alpha, beta = a_or_alpha, b_or_beta
 			Ndisc = 2 * np.exp(alpha - beta * Mi + sigma_m * epsilon)
 			if not precise:
 				Ndisc *= (dM / 2.)
@@ -474,8 +475,8 @@ def discretize_normal_distribution(k):
 	return (epsilons, weights)
 
 
-def construct_mfd_pmf(alpha, beta, cov, Mmin, Mmax_pmf, dM,
-					num_discretizations, precise=True):
+def construct_mfd_pmf(a_or_alpha, b_or_beta, cov, Mmin, Mmax_pmf, dM,
+					num_discretizations, precise=True, log10=False):
 	"""
 	Construct a probability mass function of MFDs optimally sampling
 	the uncertainty on the activity rates represented by the
@@ -486,10 +487,10 @@ def construct_mfd_pmf(alpha, beta, cov, Mmin, Mmax_pmf, dM,
 	(empty bins beyond bin with largest observed magnitude),
 	but this dependency is only slight and could be ignored.
 
-	:param alpha:
-		float, alpha value of the GR relation
-	:param beta:
-		float, beta value of the GR relation
+	:param a_or_alpha:
+		float, alpha or a value of the GR relation
+	:param b_or_beta:
+		float, beta or b value of the GR relation
 	:param cov:
 		2D matrix [2,2], covariance matrix
 	:param Mmin:
@@ -506,6 +507,12 @@ def construct_mfd_pmf(alpha, beta, cov, Mmin, Mmax_pmf, dM,
 	:param precise:
 		bool, whether to use precise formulation (True) or approximation
 		of the MFD frequencies (False).
+		(default: False)
+	:param log10:
+		bool, whether :param:`a_or_alpha` and :param:`b_or_beta` of the
+		Gutenberg-Richter relation (and :param:`cov`) correspond to
+		log10 notation (i.e., a and b values) or to the natural logarithm
+		notation (i.e., alpha and beta values)
 		(default: False)
 
 	:return:
@@ -525,9 +532,9 @@ def construct_mfd_pmf(alpha, beta, cov, Mmin, Mmax_pmf, dM,
 	for Mmax, mmax_weight in Mmax_pmf:
 		for epsilon, eps_weight in zip(epsilons, eps_weights):
 			weight = float(mmax_weight) * eps_weight
-			mfd = construct_mfd_at_epsilon(alpha, beta, cov, epsilon,
+			mfd = construct_mfd_at_epsilon(a_or_alpha, b_or_beta, cov, epsilon,
 											Mmin, Mmax, dM,
-											precise=precise, log10=False)
+											precise=precise, log10=log10)
 			mfd_list.append(mfd)
 			weights.append(weight)
 
