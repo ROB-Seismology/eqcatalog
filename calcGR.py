@@ -10,7 +10,7 @@ from scipy import stats
 
 
 
-def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verbose=False):
+def calc_gr_weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verbose=False):
 	"""
 	Calculate a and b values of Gutenberg-Richter relation using maximum likelihood
 	estimation for variable observation periods for different magnitude increments.
@@ -44,11 +44,11 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 	are taken into account. It is therefore important to specify Mmax as
 	the evaluated Mmax for the specific region or source.
 	"""
-	obs_periods = completeness.get_completeness_timespans(magnitudes, end_date)
-
 	dM = magnitudes[1] - magnitudes[0]
 	## Avoid side effects in calling function
-	magnitudes = magnitudes.copy() + dM
+	magnitudes = magnitudes.copy() + dM / 2.0
+
+	obs_periods = completeness.get_completeness_timespans(magnitudes, end_date)
 
 	if not b_val:
 		## Initial trial value
@@ -127,7 +127,7 @@ def calcGR_Weichert(magnitudes, bins_N, completeness, end_date, b_val=None, verb
 	return A, B, STDA, STDB
 
 
-def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=False):
+def calc_gr_lsq(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=False):
 	"""
 	Calculate a and b values of Gutenberg-Richter relation using a linear regression
 	(least-squares).
@@ -146,11 +146,12 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=F
 		Bool, whether some messages should be printed or not (default: False)
 
 	:return:
-		Tuple (a, b, a_sigma, b_sigma)
+		Tuple (a, b, a_sigma, b_sigma, cov_ab)
 		- a: a value (intercept)
 		- b: b value (slope, taken positive)
 		- a_sigma: standard deviation of a value
 		- b_sigma: standard deviation of b value
+		- cov_ab: covariance of a and b
 	"""
 	## Do not consider magnitudes with zero occurrence rates
 	idxs = np.where(occurrence_rates > 0)
@@ -161,7 +162,7 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=F
 	magnitudes = magnitudes[idxs]
 
 	if len(magnitudes) == 0:
-		return (np.nan, np.nan, 0, 0)
+		return (np.nan, np.nan, 0, 0, 0)
 
 	if not b_val:
 		if not weights is None:
@@ -187,15 +188,27 @@ def calcGR_LSQ(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=F
 		b_sigma = see * np.sqrt(1./sx2)
 		## Formula for a_sigma from http://www.chem.mtu.edu/~fmorriso/cm3215/UncertaintySlopeInterceptOfLeastSquaresFit.pdf
 		#a_sigma = np.sqrt((see**2 * np.sum(magnitudes**2)) / (n * sx2))
+
+		## Compute ab_sigma from:
+		## (cov_ab = var_aa + var_bb - var_predicted(m=1)) / 2
+		## and var_predicted as:
+		## (see Eq. 25 in https://pages.mtu.edu/~fmorriso/cm3215/UncertaintySlopeInterceptOfLeastSquaresFit)
+		## var_predicted(m) = var_yx * (1 + 1/n + (m - mean_m)**2 / SSxx)
+		m = 1
+		SSxx = sx2
+		var_yx = see**2
+		var_predicted = var_yx * (1 + 1./n + ((m - mx)**2) / SSxx)
+		cov_ab = (a_sigma**2 + b_sigma**2 - var_predicted) / 2.
+
 	else:
 		## Regression line always goes through mean x and y
 		mean_mag = np.mean(magnitudes)
 		mean_log_rate = np.mean(log_occurrence_rates)
 		a_val = mean_log_rate + b_val * mean_mag
-		a_sigma, b_sigma = 0, 0
+		a_sigma, b_sigma, cov_ab = 0, 0, 0
 		r = np.nan
 
 	if verbose:
 		print("Linear regression: a=%.3f, b=%.3f (r**2=%.2f)" % (a_val, b_val, r**2))
 
-	return (a_val, b_val, a_sigma, b_sigma)
+	return (a_val, b_val, a_sigma, b_sigma, cov_ab)
