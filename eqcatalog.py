@@ -2606,6 +2606,7 @@ class EQCatalog(object):
 			bins_N_incremental: incremental annual occurrence rates
 			bins_Mag: left edges of magnitude bins
 		"""
+		completeness = completeness or self.default_completeness
 		end_date = end_date or self.end_date
 		subcatalog = self.subselect(end_date=end_date)
 
@@ -2775,8 +2776,7 @@ class EQCatalog(object):
 			Tuple (a, b, stda, stdb)
 			- a: a value (intercept)
 			- b: b value (slope, taken positive)
-			- stda: standard deviation on a value
-			- stdb: standard deviation on b value
+			- cov: covariance matrix [2,2]
 		"""
 		from hazard.rshalib.mfd.truncated_gr import get_a_separation
 		from .calcGR import calc_gr_lsq
@@ -2800,11 +2800,15 @@ class EQCatalog(object):
 									Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
 									trim=False, verbose=verbose)
 
-		a, b, stda, stdb = calc_gr_lsq(magnitudes, rates, b_val=b_val, weights=weights,
-									verbose=verbose)
+		a, b, stda, stdb, cov_ab = calc_gr_lsq(magnitudes, rates, b_val=b_val,
+											weights=weights, verbose=verbose)
 		if not cumul:
+			## stda does not change
 			a += get_a_separation(b, dM)
-		return a, b, stda, stdb
+
+		cov = np.mat([[stda**2, cov_ab], [cov_ab, stdb**2]])
+
+		return (a, b, cov)
 
 	def calc_gr_aki(self,
 		Mmin=None, Mmax=None, dM=0.1,
@@ -2847,14 +2851,17 @@ class EQCatalog(object):
 			Tuple (a, b, stda, stdb)
 			- a: a value
 			- b: b value
-			- stdb: standard deviation on b value
+			- cov: covariance matrix [2,2]
 		"""
 		completeness = completeness or self.default_completeness
 		end_date = end_date or self.end_date
 
-		return self.analyse_recurrence(dM=dM, method="MLE", aM=0., Mtype=Mtype,
-								Mrelation=Mrelation, completeness=completeness,
-								end_date=end_date)
+		(a, b, stda, stdb) = self.analyse_recurrence(dM=dM, method="MLE", aM=0.,
+									Mtype=Mtype, Mrelation=Mrelation,
+									completeness=completeness, end_date=end_date)
+		cov = np.mat([[stda**2, 0.], [0., stdb**2]])
+
+		return (a, b, cov)
 
 	def calc_gr_weichert(self,
 		Mmin, Mmax, dM=0.1,
@@ -2902,8 +2909,7 @@ class EQCatalog(object):
 			Tuple (a, b, stda, stdb)
 			- a: a value
 			- b: b value
-			- stda: standard deviation of a value
-			- stdb: standard deviation of b value
+			- cov: covariance matrix [2,2]
 
 		Note:
 		This regression depends on the Mmax specified, as empty magnitude bins
@@ -2922,8 +2928,12 @@ class EQCatalog(object):
 												completeness=completeness,
 												verbose=verbose)
 
-		return calc_gr_weichert(bins_Mag, bins_N, completeness, end_date,
-								b_val=b_val, verbose=verbose)
+		(a, b, stda, stdb) = calc_gr_weichert(bins_Mag, bins_N, completeness,
+											end_date, b_val=b_val,
+											verbose=verbose)
+		cov = np.mat([[stda**2, 0.], [0., stdb**2]])
+
+		return (a, b, cov)
 
 	#TODO: averaged Weichert method (Felzer, 2007)
 
@@ -2970,8 +2980,7 @@ class EQCatalog(object):
 			tuple (a, b, stda, stdb)
 			- a: a value
 			- b: b value
-			- stda: standard deviation of a value
-			- stdb: standard deviation of b value
+			- cov: covariance matrix [2,2]
 		"""
 		from .calcGR_MLE import estimate_gr_params
 
@@ -2979,10 +2988,12 @@ class EQCatalog(object):
 		end_date = end_date or self.end_date
 
 		subcatalog = self.subselect(end_date=end_date)
-		bins_N, bins_Mag = subcatalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype,
-												Mrelation=Mrelation,
-												completeness=completeness,
-												verbose=verbose)
+		ni, Mi = subcatalog.bin_by_mag(Mmin, Mmax, dM, Mtype=Mtype,
+										Mrelation=Mrelation,
+										completeness=completeness,
+										verbose=verbose)
+		Mi += dM / 2.
+
 		if b_val:
 			prior_b = b_val
 			prior_weight = 1E+5
@@ -2994,10 +3005,9 @@ class EQCatalog(object):
 										precise=True, log10=True,
 										prior_b=prior_b, prior_weight=prior_weight)
 
-		## TODO: we should incorporate cov in MFD
-		stda, stdb = cov[0, 0], cov[1, 1]
+		#stda, stdb = np.sqrt(cov[0, 0]), np.sqrt(cov[1, 1])
 
-		return (a, b, stda, stdb)
+		return (a, b, cov)
 
 	def get_estimated_mfd(self,
 		Mmin, Mmax, dM=0.1,
@@ -3059,16 +3069,16 @@ class EQCatalog(object):
 			else:
 				kwargs['weighted'] = False
 			method = "LSQ"
-		calcGR_func = {"MLE": self.calc_gr_mle,
+		calc_gr_func = {"MLE": self.calc_gr_mle,
 						"Weichert": self.calc_gr_weichert,
 						"Aki": self.calc_gr_aki,
 						"LSQ": self.calc_gr_lsq}[method]
-		a, b, stda, stdb = calcGR_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype,
+		a, b, cov = calc_gr_func(Mmin=Mmin, Mmax=Mmax, dM=dM, Mtype=Mtype,
 								Mrelation=Mrelation, completeness=completeness,
 								end_date=end_date, b_val=b_val, verbose=verbose,
 								**kwargs)
 
-		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, stda, stdb, Mtype)
+		return TruncatedGRMFD(Mmin, Mmax, dM, a, b, cov=cov, Mtype=Mtype)
 
 	def plot_mfd(self,
 		Mmin, Mmax, dM=0.2,
@@ -3150,6 +3160,8 @@ class EQCatalog(object):
 		from hazard.rshalib.mfd import plot_mfds
 
 		mfd_list, labels, colors, styles = [], [], [], []
+		completeness = completeness or self.default_completeness
+		end_date = end_date or self.end_date
 		cc_catalog = self.subselect_completeness(completeness, Mtype, Mrelation,
 												verbose=verbose)
 		observed_mfd = cc_catalog.get_incremental_mfd(Mmin, Mmax, dM=dM, Mtype=Mtype,
@@ -3176,18 +3188,20 @@ class EQCatalog(object):
 			colors.append(color_estimated)
 			styles.append('-')
 			if num_sigma:
-				sigma_mfd1 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
-								Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
-								end_date=end_date, b_val=b+num_sigma*stdb, verbose=verbose)
+				sigma_mfd1 = estimated_mfd.construct_mfd_bound_at_epsilon(num_sigma)
+				#sigma_mfd1 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
+				#				Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
+				#				end_date=end_date, b_val=b+num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd1)
 				label = {"en": "Computed", "nl": "Berekend"}[lang]
 				label += " $\pm$ %d sigma" % num_sigma
 				labels.append(label)
 				colors.append(color_estimated)
 				styles.append('--')
-				sigma_mfd2 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
-								Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
-								end_date=end_date, b_val=b-num_sigma*stdb, verbose=verbose)
+				sigma_mfd2 = estimated_mfd.construct_mfd_bound_at_epsilon(-num_sigma)
+				#sigma_mfd2 = cc_catalog.get_estimated_mfd(Mmin, Mmax, dM=dM, method=method,
+				#				Mtype=Mtype, Mrelation=Mrelation, completeness=completeness,
+				#				end_date=end_date, b_val=b-num_sigma*stdb, verbose=verbose)
 				mfd_list.append(sigma_mfd2)
 				labels.append("_nolegend_")
 				colors.append(color_estimated)
@@ -3200,8 +3214,12 @@ class EQCatalog(object):
 		completeness_limits = {True: completeness, False: None}[plot_completeness_limits]
 		end_year = timelib.to_year(self.end_date)
 
+		discrete = [True, False, False, False]
+		cumul_or_inc = ['both', 'cumul', 'cumul', 'cumul']
+
 		return plot_mfds(mfd_list, colors=colors, styles=styles, labels=labels,
 						completeness=completeness_limits, end_year=end_year,
+						discrete=discrete, cumul_or_inc=cumul_or_inc,
 						title=title, lang=lang,
 						fig_filespec=fig_filespec, dpi=dpi, **kwargs)
 
@@ -5854,9 +5872,12 @@ class EQCatalog(object):
 		completeness_table = completeness.to_hmtk_table(Mmax=None)
 		if method == "Weichert" and aM == 0.:
 			aM = dM / 2.
-		b, stdb, a, stda = recurrence_analysis(years, Mags, completeness_table,
+		b, stdb, _a, _stda = recurrence_analysis(years, Mags, completeness_table,
 												dM, method, aM, dt)
-		return np.log10(a), b, stda, stdb
+		a = np.log10(_a)
+		stda = 0.434 * (_stda / _a)
+
+		return (a, b, stda, stdb)
 
 	def get_hmtk_catalogue(self, Mtype='MW', Mrelation={}):
 		"""
