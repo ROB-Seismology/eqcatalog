@@ -192,12 +192,15 @@ def calc_gr_lsq(magnitudes, occurrence_rates, b_val=None, weights=None, verbose=
 		## Compute ab_sigma from:
 		## (cov_ab = var_aa + var_bb - var_predicted(m=1)) / 2
 		## and var_predicted as:
-		## (see Eq. 25 in https://pages.mtu.edu/~fmorriso/cm3215/UncertaintySlopeInterceptOfLeastSquaresFit)
+		## (see Eq. 9 or 25 in https://pages.mtu.edu/~fmorriso/cm3215/UncertaintySlopeInterceptOfLeastSquaresFit)
 		## var_predicted(m) = var_yx * (1 + 1/n + (m - mean_m)**2 / SSxx)
 		m = 1
 		SSxx = sx2
 		var_yx = see**2
-		var_predicted = var_yx * (1 + 1./n + ((m - mx)**2) / SSxx)
+		## Eq. 25?
+		#var_predicted = var_yx * (1 + 1./n + ((m - mx)**2) / SSxx)
+		## or Eq. 9?
+		var_predicted = var_yx
 		cov_ab = (a_sigma**2 + b_sigma**2 - var_predicted) / 2.
 
 	else:
