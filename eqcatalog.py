@@ -4546,7 +4546,9 @@ class EQCatalog(object):
 
 		layer = self.to_folium_layer(edge_color=edge_color,
 									edge_width=edge_width, fill_color=fill_color,
-									opacity=opacity, add_popup=add_popup)
+									opacity=opacity, add_popup=add_popup,
+									Mtype=Mtype, Mrelation=Mrelation,
+									mag_size_func=mag_size_func)
 
 		map = folium.Map(tiles=bgmap, control_scale=True)
 		lonmin, lonmax, latmin, latmax = self.get_region()
