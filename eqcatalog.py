@@ -4472,6 +4472,94 @@ class EQCatalog(object):
 
 		return perpendicular_distances
 
+	def to_folium_layer(self, edge_color='blue', edge_width=1.,
+						fill_color=None, opacity=0.5, add_popup=True,
+						Mtype="MW", Mrelation={},
+						mag_size_func=lambda M: 2 * np.sqrt(2.25**(M+1) / np.pi)):
+		"""
+		Generate folium map layer
+
+		:param edge_color:
+			str, line color
+			(default: 'blue')
+		:param edge_width:
+			float, line width
+			(default: 1.)
+		:param fill_color:
+			str, fill color
+			(default: None)
+		:param opacity:
+			float, marker opacity
+			(default: 0.5)
+		:param add_popup:
+			bool, whether or not to attach popup
+			(default: True)
+		:param Mtype:
+		:param Mrelation:
+			see :meth:`get_magnitudes`
+		:param mag_size_func:
+			function to scale marker size to magnitude
+			(default: lambda M: 2 * np.sqrt(2.5**M / np.pi))
+
+		:return:
+			instance of :class:`folium.FeatureGroup`
+		"""
+		from folium import FeatureGroup
+
+		layer = FeatureGroup(name=self.name, overlay=True, control=True, show=True)
+		mags = self.get_magnitudes(Mtype, Mrelation)
+		with np.errstate(divide='ignore', invalid='ignore'):
+			marker_sizes = mag_size_func(mags)
+		marker_sizes[np.isnan(marker_sizes)] = 1.
+		for eq, marker_size in zip(self.eq_list, marker_sizes):
+			cm = eq.to_folium_marker(marker_size=marker_size, edge_color=edge_color,
+									edge_width=edge_width, fill_color=fill_color,
+									opacity=opacity, add_popup=add_popup)
+			cm.add_to(layer)
+		return layer
+
+	def get_folium_map(self, bgmap='OpenStreetMap',
+						edge_color='blue', edge_width=1.,
+						fill_color=None, opacity=0.5, add_popup=True,
+						Mtype="MW", Mrelation={},
+						mag_size_func=lambda M: 2 * np.sqrt(2.25**(M+1) / np.pi)):
+		"""
+		Generate folium map
+
+		:param bgmap:
+			str, background tile map
+			(default: 'OpenStreetMap')
+		:param edge_color:
+		:param edge_width:
+		:param fill_color:
+		:param opacity:
+		:param add_popup:
+		:param Mtype:
+		:param Mrelation:
+		:param mag_size_func:
+			see :meth:`to_folium_layer`
+
+		:return:
+			instance of :class:`folium.Map`
+		"""
+		import folium
+
+		layer = self.to_folium_layer(edge_color=edge_color,
+									edge_width=edge_width, fill_color=fill_color,
+									opacity=opacity, add_popup=add_popup)
+
+		map = folium.Map(tiles=bgmap, control_scale=True)
+		lonmin, lonmax, latmin, latmax = self.get_region()
+		bounds = [(latmin, lonmin), (latmax, lonmax)]
+
+		layer.add_to(map)
+
+		map.fit_bounds(bounds)
+		folium.LayerControl().add_to(map)
+		folium.features.LatLngPopup().add_to(map)
+
+		return map
+
 	def get_distances_along_line(self, start_pt, end_pt, max_pp_dist=None):
 		"""
 		Compute distances along straight line defined by two points
