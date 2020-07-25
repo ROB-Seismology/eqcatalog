@@ -664,37 +664,38 @@ def plot_map(catalogs,
 		Mtypes = [Mtype] * len(catalogs)
 
 	for i in range(len(catalogs)):
-		Mtype = Mtypes[i]
 		catalog = catalogs[i]
-		style = catalog_styles[i]
-		if isinstance(style, dict):
-			style = lbm.PointStyle.from_dict(style)
-		values = {}
-		if mag_size_inc:
-			## Magnitude-dependent size
-			if i == 0:
-				min_mag = np.floor(catalog.get_Mmin(Mtype, Mrelation))
-				max_mag = np.ceil(catalog.get_Mmax(Mtype, Mrelation))
-				mags = np.linspace(min_mag, max_mag, min(5, max_mag-min_mag+1))
-				sizes = style.size + (mags - 3) * mag_size_inc
-				sizes = sizes.clip(min=1)
-				style.thematic_legend_style = lbm.LegendStyle(title="Magnitude", location=3, shadow=True, fancy_box=True, label_spacing=0.7)
-			values['magnitude'] = catalog.get_magnitudes(Mtype, Mrelation)
-			style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
+		if len(catalog):
+			Mtype = Mtypes[i]
+			style = catalog_styles[i]
+			if isinstance(style, dict):
+				style = lbm.PointStyle.from_dict(style)
+			values = {}
+			if mag_size_inc:
+				## Magnitude-dependent size
+				if i == 0:
+					min_mag = np.floor(catalog.get_Mmin(Mtype, Mrelation))
+					max_mag = np.ceil(catalog.get_Mmax(Mtype, Mrelation))
+					mags = np.linspace(min_mag, max_mag, min(5, int(max_mag-min_mag+1)))
+					sizes = style.size + (mags - 3) * mag_size_inc
+					sizes = sizes.clip(min=1)
+					style.thematic_legend_style = lbm.LegendStyle(title="Magnitude", location=3, shadow=True, fancy_box=True, label_spacing=0.7)
+				values['magnitude'] = catalog.get_magnitudes(Mtype, Mrelation)
+				style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
 
-		# TODO: color by depth
-		#values['depth'] = catalog.get_depths()
-		#colorbar_style = ColorbarStyle(title="Depth (km)", location="bottom", format="%d")
-		#style.fill_color = ThematicStyleRanges([0,1,10,25,50], ['red', 'orange', 'yellow', 'green'], value_key="depth", colorbar_style=colorbar_style)
+			# TODO: color by depth
+			#values['depth'] = catalog.get_depths()
+			#colorbar_style = ColorbarStyle(title="Depth (km)", location="bottom", format="%d")
+			#style.fill_color = ThematicStyleRanges([0,1,10,25,50], ['red', 'orange', 'yellow', 'green'], value_key="depth", colorbar_style=colorbar_style)
 
-		# TODO: color by age
-		#values['year'] = catalog.get_fractional_years()
-		#style.fill_color = ThematicStyleRanges([1350,1910,2050], ['green', (1,1,1,0)], value_key="year")
+			# TODO: color by age
+			#values['year'] = catalog.get_fractional_years()
+			#style.fill_color = ThematicStyleRanges([1350,1910,2050], ['green', (1,1,1,0)], value_key="year")
 
-		point_data = lbm.MultiPointData(catalog.get_longitudes(), catalog.get_latitudes(), values=values)
+			point_data = lbm.MultiPointData(catalog.get_longitudes(), catalog.get_latitudes(), values=values)
 
-		layer = lbm.MapLayer(point_data, style, legend_label=labels[i], name="earthquakes")
-		layers.append(layer)
+			layer = lbm.MapLayer(point_data, style, legend_label=labels[i], name="earthquakes")
+			layers.append(layer)
 
 	## Sites
 	if sites:
