@@ -969,6 +969,66 @@ class LocalEarthquake(object):
 		"""
 		return geodetic.spherical_point_at(self.lon, self.lat, distance*1000, azimuth)
 
+	def to_folium_marker(self, marker_size=9, edge_color='blue', edge_width=1.,
+						fill_color=None, opacity=0.5, add_popup=True):
+		"""
+		Create circle marker to plot with folium
+
+		:param marker_size:
+			float, marker radius
+			(default: 9)
+		:param edge_color:
+			str, line color
+			(default: 'blue')
+		:param edge_width:
+			float, line width
+			(default: 1.)
+		:param fill_color:
+			str, fill color
+			(default: None)
+		:param opacity:
+			float, marker opacity
+			(default: 0.5)
+		:param add_popup:
+			bool, whether or not to attach popup
+			(default: True)
+
+		:return:
+			instance of :class:`folium.CircleMarker`
+		"""
+		from folium import CircleMarker, Popup, IFrame
+
+		fill = True
+		if fill_color is None:
+			fill_opacity = 0
+		else:
+			fill_opacity = opacity
+		location = (self.lat, self.lon)
+
+		if add_popup:
+			popup = 'ID: %s<br>' % self.ID
+			popup += 'Time: %s<br>' % self.datetime
+			popup += 'Locality: %s<br>' % self.name
+			popup += 'Depth: %.0f<br>' % self.depth
+			ML, MS, MW = self.mag.get('ML'), self.mag.get('MS'), self.mag.get('MW')
+			if ML and not np.isnan(ML):
+				popup += 'ML: %.1f<br>' % ML
+			if MS and not np.isnan(MS):
+				popup += 'MS: %.1f<br>' % MS
+			if MW and not np.isnan(MW):
+				popup += 'MW: %.1f<br>' % MW
+			## Note: IFrame is necessary to get line breaks
+			## Popup(..., parse_html=True) is necessary to avoid blank map
+			## if number of markers is too high
+			popup = Popup(IFrame(popup, width=250, height=125), parse_html=True)
+		else:
+			popup = None
+
+		return CircleMarker(location=location, radius=marker_size,
+							weight=edge_width, color=edge_color, opacity=opacity,
+							fill=fill, fill_color=fill_color,
+							fill_opacity=fill_opacity, popup=popup)
+
 
 
 #class FocMecRecord(LocalEarthquake, MT.FaultGeometry):
