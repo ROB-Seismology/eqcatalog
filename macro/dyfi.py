@@ -1015,9 +1015,14 @@ class DYFIEnsemble(object):
 							answer = labels[idx]
 							print('  [%2d] %s' % (d, answer))
 
-	def to_mdp_collection(self):
+	def to_mdp_collection(self, convert_cii=None):
 		"""
 		Convert to MDP collection
+
+		:param convert_cii:
+			str, how to convert CII to Imin/Imax: 'round', 'floor_ceil'
+			or None
+			(default: None)
 
 		:return:
 			instance of :class:`MDPCollection`
@@ -1028,8 +1033,13 @@ class DYFIEnsemble(object):
 		for dyfi_rec in self:
 			id = dyfi_rec.ids[0]
 			id_earth = dyfi_rec.event_ids[0]
-			Imin = dyfi_rec.CII[0]
-			Imax = dyfi_rec.CII[0]
+			if convert_cii == 'round':
+				Imin = Imax = np.round(dyfi_rec.CII[0])
+			elif convert_cii == 'floor_ceil':
+				Imin = np.floor(dyfi_rec.CII[0])
+				Imax = np.ceil(dyfi_rec.CII[0])
+			else:
+				Imin = Imax = dyfi_rec.CII[0]
 			imt = 'CII'
 			lon = dyfi_rec.longitudes[0]
 			lat = dyfi_rec.latitudes[0]
