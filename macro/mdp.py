@@ -126,8 +126,9 @@ class MDPCollection():
 	:param mdp_list:
 		list with instances of :class:`MacroseismicDataPoint`
 	"""
-	def __init__(self, mdp_list):
+	def __init__(self, mdp_list, name=''):
 		self.mdp_list = mdp_list
+		self.name = name
 
 	def __repr__(self):
 		txt = '<MDPCollection (n=%d)>' % len(self)
@@ -1151,3 +1152,109 @@ class MDPCollection():
 
 		return plot_histogram(datasets, distance_bins, labels=labels,
 								xlabel=xlabel, **kwargs)
+
+	def to_folium_layer(self, Imin_or_max, cmap="rob", label_size=10,
+						bg_color=True):
+		"""
+		Generate folium layer with macroseismic data points
+
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		:param cmap:
+			str, name of colormap ("rob" or "usgs")
+			(default: "rob")
+		:param label_size:
+			int, label size in points
+			(default: 10)
+		:param bg_color:
+			bool, whether or not to add colored background to label
+			(default: True)
+
+		:return:
+			instance of :class:`folium.FeatureGroup`
+		"""
+		from folium import FeatureGroup, DivIcon, Marker
+		from folium.plugins import BeautifyIcon
+		import matplotlib
+		import mapping.layeredbasemap as lbm
+
+		## Set up thematic style for macroseismic data
+		cmap_name = cmap
+		if cmap_name.lower() in ("usgs", "rob"):
+			cmap = lbm.cm.get_cmap("macroseismic", cmap_name)
+		else:
+			cmap = matplotlib.cm.get_cmap(cmap_name)
+
+		## Generate marker icons
+		## Note: do not pre-generate icons for unique intensities,
+		## this results in an error when the folium map is rendered in the browser
+		inner_icon_style = ('color:white;font-size:%dpt;text-align:center;'
+							'font-weight:bold;padding-left:5px;padding-right:5px;')
+		inner_icon_style %= label_size
+
+		layer_name = self.name or 'Macroseismic data points'
+		layer = FeatureGroup(name=layer_name, overlay=True, control=True, show=True)
+		intensities = np.round(self.get_intensities(Imin_or_max)).astype('int')
+		for mdp, I in zip(self.mdp_list, intensities):
+			if not (np.isnan(mdp.lat) or np.isnan(mdp.lon)):
+				hex_color = matplotlib.colors.rgb2hex(cmap(I))
+				if bg_color:
+					iis = inner_icon_style
+					if ((cmap_name == 'rob' and I <= 3)
+						or (cmap_name == 'usgs' and I <= 5)):
+						iis = iis.replace('white', 'black')
+					icon = BeautifyIcon(icon='', icon_shape='rectangle',
+										inner_icon_style=iis,
+										background_color=hex_color,
+										border_color='transparent',
+										number=I)
+				else:
+					div_style = '<div style="font-size: %dpt; color:%s;"><b>%d</b></div>;'
+					div_style %= (label_size, hex_color, I)
+					icon = DivIcon(div_style)
+				marker = Marker(location=(mdp.lat, mdp.lon), icon=icon)
+				marker.add_to(layer)
+
+		return layer
+
+	def get_folium_map(self, Imin_or_max, bgmap='OpenStreetMap',
+						cmap="rob", label_size=10, bg_color=True,
+						region=None):
+		"""
+		Generate folium map
+
+		:param Imin_or_max:
+			see :meth:`get_intensities`
+		:param bgmap:
+			str, background tile map
+			(default: 'OpenStreetMap')
+		:param cmap:
+		:param label_size:
+		:param bg_color:
+			see :meth:`to_folium_layer`
+		:param region:
+			(w, e, s, n) tuple specifying rectangular region of interest
+			in geographic coordinates
+			(default: None)
+
+		:return:
+			instance of :class:`folium.Map`
+		"""
+		import folium
+
+		layer = self.to_folium_layer(Imin_or_max, cmap=cmap,
+									label_size=label_size, bg_color=bg_color)
+
+		map = folium.Map(tiles=bgmap, control_scale=True)
+		if not region:
+			region = self.get_region()
+		lonmin, lonmax, latmin, latmax = region
+		bounds = [(latmin, lonmin), (latmax, lonmax)]
+
+		layer.add_to(map)
+
+		map.fit_bounds(bounds)
+		folium.LayerControl().add_to(map)
+		folium.features.LatLngPopup().add_to(map)
+
+		return map
