@@ -1341,7 +1341,8 @@ class EQCatalog(object):
 
 		:param region:
 			(w, e, s, n) tuple specifying rectangular region of interest in
-			geographic coordinates (default: None)
+			geographic coordinates
+			(default: None)
 		:param start_date:
 			Int or date or datetime object specifying start of time window of interest
 			If integer, start_date is interpreted as start year
@@ -4498,7 +4499,7 @@ class EQCatalog(object):
 		:param Mrelation:
 			see :meth:`get_magnitudes`
 		:param mag_size_func:
-			function to scale marker size to magnitude
+			int (= fixed size) or function to scale marker size to magnitude
 			(default: lambda M: 2 * np.sqrt(2.5**M / np.pi))
 
 		:return:
@@ -4510,7 +4511,10 @@ class EQCatalog(object):
 		mags = self.get_magnitudes(Mtype, Mrelation)
 		with np.errstate(divide='ignore', invalid='ignore'):
 			marker_sizes = mag_size_func(mags)
-		marker_sizes[np.isnan(marker_sizes)] = 1.
+		if not np.isscalar(marker_sizes):
+			marker_sizes[np.isnan(marker_sizes)] = 1.
+		else:
+			marker_sizes = [marker_sizes] * len(self)
 		for eq, marker_size in zip(self.eq_list, marker_sizes):
 			cm = eq.to_folium_marker(marker_size=marker_size, edge_color=edge_color,
 									edge_width=edge_width, fill_color=fill_color,
@@ -4522,7 +4526,8 @@ class EQCatalog(object):
 						edge_color='blue', edge_width=1.,
 						fill_color=None, opacity=0.5, add_popup=True,
 						Mtype="MW", Mrelation={},
-						mag_size_func=lambda M: 2 * np.sqrt(2.25**(M+1) / np.pi)):
+						mag_size_func=lambda M: 2 * np.sqrt(2.25**(M+1) / np.pi),
+						region=None):
 		"""
 		Generate folium map
 
@@ -4538,6 +4543,10 @@ class EQCatalog(object):
 		:param Mrelation:
 		:param mag_size_func:
 			see :meth:`to_folium_layer`
+		:param region:
+			(w, e, s, n) tuple specifying rectangular region of interest
+			in geographic coordinates
+			(default: None)
 
 		:return:
 			instance of :class:`folium.Map`
@@ -4551,7 +4560,9 @@ class EQCatalog(object):
 									mag_size_func=mag_size_func)
 
 		map = folium.Map(tiles=bgmap, control_scale=True)
-		lonmin, lonmax, latmin, latmax = self.get_region()
+		if not region:
+			region = self.get_region()
+		lonmin, lonmax, latmin, latmax = region
 		bounds = [(latmin, lonmin), (latmax, lonmax)]
 
 		layer.add_to(map)
