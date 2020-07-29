@@ -3343,7 +3343,7 @@ class EQCatalog(object):
 
 	## Mmax estimation
 
-	def get_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
+	def get_bayesian_mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
 					b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
 					Mrelation={}, completeness=None,
 					verbose=True):
@@ -3428,13 +3428,13 @@ class EQCatalog(object):
 			## Fake MFD
 			mfd = EvenlyDiscretizedMFD(Mmin_n, dM, [1.0])
 
-		prior, likelihood, posterior, params = mfd.get_Bayesian_Mmax_pdf(prior_model=prior_model,
+		prior, likelihood, posterior, params = mfd.get_bayesian_mmax_pdf(prior_model=prior_model,
 				Mmax_obs=Mmax_obs, n=n, Mmin_n=Mmin_n, b_val=b_val, bin_width=dM,
 				truncation=truncation, completeness=completeness,
 				end_date=self.end_date, verbose=verbose)
 		return (prior, likelihood, posterior, params)
 
-	def plot_Bayesian_Mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
+	def plot_bayesian_mmax_pdf(self, prior_model="CEUS_COMP", Mmin_n=4.5,
 						b_val=None, dM=0.1, truncation=(5.5, 8.25), Mtype='MW',
 						Mrelation={}, completeness=None,
 						num_discretizations=0, title=None, fig_filespec=None,
@@ -3490,7 +3490,7 @@ class EQCatalog(object):
 			Bool, whether or not to print additional information
 			(default: True)
 		"""
-		prior, likelihood, posterior, params = self.get_Bayesian_Mmax_pdf(prior_model,
+		prior, likelihood, posterior, params = self.get_bayesian_mmax_pdf(prior_model,
 					Mmin_n, b_val=b_val, dM=dM, truncation=truncation, Mtype=Mtype,
 					Mrelation=Mrelation, completeness=completeness, verbose=verbose)
 		mmax_obs, n, a_val, b_val = params
