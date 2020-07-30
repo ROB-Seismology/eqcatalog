@@ -6,7 +6,6 @@ according to Stromeyer & Gruenthal (2015)
 from __future__ import absolute_import, division, print_function
 
 import numpy as np
-from scipy.optimize import minimize_scalar
 
 
 
@@ -71,6 +70,8 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 	but exp(alpha) / beta = exp(a * ln(10))
 	or a = ln(exp(alpha) / beta) / ln(10)
 	"""
+	from scipy.optimize import minimize_scalar
+
 	I = len(ni)
 
 	assert len(Mi) == I
@@ -220,6 +221,8 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 		- beta: float, common beta value
 		- cov_list: list of 2D matrices, covariance matrices for each zone
 	"""
+	from scipy.optimize import minimize_scalar
+
 	J, I = nij.shape
 
 	assert len(Mi) == I
