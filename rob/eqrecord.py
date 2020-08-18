@@ -503,9 +503,10 @@ class ROBLocalEarthquake(LocalEarthquake):
 			## Note: network may sometimes contain extra spaces...
 			pick = PhasePick(phase_name, dt, self.ID, rec['station_code'],
 							component, rec['movement'], rec['id_mesure_t'],
-							rec['include_in_loc'], rec['amplitude'],
-							rec['periode'], rec['magnitude'], rec['mag_type'],
-							rec['distance'], station_network=rec['network'].strip())
+							rec['include_in_loc'], amplitude=rec['amplitude'],
+							period=rec['periode'], magnitude=rec['magnitude'],
+							mag_type=rec['mag_type'], distance=rec['distance'],
+							station_network=rec['network'].strip())
 			_station_code = rec['station_code']
 			if station_code:
 				## Trim record station code to length of given station code
