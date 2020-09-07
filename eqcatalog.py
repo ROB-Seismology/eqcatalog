@@ -1234,7 +1234,8 @@ class EQCatalog(object):
 		:return:
 			float, epicentral distance in km
 		"""
-		distances = geodetic.spherical_distance(lon, lat, self.get_longitudes(), self.get_latitudes())
+		distances = geodetic.spherical_distance(lon, lat, self.get_longitudes(),
+												self.get_latitudes())
 		return distances / 1000.
 
 	def get_hypocentral_distances(self, lon, lat, z=0):
@@ -1257,6 +1258,73 @@ class EQCatalog(object):
 		depths = np.nan_to_num(self.get_depths())
 		d_hypo = np.sqrt(d_epi**2 + (depths - z)**2)
 		return d_hypo
+
+	def calc_inter_event_distances(self):
+		"""
+		Compute inter_event distances
+
+		:return:
+			2D array, inter-event distances (in km)
+		"""
+		from mapping.geotools.geodetic import meshed_spherical_distance
+
+		lons, lats = self.get_longitudes(), self.get_latitudes()
+		distances = meshed_spherical_distance(lons, lats, lons, lats)
+		distances /= 1000
+
+		return distances
+
+	def calc_min_inter_event_distance(self):
+		"""
+		Compute shortest inter-event distance in catalog
+
+		:return:
+			float, minimum inter-event distance (in km)
+		"""
+		ied = self.calc_inter_event_distances()
+		ied[ied == 0] = np.inf
+		#np.fill_diagonal(ied, np.inf)
+		return ied.min()
+
+	def calc_max_inter_event_distance(self):
+		"""
+		Compute longest inter-event distance in catalog
+
+		:return:
+			float, maximum inter-event distance (in km)
+		"""
+		ied = self.calc_inter_event_distances()
+		np.fill_diagonal(ied, -np.inf)
+		return ied.max()
+
+	def calc_min_ied_by_mag_bin(self, dM=1, Mtype="MW", Mrelation={}):
+		"""
+		Compute minimum inter-event distance by magnitude bin
+
+		:param dM:
+			float, magnitude bin width
+			(default: 1)
+		:param Mtype:
+		:param Mrelation:
+			see :meth:`get_magnitudes`
+
+		:return:
+			(mag_bins, min_ids) tuple of 1D arrays
+		"""
+		from hazard.rshalib.utils import seq
+
+		mags = self.get_magnitudes(Mtype, Mrelation=Mrelation)
+		min_mag = np.floor(mags.min() / dM) * dM
+		max_mag = np.ceil(mags.max() / dM) * dM
+		mag_bins = seq(min_mag, max_mag, dM)
+		min_ieds = np.ones(len(mag_bins) - 1) * np.inf
+		bin_idxs = np.digitize(mags, mag_bins)
+		for i in range(len(min_ieds)):
+			subcat = self.__getitem__(bin_idxs == i + 1)
+			if len(subcat):
+				min_ieds[i] = subcat.calc_min_inter_event_distance()
+
+		return (mag_bins, min_ieds)
 
 	## Sorting
 
