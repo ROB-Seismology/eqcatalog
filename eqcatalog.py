@@ -1274,17 +1274,25 @@ class EQCatalog(object):
 
 		return distances
 
-	def calc_min_inter_event_distance(self):
+	def calc_min_inter_event_distance(self, n=1):
 		"""
 		Compute shortest inter-event distance in catalog
+
+		:param n:
+			int, n-th closest (1-based) neighbour to calculate distance to
+			(default: 1)
 
 		:return:
 			float, minimum inter-event distance (in km)
 		"""
 		ied = self.calc_inter_event_distances()
 		ied[ied == 0] = np.inf
-		#np.fill_diagonal(ied, np.inf)
-		return ied.min()
+		## Note: n*2 because all distances are twice in the array
+		try:
+			min_ied = ied.flat[np.argsort(ied.flat)[(n-1)*2]]
+		except IndexError:
+			min_ied = np.inf
+		return min_ied
 
 	def calc_max_inter_event_distance(self):
 		"""
@@ -1297,12 +1305,15 @@ class EQCatalog(object):
 		np.fill_diagonal(ied, -np.inf)
 		return ied.max()
 
-	def calc_min_ied_by_mag_bin(self, dM=1, Mtype="MW", Mrelation={}):
+	def calc_min_ied_by_mag_bin(self, dM=1, n=1, Mtype="MW", Mrelation={}):
 		"""
 		Compute minimum inter-event distance by magnitude bin
 
 		:param dM:
 			float, magnitude bin width
+			(default: 1)
+		:param n:
+			int, n-th closest (1-based) neighbour to calculate distance to
 			(default: 1)
 		:param Mtype:
 		:param Mrelation:
@@ -1322,7 +1333,7 @@ class EQCatalog(object):
 		for i in range(len(min_ieds)):
 			subcat = self.__getitem__(bin_idxs == i + 1)
 			if len(subcat):
-				min_ieds[i] = subcat.calc_min_inter_event_distance()
+				min_ieds[i] = subcat.calc_min_inter_event_distance(n=n)
 
 		return (mag_bins, min_ieds)
 
