@@ -119,6 +119,7 @@ class DYFIEnsemble(object):
 		- 1: yes, slight swinging
 		- 2: yes, violent swinging
 		- nan: no answer
+		Note: A/B/C in ROB database!
 	:param creak:
 		array-like, answer to the question
 		'Did you notice creaking or other noise?'
@@ -126,6 +127,7 @@ class DYFIEnsemble(object):
 		- 1: yes, slight noise
 		- 2: yes, loud noise
 		- nan: no answer
+		Note: A/B/C in ROB database!
 	:param shelf:
 		array-like, answer to the question
 		'Did objects topple over or fell off shelves?'
@@ -136,6 +138,7 @@ class DYFIEnsemble(object):
 		- 4: many fell off
 		- 5: nearly everything fell off
 		- nan: no answer
+		Note: A/B/C/D/E/F in ROB database!
 	:param picture:
 		array-like, answer to the question
 		'Did pictures on walls move or get knocked askew?'
@@ -143,6 +146,7 @@ class DYFIEnsemble(object):
 		- 1: yes, but did not fall
 		- 2: yes, and some fell
 		- nan: no answer
+		Note: A/B in ROB database!
 	:param furniture:
 		array-like, answer to the question
 		'Did any furniture or appliances slide, tip over or become displaced?'
