@@ -793,7 +793,7 @@ class DYFIEnsemble(object):
 			bin_edges = self.bins.get(prop, None)
 		if bin_edges is None:
 			bin_edges = 10
-		counts, bin_edges = np.histogram(ar, bins=bin_edges)
+		counts, bin_edges = np.histogram(ar[np.isfinite(ar)], bins=bin_edges)
 		return bin_edges, counts
 
 	@classmethod
