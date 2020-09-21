@@ -968,6 +968,8 @@ class EQCatalog(object):
 		:return:
 			dict, mapping magnitude types to integers
 		"""
+		from itertools import combinations
+
 		Mtype_counts = {}
 		for eq in self:
 			eq_Mtypes = eq.get_Mtypes()
@@ -976,12 +978,13 @@ class EQCatalog(object):
 					Mtype_counts[Mtype] += 1
 				else:
 					Mtype_counts[Mtype] = 1
-			if len(eq_Mtypes) > 1:
-				comb_Mtype = '+'.join(sorted(eq_Mtypes))
-				if comb_Mtype in Mtype_counts:
-					Mtype_counts[comb_Mtype] += 1
-				else:
-					Mtype_counts[comb_Mtype] = 1
+			for n in range(1, len(eq_Mtypes)):
+				for comb_Mtypes in combinations(eq_Mtypes, n+1):
+					comb_Mtype = '+'.join(sorted(comb_Mtypes))
+					if comb_Mtype in Mtype_counts:
+						Mtype_counts[comb_Mtype] += 1
+					else:
+						Mtype_counts[comb_Mtype] = 1
 		return Mtype_counts
 
 	def subselect_Mtype(self, Mtypes, catalog_name=""):
