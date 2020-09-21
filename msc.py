@@ -479,7 +479,7 @@ class IdentityMSC(MSCE):
 		return None
 
 
-class Suckale2016MS_USGS(MSCE):
+class Suckale2016MS_USGS(MSCE_MS_MW):
 	"""
 	Regression between MS and MW based on the USGS/NEIC catalog
 	(for Vanuatu)
@@ -531,3 +531,34 @@ class KadiriogluKartal2016(MSCE):
 
 	def get_sigma(self, Md=None):
 		return None
+
+
+def get_available_Mrelations(msce_type='MSCE'):
+	"""
+	Function to get all magnitude scaling relations
+
+	:param msce_type:
+		str, MSCE type
+		(default: 'MSCE')
+
+	:return:
+		ordered dict, mapping relation names to instances of :class:`MSCE`
+	"""
+	import sys, inspect
+	from collections import OrderedDict
+
+	this_mod = sys.modules[__name__]
+	msce_class = getattr(this_mod, msce_type)
+
+	def is_msce(member):
+		r_val = False
+		subclass = getattr
+		if inspect.isclass(member):
+			if issubclass(member, msce_class):
+				return True
+		return r_val
+
+	Mrelations = inspect.getmembers(this_mod, is_msce)
+	#Mrelations = [(name.replace('Window', ''), val) for (name, val) in windows]
+	Mrelations = OrderedDict(Mrelations)
+	return Mrelations
