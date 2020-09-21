@@ -559,6 +559,5 @@ def get_available_Mrelations(msce_type='MSCE'):
 		return r_val
 
 	Mrelations = inspect.getmembers(this_mod, is_msce)
-	#Mrelations = [(name.replace('Window', ''), val) for (name, val) in windows]
 	Mrelations = OrderedDict(Mrelations)
 	return Mrelations
