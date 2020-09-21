@@ -554,7 +554,7 @@ def get_available_Mrelations(msce_type='MSCE'):
 		r_val = False
 		subclass = getattr
 		if inspect.isclass(member):
-			if issubclass(member, msce_class):
+			if issubclass(member, msce_class) and member != msce_class:
 				return True
 		return r_val
 
