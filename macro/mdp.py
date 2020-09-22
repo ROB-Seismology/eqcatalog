@@ -127,6 +127,7 @@ class MDPCollection():
 		list with instances of :class:`MacroseismicDataPoint`
 	"""
 	def __init__(self, mdp_list, name=''):
+		assert len(set([mdp.imt for mdp in mdp_list])) == 1
 		self.mdp_list = mdp_list
 		self.name = name
 
@@ -170,6 +171,10 @@ class MDPCollection():
 	@property
 	def Imean(self):
 		return np.array([mdp.Imean for mdp in self])
+
+	@property
+	def imt(self):
+		return self.mdp_list[0].imt
 
 	def get_longitudes(self):
 		return np.array([mdp.lon for mdp in self])
@@ -253,7 +258,8 @@ class MDPCollection():
 
 		return agg_func(intensities)
 
-	def remove_outliers(self, Imin_or_max, min_pct=2.5, max_pct=97.5):
+	def remove_outliers(self, Imin_or_max, min_pct=2.5, max_pct=97.5,
+						verbose=False):
 		"""
 		Remove outliers (with intensity outside of confidence range)
 		from collection
@@ -266,6 +272,9 @@ class MDPCollection():
 		:param max_pct:
 			float, upper percentile
 			(default: 97.5)
+		:param verbose:
+			bool, whether or not to print number of removed MDPs
+			(default: False)
 
 		:return:
 			instance of :class:`MDPCollection`
@@ -277,6 +286,28 @@ class MDPCollection():
 		mdp_list = []
 		for idx in np.where(within_confidence)[0]:
 			mdp_list.append(self.mdp_list[idx])
+		if verbose:
+			print('Removed %d MDPs' % (len(self) - len(mdp_list)))
+
+		return self.__class__(mdp_list)
+
+	def remove_empty_locations(self, verbose=False):
+		"""
+		Remove MDPs without location
+
+		:param verbose:
+			bool, whether or not to print number of removed MDPs
+			(default: False)
+
+		:return:
+			instance of :class:`MDPCollection`
+		"""
+		mdp_list = []
+		for mdp in self:
+			if not (mdp.lon is None or (mdp.lon == 0 and mdp.lat == 0)):
+				mdp_list.append(mdp)
+		if verbose:
+			print('Removed %d MDPs' % (len(self) - len(mdp_list)))
 
 		return self.__class__(mdp_list)
 
@@ -426,13 +457,13 @@ class MDPCollection():
 				else:
 					lon, lat = 0., 0.
 				db_ids = [mdp.id for mdp in mdpc]
-				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, agg_type,
-											data_type, num_replies, lon, lat,
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, self.imt,
+											agg_type, data_type, num_replies, lon, lat,
 											db_ids=db_ids, geom_key_val=agg_key)
 				macro_info_list.append(macro_info)
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
-					min_or_max=Imin_or_max)
+					Imin_or_max=Imin_or_max)
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 											proc_info=proc_info)
 
@@ -468,7 +499,7 @@ class MDPCollection():
 			macro_info_list.append(macro_info)
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
-					min_or_max=Imin_or_max)
+					Imin_or_max=Imin_or_max)
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 											proc_info=proc_info)
 
@@ -587,8 +618,8 @@ class MDPCollection():
 			lon, lat = centroid.lon, centroid.lat
 			db_ids = [mdp.id for mdp in mdpc]
 			if len(mdpc) >= min_num_mdp or include_unmatched_polygons:
-				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, agg_type,
-											data_type, num_replies, lon, lat,
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, self.imt,
+											agg_type, data_type, num_replies, lon, lat,
 											db_ids=db_ids, geom_key_val=geom_key_val)
 				macro_info_list.append(macro_info)
 				polygon_list.append(poly_obj)
@@ -596,7 +627,7 @@ class MDPCollection():
 		macro_geoms = lbm.MultiPolygonData.from_polygons(polygon_list)
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
-					min_or_max=Imin_or_max)
+					Imin_or_max=Imin_or_max)
 		return AggregatedMacroInfoCollection(macro_info_list, 'polygon', data_type,
 									macro_geoms=macro_geoms, geom_key=value_key,
 									proc_info=proc_info)
@@ -752,8 +783,8 @@ class MDPCollection():
 				num_replies = len(mdpc)
 				lon, lat, _ = self._parse_pt(ref_pt)
 				db_ids = [mdp.id for mdp in mdpc]
-				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, agg_type,
-											data_type, num_replies, lon, lat,
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, self.imt,
+											agg_type, data_type, num_replies, lon, lat,
 											db_ids=db_ids, geom_key_val=max_radius)
 				macro_info_list.append(macro_info)
 
@@ -780,7 +811,7 @@ class MDPCollection():
 			macro_geoms = None
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
-					min_or_max=Imin_or_max)
+					Imin_or_max=Imin_or_max)
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 									macro_geoms=macro_geoms, geom_key=geom_key,
 									proc_info=proc_info)
@@ -868,13 +899,13 @@ class MDPCollection():
 				num_replies = len(mdpc)
 				lon, lat = grid_key
 				db_ids = [mdp.id for mdp in mdpc]
-				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity,
+				macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, self.imt,
 												agg_type, data_type, num_replies,
 												lon, lat, db_ids=db_ids)
 				macro_info_list.append(macro_info)
 
 		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
-					min_or_max=Imin_or_max)
+					Imin_or_max=Imin_or_max)
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 											proc_info=proc_info)
 
