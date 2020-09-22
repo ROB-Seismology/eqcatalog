@@ -217,10 +217,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if plot_info == 'intensity':
 		thematic_classes = np.arange(1, min(cmap.N, 12) + 1, dtype='int')
 		data_type = macro_info_coll.data_type
-		cb_title = {'internet': "Community Internet Intensity",
-					'online': "Community Internet Intensity",
-					'traditional': "Macroseismic Intensity"}.get(data_type,
-													"Macroseismic Intensity")
+		cb_title = 'Macroseismic Intensity (%s)' % macro_info_coll.imt
+		#cb_title = {'internet': "Community Internet Intensity",
+		#			'online': "Community Internet Intensity",
+		#			'traditional': "Macroseismic Intensity"}.get(data_type,
+		#											"Macroseismic Intensity")
 	elif plot_info == 'num_replies':
 		if thematic_classes is None:
 			thematic_classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000],
@@ -236,7 +237,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				thematic_classes = np.arange(-2.75, 2.8, 0.5)
 			else:
 				thematic_classes = np.arange(-4.5, 5, 1)
-		cb_title = "Residual Intensity"
+		cb_title = "Residual Intensity (%s)" % macro_info_coll.imt
 		cmap = matplotlib.cm.get_cmap('bwr')
 
 	if color_gradient[:4] == "disc":
