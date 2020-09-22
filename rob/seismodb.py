@@ -567,7 +567,8 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 		str, type of macroseismic data: '', 'official' or 'historical'
 		(default: '')
 	:param group_by_main_commune:
-		bool, whether or not to group the results by main village
+		bool, whether or not the value of :param:`id_com` corresponds
+		to main village
 		(default: False)
 	:param min_fiability:
 		float, minimum fiability of enquiry
@@ -644,13 +645,14 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 
 	## Construct MDP Collection
 	mdp_list = []
+	imt = 'EMS98'
 	for rec in macro_recs:
 		## Convert None Imin/Imax values to np.nan
 		rec['Imin'] = rec['Imin'] or np.nan
 		rec['Imax'] = rec['Imax'] or np.nan
 
 		mdp = MDP(rec.pop('id_macro_detail'), rec.pop('id_earth'), rec.pop('Imin'),
-				rec.pop('Imax'), 'EMS98', rec.pop('longitude'), rec.pop('latitude'),
+				rec.pop('Imax'), imt, rec.pop('longitude'), rec.pop('latitude'),
 				data_type or 'traditional', rec.pop('id_com'), rec.pop('id_main'),
 				rec.pop('fiability'), **rec)
 		mdp_list.append(mdp)
@@ -679,7 +681,7 @@ def query_historical_macro_catalog(id_earth, id_com=None, group_by_main_commune=
 
 
 def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type='',
-					min_or_max='max', group_by_main_commune=False, agg_method="mean",
+					Imin_or_max='max', group_by_main_commune=False, agg_method="mean",
 					min_fiability=80, verbose=False, errf=None):
 	"""
 	Query ROB traditional macroseismic catalog
@@ -700,7 +702,7 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 	:param data_type:
 		str, type of macroseismic data: '', 'official' or 'historical'
 		(default: '')
-	:param min_or_max:
+	:param Imin_or_max:
 		str, one of 'min', 'mean' or 'max' to select between
 		intensity_min and intensity_max values in database
 		(default: 'max')
@@ -735,11 +737,11 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 		query = 'SELECT id_com_main as "id_com",'
 		query += ' Longitude as "longitude", Latitude as "latitude",'
 		query += ' id as "id_db",'
-		if min_or_max == 'max':
+		if Imin_or_max == 'max':
 			query += ' Imax'
-		elif min_or_max == 'min':
+		elif Imin_or_max == 'min':
 			query += ' Imin'
-		elif min_or_max == 'mean':
+		elif Imin_or_max == 'mean':
 			query += ' (Imin + Imax) / 2.'
 		query += ' as "Intensity"'
 		query += ' from Macro18280223 Where country = "BE"'
@@ -771,13 +773,13 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 
 		if group_by_main_commune:
 			agg_function = AGG_FUNC_DICT.get(agg_method.lower())
-			if min_or_max == 'min':
+			if Imin_or_max == 'min':
 				intensity_col = '%s(%s) AS "Intensity"'
 				intensity_col %= (agg_function, Imin_clause)
-			elif min_or_max == 'max':
+			elif Imin_or_max == 'max':
 				intensity_col = '%s(%s) AS "Intensity"'
 				intensity_col %= (agg_function, Imax_clause)
-			elif min_or_max == 'mean':
+			elif Imin_or_max == 'mean':
 				intensity_col = '%s((%s + %s)/2.) AS "Intensity"'
 				intensity_col %= (agg_function, Imin_clause, Imax_clause)
 			column_clause.append(intensity_col)
@@ -785,11 +787,11 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 			column_clause.append('GROUP_CONCAT(id_macro_detail SEPARATOR ",") AS id_db')
 		else:
 			agg_method = None
-			if min_or_max == 'min':
+			if Imin_or_max == 'min':
 				intensity_col = '%s AS "Intensity"' % Imin_clause
-			elif min_or_max == 'max':
+			elif Imin_or_max == 'max':
 				intensity_col = '%s AS "Intensity"' % Imax_clause
-			elif min_or_max == 'mean':
+			elif Imin_or_max == 'mean':
 				intensity_col = '(%s + %s)/2. AS "Intensity"'
 				intensity_col %= (Imin_clause, Imax_clause)
 			column_clause.append(intensity_col)
@@ -836,6 +838,7 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 	## Fetch records
 	macro_infos = []
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_commune]
+	imt = 'EMS98'
 	for rec in macro_recs:
 		id_com = rec['id_com']
 		I = float(rec['Intensity'])
@@ -849,20 +852,20 @@ def query_traditional_macro_catalog_aggregated(id_earth, id_com=None, data_type=
 			enq_type = 'traditional'
 		else:
 			enq_type = data_type
-		macro_info = AggregatedMacroInfo(id_earth, id_com, I, agg_type,
+		macro_info = AggregatedMacroInfo(id_earth, id_com, I, imt, agg_type,
 										enq_type, num_replies=num_replies,
 										lon=lon, lat=lat, db_ids=db_ids)
 		macro_infos.append(macro_info)
 
 	proc_info = dict(agg_method=agg_method, min_fiability=min_fiability,
-					min_or_max=min_or_max)
+					Imin_or_max=Imin_or_max)
 	macro_info_coll = AggregatedMacroInfoCollection(macro_infos, agg_type, enq_type,
 													proc_info=proc_info)
 
 	return macro_info_coll
 
 
-def query_official_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='max',
+def query_official_macro_catalog_aggregated(id_earth, id_com=None, Imin_or_max='max',
 					group_by_main_commune=False, agg_method="mean",
 					min_fiability=80, verbose=False, errf=None):
 	"""
@@ -873,7 +876,7 @@ def query_official_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='m
 	return query_traditional_macro_catalog_aggregated(data_type='official', **kwargs)
 
 
-def query_historical_macro_catalog_aggregated(id_earth, id_com=None, min_or_max='max',
+def query_historical_macro_catalog_aggregated(id_earth, id_com=None, Imin_or_max='max',
 					group_by_main_commune=False, agg_method="mean",
 					min_fiability=80, verbose=False, errf=None):
 	"""
@@ -973,6 +976,7 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 
 	## Fetch records
 	macro_infos = []
+	imt = query_info.upper()
 	agg_type = {False: 'id_com', True: 'id_main'}[group_by_main_commune]
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					join_clause=join_clause, where_clause=where_clause,
@@ -983,7 +987,7 @@ def query_online_macro_catalog_aggregated(id_earth, min_replies=3, query_info="c
 		lon, lat = rec['lon'], rec['lat']
 		num_replies = rec['num_replies']
 		web_ids = list(map(int, rec['id_web'].split(',')))
-		macro_info = AggregatedMacroInfo(id_earth, id_com, I, agg_type,
+		macro_info = AggregatedMacroInfo(id_earth, id_com, I, imt, agg_type,
 										'internet', num_replies=num_replies,
 										lon=lon, lat=lat, db_ids=web_ids)
 		macro_infos.append(macro_info)
