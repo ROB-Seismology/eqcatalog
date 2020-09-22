@@ -110,7 +110,7 @@ def get_eq_intensities_for_commune_online(id_com, as_main_commune=False,
 
 
 def get_eq_intensities_for_commune_traditional(id_com, data_type='',
-					as_main_commune=False, min_or_max='mean', min_fiability=80):
+					as_main_commune=False, Imin_or_max='mean', min_fiability=80):
 	"""
 	Get list of all traditional intensities due to known earthquakes
 	for a given commune
@@ -124,7 +124,7 @@ def get_eq_intensities_for_commune_traditional(id_com, data_type='',
 		bool, whether or not to group subcommunes belonging to a
 		main commune
 		(default: False)
-	:param min_or_max:
+	:param Imin_or_max:
 		str, one of 'min', 'mean' or 'max' to select between
 		intensity_min and intensity_max values in database
 		(default: 'mean')
@@ -145,7 +145,7 @@ def get_eq_intensities_for_commune_traditional(id_com, data_type='',
 	eq_intensities = {}
 	mdpc_dict = mdp_collection.split_by_property('id_earth')
 	for id_earth, mdpc in mdpc_dict.items():
-		I = mdpc.get_intensities(min_or_max)
+		I = mdpc.get_intensities(Imin_or_max)
 		## Discard nan values
 		eq_intensities[id_earth] = list(I[~np.isnan(I)])
 
@@ -153,7 +153,7 @@ def get_eq_intensities_for_commune_traditional(id_com, data_type='',
 
 
 def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
-										min_or_max='mean', min_fiability=80):
+										Imin_or_max='mean', min_fiability=80):
 	"""
 	Get list of all official intensities due to known earthquakes
 	for a given commune
@@ -164,7 +164,7 @@ def get_eq_intensities_for_commune_official(id_com, as_main_commune=False,
 
 
 def get_eq_intensities_for_commune_historical(id_com, as_main_commune=False,
-										min_or_max='mean', min_fiability=80):
+										Imin_or_max='mean', min_fiability=80):
 	"""
 	Get list of all official intensities due to known earthquakes
 	for a given commune
@@ -175,7 +175,7 @@ def get_eq_intensities_for_commune_historical(id_com, as_main_commune=False,
 
 
 def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
-											min_or_max='mean', as_points=True):
+											Imin_or_max='mean', as_points=True):
 	"""
 	Get intensities for all communes from available isoseismals
 
@@ -183,7 +183,7 @@ def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
 		bool, whether or not to group subcommunes belonging to a
 		main commune
 		(default: False)
-	:param min_or_max:
+	:param Imin_or_max:
 		str, one of 'min', 'mean' or 'max' to select between
 		Imin and Imax contour values
 		(default: 'mean')
@@ -202,7 +202,7 @@ def get_isoseismal_intensities_for_all_communes(as_main_commune=False,
 	commune_eq_intensities = {}
 	for eq_id in get_available_isoseismals():
 		comm_intensities = get_commune_intensities_from_isoseismals(eq_id,
-							main_communes=as_main_commune, min_or_max=min_or_max,
+							main_communes=as_main_commune, Imin_or_max=Imin_or_max,
 							as_points=as_points)
 		for id_com, I in comm_intensities.items():
 			if not id_com in commune_eq_intensities:
@@ -238,7 +238,7 @@ def _parse_data_type(data_type):
 
 def get_all_commune_intensities(data_type='all',
 				min_fiability=80,
-				min_or_max='mean',
+				Imin_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
@@ -255,7 +255,7 @@ def get_all_commune_intensities(data_type='all',
 	:param min_fiability:
 		int, minimum fiability of internet or official enquiry
 		(default: 80)
-	:param min_or_max:
+	:param Imin_or_max:
 		see :func:`get_eq_intensities_for_commune_official`
 	:param min_replies:
 	:param filter_floors:
@@ -297,7 +297,7 @@ def get_all_commune_intensities(data_type='all',
 
 	if 'isoseismal' in data_types:
 		comm_iso_intensities = get_isoseismal_intensities_for_all_communes(
-						by_main_commune, min_or_max=min_or_max, as_points=False)
+						by_main_commune, Imin_or_max=Imin_or_max, as_points=False)
 		#if 'official' in data_types:
 		#	comm_iso_intensities.pop(509)
 		#	comm_iso_intensities.pop(987)
@@ -325,7 +325,7 @@ def get_all_commune_intensities(data_type='all',
 		if data_type is not None:
 			eq_intensities = get_eq_intensities_for_commune_traditional(id_com,
 							data_type=data_type, as_main_commune=by_main_commune,
-							min_or_max=min_or_max, min_fiability=min_fiability)
+							Imin_or_max=Imin_or_max, min_fiability=min_fiability)
 			for id_earth in eq_intensities.keys():
 				I = agg_func(eq_intensities[id_earth])
 				## Isoseismal intensities will be overwritten
@@ -357,7 +357,7 @@ def get_all_commune_intensities(data_type='all',
 def get_imax_by_commune(data_type='all',
 				count_exceedances=None,
 				min_fiability=80,
-				min_or_max='mean',
+				Imin_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
@@ -377,7 +377,7 @@ def get_imax_by_commune(data_type='all',
 	:param min_fiability:
 		int, minimum fiability of internet or official enquiry
 		(default: 80)
-	:param min_or_max:
+	:param Imin_or_max:
 		see :func:`get_eq_intensities_for_commune_official`
 	:param min_replies:
 	:param filter_floors:
@@ -411,7 +411,7 @@ def get_imax_by_commune(data_type='all',
 
 	## Fetch all intensities
 	commune_eq_intensities = get_all_commune_intensities(data_type=data_type,
-				min_fiability=min_fiability, min_or_max=min_or_max,
+				min_fiability=min_fiability, Imin_or_max=Imin_or_max,
 				min_replies=min_replies, filter_floors=filter_floors,
 				agg_method_online=agg_method_online, fix_records=fix_records,
 				include_other_felt=include_other_felt,
@@ -474,7 +474,7 @@ def get_imax_by_commune(data_type='all',
 				## Note that agg_method of DYFI data will be overwritten,
 				## but historical data are more important for this type of map
 				proc_info['agg_method'] = agg_func
-				proc_info['min_or_max'] = min_or_max
+				proc_info['Imin_or_max'] = Imin_or_max
 			macro_info_coll = AggregatedInfoCollection(macro_infos, agg_type,
 												data_type, proc_info=proc_info)
 
@@ -483,7 +483,7 @@ def get_imax_by_commune(data_type='all',
 
 def get_num_exceedances_by_commune(Imin, data_type='all',
 				min_fiability=80,
-				min_or_max='mean',
+				Imin_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
