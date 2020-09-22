@@ -126,7 +126,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		return aggregate_online_macro_info(self.ID, **kwargs)
 
 	def get_aggregated_traditional_macro_info(self, id_com=None, data_type='',
-			min_or_max='max', min_fiability=80, aggregate_by="commune",
+			Imin_or_max='max', min_fiability=80, aggregate_by="commune",
 			agg_method="mean", verbose=False):
 		"""
 		Get traditional (historical / official) macroseismic information
@@ -139,7 +139,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		:param data_type:
 			str, type of macroseismic data: '', 'official' or 'historical'
 			(default: '')
-		:param min_or_max:
+		:param Imin_or_max:
 			str, one of 'min', 'mean' or 'max' to select between
 			intensity_min and intensity_max values in database
 			(default: 'max')
@@ -170,7 +170,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		from ..macro import aggregate_traditional_macro_info
 		return aggregate_traditional_macro_info(self.ID, **kwargs)
 
-	def get_aggregated_official_macro_info(self, id_com=None, min_or_max='max',
+	def get_aggregated_official_macro_info(self, id_com=None, Imin_or_max='max',
 			aggregate_by="commune", agg_method="mean", min_fiability=80,
 			verbose=False):
 		"""
@@ -182,7 +182,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		kwargs.pop('self')
 		return self.get_aggregated_traditional_macro_info(data_type='official', **kwargs)
 
-	def get_aggregated_historical_macro_info(self, id_com=None, min_or_max='max',
+	def get_aggregated_historical_macro_info(self, id_com=None, Imin_or_max='max',
 			aggregate_by="commune", agg_method="mean", min_fiability=80,
 			verbose=False):
 		"""
@@ -208,7 +208,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 			str, type of macroseismic data: '', 'official' or 'historical'
 			(default: '')
 		:param group_by_main_commune:
-			bool, whether or not to group the results by main village
+			bool, whether or not the value of :param:`id_com` corresponds
+			to main village
 			(default: False)
 		:param min_fiability:
 			float, minimum fiability of enquiry
@@ -365,14 +366,14 @@ class ROBLocalEarthquake(LocalEarthquake):
 		#				Imax = I
 		return Imax
 
-	def get_Imax_traditional(self, data_type='', min_or_max='max',
+	def get_Imax_traditional(self, data_type='', Imin_or_max='max',
 			min_fiability=80, aggregate_by="commune", agg_method="mean",
 			verbose=False):
 		"""
 		Report maximum traditional intensity in any commune for this earthquake.
 
 		:param data_type:
-		:param min_or_max:
+		:param Imin_or_max:
 		:param min_fiability:
 		:param aggregate_by:
 		:param agg_method:
@@ -391,7 +392,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			Imax = 0
 		return Imax
 
-	def get_Imax_official(self, min_or_max='max', min_fiability=80,
+	def get_Imax_official(self, Imin_or_max='max', min_fiability=80,
 				aggregate_by="commune", agg_method="mean", verbose=False):
 		"""
 		Report maximum official intensity in any commune for this earthquake.
@@ -401,7 +402,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		kwargs.pop('self')
 		return self.get_Imax_traditional(data_type='official', **kwargs)
 
-	def get_Imax_historical(self, min_or_max='max', min_fiability=80,
+	def get_Imax_historical(self, Imin_or_max='max', min_fiability=80,
 				aggregate_by="commune", agg_method="mean", verbose=False):
 		"""
 		Report maximum historical intensity in any commune for this earthquake.
@@ -425,7 +426,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 			return 0
 
 	def get_Imax(self, min_fiability=80,
-				min_or_max='mean',
+				Imin_or_max='mean',
 				min_replies=3, filter_floors=(0, 4),
 				agg_method_online='mean', fix_records=True, include_other_felt=True,
 				include_heavy_appliance=False, remove_outliers=(2.5, 97.5),
@@ -443,7 +444,7 @@ class ROBLocalEarthquake(LocalEarthquake):
 		## Note: same min_fiability for traditional and online
 		aggregate_by = {True: 'main commune', False: 'commune'}[by_main_commune]
 		Imax_traditional = self.get_Imax_traditional(min_fiability=min_fiability,
-								min_or_max=min_or_max, aggregate_by=by_main_commune,
+								Imin_or_max=Imin_or_max, aggregate_by=by_main_commune,
 								agg_method=agg_subcommunes, verbose=verbose)
 		Imax_online = self.get_Imax_online(min_replies=min_replies,
 							min_fiability=min_fiability, filter_floors=filter_floors,
