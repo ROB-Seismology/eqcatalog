@@ -1466,6 +1466,7 @@ class DYFIEnsemble(object):
 
 		## Compute aggregated intensity and convert to aggregated macro info
 		macro_infos = []
+		imt = agg_info.upper()
 		for key in list(agg_ensemble_dict.keys()):
 			num_replies = agg_ensemble_dict[key].num_replies
 			if num_replies < min_replies:
@@ -1505,7 +1506,7 @@ class DYFIEnsemble(object):
 			else:
 				lon, lat = 0, 0
 
-			macro_info = AggregatedMacroInfo(id_earth, id_com, I, aggregate_by,
+			macro_info = AggregatedMacroInfo(id_earth, id_com, I, imt, aggregate_by,
 									'internet', num_replies, lon=lon, lat=lat,
 									residual=residual, db_ids=web_ids,
 									geom_key_val=geom_key_val)
