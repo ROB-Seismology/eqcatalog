@@ -80,7 +80,7 @@ def read_isoseismals(id_earth, filled=True):
 
 
 def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
-											min_or_max='mean', as_points=True):
+											Imin_or_max='mean', as_points=True):
 	"""
 	Assign intensities to communes based on isoseismals
 
@@ -89,7 +89,7 @@ def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
 	:param main_communes:
 		bool, whether or not to use main communes
 		(default: False)
-	:param min_or_max:
+	:param Imin_or_max:
 		str, one of 'min', 'mean' or 'max' to select between
 		Imin and Imax contour values
 		(default: 'mean')
@@ -103,10 +103,12 @@ def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
 		dict, mapping commune IDs to intensities
 	"""
 	import mapping.layeredbasemap as lbm
-	from ..rob.communes import read_commune_polygons
+	from ..rob.seismo_gis import read_commune_polygons
 
 	isoseismals = read_isoseismals(id_earth, filled=True)
 	id_com_intensity_dict = {}
+	if not isoseismals:
+		return id_com_intensity_dict
 
 	if as_points:
 		comm_recs = seismodb.get_communes('BE', main_communes=main_communes)
@@ -117,11 +119,11 @@ def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
 
 		for isoseismal in isoseismals:
 			Imin, Imax = isoseismal.value['Imin'], isoseismal.value['Imax']
-			if min_or_max[:3] == 'min':
+			if Imin_or_max[:3] == 'min':
 				intensity = Imin
-			elif min_or_max[:3] == 'max':
+			elif Imin_or_max[:3] == 'max':
 				intensity = Imax
-			elif min_or_max == 'mean':
+			elif Imin_or_max == 'mean':
 				intensity = (Imin + Imax) / 2.
 			is_inside = isoseismal.contains(pt_data)
 			for i in range(len(is_inside)):
@@ -143,7 +145,7 @@ def get_commune_intensities_from_isoseismals(id_earth, main_communes=False,
 	return id_com_intensity_dict
 
 
-def get_isoseismal_macro_info(id_earth, main_communes=False, min_or_max='mean',
+def get_isoseismal_macro_info(id_earth, main_communes=False, Imin_or_max='mean',
 								as_points=True):
 	"""
 	Similar to :func:`get_commune_intensities_from_isoseismals`,
@@ -152,7 +154,7 @@ def get_isoseismal_macro_info(id_earth, main_communes=False, min_or_max='mean',
 	from .macro_info import AggregatedMacroInfo, AggregatedMacroInfoCollection
 
 	id_com_intensity_dict = get_commune_intensities_from_isoseismals(id_earth,
-								main_communes=main_communes, min_or_max=min_or_max,
+								main_communes=main_communes, Imin_or_max=Imin_or_max,
 								as_points=as_points)
 
 	comm_recs = seismodb.get_communes('BE', main_communes=main_communes)
@@ -174,6 +176,9 @@ def get_isoseismal_macro_info(id_earth, main_communes=False, min_or_max='mean',
 		macro_infos.append(mi)
 
 	proc_info = dict(as_points=as_points)
-	macro_info_col = AggregatedMacroInfoCollection(macro_infos, agg_type,
+	if len(macro_infos):
+		macro_info_col = AggregatedMacroInfoCollection(macro_infos, agg_type,
 											'isoseismal', proc_info=proc_info)
+	else:
+		macro_info_col = None
 	return macro_info_col
