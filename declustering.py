@@ -162,15 +162,56 @@ class Reasenberg1985Window(DeclusteringWindow):
 	Implements time and distance windows used in declustering
 	method of Reasenberg (1985). This should only be used
 	in combination with :class:`ReasenbergMethod`
+
+	:param rfact:
+		float, number of crack radii (see Kanamori and Anderson,
+		1975) surrounding each earthquake within which to
+		consider linking a new event into cluster
+		(default: 10)
+	:param dsigma:
+		float, stress drop (in bars)
+		(default: 30)
+	:param rmax:
+		float, maximum interaction distance (in km)
+		(default: 30, i.e. one crustal thickness)
+	:param tau_min:
+		float, minimum length of time window (in minutes)
+		(default: 2880. = 2 days)
+	:param tau_max:
+		float, maximum length of time window (in minutes)
+		(default: 144000. = 10 days)
+	:param xmeff:
+		float, "effective" lower magnitude cutoff of the catalog
+		(default: 1.5)
+	:param xk:
+		float, factor used to raise :param:`xmeff` above its base
+		value during clusters
+		(default: 0.5)
+	:param p1:
+		float, confidence level
+		(default: 0.99)
 	"""
 	name = "Reasenberg1985"
 
-	# TODO: add XK, XMEFF, rfact, dsigma to __init__ as properties?
-	def get_time_window(self, mag, time_delta=0,
-						tau_min=2880., tau_max=14400.):
+	def __init__(self, rfact=10, dsigma=30, rmax=30,
+				tau_min=2880., tau_max=14400.,
+				xmeff=1.5, xk=0.5, p1=0.99):
+		self.rfact = rfact
+		self.dsigma = dsigma
+		self.rmax = rmax
+		self.tau_min = tau_min
+		self.tau_max = tau_max
+		self.xmeff = xmeff
+		self.xk = xk
+		self.p1 = p1
+
+	def get_time_window(self, mag, time_delta=0):
 		"""
-		Time window is a function of the magnitude of
-		and the time since the largest event in the cluster
+		Time window is the look-ahead time, defined as the time required
+		to wait in order to be p1 confident of observing the next
+		earthquake in the sequence.
+		This is based on the Omori law, and is a function of the magnitude
+		of and the time since the largest event in the cluster
 
 		:param mag:
 			float or array, magnitude of largest event in cluster
@@ -179,12 +220,6 @@ class Reasenberg1985Window(DeclusteringWindow):
 			time difference between event and largest event in cluster
 			(in minutes if float)
 			(default: 0 = case where no cluster has been defined yet)
-		:param tau_min:
-			float, minimum length of time window (in minutes)
-			(default: 2880. = 2 days)
-		:param tau_max:
-			float, maximum length of time window (in minutes)
-			(default: 144000. = 10 days)
 
 		:return:
 			numpy timedelta64
@@ -196,33 +231,32 @@ class Reasenberg1985Window(DeclusteringWindow):
 			mag = np.array([mag])
 		else:
 			mag = np.asarray(mag)
-		# TODO: xmeff should be function argument
-		P1, XK, XMEFF = 0.99, 0.5, 1.5
+		## These parameters are defined as class properties
+		#P1, XK, XMEFF = 0.99, 0.5, 1.5
 		if is_np_timedelta(time_delta):
 			td = fractional_time_delta(time_delta, 'm')
 		else:
 			td = float(time_delta)
 		if (np.isscalar(td) or len(td) == 1):
 			td = np.repeat(td, len(mag))
-		tau = np.ones_like(mag) * tau_min
+		tau = np.ones_like(mag) * self.tau_min
 		pos_idxs = (td > 0)
 		if pos_idxs.any():
 			## deltam: delta in magnitude
-			deltam = (1. - XK) * mag[pos_idxs] - XMEFF
+			deltam = (1. - self.xk) * mag[pos_idxs] - self.xmeff
 			deltam = np.maximum(0, deltam)
 			## denom: expected rate of aftershocks
 			denom = 10**((deltam - 1.) * 2./3)
-			top = -np.log(1. - P1) * td[pos_idxs]
+			top = -np.log(1. - self.p1) * td[pos_idxs]
 			_tau = top / denom
 			## Truncate tau to not exceed TAUMAX or drop below TAUMIN
-			tau[pos_idxs] = np.maximum(tau_min, np.minimum(tau_max, _tau))
+			tau[pos_idxs] = np.maximum(self.tau_min, np.minimum(self.tau_max, _tau))
 		tau_td = np.round(tau * 60).astype('m8[s]')
 		if is_scalar:
 			tau_td = tau_td[0]
 		return tau_td
 
-	def get_dist_window(self, mag, cluster_mag=0,
-						rfact=10, dsigma=30, rmax=30):
+	def get_dist_window(self, mag, cluster_mag=0):
 		"""
 		Calculate interaction radius for an event and for the largest
 		event in the cluster associated with this event.
@@ -239,29 +273,18 @@ class Reasenberg1985Window(DeclusteringWindow):
 			float, magnitude of largest event in cluster associated
 			with same event
 			(default: 0 = case where no cluster has been defined yet)
-		:param rfact:
-			float, number of crack radii (see Kanamori and Anderson,
-			1975) surrounding each earthquake within which to
-			consider linking a new event into cluster
-			(default: 10)
-		:param dsigma:
-			float, stress drop (in bars)
-			(default: 30)
-		:param rmax:
-			float, maximum interaction distance (in km)
-			(default: 30, i.e. one crustal thickness)
 
 		:return:
 			float, distance (in km)
 		"""
-		if dsigma == 30:
+		if self.dsigma == 30:
 			dsigma_term = 0.011
 		else:
-			dsigma_term = 10**((-np.log10(dsigma))/3. - 1.45)
-		r1 = rfact * dsigma_term * 10**(0.4 * mag)
+			dsigma_term = 10**((-np.log10(self.dsigma))/3. - 1.45)
+		r1 = self.rfact * dsigma_term * 10**(0.4 * mag)
 		rmain = dsigma_term * 10**(0.4 * cluster_mag)
 		## Limit interaction distance to one crustal thickness
-		rtest = np.minimum(rmax, r1 + rmain)
+		rtest = np.minimum(self.rmax, r1 + rmain)
 		return rtest
 
 
@@ -1861,7 +1884,7 @@ class ReasenbergMethod(DeclusteringMethod):
 	distance_metric = 'hypocentral'
 
 	def is_in_dist_window(self, eq1, eq2, mag1, cmag1, dc_window,
-					rfact=10, dsigma=30, rmax=30, ignore_location_errors=True):
+						ignore_location_errors=True):
 		"""
 		Determine whether event1 and event2 are clustered according
 		to the radial distance criterion.
@@ -1879,11 +1902,7 @@ class ReasenbergMethod(DeclusteringMethod):
 			float, highest magnitude of cluster first event belongs to.
 			Can be zero if no cluster has been defined yet.
 		:param dc_window:
-			instance of :class:`DeclusteringWindow`
-		:param rfact:
-		:param dsigma:
-		:param rmax:
-			see :meth:`Reasenberg1985Window.get_dist_window`
+			instance of :class:`Reasenberg1985Window`
 		:param ignore_location_errors:
 			bool, whether location errors should be ignored or
 			subtracted from the distance between event 1 and event 2
@@ -1921,8 +1940,7 @@ class ReasenbergMethod(DeclusteringMethod):
 
 		## Calculate interaction radius for the first event of the pair and for
 		## the largest event in the cluster associated with the first event
-		rtest = dc_window.get_dist_window(mag1, cmag1, rfact=rfact,
-										dsigma=dsigma, rmax=rmax)
+		rtest = dc_window.get_dist_window(mag1, cmag1)
 
 		if r <= rtest:
 			return True
@@ -1930,7 +1948,7 @@ class ReasenbergMethod(DeclusteringMethod):
 			return False
 
 	def analyze_clusters(self, catalog, Mrelation, dc_window=Reasenberg1985Window(),
-				tau_min=2880., tau_max=14400., rfact=10, dsigma=30, rmax=30,
+				#tau_min=2880., tau_max=14400., rfact=10, dsigma=30, rmax=30,
 				ignore_location_errors=True, verbose=False):
 		"""
 		Full analysis of individual clusters in earthquake catalog.
@@ -1942,13 +1960,6 @@ class ReasenbergMethod(DeclusteringMethod):
 		:param dc_window:
 			instance of :class:`DeclusteringWindow`
 			(default: instance of :class:`Reasenberg1985Window`)
-		:param tau_min:
-		:param tau_max:
-			see :meth:`Reasenberg1985Window.get_time_window`
-		:param rfact:
-		:param dsigma:
-		:param rmax:
-			see :meth:`Reasenberg1985Window.get_dist_window`
 		:param ignore_location_errors:
 			see :meth:`is_in_dist_window`
 		:param verbose:
@@ -1982,7 +1993,7 @@ class ReasenbergMethod(DeclusteringMethod):
 				ctim1 = clusters[dc_idxs[i]].datetime1()
 				cmag1 = clusters[dc_idxs[i]].mag1()
 				time_delta = itime - ctim1
-			tau = dc_window.get_time_window(cmag1, time_delta, tau_min, tau_max)
+			tau = dc_window.get_time_window(cmag1, time_delta)
 
 			## Keep getting jth events until time_delta_ij > tau
 			for j in range(i+1, len(catalog)):
@@ -2005,8 +2016,7 @@ class ReasenbergMethod(DeclusteringMethod):
 						#cmag1 = 0.
 						cmag1 = magi
 					is_clustered = self.is_in_dist_window(eqi, eqj, magi, cmag1,
-								dc_window, rfact=rfact, dsigma=dsigma, rmax=rmax,
-								ignore_location_errors=ignore_location_errors)
+						dc_window, ignore_location_errors=ignore_location_errors)
 					if is_clustered:
 						## Cluster declared
 						if dc_idxs[i] == dc_idxs[j] == -1:
@@ -2047,8 +2057,7 @@ class ReasenbergMethod(DeclusteringMethod):
 								distance_metric="hypocentral")
 
 	def decluster_catalog(self, catalog, Mrelation, dc_window=Reasenberg1985Window(),
-				tau_min=2880., tau_max=14400., rfact=10, dsigma=30, rmax=30,
-				ignore_location_errors=True):
+						ignore_location_errors=True):
 		"""
 		Decluster catalog.
 		Note that this implementation is currently based on
@@ -2057,11 +2066,6 @@ class ReasenbergMethod(DeclusteringMethod):
 		:param catalog:
 		:param Mrelation:
 		:param dc_window:
-		:param tau_min:
-		:param tau_max:
-		:param rfact:
-		:param dsigma:
-		:param rmax:
 		:param ignore_location_errors:
 			see :meth:`analyze_clusters`
 
@@ -2069,8 +2073,7 @@ class ReasenbergMethod(DeclusteringMethod):
 			instance of :class:`DeclusteringResult`
 		"""
 		dc_result = self.analyze_clusters(catalog, Mrelation, dc_window,
-						tau_min, tau_max, rfact, dsigma, rmax,
-						ignore_location_errors)
+										ignore_location_errors)
 		return dc_result.get_declustered_catalog()
 
 
