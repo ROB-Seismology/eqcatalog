@@ -304,6 +304,9 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 	## Fetch records
 	eq_list = []
+	num_skipped = 0
+	## Note: id_earth variable overwritten in loop!
+	query_for_id = bool(id_earth)
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					where_clause=where_clause, having_clause=having_clause,
 					order_clause=order_clause, verbose=verbose, errf=errf):
@@ -320,9 +323,11 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		errh, errz, errt, errM = rec["errh"], rec["errz"], rec["errt"], rec["errM"]
 		etype = rec["type"]  ## Avoid conflict with event_type parameter!
 
-		## Skip records without lon,lat, depth and magnitude
-		if lon == lat == depth == M == None:
-			continue
+		## Skip records without lon, lat, depth and magnitude
+		if not query_for_id:
+			if lon == lat == depth == M == None:
+				num_skipped += 1
+				continue
 
 		year, month, day = [int(s) for s in date.split("-")]
 		## Take into account historical earthquakes where part of date is missing
@@ -383,6 +388,10 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 							ML, MS, MW, mb, name, intensity_max, macro_radius,
 							errh, errz, errt, errM, agency="ROB", event_type=etype)
 		eq_list.append(eq)
+
+	if verbose and num_skipped:
+		print('Skipped %d records with NULL location and magnitude'
+				% num_skipped)
 
 	name = "ROB Catalog %s - %s" % (start_date, end_date)
 	start_date, end_date = np.datetime64(start_date), np.datetime64(end_date)
