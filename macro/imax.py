@@ -475,7 +475,7 @@ def get_imax_by_commune(data_type='all',
 				## but historical data are more important for this type of map
 				proc_info['agg_method'] = agg_func
 				proc_info['Imin_or_max'] = Imin_or_max
-			macro_info_coll = AggregatedInfoCollection(macro_infos, agg_type,
+			macro_info_coll = AggregatedMacroInfoCollection(macro_infos, agg_type,
 												data_type, proc_info=proc_info)
 
 	return macro_info_coll
