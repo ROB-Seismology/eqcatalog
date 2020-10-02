@@ -9,7 +9,7 @@ import eqcatalog
 
 out_folder = r"C:\Temp"
 
-end_date = 2018
+end_date = '2019-12-31'
 region = (1, 8, 49, 52)
 
 ## Gruenthal
@@ -28,14 +28,16 @@ event_type = 'ke'
 """
 
 ## Tractebel
-"""
-start_date = 1350
+start_date = '1350-01-01'
+end_date = '2020-06-30'
 region = (0, 8, 49, 52)
 event_type = 'ke'
 Mmin = 1.8
 Mtype = 'MW'
 Mrelation = {}
-"""
+catalog_name = 'ROB Catalog %s - %s'
+catalog_name %= (start_date.split('-')[0], end_date.split('-')[0])
+
 
 ## David Baumont
 """
@@ -59,6 +61,7 @@ Mrelation = {}
 """
 
 ## VPO (tectonic)
+"""
 out_folder = r"E:\Home\_kris\Projects\2019 - VPO Balmatt"
 start_date = '1350-01-01'
 end_date = '2019-10-31'
@@ -74,8 +77,7 @@ catalog_name = 'ROB tectonic earthquake catalog'
 start_date = '1910-01-01'
 event_type = 'ke,se,ki,si,qb,sqb,km,sm,kr,sr,cb,scb,kx,sx'
 catalog_name = 'ROB instrumental event catalog'
-
-
+"""
 
 raw_cat = eqcatalog.rob.query_local_eq_catalog(start_date=start_date, end_date=end_date,
 											region=region, Mmin=-1, event_type=event_type,
@@ -91,10 +93,9 @@ if Mmin:
 #for eq in raw_cat:
 #	del eq.mag['MWc']
 
-raw_cat.print_info()
-
 cat = raw_cat.get_sorted()
 cat.name = catalog_name
+cat.print_info()
 #cat1 = raw_cat.subselect(Mmin=Mmin, Mtype='ML', Mrelation={})
 #cat2 = raw_cat.subselect(Mmin=Mmin, Mtype='MS', Mrelation={})
 #cat = cat1 + cat2
@@ -117,6 +118,7 @@ gis_file = os.path.splitext(csv_file)[0] + '.SHP'
 columns[1] = 'datetime'
 del columns[2]
 cat.export_gis('ESRI Shapefile', gis_file, columns=columns, replace_null_values=-9999)
+exit()
 
 ## Export as KML
 kml_file = os.path.splitext(csv_file)[0] + '.KML'

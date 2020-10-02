@@ -37,7 +37,7 @@ def get_declustering_distance(mag, dc_window_name):
 		float, distance in km
 	"""
 	dc_window = getattr(eqcatalog.declustering, dc_window_name+"Window")()
-	t_window, s_window = dc_window.get(mag)
+	t_window, s_window = dc_window.get_windows(mag)
 	return s_window
 
 
@@ -281,7 +281,9 @@ observed_mfd = rshalib.mfd.EvenlyDiscretizedMFD(Mmin_mfd+mfd_bin_width/2,
 fit_method = "Weichert"
 #fit_method = "wLSQc"
 fitted_mfd = observed_mfd.to_truncated_GR_mfd(completeness, end_date, method=fit_method)
+print(fitted_mfd.a_val, fitted_mfd.b_val)
 fitted_mfd.print_report()
+exit()
 
 mfd_list = [observed_mfd, fitted_mfd]
 cumul_or_inc = ["cumul", "cumul"]
@@ -304,7 +306,7 @@ rshalib.mfd.plot_MFD(mfd_list, labels=labels, completeness=completeness,
 ## Compute Poisson and time-dependent probabilities
 from prettytable import PrettyTable
 import scipy.stats
-from hazard.rshalib.utils.poisson import PoissonTau
+from hazard.rshalib.poisson import PoissonTau
 t = 5.
 print("Scenario probabilities (t=%d yr)" % t)
 

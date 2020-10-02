@@ -27,7 +27,7 @@ tab = PrettyTable(['Relation', 'RMS'])
 for Mrelation_name in MS_MW_relations:
 	Mrelation = getattr(eqcatalog.msc, Mrelation_name)()
 	MWc = Mrelation(MS_db)
-	RMS = np.sqrt(np.mean((MW_db - MWc)**2))
+	RMS = np.sqrt(np.nanmean((MW_db - MWc)**2))
 	row = [Mrelation_name, RMS]
 	tab.add_row(row)
 tab.float_format = '.3'
