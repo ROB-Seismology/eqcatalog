@@ -127,7 +127,7 @@ class MDPCollection():
 		list with instances of :class:`MacroseismicDataPoint`
 	"""
 	def __init__(self, mdp_list, name=''):
-		assert len(set([mdp.imt for mdp in mdp_list])) == 1
+		assert len(set([mdp.imt for mdp in mdp_list])) <= 1
 		self.mdp_list = mdp_list
 		self.name = name
 
