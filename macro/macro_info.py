@@ -200,7 +200,7 @@ class AggregatedMacroInfoCollection():
 	def __init__(self, macro_infos, agg_type, data_type,
 				macro_geoms=None, geom_key='',
 				proc_info={}):
-		assert len(set([mi.imt for mi in macro_infos])) == 1
+		assert len(set([mi.imt for mi in macro_infos])) <= 1
 		self.macro_infos = macro_infos
 		self.agg_type = agg_type
 		if not data_type and len(macro_infos):
