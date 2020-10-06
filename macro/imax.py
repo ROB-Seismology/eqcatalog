@@ -288,7 +288,7 @@ def get_all_commune_intensities(data_type='all',
 		agg_function = agg_subcommunes[:3]
 	else:
 		agg_function = agg_subcommunes
-	agg_func = getattr(np, agg_function.lower())
+	agg_func = getattr(np, 'nan'+agg_function.lower())
 
 	## Fetch communes from database
 	comm_recs = seismodb.get_communes('BE', main_communes=by_main_commune)
@@ -327,11 +327,12 @@ def get_all_commune_intensities(data_type='all',
 							data_type=data_type, as_main_commune=by_main_commune,
 							Imin_or_max=Imin_or_max, min_fiability=min_fiability)
 			for id_earth in eq_intensities.keys():
-				I = agg_func(eq_intensities[id_earth])
-				## Isoseismal intensities will be overwritten
-				# TODO: decide if this should always be the case
-				# or only for 'official' enquiries from 1938 onwards!
-				commune_eq_intensities[id_com][id_earth] = I
+				if len(eq_intensities[id_earth]):
+					I = agg_func(eq_intensities[id_earth])
+					## Isoseismal intensities will be overwritten
+					# TODO: decide if this should always be the case
+					# or only for 'official' enquiries from 1938 onwards!
+					commune_eq_intensities[id_com][id_earth] = I
 
 		## Online enquiries
 		if 'internet' in data_types:
@@ -419,9 +420,15 @@ def get_imax_by_commune(data_type='all',
 				remove_outliers=remove_outliers, by_main_commune=by_main_commune,
 				agg_subcommunes=agg_subcommunes, verbose=verbose)
 
-	agg_func = getattr(np, agg_subcommunes.lower())
+	agg_func = getattr(np, 'nan'+agg_subcommunes.lower())
 
 	data_types = _parse_data_type(data_type)
+	imts = []
+	if 'traditional' in data_types or 'isoseismal' in data_types:
+		imts.append('EMS98')
+	if 'internet' in data_types:
+		imts.append('MMI')
+	imt = '/'.join(imts)
 	data_type = '+'.join(data_types)
 
 	macro_infos = []
@@ -435,7 +442,7 @@ def get_imax_by_commune(data_type='all',
 
 		num_replies = len(eq_ids)
 		if num_replies:
-			Imax = intensities.max()
+			Imax = np.nanmax(intensities)
 			if count_exceedances:
 				if count_exceedances == 'Imax':
 					Imin = Imax
@@ -451,7 +458,7 @@ def get_imax_by_commune(data_type='all',
 			id_earth = sorted(eq_ids)
 			agg_type = 'id_main' if by_main_commune else 'id_com'
 			db_ids = []
-			macro_info = AggregatedMacroInfo(id_earth, id_com, Imax, agg_type,
+			macro_info = AggregatedMacroInfo(id_earth, id_com, Imax, imt, agg_type,
 										data_type, num_replies, lon, lat, db_ids)
 			macro_infos.append(macro_info)
 
@@ -473,7 +480,7 @@ def get_imax_by_commune(data_type='all',
 				or 'historical' in data_types):
 				## Note that agg_method of DYFI data will be overwritten,
 				## but historical data are more important for this type of map
-				proc_info['agg_method'] = agg_func
+				proc_info['agg_method'] = agg_subcommunes.lower()
 				proc_info['Imin_or_max'] = Imin_or_max
 			macro_info_coll = AggregatedMacroInfoCollection(macro_infos, agg_type,
 												data_type, proc_info=proc_info)
