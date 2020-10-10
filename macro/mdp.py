@@ -127,7 +127,7 @@ class MDPCollection():
 		list with instances of :class:`MacroseismicDataPoint`
 	"""
 	def __init__(self, mdp_list, name=''):
-		assert len(set([mdp.imt for mdp in mdp_list])) <= 1
+		#assert len(set([mdp.imt for mdp in mdp_list])) <= 1
 		self.mdp_list = mdp_list
 		self.name = name
 
@@ -174,7 +174,8 @@ class MDPCollection():
 
 	@property
 	def imt(self):
-		return self.mdp_list[0].imt
+		imts = sorted(set([mdp.imt for mdp in self]))
+		return ' / '.join(imts)
 
 	def get_longitudes(self):
 		return np.array([mdp.lon for mdp in self])
