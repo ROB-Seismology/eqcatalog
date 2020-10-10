@@ -1646,8 +1646,9 @@ class LinkedWindowMethod(DeclusteringMethod):
 
 	def get_foreshocks(self, main_event, catalog, dc_window, Mrelation):
 		# TODO
-		mainshock_idx = catalog.index(main_event)
-		subcat = catalog[:mainshock_idx + 1]
+		#mainshock_idx = catalog.index(main_event)
+		#subcat = catalog[:mainshock_idx + 1]
+		raise NotImplementedError
 
 	def analyze_clusters(self, catalog, dc_window, Mrelation, verbose=False):
 		"""
