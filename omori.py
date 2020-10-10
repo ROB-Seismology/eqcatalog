@@ -216,7 +216,7 @@ class OmoriLaw(object):
 		popt, pcov = curve_fit(omori_rate, delta_t, n, p0=initial_guess,
 							bounds=bounds)
 		perr = np.sqrt(np.diag(pcov))
-		return (popt, perr)
+		return (popt, pcov, perr)
 
 	@classmethod
 	def fit_cumulative(cls, delta_t, N, initial_guess=(1, 0.01, 1.2),
@@ -236,26 +236,36 @@ class OmoriLaw(object):
 		popt, pcov = curve_fit(omori_cumulative, delta_t, N, p0=initial_guess,
 							bounds=bounds)
 		perr = np.sqrt(np.diag(pcov))
-		return (popt, perr)
+		return (popt, pcov, perr)
 
 	@classmethod
 	def fit_mle(cls):
 		## See https://towardsdatascience.com/a-gentle-introduction-to-maximum-likelihood-estimation-9fbff27ea12f
 		pass
 
-	def plot_rate(self, delta_t):
+	def plot_rate(self, delta_t, **kwargs):
+		from plotting.generic_mpl import plot_xy
+
 		as_rate = self.get_aftershock_rate(delta_t)
-		pylab.plot(delta_t, as_rate)
-		pylab.xlabel('Time since mainshock')
-		pylab.ylabel('Aftershock rate')
-		pylab.show()
+		datasets = [(delta_t, as_rate)]
+		if not 'xlabel' in kwargs:
+			kwargs['xlabel'] = 'Time since mainshock'
+		if not 'ylabel' in kwargs:
+			kwargs['ylabel'] = 'Aftershock rate'
+
+		return plot_xy(datasets, **kwargs)
 
 	def plot_cumulative(self, delta_t):
+		from plotting.generic_mpl import plot_xy
+
 		num_as = self.get_num_aftershocks(delta_t)
-		pylab.plot(delta_t, num_as)
-		pylab.xlabel('Time since mainshock')
-		pylab.ylabel('Number of aftershocks')
-		pylab.show()
+		datasets = [(delta_t, num_as)]
+		if not 'xlabel' in kwargs:
+			kwargs['xlabel'] = 'Time since mainshock'
+		if not 'ylabel' in kwargs:
+			kwargs['ylabel'] = 'Number of aftershocks'
+
+		return plot_xy(datasets, **kwargs)
 
 
 class GROmoriLaw(OmoriLaw):
