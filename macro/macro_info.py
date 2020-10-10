@@ -200,7 +200,7 @@ class AggregatedMacroInfoCollection():
 	def __init__(self, macro_infos, agg_type, data_type,
 				macro_geoms=None, geom_key='',
 				proc_info={}):
-		assert len(set([mi.imt for mi in macro_infos])) <= 1
+		#assert len(set([mi.imt for mi in macro_infos])) <= 1
 		self.macro_infos = macro_infos
 		self.agg_type = agg_type
 		if not data_type and len(macro_infos):
@@ -248,7 +248,8 @@ class AggregatedMacroInfoCollection():
 
 	@property
 	def imt(self):
-		return self.macro_infos[0].imt
+		imts = sorted(set([rec.imt for rec in self]))
+		return ' / '.join(imts)
 
 	@property
 	def residuals(self):
