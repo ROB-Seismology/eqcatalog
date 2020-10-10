@@ -643,7 +643,8 @@ class Cluster():
 		mainshock_dt = self.datetime1()
 		foreshocks = [eq for eq in self.sort_datetime()
 						if eq.datetime < mainshock_dt]
-		return EQCatalog(foreshocks, name=self.catalog.name + ' (foreshocks)',
+		catalog_name = "Cluster #%s (foreshocks)" % self.ID
+		return EQCatalog(foreshocks, name=catalog_name,
 						default_Mrelations={'MW': self.Mrelation})
 
 	def get_aftershocks(self):
@@ -656,7 +657,8 @@ class Cluster():
 		mainshock_dt = self.datetime1()
 		aftershocks = [eq for eq in self.sort_datetime()
 						if eq.datetime > mainshock_dt]
-		return EQCatalog(aftershocks, name=self.catalog.name + ' (aftershocks)',
+		catalog_name = "Cluster #%s (aftershocks)" % self.ID
+		return EQCatalog(aftershocks, name=catalog.name,
 						default_Mrelations={'MW': self.Mrelation})
 
 	def to_catalog(self):
@@ -1599,23 +1601,24 @@ class LinkedWindowMethod(DeclusteringMethod):
 		Re-entrant function used in :meth:`get_aftershocks`
 		"""
 		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
-		magnitudes = catalog.get_magnitudes(Mtype='MW', Mrelation=Mrelation)
 		main_mag = main_event.get_MW(Mrelation)
 		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
 		time_deltas = catalog.get_datetimes() - main_event.datetime
-		order = np.argsort(time_deltas)
 		is_later = time_deltas > np.timedelta64(0, 's')
 
-		later_and_in_window = order[is_later & in_window]
-		aftershock_list = catalog[later_and_in_window].eq_list
+		aftershock_list = catalog[is_later & in_window].eq_list
+		remaining_catalog = catalog[is_later & ~in_window]
 		after_aftershock_list = []
-		for eq, idx in zip(aftershock_list, later_and_in_window):
-			remaining_catalog = catalog[idx+1:]
+		for eq in aftershock_list:
 			if len(remaining_catalog):
-				after_aftershocks = self._find_aftershocks(eq, remaining_catalog,
+				time_deltas = remaining_catalog.get_datetimes() - eq.datetime
+				is_later = time_deltas > np.timedelta64(0, 's')
+				if np.sum(is_later):
+					after_aftershocks = self._find_aftershocks(eq,
+														remaining_catalog[is_later],
 														dc_window, Mrelation)
 				for aas in after_aftershocks:
-					if not (aas in aftershock_list or aas in after_aftershock_list):
+					if not aas in after_aftershock_list:
 						after_aftershock_list.append(aas)
 
 		return aftershock_list + after_aftershock_list
@@ -1638,7 +1641,7 @@ class LinkedWindowMethod(DeclusteringMethod):
 		aftershocks = self._find_aftershocks(main_event, catalog, dc_window, Mrelation)
 		if len(aftershocks):
 			return EQCatalog(aftershocks, name=catalog.name + ' (aftershocks)',
-						default_Mrelations={'MW': self.Mrelation},
+						default_Mrelations={'MW': Mrelation},
 						default_completeness=catalog.default_completeness)
 
 	def get_foreshocks(self, main_event, catalog, dc_window, Mrelation):
