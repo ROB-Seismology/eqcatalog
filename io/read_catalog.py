@@ -44,7 +44,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 
 	:param catalog_name:
 		str, name of catalog ("ROB", HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
-		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS")
+		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS", "KNMI")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
@@ -132,6 +132,15 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'Mtype': 'type', 'name': 'lieu'}
 			return read_catalog_csv(csv_file, column_map, date_sep='/',
 									date_order='DMY', has_header=True)
+
+	elif catalog_name.upper() == 'KNMI':
+		csv_file = get_dataset_file_on_seismogis('KNMI_catalog', 'all_tectonic.csv')
+		if csv_file:
+			column_map = {'date': 'YYMMDD', 'time': 'TIME', 'name': 'LOCATION',
+						'lat': 'LAT', 'lon': 'LON', 'depth': 'DEPTH',
+						'ML': 'MAG'}
+			return read_catalog_csv(csv_file, column_map, date_sep=None,
+							date_order='YMD', time_sep=None, has_header=True)
 
 	else:
 		date_sep = '/'
