@@ -305,7 +305,13 @@ class LocalEarthquake(object):
 			## Silently convert month/day to 1 if it is zero
 			if date:
 				if isinstance(date, basestring):
-					date_elements = date.split(date_sep)
+					if date_sep:
+						date_elements = date.split(date_sep)
+					elif len(date) == 8:
+						if date_order == 'YMD':
+							date_elements = date[:4], date[4:6], date[6:]
+						elif date_order== 'DMY':
+							date_elements = date[:2], date[2:4], date[4:]
 					year = int(date_elements[date_order.index('Y')])
 					try:
 						month = max(1, int(date_elements[date_order.index('M')]))
@@ -335,7 +341,10 @@ class LocalEarthquake(object):
 			time = rec.get(time_key)
 			if time:
 				if isinstance(time, basestring):
-					time_elements = time.split(time_sep)
+					if time_sep:
+						time_elements = time.split(time_sep)
+					else:
+						time_elements = time[:2], time[2:4], time[4:]
 					try:
 						hour = min(23, int(time_elements[0]))
 					except (IndexError, ValueError):
