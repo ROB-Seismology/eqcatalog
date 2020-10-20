@@ -238,15 +238,16 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		'MS',
 		'MW',
 		'MWH',
-		'IF(MWH, MWH, IF(MW, MW, IF(MS, MS, ML))) as M',
+		'IF(MW, MW, IF(MWH, MWH, IF(MS, MS, ML))) as M',
 		'intensity_max',
 		'macro_radius',
 		'errh',
 		'errz',
 		'errt',
 		'errM',
-		'name',
-		'type']
+		'earthquakes.name',
+		'type',
+		'providing_institute.code as agency']
 
 	where_clause = ""
 	having_clause = ""
@@ -299,6 +300,10 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	else:
 		order_clause = ""
 
+	join_clause = [('LEFT',
+					'providing_institute',
+					'id_providingInst = providing_institute.id')]
+
 	if errf !=None:
 		errf.write("Querying KSB-ORB local earthquake catalog:\n")
 
@@ -309,7 +314,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	query_for_id = bool(id_earth)
 	for rec in query_seismodb_table(table_clause, column_clause=column_clause,
 					where_clause=where_clause, having_clause=having_clause,
-					order_clause=order_clause, verbose=verbose, errf=errf):
+					order_clause=order_clause, join_clause=join_clause,
+					verbose=verbose, errf=errf):
 		id_earth, name = rec["id_earth"], rec["name"] or ''
 		date, time = rec["date"], rec["time"]
 		lon, lat = rec["longitude"], rec["latitude"]
@@ -384,9 +390,13 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 			mb = np.nan
 			"""
 
+		agency = rec["agency"]
+		if agency[:3] == 'UCC':
+			agency = 'ROB'
+
 		eq = ROBLocalEarthquake(id_earth, date, time, lon, lat, depth, {},
 							ML, MS, MW, mb, name, intensity_max, macro_radius,
-							errh, errz, errt, errM, agency="ROB", event_type=etype)
+							errh, errz, errt, errM, agency=agency, event_type=etype)
 		eq_list.append(eq)
 
 	if verbose and num_skipped:
