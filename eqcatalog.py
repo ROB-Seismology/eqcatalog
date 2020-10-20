@@ -485,7 +485,7 @@ class EQCatalog(object):
 
 	def get_formatted_table(self, max_name_width=30, lonlat_decimals=3,
 							depth_decimals=1, mag_decimals=1,
-							padding_width=1):
+							padding_width=1, include_err=False):
 		"""
 		Return formatted table of earthquakes in catalog.
 
@@ -501,6 +501,9 @@ class EQCatalog(object):
 		:param mag_decimals:
 			int, number of decimals for magnitudes
 			(default: 1)
+		:param include_err:
+			bool, whether or not to include uncertainties in table, if present
+			(default: False)
 
 		:return:
 			instance of :class:`PrettyTable`
@@ -530,6 +533,12 @@ class EQCatalog(object):
 			if not np.isnan(mags).all():
 				mags = remove_nan_values(mags)
 				tab.add_column(Mtype, mags, align='r', valign='m')
+		if include_err:
+			for unc_type in ('errt', 'errh', 'errz', 'errM'):
+				err = [getattr(eq, unc_type) for eq in self]
+				if not np.isnan(err).all():
+					err = remove_nan_values(err)
+					tab.add_column(unc_type, err)
 		intensities = self.get_max_intensities()
 		if not ((intensities == 0).all() or np.isnan(intensities).all()):
 			intensities = remove_nan_values(intensities)
@@ -537,11 +546,18 @@ class EQCatalog(object):
 		event_types = [eq.event_type for eq in self]
 		if len(set(event_types)) > min(1, len(self)-1):
 			tab.add_column('Type', event_types, valign='m')
+		agencies = [eq.agency for eq in self]
+		if len(set(agencies)) > min(1, len(self)-1):
+			tab.add_column('Agency', agencies, valign='m')
 
 		tab.padding_width = padding_width
 		tab.max_width['Name'] = max_name_width
 		tab.float_format['Lon'] = tab.float_format['Lat'] = '.%d' % lonlat_decimals
 		tab.float_format['Z'] = '.%d' % depth_decimals
+		tab.float_format['errt'] = '.1'
+		tab.float_format['errh'] = '.1'
+		tab.float_format['errz'] = '.1'
+		tab.float_format['errM'] = '.1'
 		for Mtype in Mtypes:
 			if Mtype in tab.field_names:
 				tab.float_format[Mtype] = '.%d' % mag_decimals
@@ -550,7 +566,7 @@ class EQCatalog(object):
 
 	def get_formatted_list(self, as_html=False, max_name_width=30,
 					lonlat_decimals=3, depth_decimals=1, mag_decimals=1,
-					padding_width=1):
+					padding_width=1, include_err=False):
 		"""
 		Return string representing formatted table of earthquakes
 		in catalog.
@@ -562,6 +578,7 @@ class EQCatalog(object):
 		:param lonlat_decimals:
 		:param depth_decimals:
 		:param mag_decimals:
+		:param include_err:
 			see :meth:`get_formatted_table`
 
 		:return:
@@ -569,14 +586,16 @@ class EQCatalog(object):
 		"""
 		tab = self.get_formatted_table(max_name_width=max_name_width,
 					lonlat_decimals=lonlat_decimals, depth_decimals=depth_decimals,
-					mag_decimals=mag_decimals, padding_width=padding_width)
+					mag_decimals=mag_decimals, padding_width=padding_width,
+					include_err=include_err)
 		if as_html:
 			return tab.get_html_string()
 		else:
 			return tab.get_string()
 
 	def print_list(self, out_file=None, max_name_width=30, lonlat_decimals=3,
-					depth_decimals=1, mag_decimals=1, padding_width=1):
+					depth_decimals=1, mag_decimals=1, padding_width=1,
+					include_err=False):
 		"""
 		Print list of earthquakes in catalog
 
@@ -589,6 +608,7 @@ class EQCatalog(object):
 		:param lonlat_decimals:
 		:param depth_decimals:
 		:param mag_decimals:
+		:param include_err:
 			see :meth:`get_formatted_list`
 
 		:return:
@@ -605,7 +625,8 @@ class EQCatalog(object):
 		if has_prettytable:
 			tab = self.get_formatted_table(max_name_width=max_name_width,
 						lonlat_decimals=lonlat_decimals, depth_decimals=depth_decimals,
-						mag_decimals=mag_decimals, padding_width=padding_width)
+						mag_decimals=mag_decimals, padding_width=padding_width,
+						include_err=include_err)
 			if out_file:
 				of = open(out_file, 'w')
 				if os.path.splitext(out_file)[-1].lower()[:4] == '.htm':
@@ -3305,6 +3326,89 @@ class EQCatalog(object):
 						discrete=discrete, cumul_or_inc=cumul_or_inc,
 						title=title, lang=lang,
 						fig_filespec=fig_filespec, dpi=dpi, **kwargs)
+
+	def compare_catalog(self, other_catalog, compare_distances=True,
+						verbose=False):
+		"""
+		Find events in another catalog that match with this catalog and
+		events that are missing in this catalog
+
+		:param other_catalog:
+			instance of :class:`EQCatalog`
+		:param compare_distances:
+			bool, whether to compare based on time and distance (True)
+			or based on time only (False)
+			(default: True)
+		:param verbose:
+			bool, whether or not to print information
+			(default: False)
+
+		:return:
+			(common_catalog, missing_catalog) tuple of instances of
+			:class:`EQCatalog`
+			- common_catalog: contains events in both catalogs
+			- missing_catalog: contains events in other catalog that are not
+			in this catalog
+		"""
+		from mapping.geotools.geodetic import spherical_distance
+		from .time import fractional_time_delta
+
+		dt1 = self.get_datetimes()
+		lons1 = self.get_longitudes()
+		lats1 = self.get_latitudes()
+
+		year_errt_max = {1350: np.timedelta64(1, 'D'),
+						1650: np.timedelta64(1, 'h'),
+						1900: np.timedelta64(60, 's'),
+						1985: np.timedelta64(5, 's')}
+		errt_years = np.sort(list(year_errt_max.keys()))
+		year_errh_max = {1350: 25,
+						1650: 15,
+						1900: 10,
+						1985: 5}
+		errh_years = np.sort(list(year_errh_max.keys()))
+
+		common_events, missing_events = [], []
+		for eq in other_catalog:
+			match = 0
+			time_deltas = np.abs(dt1 - eq.datetime)
+			idx = np.nanargmin(time_deltas)
+			#eq.print_info()
+			#self.__getitem__(idx).print_info()
+			yr = errt_years[eq.year >= errt_years][-1]
+			errt_max = year_errt_max[yr]
+			#print(time_deltas[idx], errt_max)
+			td = time_deltas[idx]
+			d = spherical_distance(eq.lon, eq.lat, lons1[idx], lats1[idx]) / 1000
+			eq.errt = fractional_time_delta(td, 's')
+			eq.errh = d
+			if td > errt_max:
+				missing_events.append(eq)
+			else:
+				if compare_distances:
+					yr = errh_years[eq.year >= errh_years][-1]
+					errh_max = year_errh_max[yr]
+					#print(d, errh_max)
+					if d > errh_max:
+						missing_events.append(eq)
+					else:
+						match = 1
+						common_events.append(eq)
+				else:
+					eq.event_type = self.__getitem__(idx).event_type
+					common_events.append(eq)
+
+			if verbose and match == 0:
+				eq.print_info()
+				self.__getitem__(idx).print_info()
+				print(time_deltas[idx], d)
+
+		common_catalog = EQCatalog(common_events,
+									name=other_catalog.name + ' (common)')
+		missing_catalog = EQCatalog(missing_events,
+									name=other_catalog.name + ' (missing)')
+
+		return common_catalog, missing_catalog
 
 	## Random catalogs
 
