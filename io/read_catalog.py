@@ -44,7 +44,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 
 	:param catalog_name:
 		str, name of catalog ("ROB", HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
-		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS", "KNMI")
+		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS", "KNMI", "BENS")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
@@ -140,7 +140,16 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'lat': 'LAT', 'lon': 'LON', 'depth': 'DEPTH',
 						'ML': 'MAG'}
 			return read_catalog_csv(csv_file, column_map, date_sep=None,
-							date_order='YMD', time_sep=None, has_header=True)
+							date_order='YMD', time_sep=None, has_header=True,
+							ID_prefix='KNMI')
+
+	elif catalog_name.upper()[:4] == 'BENS':
+		csv_file = get_dataset_file_on_seismogis('Bensberg_seismology', 'Bensberg_catalog.csv')
+		if csv_file:
+			catalog = read_catalog_csv(csv_file, has_header=True, ID_prefix='BENS')
+			catalog = catalog.subselect(attr_val=('event_type', ['ke']))
+			catalog.name = 'Erbebenkatalog der Erbebenstation Bensberg'
+			return catalog
 
 	else:
 		date_sep = '/'
