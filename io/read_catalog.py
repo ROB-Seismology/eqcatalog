@@ -138,16 +138,21 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 		if csv_file:
 			column_map = {'date': 'YYMMDD', 'time': 'TIME', 'name': 'LOCATION',
 						'lat': 'LAT', 'lon': 'LON', 'depth': 'DEPTH',
-						'ML': 'MAG'}
-			return read_catalog_csv(csv_file, column_map, date_sep=None,
+						'ML': 'MAG', 'agency': 'KNMI'}
+			catalog = read_catalog_csv(csv_file, column_map, date_sep=None,
 							date_order='YMD', time_sep=None, has_header=True,
 							ID_prefix='KNMI')
+			catalog.name = 'KNMI catalog'
+			return catalog
 
 	elif catalog_name.upper()[:4] == 'BENS':
 		csv_file = get_dataset_file_on_seismogis('Bensberg_seismology', 'Bensberg_catalog.csv')
 		if csv_file:
-			catalog = read_catalog_csv(csv_file, has_header=True, ID_prefix='BENS')
+			catalog = read_catalog_csv(csv_file, has_header=True, ID_prefix='BENS',
+											  column_map={'agency': 'BENS'})
 			catalog = catalog.subselect(attr_val=('event_type', ['ke']))
+			for eq in catalog:
+				eq.name = eq.name.replace('"', '').strip()
 			catalog.name = 'Erbebenkatalog der Erbebenstation Bensberg'
 			return catalog
 
