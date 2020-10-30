@@ -3327,8 +3327,9 @@ class EQCatalog(object):
 						title=title, lang=lang,
 						fig_filespec=fig_filespec, dpi=dpi, **kwargs)
 
-	def compare_catalog(self, other_catalog, compare_distances=True,
-						verbose=False):
+	def compare_catalog(self, other_catalog, compare_distances=False,
+						   compare_mags=True, max_delta_mag=1., Mtype='MW', Mrelation={},
+							verbose=False):
 		"""
 		Find events in another catalog that match with this catalog and
 		events that are missing in this catalog
@@ -3336,9 +3337,18 @@ class EQCatalog(object):
 		:param other_catalog:
 			instance of :class:`EQCatalog`
 		:param compare_distances:
-			bool, whether to compare based on time and distance (True)
+			bool, whether or not to compare distances if there is more than 1 match
 			or based on time only (False)
+			(default: False)
+		:param cofmpare_mags:
+			bool, whether or not to compare magnitudes
 			(default: True)
+		:param max_delta_mag:
+			float, maximum magnitude difference allowed to consider match
+			(default: 1.)
+		:param Mtype:
+		:param Mrelation:
+			see :meth:`get_magnitudes`
 		:param verbose:
 			bool, whether or not to print information
 			(default: False)
@@ -3356,6 +3366,9 @@ class EQCatalog(object):
 		dt1 = self.get_datetimes()
 		lons1 = self.get_longitudes()
 		lats1 = self.get_latitudes()
+		mags1 = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
+		idxs1 = np.arange(len(self))
+		unmatched = np.ones_like(lons1, dtype='bool')
 
 		year_errt_max = {1350: np.timedelta64(1, 'D'),
 						1650: np.timedelta64(1, 'h'),
@@ -3368,47 +3381,98 @@ class EQCatalog(object):
 						1985: 5}
 		errh_years = np.sort(list(year_errh_max.keys()))
 
-		common_events, missing_events = [], []
+		common_events2, missing_events = [], []
 		for eq in other_catalog:
-			match = 0
-			time_deltas = np.abs(dt1 - eq.datetime)
-			idx = np.nanargmin(time_deltas)
-			#eq.print_info()
-			#self.__getitem__(idx).print_info()
 			yr = errt_years[eq.year >= errt_years][-1]
 			errt_max = year_errt_max[yr]
+			yr = errh_years[eq.year >= errh_years][-1]
+			errh_max = year_errh_max[yr]
+
+			if compare_mags:
+				M = eq.get_or_convert_mag(Mtype=Mtype, Mrelation=Mrelation)
+
+			match = 0
+			time_deltas = np.abs(dt1[unmatched] - eq.datetime)
+			idxs = np.where(time_deltas <= errt_max)[0]
+
+			#idx = np.nanargmin(time_deltas)
+			#eq.print_info()
+			#self.__getitem__(idx).print_info()
 			#print(time_deltas[idx], errt_max)
-			td = time_deltas[idx]
-			d = spherical_distance(eq.lon, eq.lat, lons1[idx], lats1[idx]) / 1000
-			eq.errt = fractional_time_delta(td, 's')
-			eq.errh = d
-			if td > errt_max:
-				missing_events.append(eq)
-			else:
+			#td = time_deltas[idx]
+			dists = (spherical_distance(eq.lon, eq.lat, lons1[unmatched][idxs],
+											  lats1[unmatched][idxs]) / 1000.)
+			#eq.errt = fractional_time_delta(td, 's')
+			#eq.errh = d
+			#eq.event_type = self.__getitem__(idx).event_type
+			if len(idxs) == 0:
+				## No match
+				match = 0
+			elif len(idxs) == 1:
+				## Only 1 match
+				[idx] = idxs
 				if compare_distances:
-					yr = errh_years[eq.year >= errh_years][-1]
-					errh_max = year_errh_max[yr]
+					[d] = dists
 					#print(d, errh_max)
-					if d > errh_max:
-						missing_events.append(eq)
+					if d <= errh_max:
+						match = 1
+				else:
+					if compare_mags:
+						if not np.isnan(M):
+							delta_mag = np.abs(M - mags1[unmatched][idx])
+							if delta_mag <= max_delta_mag:
+								match = 1
 					else:
 						match = 1
-						common_events.append(eq)
+			else:
+				## More than 1 possible match
+				if verbose:
+					print('Found %d time matches for eq #%s' % (len(idxs), eq.ID))
+				if compare_mags:
+					if not np.isnan(M):
+						delta_mags = np.abs(M - mags1[unmatched][idxs])
+						idx = idxs[np.nanargmin(delta_mags)]
+						if np.nanmin(delta_mags) <= max_delta_mag:
+							match = 1
+					else:
+						idx = np.nanargmin(time_deltas)
+						match = 1
+				elif compare_distances:
+					idx = idxs[np.nanargmin(dists)]
+					d = np.nanmin(dists)
+					if d <= errh_max:
+						match = 1
 				else:
-					eq.event_type = self.__getitem__(idx).event_type
-					common_events.append(eq)
+					match = 1
+					idx = np.nanargmin(time_deltas)
+					#eq.event_type = self.__getitem__(idx).event_type
 
-			if verbose and match == 0:
-				eq.print_info()
-				self.__getitem__(idx).print_info()
-				print(time_deltas[idx], d)
+			if match:
+				catalog_idx = idxs1[unmatched][idx]
+				unmatched[catalog_idx] = False
+				common_events2.append(eq)
+				#if verbose:
+				#	print(eq)
+				#	print(self.__getitem__(catalog_idx))
+				#	print('')
+			else:
+				missing_events.append(eq)
+				#if verbose:
+				#	print(eq)
+				#	print('')
+					#self.__getitem__(idx).print_info()
+					#print(time_deltas[idx], d)
 
-		common_catalog = EQCatalog(common_events,
+		common_catalog2 = EQCatalog(common_events2,
 									name=other_catalog.name + ' (common)')
 		missing_catalog = EQCatalog(missing_events,
 									name=other_catalog.name + ' (missing)')
+		surplus_catalog = self.__getitem__(unmatched)
+		surplus_catalog.name = self.name + ' (surplus)'
+		common_catalog1 = self.__getitem__(~unmatched)
+		common_catalog1.name = self.name + ' (common)'
 
-		return common_catalog, missing_catalog
+		return (common_catalog1, common_catalog2, missing_catalog, surplus_catalog)
 
 	## Random catalogs
 
@@ -4060,7 +4124,7 @@ class EQCatalog(object):
 	def plot_depth_magnitude(self,
 		start_date=None,
 		Mtype="MW", Mrelation={},
-		remove_undetermined=False,
+		remove_zero_depths=False,
 		title=None,
 		fig_filespec="", fig_width=0, dpi=300):
 		"""
@@ -4713,7 +4777,7 @@ class EQCatalog(object):
 						fill_color=None, opacity=0.5, add_popup=True,
 						Mtype="MW", Mrelation={},
 						mag_size_func=lambda M: 2 * np.sqrt(2.25**(M+1) / np.pi),
-						region=None):
+						region=None, additional_layers=[]):
 		"""
 		Generate folium map
 
@@ -4733,6 +4797,9 @@ class EQCatalog(object):
 			(w, e, s, n) tuple specifying rectangular region of interest
 			in geographic coordinates
 			(default: None)
+		:param additional_layers:
+			list with instances of :class:`folium.FeatureGroup` to add to the map
+			(default: [])
 
 		:return:
 			instance of :class:`folium.Map`
@@ -4752,6 +4819,8 @@ class EQCatalog(object):
 		bounds = [(latmin, lonmin), (latmax, lonmax)]
 
 		layer.add_to(map)
+		for layer in additional_layers:
+			layer.add_to(map)
 
 		map.fit_bounds(bounds)
 		folium.LayerControl().add_to(map)
