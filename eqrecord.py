@@ -238,7 +238,7 @@ class LocalEarthquake(object):
 			Dictionary
 		"""
 		if 'datetime' in dct:
-			dt = timelib.as_np_datetime(dct['datetime'])
+			dt = timelib.as_np_datetime(dct['datetime'], unit='ms')
 			dct['date'] = timelib.as_np_date(dt)
 			dct['time'] = timelib.to_py_time(dt)
 			del dct['datetime']
@@ -294,7 +294,7 @@ class LocalEarthquake(object):
 
 		datetime_key = column_map.get('datetime', 'datetime')
 		if datetime_key in rec:
-			dt = timelib.as_np_datetime(rec[datetime_key])
+			dt = timelib.as_np_datetime(rec[datetime_key], unit='ms')
 			date = timelib.as_np_date(dt)
 			time = timelib.to_py_time(dt)
 
