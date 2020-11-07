@@ -231,6 +231,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		'id_earth',
 		'DATE_FORMAT(date, "%Y-%m-%d") as date',
 		'TIME_FORMAT(time, "%H:%i:%s") as time',
+		'tm_hund',
 		'longitude',
 		'latitude',
 		'depth',
@@ -344,7 +345,10 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		else:
 			date = datetime.date(year, 1, 1)
 		hour, minutes, seconds = [int(s) for s in time.split(":")]
-		time = datetime.time(hour, minutes, seconds)
+		microseconds = 0
+		if rec["tm_hund"]:
+			microseconds = int(rec["tm_hund"]) * 10000
+		time = datetime.time(hour, minutes, seconds, microseconds)
 
 		lon = null_value if lon is None else lon
 		lat = null_value if lat is None else lat
