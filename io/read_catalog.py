@@ -108,7 +108,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 	elif catalog_name.upper() == 'LDG':
 		csv_file = get_dataset_file_on_seismogis('EDF', 'LDG1962-2014.csv')
 		if csv_file:
-			column_map = {'id': 'num', 'date': 'date', 'time': 'heure',
+			column_map = {'ID': 'num', 'date': 'date', 'time': 'heure',
 						'lat': 'lat', 'lon': 'long', 'depth': 'prof',
 						'ML': 'ml', 'MS': 'ms'}
 
@@ -118,9 +118,10 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 	elif catalog_name.upper() == 'SIHEX':
 		csv_file = get_dataset_file_on_seismogis('EDF', 'SIHEXV2-catalogue-final.csv')
 		if csv_file:
-			column_map = {'id': 'ID NUMBER', 'date': 'DATE', 'time': 'TIME (UTC)',
+			column_map = {'ID': 'ID NUMBER', 'date': 'DATE', 'time': 'TIME (UTC)',
 						'lat': 'LATITUDE', 'lon': 'LONGITUDE',
-						'depth': 'DEPTH (km)', 'MW': 'Mw'}
+						'depth': 'DEPTH (km)', 'MW': 'Mw',
+						'agency': 'AUTHOR', 'event_type': 'TYPE'}
 			return read_catalog_csv(csv_file, column_map, date_sep='/',
 									date_order='DMY', has_header=True)
 
