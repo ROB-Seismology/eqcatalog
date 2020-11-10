@@ -3329,7 +3329,7 @@ class EQCatalog(object):
 
 	def compare_catalog(self, other_catalog, compare_distances=False,
 						   compare_mags=True, max_delta_mag=1., Mtype='MW', Mrelation={},
-							verbose=False):
+							max_distance=100., verbose=False):
 		"""
 		Find events in another catalog that match with this catalog and
 		events that are missing in this catalog
@@ -3340,12 +3340,14 @@ class EQCatalog(object):
 			bool, whether or not to compare distances if there is more than 1 match
 			or based on time only (False)
 			(default: False)
-		:param cofmpare_mags:
+		:param compare_mags:
 			bool, whether or not to compare magnitudes
 			(default: True)
 		:param max_delta_mag:
 			float, maximum magnitude difference allowed to consider match
 			(default: 1.)
+		:param max_distance:
+			float, maximum distance allowed to consider match
 		:param Mtype:
 		:param Mrelation:
 			see :meth:`get_magnitudes`
@@ -3354,11 +3356,19 @@ class EQCatalog(object):
 			(default: False)
 
 		:return:
-			(common_catalog, missing_catalog) tuple of instances of
-			:class:`EQCatalog`
-			- common_catalog: contains events in both catalogs
-			- missing_catalog: contains events in other catalog that are not
-			in this catalog
+			(common_catalog1, common_catalog2, missing_catalog, surplus_catalog)
+			tuple of instances of :class:`EQCatalog`
+			- common_catalog1: contains events from master catalog that are also
+			present in other catalog
+			- common_catalog2: contains events from other catalog that are also
+			present in master catalog
+			- missing_catalog: contains events from other catalog that are not
+			present in master catalog
+			- surplus_catalog: contains events from master catalog that are not
+			present in other catalog
+
+			Note: common events should have same index in common_catalog1 and
+			common_catalog2
 		"""
 		from mapping.geotools.geodetic import spherical_distance
 		from .time import fractional_time_delta
@@ -3367,6 +3377,7 @@ class EQCatalog(object):
 		lons1 = self.get_longitudes()
 		lats1 = self.get_latitudes()
 		mags1 = self.get_magnitudes(Mtype=Mtype, Mrelation=Mrelation)
+		## idxs1 refers to complete catalog
 		idxs1 = np.arange(len(self))
 		unmatched = np.ones_like(lons1, dtype='bool')
 
@@ -3382,94 +3393,138 @@ class EQCatalog(object):
 		errh_years = np.sort(list(year_errh_max.keys()))
 
 		common_events2, missing_events = [], []
+		common_catalog_idxs = []
 		for eq in other_catalog:
 			yr = errt_years[eq.year >= errt_years][-1]
 			errt_max = year_errt_max[yr]
 			yr = errh_years[eq.year >= errh_years][-1]
 			errh_max = year_errh_max[yr]
 
-			if compare_mags:
-				M = eq.get_or_convert_mag(Mtype=Mtype, Mrelation=Mrelation)
-
 			match = 0
 			time_deltas = np.abs(dt1[unmatched] - eq.datetime)
-			idxs = np.where(time_deltas <= errt_max)[0]
 
-			#idx = np.nanargmin(time_deltas)
-			#eq.print_info()
-			#self.__getitem__(idx).print_info()
-			#print(time_deltas[idx], errt_max)
-			#td = time_deltas[idx]
-			dists = (spherical_distance(eq.lon, eq.lat, lons1[unmatched][idxs],
-											  lats1[unmatched][idxs]) / 1000.)
-			#eq.errt = fractional_time_delta(td, 's')
-			#eq.errh = d
-			#eq.event_type = self.__getitem__(idx).event_type
+			## Compute mag and distances regardless of compare_x options
+			M = eq.get_or_convert_mag(Mtype=Mtype, Mrelation=Mrelation)
+			#dists = (spherical_distance(eq.lon, eq.lat, lons1[unmatched][idxs],
+			#								  lats1[unmatched][idxs]) / 1000.)
+			dists = (spherical_distance(eq.lon, eq.lat, lons1[unmatched],
+											  lats1[unmatched]) / 1000.)
+
+			## idxs refers to unmatched catalog
+			idxs = np.where((time_deltas <= errt_max) & (dists <= max_distance))[0]
+			dists = dists[idxs]
+
 			if len(idxs) == 0:
 				## No match
 				match = 0
 			elif len(idxs) == 1:
-				## Only 1 match
+				## Only 1 match, idx refers to unmatched catalog
 				[idx] = idxs
+				[d] = dists
 				if compare_distances:
-					[d] = dists
 					#print(d, errh_max)
 					if d <= errh_max:
 						match = 1
-				else:
-					if compare_mags:
-						if not np.isnan(M):
-							delta_mag = np.abs(M - mags1[unmatched][idx])
-							if delta_mag <= max_delta_mag:
-								match = 1
+				elif compare_mags:
+					if not np.isnan(M):
+						delta_mag = np.abs(M - mags1[unmatched][idx])
+						if np.isnan(delta_mag):
+							## Consider match, M in master catalog will be updated
+							match = 1
+						elif delta_mag <= max_delta_mag:
+							match = 1
 					else:
-						match = 1
+						## If M is nan, consider it no match
+						## eq will not be appended to missing events anyway
+						match = 0
+				else:
+					match = 1
 			else:
 				## More than 1 possible match
 				if verbose:
 					print('Found %d time matches for eq #%s' % (len(idxs), eq.ID))
-				if compare_mags:
-					if not np.isnan(M):
-						delta_mags = np.abs(M - mags1[unmatched][idxs])
-						idx = idxs[np.nanargmin(delta_mags)]
-						if np.nanmin(delta_mags) <= max_delta_mag:
-							match = 1
-					else:
-						idx = np.nanargmin(time_deltas)
-						match = 1
-				elif compare_distances:
+					print(eq)
+				d = np.nanmin(dists)
+				if compare_distances:
 					idx = idxs[np.nanargmin(dists)]
-					d = np.nanmin(dists)
+					#idx = np.nanargmin(dists)
 					if d <= errh_max:
 						match = 1
+				elif compare_mags:
+					if not np.isnan(M):
+						delta_mags = np.abs(M - mags1[unmatched][idxs])
+						try:
+							idx = idxs[np.nanargmin(delta_mags)]
+							#idx = np.nanargmin(delta_mags)
+						except ValueError:
+							match = 0
+						else:
+							if np.nanmin(delta_mags) <= max_delta_mag:
+								match = 1
+					else:
+						#idx = idxs[np.nanargmin(time_deltas)]
+						#idx = idxs[np.argmin(mags1[unmatched][idxs])]
+						#match = 1
+						match = 0
 				else:
 					match = 1
-					idx = np.nanargmin(time_deltas)
-					#eq.event_type = self.__getitem__(idx).event_type
+					## Should we take closest in time or in space?
+					#idx = idxs[np.nanargmin(time_deltas)]
+					idx = idxs[np.nanargmin(dists)]
+				if verbose:
+					for _idx in idxs:
+						local_eq = self.__getitem__(idxs1[unmatched][_idx])
+						if match and _idx == idx:
+							print('X ', local_eq)
+						else:
+							print('  ', local_eq)
 
 			if match:
 				catalog_idx = idxs1[unmatched][idx]
 				unmatched[catalog_idx] = False
+				local_eq = self.__getitem__(catalog_idx)
+				## If event type in master catalog is se, set it to ke
+				if local_eq.event_type == 'se':
+					local_eq.event_type = 'ke'
+				## Update mag in master catalog if it is nan
+				if np.isnan(local_eq.mag.get(Mtype, np.nan)):
+					local_eq.mag[Mtype] = M
+				## We could also update ID and/or agency
+
+				if verbose and d >= 25:
+					print(eq)
+					print('  ', local_eq)
+					print('   d=%.1f km' % d)
+
+				td = time_deltas[idx]
+				eq.errt = fractional_time_delta(td, 's')
+				eq.errh = d
+				#eq.event_type = self.__getitem__(idx).event_type
 				common_events2.append(eq)
+				common_catalog_idxs.append(catalog_idx)
 				#if verbose:
 				#	print(eq)
-				#	print(self.__getitem__(catalog_idx))
+				#	print(local_eq)
 				#	print('')
 			else:
-				missing_events.append(eq)
+				## Add to missing events if M is not nan
+				if not np.isnan(M):
+					missing_events.append(eq)
 				#if verbose:
 				#	print(eq)
 				#	print('')
-					#self.__getitem__(idx).print_info()
-					#print(time_deltas[idx], d)
+				#self.__getitem__(idx).print_info()
+				#print(time_deltas[idx], d)
 
 		common_catalog2 = EQCatalog(common_events2,
-									name=other_catalog.name + ' (common)')
+										name=other_catalog.name + ' (common)')
 		missing_catalog = EQCatalog(missing_events,
-									name=other_catalog.name + ' (missing)')
+										name=other_catalog.name + ' (missing)')
 		surplus_catalog = self.__getitem__(unmatched)
 		surplus_catalog.name = self.name + ' (surplus)'
-		common_catalog1 = self.__getitem__(~unmatched)
+		## Note: use common_catalog_idxs rather than ~unmatched
+		## to ensure same order as common_catalog2 !
+		common_catalog1 = self.__getitem__(common_catalog_idxs)
 		common_catalog1.name = self.name + ' (common)'
 
 		return (common_catalog1, common_catalog2, missing_catalog, surplus_catalog)
