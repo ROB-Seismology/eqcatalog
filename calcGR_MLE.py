@@ -195,7 +195,7 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 		return alpha, beta, cov
 
 
-def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
+def estimate_gr_params_multi(nij, Mi, dMi, completeness, end_date,
 							precise=False):
 	"""
 	Estimate Gutenberg-Richter parameters and associated uncertainties
@@ -242,19 +242,19 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 	## Determine common beta value
 	if not precise:
 		## Small magnitude bins
-		sum_nM = np.sum([np.nansum(nij[j] * Mi) for j in range(J)])
+		sum_niMi = np.sum([np.nansum(nij[j] * Mi) for j in range(J)])
 
 		def minimize_func(beta):
 			## Eq. B3
-			est_sum_nM = 0
+			est_sum_niMi = 0
 			exp_term = np.exp(-beta * Mi)
 			for j in range(J):
 				ni = nij[j]
-				idxs = np.isnan(ni)
+				idxs = ~np.isnan(ni)
 				Nj = np.nansum(ni)
-				nom = np.sum(ti[idxs] * dMi[idxs] * Mi[idxs] * exp_term)
-				denom = np.sum(ti[idxs] * dMi[idxs] * exp_term)
-				est_sum_nM += (Nj * nom / denom)
+				nom = np.sum(ti[idxs] * dMi[idxs] * Mi[idxs] * exp_term[idxs])
+				denom = np.sum(ti[idxs] * dMi[idxs] * exp_term[idxs])
+				est_sum_niMi += (Nj * nom / denom)
 
 			return np.abs(sum_niMi - est_sum_niMi)
 
@@ -262,13 +262,13 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 		## "Finite" magnitude bins
 		def minimize_func(beta):
 			## Eq. B8
-			sum_nM = 0
-			est_sum_nM = 0
+			sum_niMi = 0
+			est_sum_niMi = 0
 			for j in range(J):
 				ni = nij[j]
-				idxs = np.isnan(ni)
-				coth_term = 1./tanh(beta * dMi[idxs])
-				sum_nM += np.sum(ni[idxs] * (Mi[idxs] - dMi[idxs] * coth_term))
+				idxs = ~np.isnan(ni)
+				coth_term = 1./np.tanh(beta * dMi[idxs])
+				sum_niMi += np.sum(ni[idxs] * (Mi[idxs] - dMi[idxs] * coth_term))
 
 				Nj = np.nansum(ni)
 				sinh_term = np.sinh(beta * dMi[idxs])
@@ -276,7 +276,7 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 				nom = np.sum(ti[idxs] * sinh_term
 							* (Mi[idxs] - dMi[idxs] * coth_term) * exp_term)
 				denom = np.sum(ti[idxs] * sinh_term * exp_term)
-				est_sum_nM += (Nj * nom / denom)
+				est_sum_niMi += (Nj * nom / denom)
 
 			return np.abs(sum_niMi - est_sum_niMi)
 
@@ -294,7 +294,7 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 	alpha_values = []
 	for j in range(J):
 		ni = nij[j]
-		idxs = np.isnan(ni)
+		idxs = ~np.isnan(ni)
 		Nj = np.nansum(ni)
 		if not precise:
 			denom = np.sum(2 * ti[idxs] * dMi[idxs] * np.exp(-beta * Mi[idxs]))
@@ -312,7 +312,7 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 	cov_beta = 0.
 	for j in range(J):
 		ni = nij[j]
-		idxs = np.isnan(ni)
+		idxs = ~np.isnan(ni)
 		Nj = np.nansum(ni)
 		cov_alpha = float(Nj)
 		exp_term = np.exp(alpha_values[j] - beta * Mi[idxs])
@@ -321,7 +321,7 @@ def estimate_gr_params_multi(Mi, dMi, nij, completeness, end_date,
 			cov_alpha_beta = -2 * np.sum(Mi[idxs] * ti[idxs] * dMi[idxs] * exp_term)
 		else:
 			sinh_term = np.sinh(beta * dMi[idxs]) / beta
-			coth_term = 1. / tanh(beta * dMi[idxs])
+			coth_term = 1. / np.tanh(beta * dMi[idxs])
 			cov_beta += np.sum(ti[idxs] * sinh_term
 								* (Mi[idxs] - dMi[idxs] * coth_term)**2 * exp_term)
 			cov_alpha_beta = -2 * np.sum(ti[idxs] * sinh_term
