@@ -56,8 +56,12 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 		(default: 1.)
 	:param prior_weight:
 		float, weighting parameter of the prior b-value, can be
-		considered equivalent to the inverse of its variance
-		(Johnston, 1994)
+		considered equivalent to the inverse of the maximum allowed variance
+		(Johnston, 1994). Note that low prior_weights may result in huge
+		standard deviations on the b-value, but setting it to a value corresponding
+		to an acceptable standard deviation (e.g., 4, equivalent to variance of
+		0.25 and standard devation of 0.5) will result in a b-value very close
+		to the prior, so use with caution!
 		(default: 0.)
 
 	:return:
@@ -399,13 +403,18 @@ def construct_mfd_at_epsilon(a_or_alpha, b_or_beta, cov, epsilon, Mmin, Mmax, dM
 		or (if :param:`epsilon` = 0 and :param:`log10` is True)
 		instance of :class:`rshalib.mfd.TruncatedGRMFD`
 	"""
-	from hazard.rshalib.mfd import (TruncatedGRMFD, EvenlyDiscretizedMFD)
+	from hazard.rshalib.mfd import (TruncatedGRMFD, NatLogTruncatedGRMFD,
+											EvenlyDiscretizedMFD)
 
-	if epsilon == 0 and log10 is True:
+	if epsilon == 0:
 		#Mmin = Mi[0] - dM/2.
 		#Mmax = Mi[-1] + dM/2.
-		a_val, b_val = a_or_alpha, b_or_beta
-		mfd = TruncatedGRMFD(Mmin, Mmax, dM, a_val, b_val)
+		if log10:
+			a_val, b_val = a_or_alpha, b_or_beta
+			mfd = TruncatedGRMFD(Mmin, Mmax, dM, a_val, b_val)
+		else:
+			alpha, beta = a_or_alpha, b_or_beta
+			mfd = NatLogTruncatedGRMFD(Mmin, Mmax, dM, alpha, beta)
 	else:
 		num_bins = np.round((Mmax - Mmin) / dM)
 		Mi = Mmin + np.arange(num_bins) * dM + dM/2.
