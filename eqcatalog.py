@@ -3327,30 +3327,40 @@ class EQCatalog(object):
 						title=title, lang=lang,
 						fig_filespec=fig_filespec, dpi=dpi, **kwargs)
 
-	def compare_catalog(self, other_catalog, compare_distances=False,
-						   compare_mags=True, max_delta_mag=1., Mtype='MW', Mrelation={},
-							max_distance=100., verbose=False):
+	def compare_catalog(self, other_catalog, Mtype='MW', Mrelation={},
+							errt_max={1350: (1, 'D'), 1650: (1, 'h'), 1900: (60, 's'), 1985: (5, 's')},
+							errh_max=100., errM_max=1.,
+							multiple_match_criterion='score', verbose=False):
 		"""
-		Find events in another catalog that match with this catalog and
-		events that are missing in this catalog
+		Find events in another catalog that match with this (=master) catalog
+		and events that are missing in this catalog
 
 		:param other_catalog:
 			instance of :class:`EQCatalog`
-		:param compare_distances:
-			bool, whether or not to compare distances if there is more than 1 match
-			or based on time only (False)
-			(default: False)
-		:param compare_mags:
-			bool, whether or not to compare magnitudes
-			(default: True)
-		:param max_delta_mag:
-			float, maximum magnitude difference allowed to consider match
-			(default: 1.)
-		:param max_distance:
-			float, maximum distance allowed to consider match
 		:param Mtype:
 		:param Mrelation:
 			see :meth:`get_magnitudes`
+		:param errt_max:
+			dict, mapping years (ints) to time differences (tuples), or
+			(delta_t, time_unit) tuple defining maximum time difference
+			allowed to consider match
+			(default: {1350: (1, 'D'), 1650: (1, 'h'), 1900: (60, 's'), 1985: (5, 's')})
+		:param errh_max:
+			dict, mapping years (ints) to distances (floats), or
+			float, maximum distance (in km) allowed to consider match
+			(default: 100.)
+		:param errM_max:
+			dict, mapping years (ints) to magnitude differences (floats), or
+			float, maximum magnitude difference allowed to consider match
+			(default: 1.)
+		:param multiple_match_criterion:
+			str, which (minimum) criterion to use if there are multiple matches
+			allowed by :param:`errt_max`, :param:`errh_max` and :param:`errM_max`,
+			either 'time', 'magnitude', 'distance' or 'score'.
+			Score is computed from combination of time difference (1 pt. per second),
+			distance (1 pt. per 10 km) and magnitude difference (1 pt. per 0.3
+			magnitude units)
+			(default: 'score')
 		:param verbose:
 			bool, whether or not to print information
 			(default: False)
@@ -3367,8 +3377,9 @@ class EQCatalog(object):
 			- surplus_catalog: contains events from master catalog that are not
 			present in other catalog
 
-			Note: common events should have same index in common_catalog1 and
-			common_catalog2
+		Notes:
+		- common events have same index in common_catalog1 and common_catalog2
+		- events with NaN magnitude in master catalog are never matched.
 		"""
 		from mapping.geotools.geodetic import spherical_distance
 		from .time import fractional_time_delta
@@ -3381,16 +3392,28 @@ class EQCatalog(object):
 		idxs1 = np.arange(len(self))
 		unmatched = np.ones_like(lons1, dtype='bool')
 
-		year_errt_max = {1350: np.timedelta64(1, 'D'),
-						1650: np.timedelta64(1, 'h'),
-						1900: np.timedelta64(60, 's'),
-						1985: np.timedelta64(5, 's')}
+		start_year = min(self.start_year, other_catalog.start_year)
+
+		if not isinstance(errt_max, dict):
+			year_errt_max = {start_year: errt_max}
+		else:
+			year_errt_max = errt_max
+		for year, errt_max in year_errt_max.items():
+			if not isinstance(errt_max, np.timedelta64):
+				year_errt_max[year] = np.timedelta64(*errt_max)
 		errt_years = np.sort(list(year_errt_max.keys()))
-		year_errh_max = {1350: 25,
-						1650: 15,
-						1900: 10,
-						1985: 5}
+
+		if not isinstance(errh_max, dict):
+			year_errh_max = {start_year: errh_max}
+		else:
+			year_errh_max = errh_max
 		errh_years = np.sort(list(year_errh_max.keys()))
+
+		if not isinstance(errM_max, dict):
+			year_errM_max = {start_year: errM_max}
+		else:
+			year_errM_max = errM_max
+		errM_years = np.sort(list(year_errM_max.keys()))
 
 		common_events2, missing_events = [], []
 		common_catalog_idxs = []
@@ -3399,6 +3422,8 @@ class EQCatalog(object):
 			errt_max = year_errt_max[yr]
 			yr = errh_years[eq.year >= errh_years][-1]
 			errh_max = year_errh_max[yr]
+			yr = errM_years[eq.year >= errM_years][-1]
+			errM_max = year_errM_max[yr]
 
 			match = 0
 			time_deltas = np.abs(dt1[unmatched] - eq.datetime)
@@ -3411,7 +3436,7 @@ class EQCatalog(object):
 											  lats1[unmatched]) / 1000.)
 
 			## idxs refers to unmatched catalog
-			idxs = np.where((time_deltas <= errt_max) & (dists <= max_distance))[0]
+			idxs = np.where((time_deltas <= errt_max) & (dists <= errh_max))[0]
 			dists = dists[idxs]
 
 			if len(idxs) == 0:
@@ -3421,56 +3446,63 @@ class EQCatalog(object):
 				## Only 1 match, idx refers to unmatched catalog
 				[idx] = idxs
 				[d] = dists
-				if compare_distances:
-					#print(d, errh_max)
-					if d <= errh_max:
+				if not np.isnan(M):
+					delta_mag = np.abs(M - mags1[unmatched][idx])
+					if np.isnan(delta_mag):
+						## Consider match, M in master catalog will be updated
 						match = 1
-				elif compare_mags:
-					if not np.isnan(M):
-						delta_mag = np.abs(M - mags1[unmatched][idx])
-						if np.isnan(delta_mag):
-							## Consider match, M in master catalog will be updated
-							match = 1
-						elif delta_mag <= max_delta_mag:
-							match = 1
-					else:
-						## If M is nan, consider it no match
-						## eq will not be appended to missing events anyway
-						match = 0
+					elif delta_mag <= errM_max:
+						match = 1
 				else:
-					match = 1
+					## If M is nan, consider it no match
+					## eq will not be appended to missing events anyway
+					match = 0
 			else:
 				## More than 1 possible match
 				if verbose:
-					print('Found %d time matches for eq #%s' % (len(idxs), eq.ID))
+					print('Found %d matches for eq #%s' % (len(idxs), eq.ID))
 					print(eq)
 				d = np.nanmin(dists)
-				if compare_distances:
+				if multiple_match_criterion == 'time':
+					match = 1
+					idx = idxs[np.nanargmin(time_deltas)]
+				elif multiple_match_criterion[:4] == 'dist':
+					match = 1
 					idx = idxs[np.nanargmin(dists)]
-					#idx = np.nanargmin(dists)
-					if d <= errh_max:
-						match = 1
-				elif compare_mags:
+				elif multiple_match_criterion[:3] == 'mag':
 					if not np.isnan(M):
 						delta_mags = np.abs(M - mags1[unmatched][idxs])
 						try:
 							idx = idxs[np.nanargmin(delta_mags)]
-							#idx = np.nanargmin(delta_mags)
 						except ValueError:
 							match = 0
 						else:
-							if np.nanmin(delta_mags) <= max_delta_mag:
+							if np.nanmin(delta_mags) <= errM_max:
 								match = 1
 					else:
 						#idx = idxs[np.nanargmin(time_deltas)]
 						#idx = idxs[np.argmin(mags1[unmatched][idxs])]
 						#match = 1
 						match = 0
-				else:
-					match = 1
-					## Should we take closest in time or in space?
-					#idx = idxs[np.nanargmin(time_deltas)]
-					idx = idxs[np.nanargmin(dists)]
+				elif multiple_match_criterion == 'score':
+					## Compute score: 1 pt / sec, 1 pt / 10 km, 1 pt / 0.3 dM
+					time_deltas = timelib.fractional_time_delta(time_deltas, 's')
+					scores = time_deltas[idxs] + dists / 10.
+					if not np.isnan(M):
+						delta_mags = np.abs(M - mags1[unmatched][idxs])
+						scores += (delta_mags / 0.3)
+						#print(time_deltas[idxs])
+						#print(dists)
+						#print(delta_mags)
+						#print(scores)
+					try:
+						idx = idxs[np.nanargmin(scores)]
+					except:
+						## delta_mags is all NaN
+						match = 0
+					else:
+						match = 1
+
 				if verbose:
 					for _idx in idxs:
 						local_eq = self.__getitem__(idxs1[unmatched][_idx])
