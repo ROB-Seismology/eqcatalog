@@ -100,7 +100,8 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 
 		if csv_file:
 			column_map = {'date': 'yyyy-mm-dd', 'time': 'hh:mm:ss.ss',
-						'intensity_max': 'intensity', 'name': 'locality'}
+						'intensity_max': 'intensity', 'name': 'locality',
+						'agency': 'BGS'}
 			return read_catalog_csv(csv_file, column_map, has_header=True,
 								ID_prefix='BGS', null_value=null_value,
 								ignore_chars= '>+F')
