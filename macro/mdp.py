@@ -152,7 +152,7 @@ class MDPCollection():
 				idxs = idxs[np.asarray(spec)]
 				for idx in idxs:
 					mdp_list.append(self.mdp_list[idx])
-			return self.__class__(mdp_list)
+			return self.__class__(mdp_list, name=self.name)
 
 	def append(self, mdp):
 		self.mdp_list.append(mdp)
@@ -494,7 +494,7 @@ class MDPCollection():
 			num_replies = 1
 			lon, lat = mdp.lon, mdp.lat
 			db_ids = [mdp.id]
-			macro_info = AggregatedMacroInfoCollection(id_earth, id_com, intensity,
+			macro_info = AggregatedMacroInfo(id_earth, id_com, intensity,
 												agg_type, data_type, num_replies,
 												lon, lat, db_ids=db_ids)
 			macro_info_list.append(macro_info)
@@ -765,14 +765,14 @@ class MDPCollection():
 		import mapping.layeredbasemap as lbm
 
 		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
-		#mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
 		macro_info_list = []
 		if create_polygons:
 			polygon_list = []
 			azimuths = np.linspace(0, 360, 361)
 		geom_key = 'max_radius'
 		agg_type = 'distance'
-		for max_radius, mdpc in mdpc.split_by_distance(ref_pt, distance_interval):
+		mdpc_dict = mdpc.split_by_distance(ref_pt, distance_interval)
+		for max_radius, mdpc in mdpc_dict.items():
 			if len(mdpc) >= min_num_mdp:
 				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
 				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
