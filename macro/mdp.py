@@ -494,12 +494,12 @@ class MDPCollection():
 			num_replies = 1
 			lon, lat = mdp.lon, mdp.lat
 			db_ids = [mdp.id]
-			macro_info = AggregatedMacroseismicInfo(id_earth, id_com, intensity,
+			macro_info = AggregatedMacroInfoCollection(id_earth, id_com, intensity,
 												agg_type, data_type, num_replies,
 												lon, lat, db_ids=db_ids)
 			macro_info_list.append(macro_info)
 
-		proc_info = dict(agg_method=agg_function, min_fiability=min_fiability,
+		proc_info = dict(agg_method='', min_fiability=min_fiability,
 					Imin_or_max=Imin_or_max)
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 											proc_info=proc_info)
@@ -649,7 +649,7 @@ class MDPCollection():
 			if len(pt) == 3:
 				depth = pt[2]
 			else:
-				detph = 0
+				depth = 0
 
 		return (lon, lat, depth)
 
@@ -765,14 +765,14 @@ class MDPCollection():
 		import mapping.layeredbasemap as lbm
 
 		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
-		mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
+		#mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
 		macro_info_list = []
 		if create_polygons:
 			polygon_list = []
 			azimuths = np.linspace(0, 360, 361)
 		geom_key = 'max_radius'
 		agg_type = 'distance'
-		for max_radius, mdpc in self.split_by_distance(ref_pt, distance_interval):
+		for max_radius, mdpc in mdpc.split_by_distance(ref_pt, distance_interval):
 			if len(mdpc) >= min_num_mdp:
 				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
 				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
