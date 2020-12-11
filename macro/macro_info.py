@@ -226,8 +226,20 @@ class AggregatedMacroInfoCollection():
 	def __iter__(self):
 		return self.macro_infos.__iter__()
 
-	def __getitem__(self, item):
-		return self.macro_infos.__getitem__(item)
+	def __getitem__(self, spec):
+		if isinstance(spec, (int, np.integer, slice)):
+			return self.macro_infos.__getitem__(spec)
+		elif isinstance(spec, (list, np.ndarray)):
+			## spec can contain indexes or bools
+			mi_list = []
+			if len(spec):
+				idxs = np.arange(len(self))
+				idxs = idxs[np.asarray(spec)]
+				for idx in idxs:
+					mi_list.append(self.macro_infos[idx])
+			return self.__class__(mi_list, self.agg_type, self.data_type,
+										macro_geoms=self.macro_geoms,
+										geom_key=self.geom_key, proc_info=self.proc_info)
 
 	def __repr__(self):
 		txt = '<AggregatedMacroInfoCollection | by %s | n=%d | %s>'
