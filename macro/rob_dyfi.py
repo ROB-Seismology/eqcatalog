@@ -928,7 +928,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		db_rec_dict = self.read_locations_from_db()
 		num_located, num_zeroed = 0, 0
 		for rec in self.recs:
-			db_rec = db_rec_dict.get('id_web')
+			db_rec = db_rec_dict.get(rec['id_web'])
 			if db_rec:
 				rec['longitude'] = db_rec['longitude']
 				rec['latitude'] = db_rec['latitude']
