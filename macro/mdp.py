@@ -519,7 +519,7 @@ class MDPCollection():
 			num_replies = 1
 			lon, lat = mdp.lon, mdp.lat
 			db_ids = [mdp.id]
-			macro_info = AggregatedMacroInfo(id_earth, id_com, intensity,
+			macro_info = AggregatedMacroInfo(id_earth, id_com, intensity, self.imt,
 												agg_type, data_type, num_replies,
 												lon, lat, db_ids=db_ids)
 			macro_info_list.append(macro_info)
