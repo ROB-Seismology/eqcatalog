@@ -1501,7 +1501,7 @@ def zip2ID(zip_code):
 	return id_com
 
 
-def get_communes(country='BE', main_communes=False):
+def get_communes(country='BE', main_communes=False, id_com=None):
 	"""
 	Fetch communes from database
 
@@ -1510,14 +1510,26 @@ def get_communes(country='BE', main_communes=False):
 		(default: 'BE')
 	:param main_communes:
 		bool, whether or not to get main communes only
+		(default: False)
+	:param id_com:
+		int, str or list: commune ID(s),
+		mutually exclusive with :param:`main_communes`
+		(default: None)
 
 	:return:
 		list of dicts
 	"""
+	if isinstance(id_com, (int, np.integer, basestring)):
+		id_com = [id_com]
+
 	table_clause = 'communes'
-	where_clause = 'country = "%s"' % country
-	if main_communes:
-		where_clause += ' AND id = id_main'
+	where_clause = []
+	if country:
+		where_clause += ['country = "%s"' % country]
+	if not (id_com is None or id_com in ([], '')):
+		where_clause += ['id in (%s)' % ",".join([str(item) for item in id_com])]
+	elif main_communes:
+		where_clause += ['id = id_main']
 	return query_seismodb_table(table_clause, where_clause=where_clause)
 
 
