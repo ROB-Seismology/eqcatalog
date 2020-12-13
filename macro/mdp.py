@@ -113,6 +113,28 @@ class MacroseismicDataPoint():
 			self.Imin = np.round(self.Imin)
 			self.Imax = np.round(self.Imax)
 
+	def get_commune(self, main_commune=False):
+		"""
+		Get commune or main commune from ROB database
+
+		:param main_commune:
+			bool, whether to fetch commune (False) or main commune (True)
+
+		:return:
+			dict, mapping database fields to values
+		"""
+		from .. rob import get_communes
+		id_com = self.id_com
+		if main_commune:
+			id_com = self.id_main
+
+		try:
+			commune = get_communes(id_com=id_com)[0]
+		except:
+			commune = None
+
+		return commune
+
 
 MDP = MacroseismicDataPoint
 
@@ -203,8 +225,8 @@ class MDPCollection():
 		Get intensities
 
 		:param Imin_or_max:
-			str, either 'min', 'mean', 'median' or 'max', to select
-			between minimum, mean, median or maximum intensitiy of each MDP
+			str, either 'min', 'mean' or 'max', to select
+			between minimum, mean or maximum intensitiy of each MDP
 
 		:return:
 			1D float array
