@@ -56,8 +56,8 @@ class AggregatedMacroInfo():
 		- 'historical'
 		- 'official'
 		- 'isoseismal'
-	:param num_replies:
-		int, number of replies in aggregate
+	:param num_mdps:
+		int, number of MDPs in aggregate
 		(default: 1)
 	:param lon:
 		float, longitude
@@ -77,14 +77,14 @@ class AggregatedMacroInfo():
 		(default: None)
 	"""
 	def __init__(self, id_earth, id_com, intensity, imt, agg_type, data_type,
-				num_replies=1, lon=0, lat=0, residual=0, db_ids=[], geom_key_val=None):
+				num_mdps=1, lon=0, lat=0, residual=0, db_ids=[], geom_key_val=None):
 		self.id_earth = id_earth
 		self.id_com = id_com
 		self.intensity = intensity
 		self.imt = imt
 		self.agg_type = agg_type
 		self.data_type = data_type
-		self.num_replies = num_replies
+		self.num_replies = self.num_mdps = num_mdps
 		self.lon = lon
 		self.lat = lat
 		self.residual = residual
@@ -403,8 +403,8 @@ class AggregatedMacroInfoCollection():
 		lons, lats = [], []
 		for rec in self:
 			if not None in (rec.lon, rec.lat):
-				lons.extend([rec.lon] * rec.num_replies)
-				lats.extend([rec.lat] * rec.num_replies)
+				lons.extend([rec.lon] * rec.num_mdps)
+				lats.extend([rec.lat] * rec.num_mdps)
 		lonmin, lonmax = np.percentile(lons, percentiles)
 		latmin, latmax = np.percentile(lats, percentiles)
 		return (lonmin, lonmax, latmin, latmax)
@@ -448,7 +448,7 @@ class AggregatedMacroInfoCollection():
 
 		## Construct attribute dictionary
 		values = OrderedDict()
-		attributes = ['id_earth', 'intensity', 'num_replies']
+		attributes = ['id_earth', 'intensity', 'num_mdps']
 		residuals = [rec.residual for rec in self]
 		if not np.allclose(residuals, 0):
 			attributes += ['residual']
@@ -684,8 +684,8 @@ class AggregatedMacroInfoCollection():
 		elif prop == 'residual':
 			values = np.array([rec.residual for rec in self])
 			unit = 'Intensity difference'
-		elif prop == 'num_replies':
-			values = np.array([rec.num_replies for rec in self])
+		elif prop in ('num_mdps', 'num_replies'):
+			values = np.array([rec.num_mdps for rec in self])
 			unit = ''
 		else:
 			print("Unknown property %s" % prop)
@@ -827,7 +827,7 @@ def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
 	from ..rob import query_local_eq_catalog_by_id
 
 	query_info = query_info.lower()
-	if query_info == 'num_replies':
+	if query_info in ('num_mdps', 'num_replies'):
 		min_replies = 1
 
 	if aggregate_by == 'commune':
