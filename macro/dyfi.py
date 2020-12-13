@@ -366,7 +366,7 @@ class DYFIEnsemble(object):
 		"""
 		Note: slicing results in a view, fancy indexing in a copy !
 		"""
-		if isinstance(spec, (int, np.integer, slice)):
+		if isinstance(spec, (int, np.integer)):
 			## Turn index in a slice
 			spec = slice(spec, spec + 1)
 
@@ -950,7 +950,7 @@ class DYFIEnsemble(object):
 			pylab.show()
 
 	def report_bincount(self, prop, bins=None, include_nan=True, include_labels=False,
-						include_empty=False):
+						include_empty=False, label_lang='EN'):
 		"""
 		Print table with bincounts for given property
 
@@ -969,9 +969,12 @@ class DYFIEnsemble(object):
 		bins, numbers = self.bincount(prop, bins=bins, include_nan=include_nan)
 		column_names = ['Value', 'Num records']
 		if include_labels:
-			title, labels = self.get_prop_title_and_labels(prop, lang="EN")
+			title, labels = self.get_prop_title_and_labels(prop, lang=label_lang)
 			if labels and len(labels) < len(bins):
-				labels.append('No answer')
+				labels.append({'EN': 'No answer',
+									'NL': 'Geen antwoord',
+									'FR': 'Pas de réponse',
+									'DE': 'Kein Antwort'}[label_lang])
 			column_names.append('Label')
 
 		table = PrettyTable(column_names)
@@ -991,7 +994,8 @@ class DYFIEnsemble(object):
 		:param lang:
 			str, language
 		:param institute:
-			str, either 'USGS' or 'ROB'
+			str, determines number of fields and their order,
+			either 'USGS' or 'ROB'
 		"""
 		if institute.upper() == 'USGS':
 			fields = ['asleep', 'felt', 'other_felt', 'stand', 'motion',
