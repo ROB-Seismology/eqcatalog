@@ -164,15 +164,15 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	macro_info_coll = macro_info_coll.copy()
 
 	if verbose:
-		tot_num_replies = np.sum([rec.num_replies for rec in macro_info_coll])
-		print("Found %d aggregates (%d replies) for event %s:"
+		tot_num_replies = np.sum([rec.num_mdps for rec in macro_info_coll])
+		print("Found %d aggregates (%d MDPs) for event %s:"
 				% (len(macro_info_coll), tot_num_replies, macro_info_coll[0].id_earth))
 		if verbose > 1:
 			idxs = np.argsort(macro_info_coll.intensities)
 			for idx in idxs:
 				macro_rec = macro_info_coll[idx]
 				print("  %s : %.2f (n=%d)" % (macro_rec.id_com,
-							macro_rec.I, macro_rec.num_replies))
+							macro_rec.I, macro_rec.num_mdps))
 
 	if region == "auto":
 		lonmin, lonmax, latmin, latmax = macro_info_coll.get_region(95)
@@ -224,7 +224,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		#			'online': "Community Internet Intensity",
 		#			'traditional': "Macroseismic Intensity"}.get(data_type,
 		#											"Macroseismic Intensity")
-	elif plot_info == 'num_replies':
+	elif plot_info in ('num_mdps', 'num_replies'):
 		if thematic_classes is None:
 			thematic_classes = np.array([1, 3, 5, 10, 20, 50, 100, 200, 500, 1000],
 										dtype='int')
@@ -248,7 +248,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 										#labels=["%s" % val for val in thematic_classes],
 										style_under='w', style_over=cmap(1.),
 										style_bad='w')
-		elif plot_info in ('num_replies', 'residual'):
+		elif plot_info in ('num_mdps', 'num_replies', 'residual'):
 			tfc = lbm.ThematicStyleRanges(thematic_classes, cmap, value_key=plot_info,
 										#labels=["%s" % val for val in thematic_classes],
 										style_under='w', style_over=cmap(1.),
@@ -263,7 +263,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if colorbar_style == "default":
 		colorbar_style = lbm.ColorbarStyle(location="bottom", format="%d",
 							title=cb_title, spacing="uniform", extend='both')
-		if plot_info == "num_replies":
+		if plot_info in ("num_mdps", "num_replies"):
 			colorbar_style.extend = 'neither'
 	if isinstance(colorbar_style, lbm.ColorbarStyle):
 		tfc.colorbar_style = colorbar_style
@@ -326,14 +326,14 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		## Plot polygons
 		ta = 1.
 		tfh = None
-		if plot_info != 'num_replies' and thematic_num_replies:
+		if plot_info not in ('num_mdps', 'num_replies') and thematic_num_replies:
 			## Set transparency (or hatching) in function of number of replies
 			num_replies = [1, 3, 5, 10, 20, 50, 500]
 			#tfh = lbm.ThematicStyleRanges(num_replies, ['', '.....', '....', '...', '..', ''],
 			#								value_key="num_replies")
 			if color_gradient[:4] == "disc":
 				ta = lbm.ThematicStyleGradient(num_replies, [0.1, 0.3, 0.5, 0.625, 0.75, 0.875, 1.],
-											value_key="num_replies")
+											value_key="num_mdps")
 		polygon_style = lbm.PolygonStyle(line_width=0, fill_color=tfc, fill_hatch=tfh,
 						alpha=ta, thematic_legend_style=thematic_legend_style)
 		if line_style:
@@ -347,13 +347,13 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		symbol_style = symbol_style.copy()
 		## Plot points
 		## Symbol size in function of number of replies
-		if plot_info != 'num_replies' and thematic_num_replies:
+		if plot_info not in ('num_mdps', 'num_replies') and thematic_num_replies:
 			num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
 			#num_replies = num_replies[num_replies >= min_replies]
 			symbol_size = symbol_style.size
 			#sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
 			sizes = symbol_size + np.log10(num_replies) * symbol_size
-			ts = lbm.ThematicStyleGradient(num_replies, sizes, value_key="num_replies")
+			ts = lbm.ThematicStyleGradient(num_replies, sizes, value_key="num_mdps")
 			symbol_style.size = ts
 		symbol_style.fill_color = tfc
 		#symbol_style.thematic_legend_style = thematic_legend_style
@@ -454,11 +454,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		ratios = []
 		sizes = []
 		for rec in macro_info_coll:
-			if rec.num_replies >= pie_min_replies:
+			if rec.num_mdps >= pie_min_replies:
 				enq_ensemble = rec.get_online_enquiries()
 				lons.append(rec.lon)
 				lats.append(rec.lat)
-				sizes.append(np.sqrt(rec.num_replies) * size_scaling)
+				sizes.append(np.sqrt(rec.num_mdps) * size_scaling)
 				bins, counts = enq_ensemble.bincount(prop)
 				ratios.append(counts)
 
