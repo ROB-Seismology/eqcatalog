@@ -142,16 +142,19 @@ class MDPCollection():
 		return len(self.mdp_list)
 
 	def __getitem__(self, spec):
-		if isinstance(spec, (int, np.integer, slice)):
+		if isinstance(spec, (int, np.integer)):
 			return self.mdp_list.__getitem__(spec)
-		elif isinstance(spec, (list, np.ndarray)):
-			## spec can contain indexes or bools
-			mdp_list = []
-			if len(spec):
-				idxs = np.arange(len(self))
-				idxs = idxs[np.asarray(spec)]
-				for idx in idxs:
-					mdp_list.append(self.mdp_list[idx])
+		else:
+			if isinstance(spec, slice):
+				mdp_list = self.mdp_list.__getitem__(spec)
+			elif isinstance(spec, (list, np.ndarray)):
+				## spec can contain indexes or bools
+				mdp_list = []
+				if len(spec):
+					idxs = np.arange(len(self))
+					idxs = idxs[np.asarray(spec)]
+					for idx in idxs:
+						mdp_list.append(self.mdp_list[idx])
 			return self.__class__(mdp_list, name=self.name)
 
 	def append(self, mdp):
@@ -1226,7 +1229,7 @@ class MDPCollection():
 
 		layer_name = self.name or 'Macroseismic data points'
 		layer = FeatureGroup(name=layer_name, overlay=True, control=True, show=True)
-		intensities = np.round(self.get_intensities(Imin_or_max)).astype('int')
+		intensities = np.round(self.get_intensities(Imin_or_max))
 		for mdp, I in zip(self.mdp_list, intensities):
 			if not (np.isnan(mdp.lat) or np.isnan(mdp.lon)):
 				hex_color = matplotlib.colors.rgb2hex(cmap(I))
@@ -1239,7 +1242,7 @@ class MDPCollection():
 										inner_icon_style=iis,
 										background_color=hex_color,
 										border_color='transparent',
-										number=I)
+										number=int(I))
 				else:
 					div_style = '<div style="font-size: %dpt; color:%s;"><b>%d</b></div>;'
 					div_style %= (label_size, hex_color, I)
