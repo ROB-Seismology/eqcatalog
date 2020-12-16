@@ -198,13 +198,13 @@ for eq in catalog:
 			if args.map_region in ('tight', 'both'):
 				map_sizes.append('small')
 
-			for agency in ('ROB', 'BNS'):
-				if agency == 'ROB':
-					map_filename = '%i.png' % id_earth
-				elif agency == 'BNS':
-					dt_string = str(eq.datetime).replace('T', '_').replace(':', '')[:15]
-					map_filename = '%s.png' % dt_string
-				for size in map_sizes:
+			for size in map_sizes:
+				for agency in ('ROB', 'BNS'):
+					if agency == 'ROB':
+						map_filename = '%i.png' % id_earth
+					elif agency == 'BNS':
+						dt_string = str(eq.datetime).replace('T', '_').replace(':', '')[:15]
+						map_filename = '%s.png' % dt_string
 					map_filespec = os.path.join(args.base_folder, agency, size, map_filename)
 					if size == 'large':
 						region = [minlon-1, maxlon+1, minlat-.5, maxlat+.5]
