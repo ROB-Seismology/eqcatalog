@@ -64,8 +64,10 @@ parser.add_argument("--agg_method", help="Aggregation method (availability depen
                     choices=["mean", "dyfi", "min", "max", "median"], default="mean")
 parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
                     choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
-parser.add_argument("--bel_admin_level", help="Level of administrtive boundaries in Belgium",
-                    choices=["","country", "region", "province", "commune"], default="default")
+parser.add_argument("--admin_source", help="Source for administrtive boundaries",
+                    choices=["gadm", "statbel", "rob"], default="gadm")
+parser.add_argument("--admin_level", help="Level of administrtive boundaries",
+                    choices=["", "region", "province", "commune", "default"], default="default")
 parser.add_argument("--show_main_cities", help="Whether or not to plot main cities",
                     type=strtobool, default="true")
 parser.add_argument("--epicenter_marker", help="Which symbol to use for epicenter",
@@ -217,17 +219,17 @@ for eq in catalog:
 							region[1] = max(region[1], eq.lon)
 							region[2] = min(region[2], eq.lat)
 							region[3] = max(region[3], eq.lat)
-						if args.bel_admin_level == 'default':
+						if args.admin_level == 'default':
 							admin_level = 'region'
 						else:
-							admin_level = args.bel_admin_level
+							admin_level = args.admin_level
 					else:
 						#region = (eq.lon-1, eq.lon+1, eq.lat-.5, eq.lat+.5)
 						region = (minlon-0.25, maxlon+0.25, minlat-0.1, maxlat+0.1)
-						if args.bel_admin_level == 'default':
-							admin_level = 'province'
+						if args.admin_level == 'default':
+							admin_level = 'region,province'
 						else:
-							admin_level = args.bel_admin_level
+							admin_level = args.admin_level
 
 					## Plot map
 					if not args.dry_run:
@@ -239,7 +241,7 @@ for eq in catalog:
 								line_style=line_style, thematic_num_replies=thematic_num_replies,
 								interpolate_grid={}, cmap=cmap,
 								color_gradient=color_gradient, event_style=event_style,
-								country_style=country_style,
+								country_style=country_style, admin_source=args.admin_source,
 								admin_level=admin_level, admin_style=admin_style,
 								city_style=city_style, colorbar_style=colorbar_style,
 								radii=[], plot_pie=None,
