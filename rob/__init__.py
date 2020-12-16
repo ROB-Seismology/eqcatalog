@@ -33,6 +33,13 @@ else:
 
 ## Import submodules
 
+## hash (no dependencies)
+if not reloading:
+	from . import hash
+else:
+	reload(hash)
+from .hash import *
+
 ## completeness (depends on ..completeness)
 if not reloading:
 	from . import completeness
