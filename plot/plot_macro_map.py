@@ -361,15 +361,6 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		macro_style = symbol_style
 		legend_label = ""
 
-	## Macro layer
-	if interpolate_grid and not symbol_style:
-		macro_geom_data = None
-	else:
-		macro_geom_data = macro_info_coll.get_geometries(plot_polygons_as_points)
-	if macro_geom_data:
-		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
-		layers.append(macro_layer)
-
 	## Country layer
 	if country_style == 'default':
 		country_style = lbm.LineStyle(line_width=1.0, line_pattern=':')
@@ -443,6 +434,15 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		#gis_style = lbm.CompositeStyle(polygon_style=admin_style)
 		admin_layer = lbm.MapLayer(admin_data, admin_style, legend_label={"polygons": ""})
 		layers.append(admin_layer)
+
+	## Macro layer
+	if interpolate_grid and not symbol_style:
+		macro_geom_data = None
+	else:
+		macro_geom_data = macro_info_coll.get_geometries(plot_polygons_as_points)
+	if macro_geom_data:
+		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
+		layers.append(macro_layer)
 
 	if city_style:
 		# TODO: label style, thematic size
