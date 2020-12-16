@@ -39,6 +39,7 @@ from db.simpledb import (build_sql_query, query_mysql_db_generic)
 
 __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_local_eq_catalog", "query_local_eq_catalog_by_id",
+			"get_id_from_seiscomp_id",
 			"get_last_earthID", "query_focal_mechanisms",
 			"query_online_macro_catalog", "query_traditional_macro_catalog",
 			"query_official_macro_catalog", "query_historical_macro_catalog",
@@ -416,9 +417,58 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 def query_local_eq_catalog_by_id(id_earth, sort_key=None, sort_order="asc",
 								verbose=False, errf=None):
+	"""
+	Query local earthquake catalog using earthquake IDs
+
+	:param id_earth:
+		- int or list, ID(s) of event to extract
+		- str: hashed ID or SeisComP ID
+		(default: None)
+	:param sort_key:
+	:param sort_order:
+	:param verbose:
+	:param errf:
+		see :func:`query_local_eq_catalog`
+
+	:return:
+		instance of :class:`EQCatalog`
+	"""
 	if not id_earth in (None, []):
+		if isinstance(id_earth, basestring):
+			if id_earth[:2] == 'be' and id_earth[2:6].isdigit():
+				id_earth = get_id_from_seiscomp_id(id_earth)
+			else:
+				from .hash import hash2id
+				id_earth = hash2id(id_earth)
+
 		return query_local_eq_catalog(id_earth=id_earth, sort_key=sort_key,
 								sort_order=sort_order, verbose=verbose, errf=errf)
+
+
+def get_id_from_seiscomp_id(id_seiscomp):
+	"""
+	Fetch ROB earthquake ID corresponding to SeisComP ID from database
+	(based on the 'comment' field)
+
+	:param id_seiscomp:
+		str, SeisComP ID (e.g. 'be2020yqrg')
+
+	:return:
+		int, id_earth
+	"""
+	table_clause = 'earthquakes'
+	column_clause = ['id_earth']
+	where_clause = "comment LIKE 'SC3:%s'" % id_seiscomp
+
+	try:
+		[rec] = query_seismodb_table(table_clause, column_clause=column_clause,
+										 where_clause=where_clause)
+	except:
+		id_earth = None
+	else:
+		id_earth = int(rec['id_earth'])
+
+	return id_earth
 
 
 def query_focal_mechanisms(region=None, start_date=None, end_date=None,
