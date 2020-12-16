@@ -50,13 +50,9 @@ class ROBLocalEarthquake(LocalEarthquake):
 		:return:
 			string, hash
 		"""
-		import hashids
-		salt = "8dffaf6e-fb3a-11e5-86aa-5e5517507c66"
-		min_length = 9
-		alphabet = "abcdefghijklmnopqrstuvwxyz1234567890"
-		hi = hashids.Hashids(salt=salt, min_length=min_length, alphabet=alphabet)
-		hash = hi.encode(self.ID)
-		return hash
+		from .hash import id2hash
+
+		return id2hash(self.ID)
 
 	def get_aggregated_online_macro_info(self, min_replies=3, query_info="cii",
 					min_fiability=80, filter_floors=(0,4),
