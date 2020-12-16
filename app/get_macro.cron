@@ -1,0 +1,15 @@
+## Rename this file to get_macro (there should be no dots!)
+## and copy to /etc/cron.d
+
+## Run cronjobs via bash instead of sh
+SHELL=/bin/bash
+## Source conda snippet to bash run by crontab
+## This is necessary to activate the right conda environment
+BASH_ENV=/home/seismo/.conda_env
+PYTHONPATH=/home/seismo/python/seismo:$PYTHONPATH
+## Send mail if an error occurs
+MAILTO=seismo.info@seismology.be
+MAILFROM=seisweb3
+
+*/5 * * * * seismo conda activate eqcatalog; python ~/python/seismo/eqcatalog/app/get_macro.py >> ~/log/get_macro.log 2>&1
+
