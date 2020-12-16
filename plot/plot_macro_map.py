@@ -372,27 +372,46 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	## Country layer
 	if country_style == 'default':
-		country_style = lbm.LineStyle(line_width=1.0)
+		country_style = lbm.LineStyle(line_width=1.0, line_pattern=':')
 	if country_style:
-		#for feature in ('coastlines', 'countries'):
-			#country_data = lbm.BuiltinData(feature)
-			#country_layer = lbm.MapLayer(country_data, country_style)
-			#layers.append(country_layer)
-			#coll_name = 'DCW_Countries'
+		for feature in ('coastlines', 'countries'):
+			country_data = lbm.BuiltinData(feature)
+			country_layer = lbm.MapLayer(country_data, country_style)
+			layers.append(country_layer)
 
-		coll_name = 'DCW_countries'
-		for ds_name in ('france', 'germany', 'Europe/netherlands', 'united_kingdom'):
-			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
-			if gis_file:
-				country_data = lbm.GisData(gis_file)
-				country_layer = lbm.MapLayer(country_data, country_style)
-				layers.append(country_layer)
+		#coll_name = 'DCW_countries'
+		#for ds_name in ('france', 'germany', 'Europe/netherlands', 'united_kingdom'):
+		#	gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+		#	if gis_file:
+		#		country_data = lbm.GisData(gis_file)
+		#		country_layer = lbm.MapLayer(country_data, country_style)
+		#		layers.append(country_layer)
+
+		#coll_name, ds_name = 'DIVA-GIS', 'countries_2011'
+		#selection_dict = {'ISO3': ['GBR', 'NLD', 'FRA', 'DEU']}
+		coll_name, ds_name = 'NaturalEarth_10m', 'ne_10m_admin_0_countries'
+		selection_dict = {'sov_a3': ['GBR', 'NLD', 'FRA', 'DEU']}
+		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+		#if gis_file:
+		#	country_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+		#	country_layer = lbm.MapLayer(country_data, country_style)
+		#	layers.append(country_layer)
+
 		coll_name, ds_name = 'STATBEL', 'Country'
 		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 		if gis_file:
 			country_data = lbm.GisData(gis_file)
 			country_layer = lbm.MapLayer(country_data, country_style)
 			layers.append(country_layer)
+
+	## Belgium
+	coll_name, ds_name = 'STATBEL', 'Country'
+	gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+	if gis_file:
+		bel_data = lbm.GisData(gis_file)
+		bel_style = lbm.PolygonStyle(line_width=2, line_color='w', fill_color='w')
+		bel_layer = lbm.MapLayer(bel_data, bel_style)
+		layers.append(bel_layer)
 
 	## Admin layer
 	admin_data = None
