@@ -157,6 +157,8 @@ for eq in catalog:
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
 					fix_records=True, include_other_felt=True,
 					include_heavy_appliance=False, remove_outliers=(2.5, 97.5))
+				if args.verbose:
+					print('Imin/max: %.1f/%.1f' % macro_info.Iminmax())
 			else:
 				macro_info = macro_data
 
