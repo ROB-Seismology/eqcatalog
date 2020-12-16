@@ -157,10 +157,13 @@ for eq in catalog:
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
 					fix_records=True, include_other_felt=True,
 					include_heavy_appliance=False, remove_outliers=(2.5, 97.5))
-				if args.verbose:
+				if args.verbose and len(macro_info):
 					print('Imin/max: %.1f/%.1f' % macro_info.Iminmax())
 			else:
 				macro_info = macro_data
+			
+			if not(len(macro_info)):
+				continue
 
 			minlon, maxlon, minlat, maxlat = macro_info.get_region()
 
