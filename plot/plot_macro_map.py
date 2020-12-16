@@ -25,8 +25,9 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				int_conversion="round", symbol_style=None, line_style="default",
 				thematic_num_replies=False, thematic_classes=None, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
-				country_style="default", admin_level="province", admin_style="default",
-				city_style="default", colorbar_style="default", radii=[],
+				country_style="default", city_style="default",
+				admin_source='gadm', admin_level="province", admin_style="default",
+				colorbar_style="default", radii=[],
 				plot_pie={}, title="", fig_filespec=None,
 				ax=None, copyright=u"© ROB", text_box={}, dpi="default",
 				border_width=0.2, verbose=True):
@@ -95,9 +96,14 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		instance of :class:`mapping.layeredbasemap.LineStyle`,
 		line style for country borders
 		(default: "default")
+	:param admin_source:
+		str, source for administrative boundaries,
+		either 'belstat', 'rob' or 'gadm'
+		(default: 'gadm')
 	:param admin_level:
 		str, administrative level to plot over intensity map,
-		one of 'province', 'region' or 'country'
+		one of 'region', 'province', 'arrondissement, 'main commune', 'commune',
+		'sector' or any combination of these
 		(default: 'province')
 	:param admin_style:
 		instance of :class:`mapping.layeredbasemap.LineStyle`,
@@ -361,80 +367,6 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		macro_style = symbol_style
 		legend_label = ""
 
-	## Country layer
-	if country_style == 'default':
-		country_style = lbm.LineStyle(line_width=1.0, line_pattern=':')
-	if country_style:
-		for feature in ('coastlines', 'countries'):
-			country_data = lbm.BuiltinData(feature)
-			country_layer = lbm.MapLayer(country_data, country_style)
-			layers.append(country_layer)
-
-		#coll_name = 'DCW_countries'
-		#for ds_name in ('france', 'germany', 'Europe/netherlands', 'united_kingdom'):
-		#	gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
-		#	if gis_file:
-		#		country_data = lbm.GisData(gis_file)
-		#		country_layer = lbm.MapLayer(country_data, country_style)
-		#		layers.append(country_layer)
-
-		#coll_name, ds_name = 'DIVA-GIS', 'countries_2011'
-		#selection_dict = {'ISO3': ['GBR', 'NLD', 'FRA', 'DEU']}
-		coll_name, ds_name = 'NaturalEarth_10m', 'ne_10m_admin_0_countries'
-		selection_dict = {'sov_a3': ['GBR', 'NLD', 'FRA', 'DEU']}
-		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
-		#if gis_file:
-		#	country_data = lbm.GisData(gis_file, selection_dict=selection_dict)
-		#	country_layer = lbm.MapLayer(country_data, country_style)
-		#	layers.append(country_layer)
-
-		coll_name, ds_name = 'STATBEL', 'Country'
-		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
-		if gis_file:
-			country_data = lbm.GisData(gis_file)
-			country_layer = lbm.MapLayer(country_data, country_style)
-			layers.append(country_layer)
-
-	## Belgium
-	coll_name, ds_name = 'STATBEL', 'Country'
-	gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
-	if gis_file:
-		bel_data = lbm.GisData(gis_file)
-		bel_style = lbm.PolygonStyle(line_width=2, line_color='w', fill_color='w')
-		bel_layer = lbm.MapLayer(bel_data, bel_style)
-		layers.append(bel_layer)
-
-	## Admin layer
-	admin_data = None
-	if admin_level:
-		if admin_level.lower() == 'province':
-			#coll_name, ds_name = "Bel_administrative_ROB", "Bel_provinces"
-			coll_name, ds_name = 'STATBEL', 'Provinces'
-		elif admin_level.lower() == 'region':
-			#coll_name, ds_name = "Bel_administrative_ROB", "Bel_regions"
-			coll_name, ds_name = 'STATBEL', 'Regions'
-		elif admin_level.lower() == 'country':
-			#coll_name, ds_name = "Bel_administrative_ROB", "Bel_border"
-			coll_name, ds_name = 'STATBEL', 'Country'
-		elif admin_level.lower() == 'commune':
-			coll_name, ds_name = "Bel_administrative_ROB", "Bel_communes_avant_fusion"
-		elif admin_level.lower() == 'main commune':
-			coll_name, ds_name = "Bel_administrative_ROB", "Bel_villages_polygons"
-			#coll_name, ds_name = 'STATBEL', 'Municipalities'
-		elif admin_level.lower() == 'sector':
-			coll_name, ds_name = 'STATBEL', 'scbel01012011_gen13.shp'
-
-		gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
-		if gis_file:
-			admin_data = lbm.GisData(gis_file)
-
-	if admin_data:
-		if admin_style == "default":
-			admin_style = lbm.PolygonStyle(line_width=0.5, fill_color='none')
-		#gis_style = lbm.CompositeStyle(polygon_style=admin_style)
-		admin_layer = lbm.MapLayer(admin_data, admin_style, legend_label={"polygons": ""})
-		layers.append(admin_layer)
-
 	## Macro layer
 	if interpolate_grid and not symbol_style:
 		macro_geom_data = None
@@ -443,6 +375,187 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if macro_geom_data:
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
+
+	## Country layer
+	if country_style == 'default':
+		country_style = lbm.LineStyle(line_width=1.25)
+	if country_style:
+		if admin_source in ('belstat', 'rob'):
+			for feature in ('coastlines', 'countries'):
+				country_data = lbm.BuiltinData(feature)
+				builtin_country_style = country_style.copy()
+				builtin_country_style.line_pattern = ':'
+				country_layer = lbm.MapLayer(country_data, builtin_country_style)
+				layers.append(country_layer)
+
+			selection_dict = {}
+			if admin_source == 'rob':
+				coll_name, ds_name = 'Bel_administrative_ROB', 'Bel_border'
+			elif admin_source == 'statbel':
+				coll_name, ds_name = 'STATBEL', 'Country'
+			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+
+		else:
+			#coll_name = 'DCW_countries'
+			#for ds_name in ('france', 'germany', 'Europe/netherlands', 'united_kingdom'):
+			#	gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+			#	if gis_file:
+			#		country_data = lbm.GisData(gis_file)
+			#		country_layer = lbm.MapLayer(country_data, country_style)
+			#		layers.append(country_layer)
+
+			#coll_name, ds_name = 'DIVA-GIS', 'countries_2011'
+			#selection_dict = {'ISO3': ['GBR', 'NLD', 'FRA', 'DEU']}
+			#coll_name, ds_name = 'NaturalEarth_10m', 'ne_10m_admin_0_countries'
+			#selection_dict = {'sov_a3': ['GBR', 'NLD', 'FRA', 'DEU']}
+			coll_name, ds_name = 'GADM', 'gadm28_adm0'
+			selection_dict = {'ISO': ['BEL', 'GBR', 'NLD', 'FRA', 'DEU', 'LUX']}
+			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+
+		if gis_file:
+			country_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+			country_layer = lbm.MapLayer(country_data, country_style)
+			layers.append(country_layer)
+
+	## Admin layer
+	admin_data, admin_styles = [], []
+	if admin_level:
+		if admin_style == "default":
+			admin_style = lbm.PolygonStyle(line_width=0.5, line_color='0.75',
+													fill_color='none')
+
+		admin_level = admin_level.lower()
+		if 'sector' in admin_level:
+			line_width = 0.3
+			gis_file = None
+			if admin_source == 'statbel':
+				coll_name, ds_name = 'STATBEL', 'scbel01012011_gen13.shp'
+				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+			if gis_file:
+				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+				admin_data.append(adm_data)
+				admin_style.line_width = line_width
+				admin_styles.append(admin_style.copy())
+
+		if 'commune' in admin_level.lower():
+			line_width = 0.3
+			gis_file = None
+			if admin_source == 'rob':
+				coll_name, ds_name = "Bel_administrative_ROB", "Bel_communes_avant_fusion"
+			if gis_file:
+				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+				admin_data.append(adm_data)
+				admin_style.line_width = line_width
+				admin_styles.append(admin_style.copy())
+
+		if 'main commune' in admin_level:
+			line_width = 0.3
+			if admin_source in ('statbel', 'rob'):
+				if admin_source == 'rob':
+					coll_name, ds_name = "Bel_administrative_ROB", "Bel_villages_polygons"
+				elif admin_source == 'statbel':
+					coll_name, ds_name = 'STATBEL', 'Municipalities'
+				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+				if gis_file:
+					adm_data = lbm.GisData(gis_file)
+					admin_data.append(adm_data)
+					admin_style.line_width = line_width
+					admin_styles.append(admin_style.copy())
+			elif admin_source == 'gadm':
+				for i in range(3):
+					if i == 0:
+						coll_name, ds_name = 'GADM', 'gadm28_adm4'
+						selection_dict = {'ISO': ['BEL', 'GBR', 'FRA']}
+					elif i == 1:
+						coll_name, ds_name = 'GADM', 'gadm28_adm3'
+						selection_dict = {'ISO': ['DEU', 'LUX']}
+					elif i == 2:
+						coll_name, ds_name = 'GADM', 'gadm28_adm2'
+						selection_dict = {'ISO': ['NLD']}
+					gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+					if gis_file:
+						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+						admin_data.append(adm_data)
+						admin_style.line_width = line_width
+						admin_styles.append(admin_style.copy())
+
+		if 'arrondissement' in admin_level:
+			line_width = 0.5
+			if admin_source == 'statbel':
+				coll_name, ds_name = 'STATBEL', 'Arrondissements'
+				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+				if gis_file:
+					adm_data = lbm.GisData(gis_file)
+					admin_data.append(adm_data)
+					admin_style.line_width = line_width
+					admin_styles.append(admin_style.copy())
+			elif admin_source == 'gadm':
+				for i in range(2):
+					if i == 0:
+						coll_name, ds_name = 'GADM', 'gadm28_adm3'
+						selection_dict = {'ISO': ['BEL', 'GBR', 'FRA']}
+					elif i == 1:
+						coll_name, ds_name = 'GADM', 'gadm28_adm2'
+						selection_dict = {'ISO': ['LUX', 'DEU']}
+					gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+					if gis_file:
+						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+						admin_data.append(adm_data)
+						admin_style.line_width = line_width
+						admin_styles.append(admin_style.copy())
+
+		if 'province' in admin_level:
+			line_width = 0.75
+			if admin_source in ('statbel', 'rob'):
+				if admin_source == 'rob':
+					coll_name, ds_name = "Bel_administrative_ROB", "Bel_provinces"
+				elif admin_source == 'statbel':
+					coll_name, ds_name = 'STATBEL', 'Provinces'
+				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+				if gis_file:
+					adm_data = lbm.GisData(gis_file)
+					admin_data.append(adm_data)
+					admin_style.line_width = line_width
+					admin_styles.append(admin_style.copy())
+			elif admin_source == 'gadm':
+				for i in range(2):
+					if i == 0:
+						coll_name, ds_name = 'GADM', 'gadm28_adm2'
+						selection_dict = {'ISO': ['BEL', 'GBR', 'FRA']}
+					elif i == 1:
+						coll_name, ds_name = 'GADM', 'gadm28_adm1'
+						selection_dict = {'ISO': ['NLD', 'LUX']}
+					gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+					if gis_file:
+						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+						admin_data.append(adm_data)
+						admin_style.line_width = line_width
+						admin_styles.append(admin_style.copy())
+
+		if admin_level == 'region':
+			line_width = 1.0
+			gis_file = None
+			selection_dict = {}
+			if admin_source == 'rob':
+				coll_name, ds_name = "Bel_administrative_ROB", "Bel_regions"
+			elif admin_source == 'statbel':
+				coll_name, ds_name = 'STATBEL', 'Regions'
+			elif admin_source == 'gadm':
+				coll_name, ds_name = 'GADM', 'gadm28_adm1'
+				## Exclude NLD, LUX
+				selection_dict = {'ISO': ['BEL', 'GBR', 'FRA', 'DEU']}
+			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
+			if gis_file:
+				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+				admin_data.append(adm_data)
+				admin_style.line_width = line_width
+				admin_styles.append(admin_style.copy())
+
+
+		for adm_data, adm_style in zip(admin_data, admin_styles):
+			#gis_style = lbm.CompositeStyle(polygon_style=admin_style)
+			admin_layer = lbm.MapLayer(adm_data, adm_style, legend_label={"polygons": ""})
+			layers.append(admin_layer)
 
 	if city_style:
 		# TODO: label style, thematic size
