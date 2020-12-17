@@ -95,7 +95,7 @@ if args.id_earth:
 	catalog = eqcatalog.rob.query_local_eq_catalog_by_id(args.id_earth)
 	overwrite_map = True
 else:
-	catalog = eqcatalog.rob.query_local_eq_catalog(has_open_enquiry=True)
+	catalog = eqcatalog.rob.query_local_eq_catalog(has_open_enquiry=True, start_date=2000)
 	overwrite_map = False
 
 
