@@ -413,7 +413,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 
 		if gis_file:
-			country_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+			country_data = lbm.GisData(gis_file, selection_dict=selection_dict,
+											region=region)
 			country_layer = lbm.MapLayer(country_data, country_style)
 			layers.append(country_layer)
 
@@ -421,7 +422,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	admin_data, admin_styles = [], []
 	if admin_level:
 		if admin_style == "default":
-			admin_style = lbm.PolygonStyle(line_width=0.5, line_color='0.75',
+			admin_style = lbm.PolygonStyle(line_width=0.5, line_color='0.25',
 													fill_color='none')
 
 		admin_level = admin_level.lower()
@@ -432,7 +433,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				coll_name, ds_name = 'STATBEL', 'scbel01012011_gen13.shp'
 				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 			if gis_file:
-				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict,
+											region=region)
 				admin_data.append(adm_data)
 				admin_style.line_width = line_width
 				admin_styles.append(admin_style.copy())
@@ -443,7 +445,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			if admin_source == 'rob':
 				coll_name, ds_name = "Bel_administrative_ROB", "Bel_communes_avant_fusion"
 			if gis_file:
-				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict,
+											region=region)
 				admin_data.append(adm_data)
 				admin_style.line_width = line_width
 				admin_styles.append(admin_style.copy())
@@ -457,7 +460,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 					coll_name, ds_name = 'STATBEL', 'Municipalities'
 				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 				if gis_file:
-					adm_data = lbm.GisData(gis_file)
+					adm_data = lbm.GisData(gis_file, region=region)
 					admin_data.append(adm_data)
 					admin_style.line_width = line_width
 					admin_styles.append(admin_style.copy())
@@ -474,7 +477,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 						selection_dict = {'ISO': ['NLD']}
 					gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 					if gis_file:
-						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict,
+													 region=region)
 						admin_data.append(adm_data)
 						admin_style.line_width = line_width
 						admin_styles.append(admin_style.copy())
@@ -485,7 +489,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				coll_name, ds_name = 'STATBEL', 'Arrondissements'
 				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 				if gis_file:
-					adm_data = lbm.GisData(gis_file)
+					adm_data = lbm.GisData(gis_file, region=region)
 					admin_data.append(adm_data)
 					admin_style.line_width = line_width
 					admin_styles.append(admin_style.copy())
@@ -499,7 +503,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 						selection_dict = {'ISO': ['LUX', 'DEU']}
 					gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 					if gis_file:
-						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict,
+													region=region)
 						admin_data.append(adm_data)
 						admin_style.line_width = line_width
 						admin_styles.append(admin_style.copy())
@@ -513,7 +518,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 					coll_name, ds_name = 'STATBEL', 'Provinces'
 				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 				if gis_file:
-					adm_data = lbm.GisData(gis_file)
+					adm_data = lbm.GisData(gis_file, region=region)
 					admin_data.append(adm_data)
 					admin_style.line_width = line_width
 					admin_styles.append(admin_style.copy())
@@ -527,7 +532,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 						selection_dict = {'ISO': ['NLD', 'LUX']}
 					gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 					if gis_file:
-						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+						adm_data = lbm.GisData(gis_file, selection_dict=selection_dict,
+													region=region)
 						admin_data.append(adm_data)
 						admin_style.line_width = line_width
 						admin_styles.append(admin_style.copy())
@@ -546,11 +552,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				selection_dict = {'ISO': ['BEL', 'GBR', 'FRA', 'DEU']}
 			gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
 			if gis_file:
-				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict)
+				adm_data = lbm.GisData(gis_file, selection_dict=selection_dict,
+											region=region)
 				admin_data.append(adm_data)
 				admin_style.line_width = line_width
 				admin_styles.append(admin_style.copy())
-
 
 		for adm_data, adm_style in zip(admin_data, admin_styles):
 			#gis_style = lbm.CompositeStyle(polygon_style=admin_style)
