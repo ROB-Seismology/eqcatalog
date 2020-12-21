@@ -66,9 +66,9 @@ parser.add_argument("--commune_marker", help="Which symbol/geometry to use for c
                     choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
 parser.add_argument("--admin_source", help="Source for administrtive boundaries",
                     choices=["gadm", "statbel", "rob"], default="gadm")
-parser.add_argument("--admin_level", help="Level of administrtive boundaries ('region', 'province', 'arrondissement', 'main commune', 'commune', 'sector' or any combination",
+parser.add_argument("--admin_level", help="Level of administrtive boundaries ('region', 'province', 'arrondissement', 'main commune', 'commune', 'sector' or any combination or 'auto'",
 #                    choices=["", "region", "province", "commune", "default"], default="default")
-                    type=str, default="default")
+                    type=str, default="auto")
 parser.add_argument("--show_main_cities", help="Whether or not to plot main cities",
                     type=strtobool, default="true")
 parser.add_argument("--epicenter_marker", help="Which symbol to use for epicenter",
@@ -164,7 +164,7 @@ for eq in catalog:
 					print('Imin/max: %.1f/%.1f' % macro_info.Iminmax())
 			else:
 				macro_info = macro_data
-			
+
 			if not(len(macro_info)):
 				continue
 
