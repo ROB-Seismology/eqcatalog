@@ -103,7 +103,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	:param admin_level:
 		str, administrative level to plot over intensity map,
 		one of 'region', 'province', 'arrondissement, 'main commune', 'commune',
-		'sector' or any combination of these
+		'sector' or any combination of these or 'auto'
 		(default: 'province')
 	:param admin_style:
 		instance of :class:`mapping.layeredbasemap.LineStyle`,
@@ -424,6 +424,19 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		if admin_style == "default":
 			admin_style = lbm.PolygonStyle(line_width=0.5, line_color='0.25',
 													fill_color='none')
+
+		if admin_level == 'auto':
+			dlon = region[1] - region[0]
+			dlat = region[3] - region[2]
+			map_range = max(dlon, dlat)
+			if map_range > 5:
+				admin_level = 'region'
+			elif map_range > 2.5:
+				admin_level = 'region,province'
+			elif map_range > 1.25:
+				admin_level = 'region,province,arrondissement'
+			elif map_range > 0.5:
+				admin_level = 'region,province,arrondissement,main commune'
 
 		admin_level = admin_level.lower()
 		if 'sector' in admin_level:
