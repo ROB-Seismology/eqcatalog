@@ -135,6 +135,21 @@ class MacroseismicDataPoint():
 
 		return commune
 
+	def get_commune_name(self, main_commune=False):
+		"""
+		Get commune name from ROB database
+
+		:param main_commune:
+			see :meth:`get_commune`
+
+		:return:
+			str
+		"""
+		comm_rec = self.get_commune(main_commune=main_commune)
+
+		if comm_rec:
+			return comm_rec['name']
+
 
 MDP = MacroseismicDataPoint
 
@@ -364,6 +379,57 @@ class MDPCollection():
 			d_hypo = d_epi
 
 		return d_hypo
+
+	# TODO: only works for communes in Belgium!
+
+	def get_commune_names(self, main_commune=False):
+		"""
+		Get names of commune or main commune from ROB database
+
+		:param main_commune:
+			bool, whether to fetch commune (False) or main commune (True)
+
+		:return:
+			list of str
+		"""
+		from .. rob import get_communes
+
+		if main_commune:
+			commune_ids = self.get_prop_values('id_main')
+		else:
+			commune_ids = self.get_prop_values('id_com')
+
+		try:
+			commune_recs = get_communes(id_com=commune_ids)
+		except:
+			commune_names = []
+		else:
+			commune_names = [rec['name'] for rec in commune_recs]
+
+		return commune_names
+
+	def subselect_by_commune_name(self, commune_names, main_commune=False):
+		"""
+		Select MDPs by name of commune or main commune
+
+		:param commune_names:
+			list of str, commune names
+		:param main_commune:
+			see :meth:`get_commune_names`
+
+		:return:
+			instance of :class:`MDPCollection`
+		"""
+		commune_names = [item.upper() for item in commune_names]
+		mdp_commune_names = self.get_commune_names(main_commune=main_commune)
+		mdp_list = []
+		for commune_name in commune_names:
+			for m, mdp in enumerate(self.mdp_list):
+				if mdp_commune_names[m].upper() in commune_names:
+					mdp_list.append(mdp)
+					break
+
+		return self.__class__(mdp_list)
 
 	def get_prop_values(self, prop_name):
 		"""
