@@ -455,14 +455,42 @@ class MDPCollection():
 		"""
 		return np.unique(self.get_prop_values(prop_name))
 
-	def subselect_by_property(self, prop_name, prop_val, comparator=operator.eq):
+	def subselect_by_property(self, prop_name, prop_values, negate=False):
 		"""
 		Select MDPs based on the value of a particular property
 
 		:param prop_name:
 			str, property name
+		:param prop_values:
+			list of values of :param:`prop` that should be matched
+		:param negate:
+			bool, whether or not to reverse the matching
+
+		:return:
+			instance of :class:`MDPCollection`
+		"""
+		if np.isscalar(prop_values):
+			prop_values = [prop_values]
+
+		values = self.get_prop_values(prop_name)
+		if len(values) and isinstance(values[0], basestring):
+			prop_values = [str(pv) if pv is not None else pv for pv in prop_values]
+		if not negate:
+			idxs = [i for i in range(len(values)) if values[i] in prop_values]
+		else:
+			idxs = [i for i in range(len(values)) if not values[i] in prop_values]
+
+		return self.__getitem__(idxs)
+
+	def subselect_by_property_generic(self, prop_name, prop_val, comparator=operator.eq):
+		"""
+		Select MDPs based on the value of a particular property using a generic
+		comparison operator
+
+		:param prop_name:
+			str, property name
 		:param prop_val:
-			property value
+			property value (single value!)
 		:param comparator:
 			comparison function
 			(default: operator.eq)
@@ -525,7 +553,7 @@ class MDPCollection():
 			commune_coords = {rec['id']: (rec['longitude'], rec['latitude'])
 							for rec in communes}
 
-		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc = self.__getitem__(self.get_prop_values('fiability') >= min_fiability)
 		mdpc_dict = mdpc.split_by_property(prop_name)
 		macro_info_list = []
 		for agg_key, mdpc in mdpc_dict.items():
@@ -573,7 +601,7 @@ class MDPCollection():
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
 		"""
-		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc = self.__getitem__(self.get_prop_values('fiability') >= min_fiability)
 		intensities = self.get_intensities(Imin_or_max)
 		macro_info_list = []
 		for m, mdp in enumerate(mdpc):
@@ -686,7 +714,7 @@ class MDPCollection():
 			gis_data = lbm.GisData(poly_data)
 			_, _, poly_data = gis_data.get_data()
 
-		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc = self.__getitem__(self.get_prop_values('fiability') >= min_fiability)
 		mdpc_dict = mdpc.split_by_polygon_data(poly_data, value_key)
 		macro_info_list = []
 		polygon_list = []
@@ -855,7 +883,7 @@ class MDPCollection():
 		from mapping.geotools.geodetic import spherical_point_at
 		import mapping.layeredbasemap as lbm
 
-		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc = self.__getitem__(self.get_prop_values('fiability') >= min_fiability)
 		macro_info_list = []
 		if create_polygons:
 			polygon_list = []
@@ -975,7 +1003,7 @@ class MDPCollection():
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
 		"""
-		mdpc = self.subselect_by_property('fiability', min_fiability, operator.ge)
+		mdpc = self.__getitem__(self.get_prop_values('fiability') >= min_fiability)
 		mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
 		macro_info_list = []
 		agg_type = 'grid_%d' % grid_spacing
