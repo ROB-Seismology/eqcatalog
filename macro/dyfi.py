@@ -1282,7 +1282,7 @@ class DYFIEnsemble(object):
 				Iagg = self.calc_cii(aggregate=True,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
-								max_devation=max_deviation,
+								max_deviation=max_deviation,
 								max_nan_pct=max_nan_pct)
 			if 'mean' in agg_method:
 				Imean = self.calc_mean_cii_or_cdi('cii',
@@ -1955,6 +1955,8 @@ class DYFIEnsemble(object):
 			if max_deviation:
 				with np.errstate(invalid='ignore', divide='ignore'):
 					cii = 3.40 * np.log(cws_individual) - 4.38
+				## Replace -inf CII values (due to zero CWS values) with ones
+				cii[np.isinf(cii)] = 1
 				_mean = np.nanmean(cii)
 				_std = np.nanstd(cii)
 				deviation = np.abs(cii - _mean)
