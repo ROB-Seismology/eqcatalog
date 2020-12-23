@@ -514,6 +514,50 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			zip_ensemble_recs.extend(ensemble.recs)
 		return self.__class__(self.id_earth, zip_ensemble_recs)
 
+	def get_commune_names(self, main_commune=False):
+		"""
+		Get names of commune or main commune from ROB database
+
+		:param main_commune:
+			bool, whether to fetch commune (False) or main commune (True)
+
+		:return:
+			list of str
+		"""
+		if main_commune:
+			comm_key = 'id_main'
+			commune_ids = self.get_main_commune_ids()
+		else:
+			comm_key = 'id_com'
+			commune_ids = self.get_prop_values(comm_key)
+
+		commune_recs = self.get_communes_from_db(comm_key)
+
+		return [commune_recs[id_com]['name'] for id_com in commune_ids]
+
+	def subselect_by_commune_name(self, commune_names, main_commune=False):
+		"""
+		Select DYFI records by name of commune or main commune
+
+		:param commune_names:
+			list of str, commune names
+		:param main_commune:
+			see :meth:`get_commune_names`
+
+		:return:
+			instance of :class:`MDPCollection`
+		"""
+		commune_names = [item.upper() for item in commune_names]
+		dyfi_commune_names = self.get_commune_names(main_commune=main_commune)
+		idxs = []
+		for commune_name in commune_names:
+			for m in range(len(self)):
+				if dyfi_commune_names[m].upper() in commune_names:
+					idxs.append(m)
+					break
+
+		return self.__getitem__(idxs)
+
 	def get_addresses(self, exclude_empty_streets=True):
 		"""
 		Return list of addresses for each record
@@ -1041,7 +1085,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5), max_nan_pct=100,
+					max_deviation=2., max_nan_pct=100,
 					fix_commune_ids=True, fix_felt=True, remove_duplicates=False,
 					**kwargs):
 		"""
@@ -1055,7 +1099,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		:param agg_method:
 		:param include_other_felt:
 		:param include_heavy_appliance:
-		:param remove_outliers:
+		:param max_deviation:
 		:param max_nan_pct:
 		:**kwargs:
 			see :meth:`DYFIEnsemble.aggregate`
@@ -1088,14 +1132,14 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					agg_info=agg_info, agg_method=agg_method,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					**kwargs)
 
 	def aggregate_by_commune(self, comm_key='id_main',
 					min_replies=3, min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5), max_nan_pct=100,
+					max_deviation=2., max_nan_pct=100,
 					fix_commune_ids=True, fix_felt=True):
 		"""
 		Aggregate DYFI collection by commune
@@ -1114,7 +1158,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 						agg_info=agg_info, agg_method=agg_method,
 						include_other_felt=include_other_felt,
 						include_heavy_appliance=include_heavy_appliance,
-						remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+						max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 						fix_commune_ids=fix_commune_ids, fix_felt=fix_felt)
 
 		## Override agg_type, as DYFIEnsemble only knows id_com
@@ -1262,10 +1306,14 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		table._rows = sorted(table._rows, key=itemgetter(sort_column), reverse=reverse_order)
 		print(table)
 
-	def find_duplicate_addresses(self, verbose=True):
+	def find_duplicate_addresses(self, allow_multiple_names=True, verbose=True):
 		"""
 		Find duplicate records based on their address (street name and ZIP).
 
+		:param allow_multiple_names:
+			bool, whether or not to allow multiple names (= persons) at the
+			same address
+			(default: True)
 		:param verbose:
 			bool, whether or not to print some useful information
 
@@ -1275,6 +1323,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		all_streets = self.get_prop_values('street')
 		all_zips = self.get_prop_values('zip')
 		#all_communes = self.get_prop_values('city')
+		all_names = self.get_prop_values('name')
 		unique_streets = []
 		unique_idxs = []
 		duplicate_idxs = {}
@@ -1291,10 +1340,11 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					## Duplicate
 					unique_idx = unique_streets.index(zip_street)
 					unique_idx = unique_idxs[unique_idx]
-					if unique_idx in duplicate_idxs:
-						duplicate_idxs[unique_idx].append(s)
-					else:
-						duplicate_idxs[unique_idx] = [s]
+					if not allow_multiple_names or all_names[s] == all_names[unique_idx]:
+						if unique_idx in duplicate_idxs:
+							duplicate_idxs[unique_idx].append(s)
+						else:
+							duplicate_idxs[unique_idx] = [s]
 		duplicate_idxs = [[key] + values for key, values in duplicate_idxs.items()]
 		duplicate_idxs = sorted(duplicate_idxs)
 
@@ -1318,25 +1368,27 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 
 		return duplicate_idxs
 
-	def get_duplicate_records(self, verbose=True):
+	def get_duplicate_records(self, allow_multiple_names=True, verbose=True):
 		"""
 		Get duplicate records based on their address (street name and ZIP).
 
+		:param allow_multiple_names:
 		:param verbose:
-			bool, whether or not to print some useful information
+			see :meth:`find_duplicate_addresses`
 
 		:return:
 			list of instances of :class:`MacroseismicEnquiryEnsemble`
 			for each set of duplicate records
 		"""
-		duplicate_idxs = self.find_duplicate_addresses(verbose=verbose)
+		duplicate_idxs = self.find_duplicate_addresses(verbose=verbose,
+											allow_multiple_names=allow_multiple_names)
 		ensemble_list = []
 		for idxs in duplicate_idxs:
 			ensemble = self.__getitem__(idxs)
 			ensemble_list.append(ensemble)
 		return ensemble_list
 
-	def remove_duplicate_records(self, verbose=True):
+	def remove_duplicate_records(self, allow_multiple_names=True, verbose=True):
 		"""
 		Remove duplicate records based on street name and ZIP code.
 		For duplicate records, the one with the highest fiability and
@@ -1345,13 +1397,15 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		Note that records are not removed from current instance,
 		but a new instance without the duplicate records is returned!
 
+		:param allow_multiple_names:
 		:param verbose:
-			bool, whether or not to print some useful information
+			see :meth:`find_duplicate_addresses`
 
 		:return:
 			instance of :class:`MacroseismicEnquiryEnsemble`
 		"""
-		duplicate_idxs = self.find_duplicate_addresses(verbose=verbose)
+		duplicate_idxs = self.find_duplicate_addresses(verbose=verbose,
+											allow_multiple_names=allow_multiple_names)
 		web_ids_to_remove = []
 		for idxs in duplicate_idxs:
 			ensemble = self.__getitem__(idxs)
