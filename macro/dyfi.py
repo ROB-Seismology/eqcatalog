@@ -1238,7 +1238,7 @@ class DYFIEnsemble(object):
 	def get_aggregated_intensity(self, agg_info='cii', agg_method='mean',
 								include_other_felt=True,
 								include_heavy_appliance=False,
-								remove_outliers=(2.5, 97.5), max_nan_pct=100):
+								max_deviation=2., max_nan_pct=100):
 		"""
 		Compute aggregated intensity, and optionally the residual
 		(difference) between two methods
@@ -1260,10 +1260,11 @@ class DYFIEnsemble(object):
 			bool, whether or not to take heavy_appliance into account
 			as well (not standard, but occurs with ROB forms)
 			(default: False)
-		:param remove_outliers:
-			(min_pct, max_pct) tuple, percentile range to use.
+		:param max_deviation:
+			float, max. deviation allowed for individual intensities to be
+			taken into account to compute the aggregated intensity.
 			Applies to both aggregation methods (in a different way)
-			(default: 2.5, 97.5)
+			(default: 2.)
 		:param max_nan_pct:
 			int, maximum percentage of nan (i.e. unanswered) values
 			to accept for each index in aggregated calculation
@@ -1281,24 +1282,24 @@ class DYFIEnsemble(object):
 				Iagg = self.calc_cii(aggregate=True,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers,
+								max_devation=max_deviation,
 								max_nan_pct=max_nan_pct)
 			if 'mean' in agg_method:
 				Imean = self.calc_mean_cii_or_cdi('cii',
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers)
+								max_deviation=max_deviation)
 		elif agg_info == 'cdi':
 			if 'dyfi' in agg_method:
 				Iagg = self.calc_cdi(include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers,
+								max_deviation=max_deviation,
 								max_nan_pct=max_nan_pct)
 			if 'mean' in agg_method:
 				Imean = self.calc_mean_cii_or_cdi('cdi',
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers)
+								max_deviation=max_deviation)
 
 		residual = 0
 		if agg_info in ('cii', 'cdi'):
@@ -1319,7 +1320,7 @@ class DYFIEnsemble(object):
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+					max_deviation=2, max_nan_pct=100, **kwargs):
 		"""
 		Get aggregated macroseismic information.
 
@@ -1349,7 +1350,7 @@ class DYFIEnsemble(object):
 		:param agg_method:
 		:param include_other_felt:
 		:param include_heavy_appliance:
-		:param remove_outliers:
+		:param max_deviation:
 		:param max_nan_pct:
 			see :meth:`get_aggregated_intensity`
 
@@ -1481,7 +1482,7 @@ class DYFIEnsemble(object):
 								agg_info=agg_info, agg_method=agg_method,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers,
+								max_deviation=max_deviation,
 								max_nan_pct=max_nan_pct)
 			if agg_info == "num_replies":
 				I = 1
@@ -1520,7 +1521,7 @@ class DYFIEnsemble(object):
 						filter_floors=filter_floors, agg_method=agg_method,
 						include_other_felt=include_other_felt,
 						include_heavy_appliance=include_heavy_appliance,
-						remove_outliers=remove_outliers)
+						max_deviation=max_deviation)
 
 		macro_info_coll = AggregatedMacroInfoCollection(macro_infos, aggregate_by,
 										'internet', macro_geoms=macro_geoms,
@@ -1531,7 +1532,7 @@ class DYFIEnsemble(object):
 	def aggregate_by_nothing(self, min_replies=3, min_fiability=80,
 					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+					max_deviation=2., max_nan_pct=100, **kwargs):
 		"""
 		Turn DYFI collection in aggregated macro information, with
 		each enquiry corresponding to an aggregate
@@ -1549,13 +1550,13 @@ class DYFIEnsemble(object):
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					**kwargs)
 
 	def aggregate_by_commune(self, min_replies=3, min_fiability=80,
 					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5), max_nan_pct=100):
+					max_deviation=2., max_nan_pct=100):
 		"""
 		Aggregate DYFI collection by commune
 
@@ -1574,13 +1575,13 @@ class DYFIEnsemble(object):
 					agg_info=agg_info, agg_method=agg_method,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct)
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct)
 
 	def aggregate_by_distance(self, ref_pt, distance_interval, create_polygons=True,
 					min_replies=3, min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+					max_deviation=2., max_nan_pct=100, **kwargs):
 		"""
 		Aggregate DYFI ensemble by distance
 
@@ -1604,7 +1605,7 @@ class DYFIEnsemble(object):
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					ref_pt=ref_pt,  distance_interval=distance_interval,
 					create_polygons=create_polygons, **kwargs)
 
@@ -1613,7 +1614,7 @@ class DYFIEnsemble(object):
 					min_replies=3, min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=(2.5, 97.5), max_nan_pct=100, **kwargs):
+					max_deviation=2., max_nan_pct=100, **kwargs):
 		"""
 		Aggregate DYFI ensemble according to a set of polygons
 
@@ -1637,31 +1638,34 @@ class DYFIEnsemble(object):
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					poly_data=poly_data, value_key=value_key,
 					include_unmatched_polygons=include_unmatched_polygons, **kwargs)
 
-	def remove_outliers(self, min_pct=2.5, max_pct=97.5):
+	#def remove_outliers(self, min_pct=2.5, max_pct=97.5):
+	def remove_outliers(self, max_deviation=2.):
 		"""
-		Remove outliers (with CII outside of confidence range)
+		Remove outliers (with CII outside of mean +/- nr. of standard deviations)
 		from ensemble
 
-		:param min_pct:
-			float, lower percentile
-			(default: 2.5)
-		:param max_pct:
-			float, upper percentile
-			(default: 97.5)
+		:param max_deviation:
+			float, maximum allowed deviation in terms of number of
+			standard deviations
+			(default: 2.)
 
 		:return:
 			instance of :class:`MDPCollection`
 		"""
 		# TODO: add recalc_cii option, but requires additional parameters...?
-		pct0 = np.percentile(self.CII, min_pct)
-		pct1 = np.percentile(self.CII, max_pct)
-		within_confidence = (self.CII >= pct0) & (self.CII <= pct1)
-		idxs = np.where(within_confidence)[0]
-		return self.__getitem__(idxs)
+		if max_deviation:
+			mean = np.nanmean(self.CII)
+			std = np.nanstd(self.CII)
+			deviation = np.abs(self.CII - mean)
+			is_outlier = deviation > max_deviation * std
+		else:
+			is_outlier = np.zeros_like(self.CII, dtype=np.bool)
+
+		return self.__getitem__(~is_outlier)
 
 	def filter_floors(self, min_level=0, max_level=4, keep_nan_values=True):
 		"""
@@ -1882,7 +1886,7 @@ class DYFIEnsemble(object):
 
 	def calc_cws(self, aggregate=True, filter_floors=(0, 4),
 				include_other_felt=True, include_heavy_appliance=False,
-				remove_outliers=None, max_nan_pct=100,
+				max_deviation=None, max_nan_pct=100,
 				overwrite=False):
 		"""
 		Compute Community Weighted Sum (CWS) following Wald et al. (1999)
@@ -1899,9 +1903,9 @@ class DYFIEnsemble(object):
 			see :meth:`calc_felt_index`
 		:param include_heavy_appliance:
 			see :meth:`calc_furniture_index`
-		:param remove_outliers:
-			(min_pct, max_pct) tuple, percentile range of non-aggregated
-			intensities to use for calculating aggregated CWS
+		:param max_deviation:
+			float, maximum deviation of non-aggregated intensities (in terms of
+			number of standard deviations) to use for calculating aggregated CWS
 			Only applies if :param:`aggregate` is True!
 			(default: None)
 		:param max_nan_pct:
@@ -1948,13 +1952,13 @@ class DYFIEnsemble(object):
 			## It is not possible to remove outliers for individual indexes,
 			## but we can compute non-aggregated intensities first,
 			## and determine outliers from that distribution
-			if remove_outliers:
-				min_pct, max_pct = remove_outliers
+			if max_deviation:
 				with np.errstate(invalid='ignore', divide='ignore'):
 					cii = 3.40 * np.log(cws_individual) - 4.38
-				pct0 = np.percentile(cii, min_pct)
-				pct1 = np.percentile(cii, max_pct)
-				idxs = (cii >= pct0) & (cii <= pct1)
+				_mean = np.nanmean(cii)
+				_std = np.nanstd(cii)
+				deviation = np.abs(cii - _mean)
+				idxs = deviation <= max_deviation * _std
 				felt_indexes = felt_indexes[idxs]
 				motion_indexes = motion_indexes[idxs]
 				reaction_indexes = reaction_indexes[idxs]
@@ -2024,7 +2028,7 @@ class DYFIEnsemble(object):
 
 	def calc_cdi(self, aggregate=True, filter_floors=(0, 4),
 				include_other_felt=True, include_heavy_appliance=False,
-				remove_outliers=None, max_nan_pct=100,
+				max_deviation=None, max_nan_pct=100,
 				overwrite=False):
 		"""
 		Compute original Community Decimal Intensity sensu Dengler &
@@ -2034,7 +2038,7 @@ class DYFIEnsemble(object):
 		:param filter_floors:
 		:param include_other_felt:
 		:param include_heavy_appliance:
-		:param remove_outliers:
+		:param max_deviation:
 		:param max_nan_pct:
 		:param overwrite:
 			see :meth:`calc_cws`
@@ -2045,7 +2049,7 @@ class DYFIEnsemble(object):
 		cws = self.calc_cws(aggregate=aggregate, filter_floors=filter_floors,
 							include_other_felt=include_other_felt,
 							include_heavy_appliance=include_heavy_appliance,
-							remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+							max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 							overwrite=overwrite)
 		cdi = 3.3 + 0.13 * cws
 		if overwrite and aggregate is False:
@@ -2055,7 +2059,7 @@ class DYFIEnsemble(object):
 
 	def calc_cii(self, aggregate=True, filter_floors=(0, 4),
 				include_other_felt=True, include_heavy_appliance=False,
-				remove_outliers=None, max_nan_pct=100,
+				max_deviation=None, max_nan_pct=100,
 				overwrite=False):
 		"""
 		Compute Community Internet Intensity following Wald et al. (1999),
@@ -2065,7 +2069,7 @@ class DYFIEnsemble(object):
 		:param filter_floors:
 		:param include_other_felt:
 		:param include_heavy_appliance:
-		:param remove_outliers:
+		:param max_deviation:
 		:param max_nan_pct:
 		:param overwrite:
 			see :meth:`calc_cws`
@@ -2076,7 +2080,7 @@ class DYFIEnsemble(object):
 		cws = self.calc_cws(aggregate=aggregate, filter_floors=filter_floors,
 							include_other_felt=include_other_felt,
 							include_heavy_appliance=include_heavy_appliance,
-							remove_outliers=remove_outliers, max_nan_pct=max_nan_pct,
+							max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 							overwrite=overwrite)
 		with np.errstate(invalid='ignore', divide='ignore'):
 			cii = 3.40 * np.log(cws) - 4.38
@@ -2120,7 +2124,7 @@ class DYFIEnsemble(object):
 
 	def calc_mean_cii_or_cdi(self, which='cii', filter_floors=(0, 4),
 						include_other_felt=True, include_heavy_appliance=False,
-						remove_outliers=(2.5, 97.5)):
+						max_deviation=2.):
 		"""
 		Compute mean CII value from CII values of individual enquiries,
 		ignoring outliers. This is an alternative to the aggregated
@@ -2132,9 +2136,10 @@ class DYFIEnsemble(object):
 		:param include_other_felt:
 		:param include_heavy_appliance:
 			see :meth:`calc_cii`
-		:param remove_outliers:
-			(min_pct, max_pct) tuple, percentile range to use
-			(default: 2.5, 97.5)
+		:param max_deviation:
+			float, maximum deviation allowed for individual enquiries to
+			be used for calculating the mean
+			(default: 2.)
 
 		:return:
 			float, mean CII or CDI
@@ -2143,11 +2148,12 @@ class DYFIEnsemble(object):
 		cii_or_cdi = func(aggregate=False, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance)
-		if remove_outliers:
-			min_pct, max_pct = remove_outliers
-			pct0 = np.percentile(cii_or_cdi, min_pct)
-			pct1 = np.percentile(cii_or_cdi, max_pct)
-			cii_or_cdi = cii_or_cdi[(cii_or_cdi >= pct0) & (cii_or_cdi <= pct1)]
+		if max_deviation:
+			_mean = np.nanmean(cii_or_cdi)
+			_std = np.std(cii_or_cdi)
+			deviation = np.abs(cii_or_cdi - _mean)
+			is_outlier = deviation > max_deviation * _std
+			cii_or_cdi = cii_or_cdi[~is_outlier]
 		if len(cii_or_cdi):
 			return cii_or_cdi.mean()
 		else:
@@ -2155,7 +2161,7 @@ class DYFIEnsemble(object):
 
 	def evaluate_cws_calculation(self, aggregate=False, include_other_felt=True,
 							include_heavy_appliance=False, filter_floors=(0, 4),
-							remove_outliers=None, max_nan_pct=100):
+							max_deviation=None, max_nan_pct=100):
 		"""
 		Print values of properties used for CWS calculation, and the
 		derived indexes.
@@ -2164,7 +2170,7 @@ class DYFIEnsemble(object):
 		:param include_other_felt:
 		:param include_heavy_appliance:
 		:param filter_floors:
-		:param remove_outliers:
+		:param max_deviation:
 		:param max_nan_pct:
 			see :meth:`calc_cws`
 		"""
@@ -2290,12 +2296,12 @@ class DYFIEnsemble(object):
 		print("  Recomputed: %s" % self.calc_cws(aggregate=aggregate,
 			filter_floors=filter_floors, include_other_felt=include_other_felt,
 			include_heavy_appliance=include_heavy_appliance,
-			remove_outliers=remove_outliers, max_nan_pct=max_nan_pct))
+			max_deviation=max_deviation, max_nan_pct=max_nan_pct))
 		if not aggregate:
 			print("  Aggregated: %.2f" % self.calc_cws(filter_floors=filter_floors,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
-								remove_outliers=remove_outliers, max_nan_pct=max_nan_pct))
+								max_deviation=max_deviation, max_nan_pct=max_nan_pct))
 
 	def plot_analysis_comparison(self, prop='CWS', include_other_felt=True,
 								include_heavy_appliance=False):
