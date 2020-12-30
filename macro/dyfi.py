@@ -35,7 +35,7 @@ class DYFIEnsemble(object):
 	Ensemble of online 'Did You Feel It?' macroseismic enquiry results
 
 	:param ids:
-		array-like, enquiry  IDs
+		array-like, enquiry IDs
 	:param event_ids:
 		array-like, earthquake IDs (one for each enquiry!)
 	:param event_times:
@@ -575,17 +575,34 @@ class DYFIEnsemble(object):
 		"""
 		return self.submit_times - self.event_times
 
-	def plot_cumulative_responses_vs_time(self):
-		import pylab
-		date_times = np.sort(self.submit_times).astype(object)
-		pylab.plot(date_times, np.arange(self.num_replies)+1)
-		pylab.gcf().autofmt_xdate()
-		pylab.xlabel("Time")
-		pylab.ylabel("Number of replies")
-		pylab.grid(True)
-		pylab.show()
+	def plot_cumulative_responses_vs_time(self, **kwargs):
+		"""
+		Plot cumulative number of responses versus time
 
-	def calc_distances(self, lon, lat, depth=0):
+		kwargs: keyword arguments understood by :func:`plotting.generic_mpl.plot_xy`
+
+		:return:
+			matplotlib Axes instance
+		"""
+		import pylab
+		from plotting.generic_mpl import plot_xy, show_or_save_plot
+
+		date_times = np.sort(self.submit_times).astype(object)
+		cumulative_replies = np.arange(self.num_replies)+1
+		datasets = [(date_times, cumulative_replies)]
+		xlabel = kwargs.pop('xlabel', 'Time')
+		ylabel = kwargs.pop('ylabel', 'Number of replies')
+		xgrid = kwargs.pop('xgrid', 1)
+		ygrid = kwargs.pop('ygrid', 1)
+		fig_filespec = kwargs.pop('fig_filespec', None)
+
+		ax = plot_xy(datasets, xlabel=xlabel, ylabel=ylabel,
+						xgrid=xgrid, ygrid=ygrid, fig_filespec='wait', **kwargs)
+		pylab.gcf().autofmt_xdate()
+
+		return show_or_save_plot(ax, fig_filespec=fig_filespec)
+
+	def calc_distances(self, lon, lat, depth=0, method='spherical'):
 		"""
 		Compute distances with respect to a particular point
 
@@ -596,40 +613,120 @@ class DYFIEnsemble(object):
 		:param depth:
 			float, depth of point (in km)
 			(default: 0)
+		:param method:
+			str, calculation method, either 'spherical' or 'ellipsoidal'
+			The spherical method is based on the haversine formula and is fast,
+			but diverges about 0.3% from the true distance.
+			The ellipsoidal method uses the WGS84 ellipsoid and is more accurate,
+			but more than 100 times slower
+			(default: 'spherical')
 
 		:return:
 			array, distances (in km)
 		"""
-		import mapping.geotools.geodetic as geodetic
-
 		rec_lons = self.longitudes
 		rec_lats = self.latitudes
-		dist = geodetic.spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
-		dist = np.sqrt(dist**2 + depth**2)
-		return dist
 
-	def calc_epicentral_distances(self):
+		if method == 'spherical':
+			from mapping.geotools.geodetic import spherical_distance
+			distances = spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
+		elif method == 'ellipsoidal':
+			distances, _, _ = self.calc_distances_and_azimuths(lon, lat)
+			distances[np.isnan(rec_lons)] = np.nan
+		else:
+			raise Exception('Method %s not known' % method)
+
+		if depth:
+			distances = np.sqrt(distances**2 + depth**2)
+
+		return distances
+
+	def calc_distances_and_azimuths(self, lon, lat, depth=0.):
+		"""
+		Compute distances, azimuths and backazimuths with respect to a particular
+		point using :func:`obspy.geodetics.gps2dist_azimuth` (= ellipsoidal method)
+
+		:param lon:
+			float, longitude of reference point (in degrees)
+		:param lat:
+			float, latitude of reference point (in degrees)
+		:param depth:
+			float, depth of reference point (in km)
+			(default: 0.)
+
+		:return:
+			(distances, azimuths, back_azimuths) tuple of 1D arrays:
+			- distances: distances in km
+			- azimuths: azimuths in degrees (from reference point to DYFI records)
+			- back_azimuths: back_azimuths in degrees (towards reference point)
+		"""
+		from obspy.geodetics import gps2dist_azimuth
+
+		distances, azimuths, back_azimuths = [], [], []
+		for rec_lon, rec_lat in zip(self.longitudes, self.latitudes):
+			d, az, back_az = gps2dist_azimuth(lat, lon, rec_lat, rec_lon)
+			distances.append(d)
+			azimuths.append(az)
+			back_azimuths.append(back_az)
+		distances = np.array(distances) / 1000.
+		if depth:
+			distances = np.sqrt(distances**2 + depth**2)
+		azimuths = np.array(azimuths)
+		back_azimuths = np.array(back_azimuths)
+
+		return (distances, azimuths, back_azimuths)
+
+	def calc_epicentral_distances(self, method='spherical'):
 		"""
 		Compute epicentral distances
 
+		:param method:
+			see :meth:`calc_distances`
+
 		:return:
 			array, distances (in km)
 		"""
-		lon, lat = self.event_longitudes, self.event_latitudes
-		return self.calc_distances(lon, lat, depth=0)
+		event_ids = self.event_ids
+		unique_event_ids = np.unique(event_ids)
+		Repi = np.zeros(len(self))
 
-	def calc_hypocentral_distances(self):
+		for id_earth in unique_event_ids:
+			idxs = (event_ids == id_earth)
+			subselection = self.__getitem__(idxs)
+			ref_lon = subselection.event_longitudes[0]
+			ref_lat = subselection.event_latitudes[0]
+			Repi[idxs] = subselection.calc_distances(ref_lon, ref_lat, depth=0,
+																method=method)
+
+		return Repi
+
+	def calc_hypocentral_distances(self, method='spherical'):
 		"""
 		Compute hypocentral distances
 
+		:param method:
+			see :meth:`calc_distances`
+
 		:return:
 			array, distances (in km)
 		"""
-		lon, lat = self.event_longitudes, self.event_latitudes
-		depth = self.event_depths
-		return self.calc_distances(lon, lat, depth=depth)
+		event_ids = self.event_ids
+		unique_event_ids = np.unique(event_ids)
+		Rhypo = np.zeros(len(self))
 
-	def subselect_by_distance(self, ref_pt, radius):
+		for id_earth in unique_event_ids:
+			idxs = (event_ids == id_earth)
+			subselection = self.__getitem__(idxs)
+			ref_lon = subselection.event_longitudes[0]
+			ref_lat = subselection.event_latitudes[0]
+			depth = subselection.event_depths[0]
+			Rhypo[idxs] = subselection.calc_distances(ref_lon, ref_lat, depth=depth,
+																method=method)
+
+		return Rhypo
+
+	def subselect_by_distance(self, ref_pt, max_radius, min_radius=0.,
+									method='spherical'):
 		"""
 		Select part of ensemble situated inside given radius around
 		given point
@@ -637,26 +734,120 @@ class DYFIEnsemble(object):
 		:param ref_pt:
 			reference point, either (lon, lat, [depth]) tuple or
 			object having 'lon', 'lat' and optionally 'depth' properties
-			If None, :prop:`event_longitudes` and :prop:`event_latitudes`
-			will be used
-		:param radius:
-			float, radius (in km)
+			If None, :meth:`calc_epicentral_distances` will be used
+		:param max_radius:
+			float, maximum radius (in km)
+		:param min_radius:
+			float, minimum radius (in km)
+			(default: 0)
+		:param method:
+			see :meth:`calc_distances`
+
+		:return:
+			instance of :class:`DYFIEnsemble`
 		"""
 		if ref_pt is None:
-			lon, lat = self.event_longitudes, self.event_latitudes
-			depth = self.event_depths
-		elif hasattr(ref_pt, 'lon'):
-			lon, lat = ref_pt.lon, ref_pt.lat
-			depth = getattr(ref_pt, 'depth', 0.)
+			all_distances = self.calc_epicentral_distances(method=method)
 		else:
-			lon, lat = ref_pt[:2]
-			if len(ref_pt) > 2:
-				depth = ref_pt[2]
+			if hasattr(ref_pt, 'lon'):
+				lon, lat = ref_pt.lon, ref_pt.lat
+				depth = getattr(ref_pt, 'depth', 0.)
 			else:
-				depth = 0
+				lon, lat = ref_pt[:2]
+				if len(ref_pt) > 2:
+					depth = ref_pt[2]
+				else:
+					depth = 0
+			all_distances = self.calc_distances(lon, lat, depth=depth,
+														method=method)
 
-		all_distances = self.calc_distances(lon, lat, depth=depth)
-		idxs = np.where(all_distances <= radius)[0]
+		idxs = (all_distances >= min_radius) (all_distances < max_radius)
+		return self.__getitem__(idxs)
+
+	def calc_azimuths(self, lon, lat, method='spherical'):
+		"""
+		Compute azimuths from a particular reference point
+
+		:param lon:
+			float, longitude of reference point (in degrees)
+		:param lat:
+			float, latitude of reference point (in degrees)
+		:param method:
+			str, calculation method, either 'spherical' or 'ellipsoidal'
+			The spherical method is based on the haversine formula and is fast.
+			The ellipsoidal method uses the WGS84 ellipsoid and is more accurate.
+			(default: 'spherical')
+
+		:return:
+			1D array, azimuths (in degrees)
+		"""
+		rec_lons = self.longitudes
+		rec_lats = self.latitudes
+
+		if method == 'spherical':
+			from mapping.geotools.geodetic import spherical_azimuth
+			azimuths = spherical_azimuth(lon, lat, rec_lons, rec_lats)
+		elif method == 'ellipsoidal':
+			_, azimuths, _ = self.calc_distances_and_azimuths(lon, lat)
+			azimuths[np.isnan(rec_lons)] = np.nan
+		else:
+			raise Exception('Method %s not known' % method)
+
+		return azimuths
+
+	def calc_epicentral_azimuths(self, method='spherical'):
+		"""
+		Compute azimuths from the (respective) epicenter(s)
+
+		:param method:
+			see :meth:`calc_azimuths`
+
+		:return:
+			1D array, epicentral azimuths (in degrees)
+		"""
+		event_ids = self.event_ids
+		unique_event_ids = np.unique(event_ids)
+		azimuths = np.zeros(len(self))
+
+		for id_earth in unique_event_ids:
+			idxs = (event_ids == id_earth)
+			subselection = self.__getitem__(idxs)
+			ref_lon = subselection.event_longitudes[0]
+			ref_lat = subselection.event_latitudes[0]
+			azimuths[idxs] = subselection.calc_azimuths(ref_lon, ref_lat,
+																	method=method)
+
+		return azimuths
+
+	def subselect_by_azimuth(self, ref_pt, min_azimuth, max_azimuth,
+									method='spherical'):
+		"""
+		Select part of ensemble in given azimuthal range
+
+		:param ref_pt:
+			reference point, either (lon, lat, [depth]) tuple or
+			object having 'lon', 'lat' and optionally 'depth' properties
+			If None, :meth:`calc_epicentral_distances` will be used
+		:param min_azimuth:
+			float, minimum azimuth (in degrees 0 - 360)
+		:param max_azimuth:
+			float, maximum azimuth (in degrees 0 - 360)
+		:param method:
+			see :meth:`calc_azimuths`
+
+		:return:
+			instance of :class:`DYFIEnsemble`
+		"""
+		if ref_pt is None:
+			all_azimuths = self.calc_epicentral_azimuths(method=method)
+		else:
+			if hasattr(ref_pt, 'lon'):
+				lon, lat = ref_pt.lon, ref_pt.lat
+			else:
+				lon, lat = ref_pt[:2]
+			all_azimuths = self.calc_azimuths(lon, lat, method=method)
+
+		idxs = (all_azimuths >= min_azimuth) & (all_azimuths < max_azimuth)
 		return self.__getitem__(idxs)
 
 	def get_region(self, percentile_width=100):
@@ -1108,7 +1299,8 @@ class DYFIEnsemble(object):
 
 		return agg_idx_dict
 
-	def split_by_distance(self, ref_pt, distance_interval):
+	def split_by_distance(self, ref_pt, distance_interval, method='spherical',
+								include_empty_intervals=False):
 		"""
 		Split enquiries in different distance bins
 
@@ -1116,42 +1308,87 @@ class DYFIEnsemble(object):
 			see :meth:`subselect_by_distance`
 		:param distance_interval:
 			float, distance interval for binning (in km)
+			or 1D array, distance bin edges (including rightmost edge)
+		:param method:
+			see :meth:`calc_distances`
+		:param include_empty_intervals:
+			bool, whether or not to include empty distance bins
+			(default: False)
 
 		:return:
-			dict, mapping distance bins to instances of
-			:class:`MacroseismicEnquiryEnsemble`
+			dict, mapping (min_distance, max_distance) tuples
+			to instances of :class:`DYFIEnsemble`
 		"""
 		if ref_pt is None:
-			lon, lat = self.event_longitudes, self.event_latitudes
-			depth = self.event_depths
-		elif hasattr(ref_pt, 'lon'):
-			lon, lat = ref_pt.lon, ref_pt.lat
-			depth = getattr(ref_pt, 'depth', 0.)
+			distances = self.calc_epicentral_distances(method=method)
 		else:
-			lon, lat = ref_pt[:2]
-			if len(ref_pt) > 2:
-				depth = ref_pt[2]
+			if hasattr(ref_pt, 'lon'):
+				lon, lat = ref_pt.lon, ref_pt.lat
+				depth = getattr(ref_pt, 'depth', 0.)
 			else:
-				depth = 0
+				lon, lat = ref_pt[:2]
+				if len(ref_pt) > 2:
+					depth = ref_pt[2]
+				else:
+					depth = 0
+			distances = self.calc_distances(lon, lat, depth=depth,
+													method=method)
 
-		distances = self.calc_distances(lon, lat, depth=depth)
-		binned_distances = np.floor(distances / distance_interval) * distance_interval
-		binned_distances += distance_interval / 2.
+		if np.isscalar(distance_interval):
+			min_distances = np.arange(0, np.nanmax(distances), distance_interval)
+			max_distances = min_distances + distance_interval
+		else:
+			distance_bin_edges = distance_interval
+			min_distances = distance_bin_edges[:-1]
+			max_distances = distance_bin_edges[1:]
 
-		agg_idx_dict = {}
-		for r in range(len(self)):
-			bin = binned_distances[r]
-			if np.isnan(bin):
-				bin = None
-			if not bin in agg_idx_dict:
-				agg_idx_dict[bin] = [r]
+		dist_dyfi_dict = {}
+		for min_dist, max_dist in zip(min_distances, max_distances):
+			idxs = (distances >= min_dist) & (distances < max_dist)
+			if np.sum(idxs) > 0 or include_empty_intervals:
+				dist_dyfi_dict[(min_dist, max_dist)] = self.__getitem__(idxs)
+
+		return dist_dyfi_dict
+
+	def split_by_azimuth(self, ref_pt, azimuth_interval, method='spherical',
+								include_empty_intervals=False):
+		"""
+		Split enquiries in different azimuth bins
+
+		:param ref_pt:
+			see :meth:`subselect_by_azimuth`
+		:param azimuth_interval:
+			float, azimuth interval for binning (in degrees)
+		:param method:
+			see :meth:`calc_azimuths`
+		:param include_empty_intervals:
+			bool, whether or not to include empty distance bins
+			(default: False)
+
+		:return:
+			dict, mapping (min_azimuth, max_azimuth) tuples
+			to instances of :class:`DYFIEnsemble`
+		"""
+		if ref_pt is None:
+			azimuths = self.calc_epicentral_azimuths(method=method)
+		else:
+			if hasattr(ref_pt, 'lon'):
+				lon, lat = ref_pt.lon, ref_pt.lat
 			else:
-				agg_idx_dict[bin].append(r)
+				lon, lat = ref_pt[:2]
+			azimuths = self.calc_azimuths(lon, lat, method=method)
 
-		for key, idxs in agg_idx_dict.items():
-			agg_idx_dict[key] = self.__getitem__(idxs)
+		assert np.mod(360, azimuth_interval) == 0
+		min_azimuths = np.arange(0, 360, azimuth_interval)
+		max_azimuths = min_azimuths + azimuth_interval
 
-		return agg_idx_dict
+		az_dyfi_dict = {}
+		for min_azimuth, max_azimuth in zip(min_azimuths, max_azimuths):
+			idxs = (azimuths >= min_azimuth) & (azimuths < max_azimuth)
+			if np.sum(idxs) > 0 or include_empty_intervals:
+				az_dyfi_dict[(min_azimuth, max_azimuth)] = self.__getitem__(idxs)
+
+		return az_dyfi_dict
 
 	def split_by_property(self, prop):
 		"""
@@ -1438,22 +1675,32 @@ class DYFIEnsemble(object):
 		elif aggregate_by == 'distance':
 			ref_pt = kwargs['ref_pt']
 			distance_interval = kwargs['distance_interval']
+			distance_method = kwargs.get('distance_method', 'spherical')
 			create_polygons = kwargs.get('create_polygons', True)
 
-			agg_ensemble_dict = ensemble.split_by_distance(ref_pt, distance_interval)
+			agg_ensemble_dict = ensemble.split_by_distance(ref_pt, distance_interval,
+																		method=distance_method)
 
 			## Create macro_geoms
 			if create_polygons:
 				geom_key = 'max_radius'
 				polygon_list = []
 				azimuths = np.linspace(0, 360, 361)
-				if hasattr(ref_pt, 'lon'):
+				if ref_pt is None:
+					unique_event_lons = np.unique(self.event_longitudes)
+					unique_event_lats = np.unique(self.event_latitudes)
+					if len(unique_event_lons) > 1:
+						raise Exception('Cannot create distance geometries for '
+											'more than 1 epicenter!')
+					else:
+						[lon] = unique_event_lons
+						[lat] = unique_event_lats
+				elif hasattr(ref_pt, 'lon'):
 					lon, lat = ref_pt.lon, ref_pt.lat
 				else:
 					lon, lat = ref_pt[:2]
-				for max_radius in agg_ensemble_dict.keys():
+				for (min_radius, max_radius) in agg_ensemble_dict.keys():
 					lons, lats = spherical_point_at(lon, lat, max_radius, azimuths)
-					min_radius = max_radius - distance_interval
 					if min_radius:
 						interior_lons, interior_lats = spherical_point_at(lon, lat,
 																min_radius, azimuths)
@@ -1577,7 +1824,8 @@ class DYFIEnsemble(object):
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct)
 
-	def aggregate_by_distance(self, ref_pt, distance_interval, create_polygons=True,
+	def aggregate_by_distance(self, ref_pt, distance_interval,
+					distance_method='spherical', create_polygons=True,
 					min_replies=3, min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
@@ -1587,6 +1835,7 @@ class DYFIEnsemble(object):
 
 		:param ref_pt:
 		:param distance_interval:
+		:paam distance_method:
 			see :meth:`split_by_distance`
 		:param create_polygons:
 			bool, whether or not to create polygon objects necessary
@@ -1606,8 +1855,9 @@ class DYFIEnsemble(object):
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
-					ref_pt=ref_pt,  distance_interval=distance_interval,
-					create_polygons=create_polygons, **kwargs)
+					ref_pt=ref_pt, distance_interval=distance_interval,
+					distance_method=distance_method, create_polygons=create_polygons,
+					**kwargs)
 
 	def aggregate_by_polygon_data(self, poly_data, value_key,
 					include_unmatched_polygons=False,
