@@ -187,7 +187,7 @@ class AggregatedMacroInfoCollection():
 		instance of :class:`layeredbasemap.base.MultiData`,
 		geometries corresponding to aggregated macroseismic records
 		(required if :param:`agg_type` not in ('id_com', 'commune',
-		'id_main', 'main commune', 'grid_X', '' or None)
+		'id_main', 'main commune', 'grid_X', 'distance', '' or None)
 		(default: None)
 	:param geom_key:
 		str, name of geometry key used to link macroseismic records to
@@ -207,7 +207,7 @@ class AggregatedMacroInfoCollection():
 			data_type = macro_infos[0].data_type
 		self.data_type = data_type
 		if (agg_type not in ('id_com', 'commune', 'id_main', 'main commune',
-							'', None) and agg_type[:4] != 'grid'):
+								'distance', '', None) and agg_type[:4] != 'grid'):
 			assert macro_geoms is not None
 		self.macro_geoms = macro_geoms
 		if macro_geoms is not None:
