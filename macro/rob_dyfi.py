@@ -353,7 +353,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		"""
 		if np.isscalar(prop_values):
 			prop_values = [prop_values]
-		if hasattr(self, prop):
+		if hasattr(self, prop) and prop != 'id_earth':
 			## Regular array
 			values = getattr(self, prop)
 			idxs = np.zeros_like(values, dtype='bool')
