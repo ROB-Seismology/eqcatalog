@@ -235,6 +235,27 @@ class MDPCollection():
 
 		return (np.nanmin(lons), np.nanmax(lons), np.nanmin(lats), np.nanmax(lats))
 
+	def get_event_ids(self):
+		"""
+		Get list of event IDs corresponding to each MDP
+
+		:return:
+			list of strings or ints
+		"""
+		return [mdp.id_earth for mdp in self]
+
+	def get_catalog(self):
+		"""
+		Fetch earthquake catalog from ROB database
+
+		:return:
+			instance of :class:`eqcatalog.EQCatalog`
+		"""
+		from ..rob.seismodb import query_local_eq_catalog_by_id
+
+		unique_event_ids = list(np.unique(self.get_event_ids()))
+		return query_local_eq_catalog_by_id(unique_event_ids)
+
 	def get_intensities(self, Imin_or_max):
 		"""
 		Get intensities
@@ -299,20 +320,17 @@ class MDPCollection():
 
 		return agg_func(intensities)
 
-	def remove_outliers(self, Imin_or_max, min_pct=2.5, max_pct=97.5,
-						verbose=False):
+	def remove_outliers(self, Imin_or_max, max_deviation=2., verbose=False):
 		"""
 		Remove outliers (with intensity outside of confidence range)
 		from collection
 
 		:param Imin_or_max:
 			see :meth:`get_intensities`
-		:param min_pct:
-			float, lower percentile
-			(default: 2.5)
-		:param max_pct:
-			float, upper percentile
-			(default: 97.5)
+		:param max_deviation:
+			float, maximum allowed deviation in terms of number of
+			standard deviations
+			(default: 2.)
 		:param verbose:
 			bool, whether or not to print number of removed MDPs
 			(default: False)
@@ -321,16 +339,18 @@ class MDPCollection():
 			instance of :class:`MDPCollection`
 		"""
 		intensities = self.get_intensities(Imin_or_max)
-		pct0 = np.percentile(intensities, min_pct)
-		pct1 = np.percentile(intensities, max_pct)
-		within_confidence = (intensities >= pct0) & (intensities <= pct1)
-		mdp_list = []
-		for idx in np.where(within_confidence)[0]:
-			mdp_list.append(self.mdp_list[idx])
-		if verbose:
-			print('Removed %d MDPs' % (len(self) - len(mdp_list)))
+		if max_deviation:
+			mean = np.nanmean(intensities)
+			std = np.nanstd(intensities)
+			deviation = np.abs(intensities - mean)
+			is_outlier = deviation > max_deviation * std
+		else:
+			is_outlier = np.zeros_like(intensities, dtype=np.bool)
 
-		return self.__class__(mdp_list)
+		if verbose:
+			print('Removed %d MDPs' % (len(self) - np.sum(is_outlier)))
+
+		return self.__getitem__(~is_outlier)
 
 	def remove_empty_locations(self, verbose=False):
 		"""
@@ -352,7 +372,7 @@ class MDPCollection():
 
 		return self.__class__(mdp_list)
 
-	def calc_distances(self, lon, lat, depth=0):
+	def calc_distances(self, lon, lat, depth=0, method='spherical'):
 		"""
 		Compute distance with respect to a point, optionally at some depth
 
@@ -367,18 +387,159 @@ class MDPCollection():
 		return:
 			1-D float array, distances (in km)
 		"""
-		from mapping.geotools.geodetic import spherical_distance
+		rec_lons, rec_lats = self.get_longitudes(), self.get_latitudes()
 
-		d_epi = spherical_distance(lon, lat, self.get_longitudes(),
-									self.get_latitudes())
-		d_epi /= 1000
+		if method == 'spherical':
+			from mapping.geotools.geodetic import spherical_distance
+			distances = spherical_distance(lon, lat, rec_lons, rec_lats) / 1000.
+		elif method == 'ellipsoidal':
+			distances, _, _ = self.calc_distances_and_azimuths(lon, lat)
+			distances[np.isnan(rec_lons)] = np.nan
+		else:
+			raise Exception('Method %s not known' % method)
 
 		if depth:
-			d_hypo = np.sqrt(d_epi**2 + depth**2)
-		else:
-			d_hypo = d_epi
+			distances = np.sqrt(distances**2 + depth**2)
 
-		return d_hypo
+		return distances
+
+	def calc_distances_and_azimuths(self, lon, lat, depth=0.):
+		"""
+		Compute distances, azimuths and backazimuths with respect to a particular
+		point using :func:`obspy.geodetics.gps2dist_azimuth` (= ellipsoidal method)
+
+		:param lon:
+			float, longitude of reference point (in degrees)
+		:param lat:
+			float, latitude of reference point (in degrees)
+		:param depth:
+			float, depth of reference point (in km)
+			(default: 0.)
+
+		:return:
+			(distances, azimuths, back_azimuths) tuple of 1D arrays:
+			- distances: distances in km
+			- azimuths: azimuths in degrees (from reference point to MDPs)
+			- back_azimuths: back_azimuths in degrees (towards reference point)
+		"""
+		from obspy.geodetics import gps2dist_azimuth
+
+		distances, azimuths, back_azimuths = [], [], []
+		for rec_lon, rec_lat in zip(self.get_longitudes(), self.get_latitudes()):
+			d, az, back_az = gps2dist_azimuth(lat, lon, rec_lat, rec_lon)
+			distances.append(d)
+			azimuths.append(az)
+			back_azimuths.append(back_az)
+		distances = np.array(distances) / 1000.
+		if depth:
+			distances = np.sqrt(distances**2 + depth**2)
+		azimuths = np.array(azimuths)
+		back_azimuths = np.array(back_azimuths)
+
+		return (distances, azimuths, back_azimuths)
+
+	def calc_epicentral_distances(self, method='spherical'):
+		"""
+		Compute epicentral distances
+
+		:param method:
+			see :meth:`calc_distances`
+
+		:return:
+			array, distances (in km)
+		"""
+		event_ids = self.get_event_ids()
+		unique_event_ids = np.unique(event_ids)
+		Repi = np.zeros(len(self))
+
+		for id_earth in unique_event_ids:
+			idxs = (event_ids == id_earth)
+			subselection = self.__getitem__(idxs)
+			eq = subselection[0].get_eq()
+			Repi[idxs] = subselection.calc_distances(eq.lon, eq.lat, depth=0,
+																method=method)
+
+		return Repi
+
+	def calc_hypocentral_distances(self, method='spherical'):
+		"""
+		Compute hypocentral distances
+
+		:param method:
+			see :meth:`calc_distances`
+
+		:return:
+			array, distances (in km)
+		"""
+		event_ids = self.get_event_ids()
+		unique_event_ids = np.unique(event_ids)
+		Rhypo = np.zeros(len(self))
+
+		for id_earth in unique_event_ids:
+			idxs = (event_ids == id_earth)
+			subselection = self.__getitem__(idxs)
+			eq = subselection[0].get_eq()
+			depth = eq.depth
+			if np.isnan(depth):
+				depth = 0
+			Rhypo[idxs] = subselection.calc_distances(eq.lon, eq.lat, depth=depth,
+																method=method)
+
+		return Rhypo
+
+	def calc_azimuths(self, lon, lat, method='spherical'):
+		"""
+		Compute azimuths from a particular reference point
+
+		:param lon:
+			float, longitude of reference point (in degrees)
+		:param lat:
+			float, latitude of reference point (in degrees)
+		:param method:
+			str, calculation method, either 'spherical' or 'ellipsoidal'
+			The spherical method is based on the haversine formula and is fast.
+			The ellipsoidal method uses the WGS84 ellipsoid and is more accurate.
+			(default: 'spherical')
+
+		:return:
+			1D array, azimuths (in degrees)
+		"""
+		rec_lons = self.get_longitudes()
+		rec_lats = self.get_latitudes()
+
+		if method == 'spherical':
+			from mapping.geotools.geodetic import spherical_azimuth
+			azimuths = spherical_azimuth(lon, lat, rec_lons, rec_lats)
+		elif method == 'ellipsoidal':
+			_, azimuths, _ = self.calc_distances_and_azimuths(lon, lat)
+			azimuths[np.isnan(rec_lons)] = np.nan
+		else:
+			raise Exception('Method %s not known' % method)
+
+		return azimuths
+
+	def calc_epicentral_azimuths(self, method='spherical'):
+		"""
+		Compute azimuths from the (respective) epicenter(s)
+
+		:param method:
+			see :meth:`calc_azimuths`
+
+		:return:
+			1D array, epicentral azimuths (in degrees)
+		"""
+		event_ids = self.get_event_ids()
+		unique_event_ids = np.unique(event_ids)
+		azimuths = np.zeros(len(self))
+
+		for id_earth in unique_event_ids:
+			idxs = (event_ids == id_earth)
+			subselection = self.__getitem__(idxs)
+			eq = subselection[0].get_eq()
+			azimuths[idxs] = subselection.calc_azimuths(eq.lon, eq.lat,
+																	method=method)
+
+		return azimuths
 
 	# TODO: only works for communes in Belgium!
 
@@ -788,7 +949,8 @@ class MDPCollection():
 		lat_idxs = (latmin <= latitudes) & (latitudes <= latmax)
 		return self.__getitem__(lon_idxs & lat_idxs)
 
-	def subselect_by_distance(self, ref_pt, max_dist, min_dist=0.):
+	def subselect_by_distance(self, ref_pt, max_dist, min_dist=0.,
+									method='spherical'):
 		"""
 		Select MDPs that are situated within a given distance range
 		with respect to a reference point
@@ -796,22 +958,30 @@ class MDPCollection():
 		:param ref_pt:
 			(lon, lat, [depth]) tuple or instance having lon, lat, [depth]
 			properties. Set depth of ref_pt to zero for epicentral distance
+			If None, :meth:`calc_epicentral_distances` will be used
 		:param max_dist:
 			float, maximum distance (in km)
 		:param min_dist:
 			float, minimum distance (in km)
+			(default: 0.)
+		:param method:
+			see :meth:`calc_distances`
 
 		:return:
 			instance of :class:`MDPCollection`
 		"""
-		lon, lat, depth = self._parse_pt(ref_pt)
-		distances = self.calc_distances(lon, lat, depth)
+		if ref_pt is None:
+			distances = self.calc_epicentral_distances(method=method)
+		else:
+			lon, lat, depth = self._parse_pt(ref_pt)
+			distances = self.calc_distances(lon, lat, depth, method=method)
 
 		is_in_range = (distances >= min_dist) & (distances < max_dist)
 
 		return self.__getitem__(is_in_range)
 
-	def split_by_distance(self, ref_pt, distance_interval):
+	def split_by_distance(self, ref_pt, distance_interval, method='spherical',
+								include_empty_intervals=False):
 		"""
 		Split MDP collection in different distance bins with respect
 		to a reference point
@@ -820,48 +990,45 @@ class MDPCollection():
 			see :meth:`subselect_by_distance`
 		:param distance_interval:
 			float, distance interval (in km)
-			or 1D array, distance bin edges
+			or 1D array, distance bin edges (including rightmost edge)
+		:param method:
+			see :meth:`calc_distances`
 
 		:return:
 			dict, mapping maximum distance to instances of
 			:class:`MDPCollection`
 		"""
-		lon, lat, depth = self._parse_pt(ref_pt)
-		distances = self.calc_distances(lon, lat, depth)
+		if ref_pt is None:
+			distances = self.calc_epicentral_distances(method=method)
+		else:
+			lon, lat, depth = self._parse_pt(ref_pt)
+			distances = self.calc_distances(lon, lat, depth, method=method)
 
 		if np.isscalar(distance_interval):
-			distance_interval = float(distance_interval)
-			binned_distances = np.floor(distances / distance_interval) * distance_interval
-			binned_distances += distance_interval / 2.
+			min_distances = np.arange(0, np.nanmax(distances), distance_interval)
+			max_distances = min_distances + distance_interval
 		else:
-			distance_bin_edges = np.asarray(distance_interval)
-			bin_idxs = np.digitize(distances, distance_bin_edges)
-			bin_idxs -= 1
-			distance_bin_centers = (distance_bin_edges[:-1]
-									+ np.diff(distance_bin_edges)/2.)
-			binned_distances = [distance_bin_centers[i] for i in bin_idxs]
-			binned_distances = np.array(binned_distances)
+			distance_bin_edges = distance_interval
+			min_distances = distance_bin_edges[:-1]
+			max_distances = distance_bin_edges[1:]
 
 		mdpc_dict = {}
-		for m, mdp in enumerate(self):
-			bin = binned_distances[m]
-			if np.isnan(bin):
-				bin = None
-			if not bin in mdpc_dict:
-				mdpc_dict[bin] = self.__class__([mdp])
-			else:
-				mdpc_dict[bin].append(mdp)
+		for min_dist, max_dist in zip(min_distances, max_distances):
+			idxs = (distances >= min_dist) & (distances < max_dist)
+			if np.sum(idxs) > 0 or include_empty_intervals:
+				mdpc_dict[(min_dist, max_dist)] = self.__getitem__(idxs)
 
 		return mdpc_dict
 
 	def aggregate_by_distance(self, ref_pt, distance_interval, Imin_or_max,
 							agg_function, min_fiability=80, min_num_mdp=3,
-							create_polygons=True):
+							create_polygons=True, distance_method='spherical'):
 		"""
 		Aggregate MDPs by distance with respect to a reference point
 
 		:param ref_pt:
 		:param distance_interval:
+		:param distance_method:
 			see :meth:`split_by_distance`
 		:param Imin_or_max:
 		:param agg_function:
@@ -890,8 +1057,9 @@ class MDPCollection():
 			azimuths = np.linspace(0, 360, 361)
 		geom_key = 'max_radius'
 		agg_type = 'distance'
-		mdpc_dict = mdpc.split_by_distance(ref_pt, distance_interval)
-		for max_radius, mdpc in mdpc_dict.items():
+		mdpc_dict = mdpc.split_by_distance(ref_pt, distance_interval,
+													method=distance_method)
+		for (min_radius, max_radius), mdpc in mdpc_dict.items():
 			if len(mdpc) >= min_num_mdp:
 				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
 				id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
@@ -911,7 +1079,6 @@ class MDPCollection():
 				## Create polygon
 				if create_polygons:
 					lons, lats = spherical_point_at(lon, lat, max_radius, azimuths)
-					min_radius = max_radius - distance_interval
 					if min_radius:
 						interior_lons, interior_lats = spherical_point_at(lon, lat,
 																min_radius, azimuths)
@@ -935,6 +1102,71 @@ class MDPCollection():
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 									macro_geoms=macro_geoms, geom_key=geom_key,
 									proc_info=proc_info)
+
+	def subselect_by_azimuth(self, ref_pt, min_azimuth, max_azimuth,
+									method='spherical'):
+		"""
+		Select MDPs in given azimuthal range
+
+		:param ref_pt:
+			reference point, either (lon, lat, [depth]) tuple or
+			object having 'lon', 'lat' and optionally 'depth' properties
+			If None, :meth:`calc_epicentral_azimuths` will be used
+		:param min_azimuth:
+			float, minimum azimuth (in degrees 0 - 360)
+		:param max_azimuth:
+			float, maximum azimuth (in degrees 0 - 360)
+		:param method:
+			see :meth:`calc_azimuths`
+
+		:return:
+			instance of :class:`MDPCollection`
+		"""
+		if ref_pt is None:
+			all_azimuths = self.calc_epicentral_azimuths(method=method)
+		else:
+			lon, lat, depth = self._parse_pt(ref_pt)
+			all_azimuths = self.calc_azimuths(lon, lat, method=method)
+
+		idxs = (all_azimuths >= min_azimuth) & (all_azimuths < max_azimuth)
+		return self.__getitem__(idxs)
+
+	def split_by_azimuth(self, ref_pt, azimuth_interval, method='spherical',
+								include_empty_intervals=False):
+		"""
+		Split MDP collection in different azimuth bins
+
+		:param ref_pt:
+			see :meth:`subselect_by_azimuth`
+		:param azimuth_interval:
+			float, azimuth interval for binning (in degrees)
+		:param method:
+			see :meth:`calc_azimuths`
+		:param include_empty_intervals:
+			bool, whether or not to include empty distance bins
+			(default: False)
+
+		:return:
+			dict, mapping (min_azimuth, max_azimuth) tuples
+			to instances of :class:`MDPCollection`
+		"""
+		if ref_pt is None:
+			azimuths = self.calc_epicentral_azimuths(method=method)
+		else:
+			lon, lat, depth = self._parse_pt(ref_pt)
+			azimuths = self.calc_azimuths(lon, lat, method=method)
+
+		assert np.mod(360, azimuth_interval) == 0
+		min_azimuths = np.arange(0, 360, azimuth_interval)
+		max_azimuths = min_azimuths + azimuth_interval
+
+		az_mdp_dict = {}
+		for min_azimuth, max_azimuth in zip(min_azimuths, max_azimuths):
+			idxs = (azimuths >= min_azimuth) & (azimuths < max_azimuth)
+			if np.sum(idxs) > 0 or include_empty_intervals:
+				az_mdp_dict[(min_azimuth, max_azimuth)] = self.__getitem__(idxs)
+
+		return az_mdp_dict
 
 	def split_by_grid_cells(self, grid_spacing, srs='LAMBERT1972'):
 		"""
