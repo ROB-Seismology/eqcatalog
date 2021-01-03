@@ -618,7 +618,7 @@ class DYFIEnsemble(object):
 			The spherical method is based on the haversine formula and is fast,
 			but diverges about 0.3% from the true distance.
 			The ellipsoidal method uses the WGS84 ellipsoid and is more accurate,
-			but more than 100 times slower
+			but much slower, and may fail in some cases (e.g., nearly antipodal points)
 			(default: 'spherical')
 
 		:return:
@@ -644,7 +644,8 @@ class DYFIEnsemble(object):
 	def calc_distances_and_azimuths(self, lon, lat, depth=0.):
 		"""
 		Compute distances, azimuths and backazimuths with respect to a particular
-		point using :func:`obspy.geodetics.gps2dist_azimuth` (= ellipsoidal method)
+		point using :func:`mapping.geotools.ellipsoidal_distance_and_azimuth`
+		(= ellipsoidal method)
 
 		:param lon:
 			float, longitude of reference point (in degrees)
@@ -660,14 +661,11 @@ class DYFIEnsemble(object):
 			- azimuths: azimuths in degrees (from reference point to DYFI records)
 			- back_azimuths: back_azimuths in degrees (towards reference point)
 		"""
-		from obspy.geodetics import gps2dist_azimuth
+		from mapping.geotools.geodetic import ellipsoidal_distance_and_azimuth
 
-		distances, azimuths, back_azimuths = [], [], []
-		for rec_lon, rec_lat in zip(self.longitudes, self.latitudes):
-			d, az, back_az = gps2dist_azimuth(lat, lon, rec_lat, rec_lon)
-			distances.append(d)
-			azimuths.append(az)
-			back_azimuths.append(back_az)
+		rec_lons, rec_lats = self.longitudes, self.latitudes
+		distances, azimuths, back_azimuths = ellipsoidal_distance_and_azimuth(
+															lon, lat, rec_lons, rec_lats)
 		distances = np.array(distances) / 1000.
 		if depth:
 			distances = np.sqrt(distances**2 + depth**2)
