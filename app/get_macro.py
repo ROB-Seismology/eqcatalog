@@ -62,7 +62,7 @@ parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data p
 parser.add_argument("--agg_method", help="Aggregation method (availability depends on data_type option!)",
 					choices=["mean", "dyfi", "min", "max", "median"], default="mean")
 parser.add_argument("--min_num_replies", help="Min. number of replies per aggregate",
-					type=int, default=3)
+					type=int, default=2)
 parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
 					choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
 parser.add_argument("--admin_source", help="Source for administrtive boundaries",
