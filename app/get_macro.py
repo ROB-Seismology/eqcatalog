@@ -47,7 +47,6 @@ else:
 	BASE_FOLDER = '/home/seismo/lib/macro_maps'
 
 MIN_FIABILITY = 80
-MIN_NUM_REPLIES = 3
 
 
 ## Command-line options
@@ -61,28 +60,30 @@ parser.add_argument("--data_type", help="Type of macroseismic data",
 parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data points",
 					choices=["", "commune", "main commune", "grid5", "grid10"], default="commune")
 parser.add_argument("--agg_method", help="Aggregation method (availability depends on data_type option!)",
-                    choices=["mean", "dyfi", "min", "max", "median"], default="mean")
+					choices=["mean", "dyfi", "min", "max", "median"], default="mean")
+parser.add_argument("-min_num_replies", help="Min. number of replies per aggregate",
+					type=int, default=3)
 parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
-                    choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
+					choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
 parser.add_argument("--admin_source", help="Source for administrtive boundaries",
-                    choices=["gadm", "statbel", "rob"], default="gadm")
+					choices=["gadm", "statbel", "rob"], default="gadm")
 parser.add_argument("--admin_level", help="Level of administrtive boundaries ('region', 'province', 'arrondissement', 'main commune', 'commune', 'sector' or any combination or 'auto'",
-#                    choices=["", "region", "province", "commune", "default"], default="default")
-                    type=str, default="auto")
+#					choices=["", "region", "province", "commune", "default"], default="default")
+					type=str, default="auto")
 parser.add_argument("--show_main_cities", help="Whether or not to plot main cities",
-                    type=strtobool, default="true")
+					type=strtobool, default="true")
 parser.add_argument("--epicenter_marker", help="Which symbol to use for epicenter",
-                    choices=["", "o", "s", "v", "^", "p", "*", "h", "D"], default="*")
+					choices=["", "o", "s", "v", "^", "p", "*", "h", "D"], default="*")
 parser.add_argument("--cmap", help="Intensity color map",
 					choices=["rob", "usgs"], default="rob")
 parser.add_argument("--color_gradient", help="Color gradient",
-                    choices=["discrete", "continuous"], default="discrete")
+					choices=["discrete", "continuous"], default="discrete")
 parser.add_argument("--map_region", help="Size of map region wrt intensity data",
-                    choices=["wide", "tight", "both"], default="both")
+					choices=["wide", "tight", "both"], default="both")
 parser.add_argument("--copyright_label", help="Label to use as copyright",
-                    type=str, default="Collaborative project of ROB and BNS")
+					type=str, default="Collaborative project of ROB and BNS")
 parser.add_argument("--base_folder", help="Base folder for generated maps",
-                    type=str, default=BASE_FOLDER)
+					type=str, default=BASE_FOLDER)
 parser.add_argument("--dry_run", help="Run script without actually plotting anything",
 					type=strtobool, default="false")
 parser.add_argument("--verbose", help="Whether or not to print progress information",
@@ -110,9 +111,9 @@ for eq in catalog:
 		macro_data = eq.get_aggregated_traditional_macro_info(data_type=args.data_type,
 							aggregate_by=args.aggregate_by or "commune",
 							agg_method=args.agg_method, min_fiability=MIN_FIABILITY)
-		MIN_NUM_REPLIES = 1
+		args.min_num_replies = 1
 
-	if len(macro_data) >= MIN_NUM_REPLIES:
+	if len(macro_data) >= args.min_num_replies:
 		if args.data_type == "dyfi":
 			if np.isnan(macro_data.latitudes).all():
 				macro_data.set_locations_from_communes()
@@ -253,6 +254,6 @@ for eq in catalog:
 							shutil.copyfile(rob_filespec, map_filespec)
 
 	else:
-		print("Not enough data to draw a map (<%d replies)" % MIN_NUM_REPLIES)
+		print("Not enough data to draw a map (<%d replies)" % args.min_num_replies)
 	if args.verbose:
 		print("------------------------------------------")
