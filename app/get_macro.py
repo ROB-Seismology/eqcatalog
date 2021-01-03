@@ -61,7 +61,7 @@ parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data p
 					choices=["", "commune", "main commune", "grid5", "grid10"], default="commune")
 parser.add_argument("--agg_method", help="Aggregation method (availability depends on data_type option!)",
 					choices=["mean", "dyfi", "min", "max", "median"], default="mean")
-parser.add_argument("-min_num_replies", help="Min. number of replies per aggregate",
+parser.add_argument("--min_num_replies", help="Min. number of replies per aggregate",
 					type=int, default=3)
 parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
 					choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
@@ -115,6 +115,7 @@ for eq in catalog:
 
 	if len(macro_data) >= args.min_num_replies:
 		if args.data_type == "dyfi":
+			macro_data = macro_data.fix_all()
 			if np.isnan(macro_data.latitudes).all():
 				macro_data.set_locations_from_communes()
 			## Note: NULL submit_time values are automatically replaced with event time
@@ -159,8 +160,9 @@ for eq in catalog:
 			if args.data_type == "dyfi":
 				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by,
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
-					fix_records=True, include_other_felt=True,
-					include_heavy_appliance=False, remove_outliers=(2.5, 97.5))
+					min_replies=args.min_num_replies, min_fiability=MIN_FIABILITY,
+					fix_records=False, include_other_felt=True,
+					include_heavy_appliance=False, remove_outliers=2.0)
 				if args.verbose and len(macro_info):
 					print('Imin/max: %.1f/%.1f' % macro_info.Iminmax())
 			else:
