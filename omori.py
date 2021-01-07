@@ -118,7 +118,11 @@ class OmoriLaw(object):
 		:return:
 			float, probability
 		"""
-		from scipy.misc import factorial
+		try:
+			from scipy.special import factorial
+		except ImportError:
+			## Older scipy versions
+			from scipy.misc import factorial
 
 		N = self.get_num_aftershocks(delta_t2, delta_t1)
 		return (np.exp(-N) * N**n) / factorial(n)
@@ -255,7 +259,7 @@ class OmoriLaw(object):
 
 		return plot_xy(datasets, **kwargs)
 
-	def plot_cumulative(self, delta_t):
+	def plot_cumulative(self, delta_t, **kwargs):
 		from plotting.generic_mpl import plot_xy
 
 		num_as = self.get_num_aftershocks(delta_t)
@@ -266,6 +270,20 @@ class OmoriLaw(object):
 			kwargs['ylabel'] = 'Number of aftershocks'
 
 		return plot_xy(datasets, **kwargs)
+
+	def to_gr_omori_law(self, b):
+		"""
+		Convert to Gutenberg-Richter Omori law
+
+		:param b:
+			float, b-value of Gutenberg-Richter relation
+
+		:return:
+			instance of :class:`Base10GROmoriLaw`
+		"""
+		A = np.log10(self.K) - b * (self.Mm - self.Mc)
+
+		return Base10GROmoriLaw(A, self.c, self.p, b, self.Mm, self.Mc)
 
 
 class GROmoriLaw(OmoriLaw):
