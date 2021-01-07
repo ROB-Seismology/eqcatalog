@@ -370,6 +370,8 @@ class GROmoriLaw(OmoriLaw):
 		## Set mainshock magnitude back to original value
 		self.Mm = mainshock[1]
 
+		return as_sequence
+
 
 class ExpGROmoriLaw(GROmoriLaw):
 	"""
