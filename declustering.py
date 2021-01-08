@@ -330,7 +330,11 @@ class Cluster():
 		return eq.ID in self.get_ids()
 
 	def print_info(self):
-		print("Cluster #%d" % self.ID)
+		line = "Cluster #%d" % self.ID
+		name = self.get_mainshock().name
+		if name:
+			line += ': %s' % name
+		print(line)
 		print("Number of events: %d" % len(self))
 		print("Mainshock: %s (M=%.1f)" % (self.datetime1(), self.mag1()))
 		print("First event: %s (M=%.1f)" % (self.datetime0(), self.mag0()))
