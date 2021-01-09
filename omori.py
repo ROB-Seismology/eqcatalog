@@ -291,12 +291,15 @@ class GROmoriLaw(OmoriLaw):
 	Base class for Gutenberg-Richter Omori law, where aftershock
 	magnitudes follow a Gutenberg-Richter distribution.
 	"""
-	def get_random_magnitudes(self, n, random_seed=None):
+	def get_random_magnitudes(self, n, Mmax=None, random_seed=None):
 		"""
 		Generate random aftershock magnitudes
 
 		:param n:
 			int, length of aftershock sequence
+		:param Mmax:
+			float, maximum magnitude
+			(default: None, will use mainshock magnitude in :prop:`Mm`)
 		:param random_seed:
 			int, seed for random number generator
 			(default: None)
@@ -307,9 +310,12 @@ class GROmoriLaw(OmoriLaw):
 		np.random.seed(random_seed)
 		rnd = np.random.random(n)
 		beta = self.get_beta()
-		Mc, Mm = self.Mc, self.Mm
+		Mc = self.Mc
+		if Mmax is None:
+			Mmax = self.Mm
+		assert Mmax > Mc
 		return (-1./beta) * np.log(np.exp(-beta*Mc)
-							- (1 - rnd) * (np.exp(-beta*Mc) - np.exp(-beta*Mm)))
+							- (1 - rnd) * (np.exp(-beta*Mc) - np.exp(-beta*Mmax)))
 
 	def get_random_time_deltas(self, duration, random_seed=None):
 		"""
@@ -331,7 +337,8 @@ class GROmoriLaw(OmoriLaw):
 		n_values = tail_size * (1 - np.random.random(num_expected))
 		return np.sort(self.get_time_delta_for_n_aftershocks(n_values))
 
-	def gen_aftershock_sequence(self, duration, etas=True, random_seed=None):
+	def gen_aftershock_sequence(self, duration, etas=True, Mmax=None,
+									random_seed=None):
 		"""
 		Generate aftershock sequence
 
@@ -343,6 +350,9 @@ class GROmoriLaw(OmoriLaw):
 			aftershock incites its own aftershock sequence
 			(self-exciting process)
 			(default: True)
+		:param Mmax:
+			float, maximum magnitude
+			(default: None, will use mainshock magnitude in :prop:`Mm`)
 		:param random_seed:
 			int, seed for random number generator
 			(default: None)
@@ -371,6 +381,10 @@ class GROmoriLaw(OmoriLaw):
 		self.Mm = mainshock[1]
 
 		return as_sequence
+
+	def gen_aftershock_catalog(self, duration, etas=True, random_seed=None):
+		# TODO
+		pass
 
 
 class ExpGROmoriLaw(GROmoriLaw):
