@@ -27,16 +27,15 @@ class OmoriLaw(object):
 	:param Mc:
 		float, cutoff or completeness magnitude, lower magnitude above
 		which aftershocks are counted (and are assumed to be complete)
-	:param time_delta:
-		instance of :class:`np.timedelta64`, time unit in which Omori
-		law is expressed
-		(default: np.timedelta64(1, 'D') = 1 day)
+	:param time_unit:
+		time unit in which Omori law is expressed: 'Y', 'W', 'D', 'h', 'm' or 's'
+		(default: 'D' = days)
 
 	Although Mm and Mc are not necessary to compute aftershock decay,
 	they are characteristic of the aftershock sequence.
 	Note that modifying Mm or Mc will not change the Omori law.
 	"""
-	def __init__(self, K, c, p, Mc, Mm, time_delta=np.timedelta64(1, 'D')):
+	def __init__(self, K, c, p, Mc, Mm, time_unit='D'):
 		# TODO: time unit?
 		assert K >= 0
 		assert c > 0
@@ -48,9 +47,16 @@ class OmoriLaw(object):
 		self.Mm = float(Mm)
 		self.Mc = float(Mc)
 
+		assert time_unit in ('Y', 'W', 'D', 'h', 'm', 's')
+		self.time_unit = time_unit
+
 	@property
 	def delta_M(self):
 		return self.Mm - self.Mc
+
+	@property
+	def time_delta(self):
+		return np.timedelta64(1, self.time_unit)
 
 	def get_aftershock_rate(self, delta_t):
 		"""
@@ -283,7 +289,8 @@ class OmoriLaw(object):
 		"""
 		A = np.log10(self.K) - b * (self.Mm - self.Mc)
 
-		return Base10GROmoriLaw(A, self.c, self.p, b, self.Mm, self.Mc)
+		return Base10GROmoriLaw(A, self.c, self.p, b, self.Mm, self.Mc,
+									time_unit=self.time_unit)
 
 
 class GROmoriLaw(OmoriLaw):
@@ -340,7 +347,7 @@ class GROmoriLaw(OmoriLaw):
 	def gen_aftershock_sequence(self, duration, etas=True, Mmax=None,
 									random_seed=None):
 		"""
-		Generate aftershock sequence
+		Generate random aftershock sequence
 
 		:param duration:
 			float, duration of aftershock sequence (in same time units
@@ -380,11 +387,55 @@ class GROmoriLaw(OmoriLaw):
 		## Set mainshock magnitude back to original value
 		self.Mm = mainshock[1]
 
-		return as_sequence
+	def gen_aftershock_catalog(self, duration, mainshock=None, etas=True,
+									Mmax=None, Mtype='MW', random_seed=None):
+		"""
+		Generate random aftershock catalog
 
-	def gen_aftershock_catalog(self, duration, etas=True, random_seed=None):
-		# TODO
-		pass
+		:param duration:
+		:param etas:
+		:param random_seed:
+			see :meth:`gen_aftershock_sequence`
+		:param mainshock:
+			instance of :class:`eqcatalog.LocalEarthquake`
+			mainshock (used for origin time and location)
+		:param Mtype:
+			str, magnitude type to consider for random aftershock magnitudes
+
+		:return:
+			instance of :class:`eqcatalog.EQCatalog`
+		"""
+		from .time import (as_np_datetime, as_np_timedelta, as_np_date,
+								to_py_time, convert_time_unit)
+		from .eqrecord import LocalEarthquake
+		from .eqcatalog import EQCatalog
+
+		if mainshock:
+			origin_time = mainshock.datetime
+		else:
+			origin_time = as_np_datetime('now')
+
+		eq_list = []
+		for item in self.gen_aftershock_sequence(duration=duration, etas=etas,
+													Mmax=Mmax, random_seed=random_seed):
+			time_delta, mag, index, parent_index = item
+			time_delta = convert_time_unit(time_delta, self.time_unit, 'ms')
+			time_delta = as_np_timedelta(int(round(time_delta)), 'ms')
+			date_time = origin_time + time_delta
+			date = as_np_date(date_time)
+			time = to_py_time(date_time)
+			# TODO: it may be possible to generate random location
+			# in radius of max. interaction distance around mainshock location
+			lon = getattr(mainshock, 'lon', np.nan)
+			lat = getattr(mainshock, 'lat', np.nan)
+			depth = getattr(mainshock, 'depth', np.nan)
+			name = 'AS #%d (parent: %d)' % (index, parent_index)
+			eq = LocalEarthquake(index, date, time, lon, lat, depth, {Mtype: mag},
+										name=name)
+			eq_list.append(eq)
+
+		catalog = EQCatalog(eq_list)
+		return catalog
 
 
 class ExpGROmoriLaw(GROmoriLaw):
@@ -407,19 +458,20 @@ class ExpGROmoriLaw(GROmoriLaw):
 		higher values represent typical mainshock-aftershock activity
 	:param Mm:
 	:param Mc:
+	:param time_unit:
 		see :class:`OmoriLaw`
 
 	Note that, in contrast to :class:`OmoriLaw`, Mm and/or Mc can be
 	changed to adjust the Omori law!
 	"""
-	def __init__(self, A, c, p, alpha, Mm, Mc, time_delta=np.timedelta64(1, 'D')):
+	def __init__(self, A, c, p, alpha, Mm, Mc, time_unit='D'):
 		self.A = A
 		self.c = c
 		self.p = p
 		self.alpha = alpha
 		self.Mm = Mm
 		self.Mc = Mc
-		self.time_delta = time_delta
+		self.time_unit = time_unit
 
 	@property
 	def K(self):
@@ -444,7 +496,7 @@ class ExpGROmoriLaw(GROmoriLaw):
 		A = np.log10(self.A)
 		b = self.get_b()
 		return Base10GROmoriLaw(A, self.c, self.p, b, self.Mm, self.Mc,
-						self.time_delta)
+									self.time_unit)
 
 
 class Base10GROmoriLaw(GROmoriLaw):
@@ -462,19 +514,20 @@ class Base10GROmoriLaw(GROmoriLaw):
 		float, Gutenberg-Richter b-value (of the aftershock sequence)
 	:param Mm:
 	:param Mc:
+	:param time_unit:
 		see :class:`OmoriLaw`
 
 	Note that, in contrast to :class:`OmoriLaw`, Mm and/or Mc can be
 	changed to adjust the Omori law!
 	"""
-	def __init__(self, A, c, p, b, Mm, Mc, time_delta=np.timedelta64(1, 'D')):
+	def __init__(self, A, c, p, b, Mm, Mc, time_unit='D'):
 		self.A = A
 		self.c = c
 		self.p = p
 		self.b = b
 		self.Mm = Mm
 		self.Mc = Mc
-		self.time_delta = time_delta
+		self.time_unit = time_unit
 
 	@property
 	def K(self):
@@ -522,7 +575,7 @@ class Base10GROmoriLaw(GROmoriLaw):
 		A = 10**self.A
 		alpha = self.get_alpha()
 		return ExpGROmoriLaw(A, self.c, self.p, alpha, self.Mm, self.Mc,
-							self.time_delta)
+								self.time_unit)
 
 
 class Reasenberg1985OmoriLaw(Base10GROmoriLaw):
@@ -534,13 +587,14 @@ class Reasenberg1985OmoriLaw(Base10GROmoriLaw):
 	:param p:
 	:param Mm:
 	:param Mc:
-	:param time_delta:
+	:param time_unit:
 		see :class:`Base10GROmoriLaw`
 	"""
-	def __init__(self, c, p, Mm, Mc, time_delta=np.timedelta64(1, 'D')):
+	def __init__(self, c, p, Mm, Mc, time_unit='D'):
 		A = -2./3
 		b = 2./3
-		super(Reasenberg1985OmoriLaw, self).__init__(A, c, p, b, Mm, Mc, time_delta)
+		super(Reasenberg1985OmoriLaw, self).__init__(A, c, p, b, Mm, Mc,
+																self.time_unit)
 
 
 
