@@ -190,6 +190,10 @@ class Reasenberg1985Window(DeclusteringWindow):
 	:param p1:
 		float, confidence level
 		(default: 0.99)
+
+	Note:
+		- higher stress drop --> shorter interaction distance
+		- lower xmeff --> shorter time window
 	"""
 	name = "Reasenberg1985"
 
@@ -1970,6 +1974,7 @@ class ReasenbergMethod(DeclusteringMethod):
 			(default: instance of :class:`Reasenberg1985Window`)
 		:param ignore_location_errors:
 			see :meth:`is_in_dist_window`
+			(default: True, similar to cluster2000, but False is better!)
 		:param verbose:
 			bool, whether or not to print information during declustering
 
