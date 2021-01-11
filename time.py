@@ -102,7 +102,8 @@ def as_np_timedelta(td, unit=None):
 
 	Note: we do not allow conversion of timedelta64 units because
 	precision could be lost as timedelta64 can't be floats
-	Use :func:`fractional_time_delta` instead
+	In case of float values, convert to a higher-resolution time unit first
+	using :func:`convert_time_unit`
 
 	:param td:
 		instance of :class:`datetime.timedelta` or list with such instances
@@ -291,7 +292,8 @@ def to_py_date(dt64):
 		return py_dt.date() if isinstance(py_dt, datetime.datetime) else py_dt
 	else:
 		py_dt = [to_py_datetime(item).date() for item in dt64]
-		py_dt = [item.date() if isinstance(item, datetime.datetime) else item]
+		py_dt = [item.date() if isinstance(item, datetime.datetime) else item
+					for item in py_dt]
 		return py_dt
 
 
@@ -487,6 +489,36 @@ def fractional_time_delta(td64, unit):
 	return (td64 / divisor)
 
 
+def convert_time_unit(time_value, unit, target_unit):
+	"""
+	Convert between different time units
+
+	:param time_value:
+		float or array, time length(s)
+	:param unit:
+		str, time unit corresponding to :param:`time_value`,
+		one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+	:param targetr_unit:
+		str, target time unit,
+		one of 'Y', 'W', 'D', 'h', 'm', 's', 'ms', 'us'
+
+	:return:
+		float or array, converted time length(s)
+	"""
+	conversion_dict = {'Y': AVG_SECS_PER_YEAR,
+						'W': SECS_PER_WEEK,
+						'D': SECS_PER_DAY,
+						'h': SECS_PER_HOUR,
+						'm': SECS_PER_MINUTE,
+						's': 1,
+						'ms': 1E-3,
+						'us': 1E-6}
+
+	conv_factor = conversion_dict[unit] / conversion_dict[target_unit]
+
+	return time_value * conv_factor
+
+
 def days_in_year(year):
 	"""
 	Return number of days in given year
@@ -605,6 +637,7 @@ def get_py_tz_offset(tz=None):
 	else:
 		now_local = datetime.datetime.now(tz)
 		return now_local.utcoffset()
+
 
 def get_np_tz_offset(tz=None):
 	"""
