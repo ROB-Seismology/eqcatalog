@@ -1385,7 +1385,8 @@ class MDPCollection():
 			return (intensities, dmean, dmean - dsigma, dmean + dsigma)
 
 	def plot_intensity_vs_distance(self, ref_pt, Imin_or_max, marker='.',
-									marker_size=8, azimuth_cmap=None, **kwargs):
+									marker_size=8, marker_fill_color='b',
+									azimuth_cmap=None, label='', **kwargs):
 		"""
 		Plot intensity (Y axis) versus distance (X axis)
 
@@ -1393,6 +1394,23 @@ class MDPCollection():
 			see :meth:`subselect_by_distance`
 		:param Imin_or_max:
 			see :meth:`get_intensities`
+		:param marker:
+			str, symbol marker for intensity points
+			See :func:`generic_mpl.plot_xy` for options
+			(default: '.')
+		:param marker_size:
+			float, marker size
+			(default: 8)
+		:param marker_fill_color:
+			matplotlib color spec, fill color for markers
+			(default: 'b')
+		:param azimuth_cmap:
+			str or matplotlib Colormap instance: colormap to use for coloring
+			markers by azimuth.
+			If set, :param:`marker_fill_color` will be ignored.
+			(default: None)
+		:param label:
+			str, plot label for this data set
 		:**kwargs:
 			additional keyword arguments understood by
 			:func:`generic_mpl.plot_xy`
@@ -1411,12 +1429,17 @@ class MDPCollection():
 			if isinstance(azimuth_cmap, basestring):
 				from matplotlib.cm import get_cmap
 				cmap = get_cmap(azimuth_cmap)
+			else:
+				cmap = azimuth_cmap
 			norm = Normalize(0, 360)
 			azimuths = spherical_azimuth(lon, lat,
 									self.get_longitudes(), self.get_latitudes())
 			marker_fill_colors = [cmap(norm(azimuths))]
 		else:
-			marker_fill_colors = []
+			if marker_fill_color:
+				marker_fill_colors = [marker_fill_color]
+			else:
+				marker_fill_colors = []
 
 		xlabel = kwargs.pop('xlabel', 'Distance (km)')
 		ylabel = kwargs.pop('ylabel', 'Intensity (%s)' % self.mdp_list[0].imt)
@@ -1426,13 +1449,14 @@ class MDPCollection():
 		linewidths = [0]
 		markers = [marker]
 		marker_sizes = [marker_size]
+		labels = [label]
 
 		return plot_xy([(distances, intensities)], linestyles=linestyles,
 						linewidths=linewidths, markers=markers,
 						marker_sizes=marker_sizes,
 						marker_fill_colors=marker_fill_colors, fill_colors=[None],
 						xlabel=xlabel, ylabel=ylabel, xmin=xmin, ymin=ymin,
-						**kwargs)
+						labels=labels, **kwargs)
 
 	def plot_histogram(self, Imin_or_max, color='usgs', label='', **kwargs):
 		"""
