@@ -758,8 +758,8 @@ class AggregatedMacroInfoCollection():
 					% (include_other_felt, include_heavy_appliance))
 			text += '\nCWS calculation: %s' % cws_calculation
 			if self.proc_info['agg_method'][:4] == "mean":
-				text += ("\nRemove outliers: %s"
-					% str(self.proc_info['remove_outliers']))
+				text += ("\nMax. deviation: %s"
+					% str(self.proc_info.get('max_deviation', '')))
 		elif self.data_type in ('traditional', 'official', 'historical'):
 			text += "\nMin. fiability: %d" % self.proc_info['min_fiability']
 			text += "\nImin_or_max: %s" % self.proc_info['Imin_or_max']
@@ -771,7 +771,7 @@ def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
 				min_fiability=80, filter_floors=(0, 4), aggregate_by="commune",
 				agg_method='mean', fix_records=True,
 				include_other_felt=True, include_heavy_appliance=False,
-				remove_outliers=(2.5, 97.5), verbose=False):
+				max_deviation=2., verbose=False):
 	"""
 	Obtain aggregated internet macroseismic information for given earthquake
 
@@ -814,11 +814,12 @@ def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
 		bool, whether or not to take heavy_appliance into account
 		as well (not standard, but occurs with ROB forms)
 		(default: False)
-	:param remove_outliers:
-		(min_pct, max_pct) tuple, percentile range to use.
+	:param max_deviation:
+		float, maximum allowed deviation in terms of number of
+		standard deviations
 		Only applies if :param:`agg_method` = 'mean'
 		and if :param:`agg_info` = 'cii'
-		(default: 2.5, 97.5)
+			(default: 2.)
 	:param verbose:
 		bool, if True the query string will be echoed to standard output
 
@@ -848,7 +849,7 @@ def aggregate_online_macro_info(id_earth, min_replies=3, query_info="cii",
 							filter_floors=filter_floors, agg_method=agg_method,
 							fix_records=fix_records, include_other_felt=include_other_felt,
 							include_heavy_appliance=include_heavy_appliance,
-							remove_outliers=remove_outliers)
+							max_deviation=max_deviation)
 	macro_info_coll.proc_info['fix_records'] = fix_records
 
 	return macro_info_coll
