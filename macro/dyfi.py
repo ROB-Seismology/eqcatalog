@@ -1250,7 +1250,7 @@ class DYFIEnsemble(object):
 
 		return MDPCollection(mdp_list)
 
-	def split_by_grid(self, grid_spacing=5, srs='LAMBERT1972'):
+	def split_by_grid_cells(self, grid_spacing=5, srs='LAMBERT1972'):
 		"""
 		Split enquiries into rectangular grid cells
 
@@ -1646,7 +1646,8 @@ class DYFIEnsemble(object):
 				grid_spacing = float(grid_spacing)
 			else:
 				grid_spacing = 5
-			agg_ensemble_dict = ensemble.split_by_grid(grid_spacing)
+			srs = kwargs.get('srs', 'LAMBERT1972')
+			agg_ensemble_dict = ensemble.split_by_grid_cells(grid_spacing, srs=srs)
 
 		elif aggregate_by == 'polygon':
 			poly_data, value_key = kwargs['poly_data'], kwargs['value_key']
@@ -1777,15 +1778,21 @@ class DYFIEnsemble(object):
 	def aggregate_by_nothing(self, min_replies=3, min_fiability=80,
 					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100, **kwargs):
+					max_deviation=2., max_nan_pct=100):
 		"""
 		Turn DYFI collection in aggregated macro information, with
 		each enquiry corresponding to an aggregate
 
-		See :meth:`aggregate` for parameters
-
-		:**kwargs:
-			additional keyword arguments for :class:`ROBDYFIEnsemble`
+		:param min_replies:
+		:param min_fiability:
+		:param filter_floors:
+		:param agg_info:
+		:param agg_method:
+		:param include_other_felt:
+		:param include_heavy_appliance:
+		:param max_deviation:
+		:param max_nan_pct:
+			see :meth:`aggregate`
 
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
@@ -1795,8 +1802,7 @@ class DYFIEnsemble(object):
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
-					**kwargs)
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct)
 
 	def aggregate_by_commune(self, min_replies=3, min_fiability=80,
 					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
@@ -1805,10 +1811,16 @@ class DYFIEnsemble(object):
 		"""
 		Aggregate DYFI collection by commune
 
-		See :meth:`aggregate` for other parameters
-
-		:**kwargs:
-			additional keyword arguments for :class:`ROBDYFIEnsemble`
+		:param min_replies:
+		:param min_fiability:
+		:param filter_floors:
+		:param agg_info:
+		:param agg_method:
+		:param include_other_felt:
+		:param include_heavy_appliance:
+		:param max_deviation:
+		:param max_nan_pct:
+			see :meth:`aggregate`
 
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
@@ -1827,7 +1839,7 @@ class DYFIEnsemble(object):
 					min_replies=3, min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100, **kwargs):
+					max_deviation=2., max_nan_pct=100):
 		"""
 		Aggregate DYFI ensemble by distance
 
@@ -1839,10 +1851,16 @@ class DYFIEnsemble(object):
 			bool, whether or not to create polygon objects necessary
 			for plotting on a map
 			(default: True)
-		:**kwargs:
-			additional keyword arguments for :class:`ROBDYFIEnsemble`
-
-		See :meth:`aggregate` for other parameters
+		:param min_replies:
+		:param min_fiability:
+		:param filter_floors:
+		:param agg_info:
+		:param agg_method:
+		:param include_other_felt:
+		:param include_heavy_appliance:
+		:param max_deviation:
+		:param max_nan_pct:
+			see :meth:`aggregate`
 
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
@@ -1854,15 +1872,46 @@ class DYFIEnsemble(object):
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					ref_pt=ref_pt, distance_interval=distance_interval,
-					distance_method=distance_method, create_polygons=create_polygons,
-					**kwargs)
+					distance_method=distance_method, create_polygons=create_polygons)
+
+	def aggregate_by_grid_cells(self, grid_spacing, srs='LAMBERT1972',
+					min_replies=3, min_fiability=80,
+					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
+					include_other_felt=True, include_heavy_appliance=False,
+					max_deviation=2., max_nan_pct=100):
+		"""
+		Aggregate DYFI ensemble in grid cells
+
+		:param grid_spacing:
+		:param srs:
+			see :meth:`split_by_grid_cells`
+		:param min_replies:
+		:param min_fiability:
+		:param filter_floors:
+		:param agg_info:
+		:param agg_method:
+		:param include_other_felt:
+		:param include_heavy_appliance:
+		:param max_deviation:
+		:param max_nan_pct:
+			see :meth:`aggregate`
+
+		:return:
+			instance of :class:`AggregatedMacroInfoCollection`
+		"""
+		aggregate_by = 'grid_%G' % grid_spacing
+		return self.aggregate(aggregate_by, min_replies=min_replies,
+					min_fiability=min_fiability, filter_floors=filter_floors,
+					include_other_felt=include_other_felt,
+					include_heavy_appliance=include_heavy_appliance,
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct, srs=srs)
 
 	def aggregate_by_polygon_data(self, poly_data, value_key,
 					include_unmatched_polygons=False,
 					min_replies=3, min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100, **kwargs):
+					max_deviation=2., max_nan_pct=100):
 		"""
 		Aggregate DYFI ensemble according to a set of polygons
 
@@ -1873,10 +1922,16 @@ class DYFIEnsemble(object):
 			bool, whether or not unmatched polygons should be included
 			in the result (their intensity will be set to nan!)
 			(default: True)
-		:**kwargs:
-			additional keyword arguments for :class:`ROBDYFIEnsemble`
-
-		See :meth:`aggregate` for other parameters
+		:param min_replies:
+		:param min_fiability:
+		:param filter_floors:
+		:param agg_info:
+		:param agg_method:
+		:param include_other_felt:
+		:param include_heavy_appliance:
+		:param max_deviation:
+		:param max_nan_pct:
+			see :meth:`aggregate`
 
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
@@ -1888,7 +1943,7 @@ class DYFIEnsemble(object):
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					poly_data=poly_data, value_key=value_key,
-					include_unmatched_polygons=include_unmatched_polygons, **kwargs)
+					include_unmatched_polygons=include_unmatched_polygons)
 
 	#def remove_outliers(self, min_pct=2.5, max_pct=97.5):
 	def remove_outliers(self, max_deviation=2.):
