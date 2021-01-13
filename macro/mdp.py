@@ -1243,7 +1243,7 @@ class MDPCollection():
 		mdpc = self.__getitem__(self.get_prop_values('fiability') >= min_fiability)
 		mdpc_dict = mdpc.split_by_grid_cells(grid_spacing, srs=srs)
 		macro_info_list = []
-		agg_type = 'grid_%d' % grid_spacing
+		agg_type = 'grid_%G' % grid_spacing
 		for grid_key, mdpc in mdpc_dict.items():
 			if len(mdpc) >= min_num_mdp:
 				unique_id_earths = mdpc.get_unique_prop_values('id_earth')
