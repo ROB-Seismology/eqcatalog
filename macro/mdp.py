@@ -1292,6 +1292,7 @@ class MDPCollection():
 		:param bin_func':
 			str, aggregation function to apply to bins before fitting,
 			either 'mean' or 'median'
+			Only applies if :param:`independent_var` = 'distance'
 			(default: 'mean')
 		:param bin_min_num_mdp:
 			int, minimum number of MDPs in a bin
@@ -1314,7 +1315,6 @@ class MDPCollection():
 			- mean - sigma or 32nd percentile of the dependent variable
 			- mean + sigma or 68th percentile of the dependent variable
 		"""
-		# TODO: support bin_func = 'median'
 		# TODO (in plot): oqhazlib IPE relations
 
 		from scipy.ndimage.filters import uniform_filter1d
@@ -1327,7 +1327,7 @@ class MDPCollection():
 			distances = np.sort(mdpc_dict.keys())
 			num_mdp = np.array([len(mdpc_dict[d]) for d in distances])
 			distances = distances[num_mdp >= bin_min_num_mdp]
-			Imean = [mdpc_dict[d].get_aggregated_intensity(Imin_or_max, 'mean')
+			Imean = [mdpc_dict[d].get_aggregated_intensity(Imin_or_max, bin_func)
 					for d in distances]
 			Isigma = [mdpc_dict[d].get_aggregated_intensity(Imin_or_max, 'std')
 					for d in distances]
