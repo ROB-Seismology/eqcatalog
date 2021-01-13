@@ -1269,6 +1269,7 @@ class MDPCollection():
 	def estimate_intensity_attenuation(self, ref_pt, independent_var='distance',
 									Imin_or_max='mean', bin_interval='default',
 									bin_func='mean', bin_min_num_mdp=3,
+									distance_method='spherical',
 									polyfit_degree=3):
 		"""
 		Estimate intensity-distance relation based on binning
@@ -1295,6 +1296,9 @@ class MDPCollection():
 		:param bin_min_num_mdp:
 			int, minimum number of MDPs in a bin
 			(default: 3)
+		:param distance_method:
+			str, method for calculating distances: 'spherical' or 'ellipsoidal'
+			(default: 'spherical')
 		:param polyfit_degree:
 			int, degree of the fitting polynomial
 			see :func:`np.polyfit`
@@ -1318,7 +1322,8 @@ class MDPCollection():
 		if independent_var == 'distance':
 			if bin_interval == 'default':
 				bin_interval = 5.
-			mdpc_dict = self.split_by_distance(ref_pt, bin_interval)
+			mdpc_dict = self.split_by_distance(ref_pt, bin_interval,
+														method=distance_method)
 			distances = np.sort(mdpc_dict.keys())
 			num_mdp = np.array([len(mdpc_dict[d]) for d in distances])
 			distances = distances[num_mdp >= bin_min_num_mdp]
@@ -1344,7 +1349,8 @@ class MDPCollection():
 		elif independent_var == 'intensity':
 			if bin_interval == 'default':
 				bin_interval = 0.5
-			distances = self.calc_distances(ref_pt.lon, ref_pt.lat, ref_pt.depth)
+			distances = self.calc_distances(ref_pt.lon, ref_pt.lat, ref_pt.depth,
+													method=distance_method)
 			intensities = self.get_intensities(Imin_or_max)
 			Imax = np.ceil(intensities.max()) + bin_interval
 			Imin = max(0, 1 - bin_interval / 2.)
