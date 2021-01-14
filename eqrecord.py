@@ -470,7 +470,9 @@ class LocalEarthquake(object):
 		:return:
 			instance of :class:`dict`
 		"""
-		return self.__dict__.copy()
+		from copy import deepcopy
+
+		return deepcopy(self.__dict__)
 
 	def dump_json(self):
 		"""
