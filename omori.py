@@ -218,6 +218,26 @@ class OmoriLaw(object):
 	@classmethod
 	def fit_rate(cls, delta_t, n, initial_guess=(1, 0.01, 1.2),
 				bounds=((0, 0.001, 0.1), (np.inf, 10, 10))):
+		"""
+		Fit K, c and p parameters of Omori law based on aftershock rates
+
+		:param delta_t:
+			1D array, elapsed times since mainshock
+		:param n:
+			1D array, aftershock rates
+		:param initial_guess:
+			(K, c, p) tuple of floats
+			(default: (1, 0.01, 1.2))
+		:param bounds:
+			((Kmin, cmin, pmin) (Kmax, cmax, pmax)) tuple of floats
+			(default: ((0, 0.001, 0.1), (np.inf, 10, 10)))
+
+		:return:
+			(popt, pcov, perr) tuple of arrays
+			- popt: fitted values of K, c, p
+			- pcov: covariance matrix
+			- perr: standard deviations for K, c, p
+		"""
 		from scipy.optimize import curve_fit
 
 		def omori_rate(delta_t, K, c, p):
@@ -232,7 +252,25 @@ class OmoriLaw(object):
 	def fit_cumulative(cls, delta_t, N, initial_guess=(1, 0.01, 1.2),
 				bounds=((0, 0.001, 0.1), (np.inf, 10, 10))):
 		"""
-		Note: delta_t not necessarily binned
+		Fit K, c and p parameters of Omori law based on cumulative number of
+		aftershocks
+
+		:param delta_t:
+			1D array, elapsed times since mainshock
+		:param N:
+			1D array, cumulative numbers of aftershocks
+		:param initial_guess:
+			(K, c, p) tuple of floats
+			(default: (1, 0.01, 1.2))
+		:param bounds:
+			((Kmin, cmin, pmin) (Kmax, cmax, pmax)) tuple of floats
+			(default: ((0, 0.001, 0.1), (np.inf, 10, 10)))
+
+		:return:
+			(popt, pcov, perr) tuple of arrays
+			- popt: fitted values of K, c, p
+			- pcov: covariance matrix
+			- perr: standard deviations for K, c, p
 		"""
 		from scipy.optimize import curve_fit
 
@@ -249,33 +287,172 @@ class OmoriLaw(object):
 		return (popt, pcov, perr)
 
 	@classmethod
-	def fit_mle(cls):
-		## See https://towardsdatascience.com/a-gentle-introduction-to-maximum-likelihood-estimation-9fbff27ea12f
-		pass
+	def fit_mle(cls, delta_t, initial_guess=(0.01, 1.2),
+				bounds=((1E-5, 0.1), (10, 10)), Ts=0.,
+				minimize_method='Nelder-Mead'):
+		"""
+		Fit Omori law c and p parameters using MLE estimation,
+		and determine corresponding K parameter
+		based on equations 11 and 12 in Utsu et al. (1995)
 
-	def plot_rate(self, delta_t, **kwargs):
+		:param delta_t:
+			1D array, elapsed times since mainshock
+		:param initial_guess:
+		:param bounds:
+		:param Ts:
+		:param minimize_method:
+			see :func:`estimate_omori_params`
+
+		:return:
+			(K, c, p) tuple of floats
+		"""
+		return estimate_omori_params(delta_t, initial_guess=initial_guess, Ts=Ts,
+										bounds=bounds, minimize_method=minimize_method)
+
+	def plot_rate(self, delta_t, observed_delta_t=None, observed_rate=None,
+					label='', color='b', linestyle='-', linewidth=1, marker='',
+					**kwargs):
+		"""
+		Plot aftershock rate versus elapsed time
+
+		:param delta_t:
+			1D array, elapsed times to plot as X values
+		:param observed_delta_t:
+			1D array, elapsed times of observed aftershocks
+			(default: None)
+		:param observed_rate:
+			1D array, rates of observed aftershocks
+			corrsponding to :param:`observed_delta_t`
+			(default: None)
+		:param label:
+			str, label to use for plot of predicted values
+			(default: '')
+		:param color:
+			matplotlib color spec, color to use for plot of predicted values
+			(default: 'b')
+		:param linestyle:
+			matplotlib linestyle spec, linestyle to use for plot of
+			predicted values
+			(default: '')
+		:param linewidth:
+			float, linewidth to use for plot of predicted values
+			(default: 1)
+		:param marker:
+			str, matplotlib marker spec, marker symbol to use for plot of
+			predicted values
+			(default: '')
+		:kwargs:
+			additional keyword arguments understood by :func:`generic_mpl.plot_xy`
+
+		:return:
+			matplotlib Axes instance
+		"""
 		from plotting.generic_mpl import plot_xy
 
 		as_rate = self.get_aftershock_rate(delta_t)
 		datasets = [(delta_t, as_rate)]
+		labels = [label]
+		colors = [color]
+		linestyles = [linestyle]
+		markers = [marker]
+
+		if observed_delta_t is not None and observed_rate is not None:
+			datasets.append((observed_delta_t, observed_rate))
+			if label in (None, ''):
+				labels = ['Omori law']
+			labels.append('Observed')
+			colors.append('r')
+			linestyles.append('')
+			markers.append('x')
+
 		if not 'xlabel' in kwargs:
-			kwargs['xlabel'] = 'Time since mainshock'
+			kwargs['xlabel'] = 'Time since mainshock (%s)' % self.time_unit
 		if not 'ylabel' in kwargs:
-			kwargs['ylabel'] = 'Aftershock rate'
+			kwargs['ylabel'] = 'Aftershock rate (1/%s)' % self.time_unit
+		if not 'xmin' in kwargs:
+			kwargs['xmin'] = 0
+		if not 'ymin' in kwargs:
+			kwargs['ymin'] = 0
+		if not 'xgrid' in kwargs:
+			kwargs['xgrid'] = 1
+		if not 'ygrid' in kwargs:
+			kwargs['ygrid'] = 1
 
-		return plot_xy(datasets, **kwargs)
+		return plot_xy(datasets, labels=labels, colors=colors,
+						linestyles=linestyles, markers=markers, **kwargs)
 
-	def plot_cumulative(self, delta_t, **kwargs):
+	def plot_cumulative(self, delta_t, observed_delta_t=None, observed_N=None,
+							label='', color='b', linestyle='-', linewidth=1,
+							marker='', **kwargs):
+		"""
+		Plot cumulative number of aftershocks versus elapsed time
+
+		:param delta_t:
+			1D array, elapsed times to plot as X values
+		:param observed_delta_t:
+			1D array, elapsed times of observed aftershocks
+			(default: None)
+		:param observed_N:
+			1D array, cumulative numbers of observed aftershocks
+			corrsponding to :param:`observed_delta_t`
+			(default: None)
+		:param label:
+			str, label to use for plot of predicted values
+			(default: '')
+		:param color:
+			matplotlib color spec, color to use for plot of predicted values
+			(default: 'b')
+		:param linestyle:
+			matplotlib linestyle spec, linestyle to use for plot of
+			predicted values
+			(default: '')
+		:param linewidth:
+			float, linewidth to use for plot of predicted values
+			(default: 1)
+		:param marker:
+			str, matplotlib marker spec, marker symbol to use for plot of
+			predicted values
+			(default: '')
+		:kwargs:
+			additional keyword arguments understood by :func:`generic_mpl.plot_xy`
+
+		:return:
+			matplotlib Axes instance
+		"""
 		from plotting.generic_mpl import plot_xy
 
 		num_as = self.get_num_aftershocks(delta_t)
 		datasets = [(delta_t, num_as)]
+		labels = [label]
+		colors = [color]
+		linestyles = [linestyle]
+		markers = [marker]
+		if observed_delta_t is not None:
+			if observed_N is None:
+				observed_N = np.arange(len(observed_delta_t)) + 1
+			datasets.append((observed_delta_t, observed_N))
+			if label in (None, ''):
+				labels = ['Omori law']
+			labels.append('Observed')
+			colors.append('r')
+			linestyles.append('')
+			markers.append('x')
+
 		if not 'xlabel' in kwargs:
-			kwargs['xlabel'] = 'Time since mainshock'
+			kwargs['xlabel'] = 'Time since mainshock (%s)' % self.time_unit
 		if not 'ylabel' in kwargs:
 			kwargs['ylabel'] = 'Number of aftershocks'
+		if not 'xmin' in kwargs:
+			kwargs['xmin'] = 0
+		if not 'ymin' in kwargs:
+			kwargs['ymin'] = 0
+		if not 'xgrid' in kwargs:
+			kwargs['xgrid'] = 1
+		if not 'ygrid' in kwargs:
+			kwargs['ygrid'] = 1
 
-		return plot_xy(datasets, **kwargs)
+		return plot_xy(datasets, labels=labels, colors=colors,
+						linestyles=linestyles, markers=markers, **kwargs)
 
 	def to_gr_omori_law(self, b):
 		"""
@@ -606,6 +783,9 @@ def estimate_omori_params(as_time_deltas, initial_guess=(0.01, 1.2),
 	equations 11 and 12 in Utsu et al. (1995)
 	K is determined from c and p using eq. 12 in Utsu et al. (1995)
 
+	See also:
+	https://towardsdatascience.com/a-gentle-introduction-to-maximum-likelihood-estimation-9fbff27ea12f
+
 	:param as_time_deltas:
 		float array, fractional time differences (arbitrary time unit)
 		between aftershocks and mainshock
@@ -662,6 +842,33 @@ def estimate_omori_params(as_time_deltas, initial_guess=(0.01, 1.2),
 		return (K, c, p)
 	else:
 		print(result.message)
+
+
+def calc_smoothed_rates(elapsed_times, n=3):
+	"""
+	Compute smoothed aftershock rates from elapsed times.
+	The smoothed rates are computed as n divided by the
+	elapsed time to the center of the time window corresponding
+	to each subsequent set of n earthquakes
+
+	:param elapsed_times:
+		1D array, elapsed times since mainshock
+	:param n:
+		int, smoothing factor
+		(default: 3)
+
+	:return:
+		(delta_t, as_rate) tuple of arrays:
+			- delta_t: elapsed times
+			- as_rate: aftershock rates
+	"""
+	## Compute time intervals for n aftershocks
+	elapsed_times = elapsed_times[::n]
+	time_intervals = np.diff(elapsed_times)
+	delta_t = elapsed_times[:-1] + time_intervals / 2.
+	as_rate = n / delta_t
+
+	return (delta_t, as_rate)
 
 
 
