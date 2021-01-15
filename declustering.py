@@ -485,6 +485,7 @@ class Cluster():
 	def argsort_mag(self):
 		"""
 		Return indexes that would sort cluster by descending magnitude
+		Identical magnitudes are sorted by ascending time
 
 		:return:
 			(mags, order) tuple:
@@ -493,7 +494,13 @@ class Cluster():
 		"""
 		mags = self.get_magnitudes()
 		nan_idxs = np.isnan(mags)
-		ordered_idxs = np.hstack([np.argsort(mags[~nan_idxs])[::-1], nan_idxs])
+		datetimes = self.get_datetimes()
+		n = np.sum(~nan_idxs)
+		ar = np.zeros(n, dtype=[('mag', np.float32), ('dt', np.float64)])
+		ar['mag'] = mags[~nan_idxs]
+		ar['dt'] = datetimes.max() - datetimes[~nan_idxs]
+		ordered_idxs = np.argsort(ar, order=['mag', 'dt'])[::-1]
+		ordered_idxs = np.hstack([ordered_idxs, nan_idxs])
 		return (mags, ordered_idxs)
 
 	def sort_mag(self):
@@ -666,7 +673,7 @@ class Cluster():
 		aftershocks = [eq for eq in self.sort_datetime()
 						if eq.datetime > mainshock_dt]
 		catalog_name = "Cluster #%s (aftershocks)" % self.ID
-		return EQCatalog(aftershocks, name=catalog.name,
+		return EQCatalog(aftershocks, name=catalog_name,
 						default_Mrelations={'MW': self.Mrelation})
 
 	def to_catalog(self):
@@ -977,8 +984,9 @@ class DeclusteringResult():
 		:return:
 			instance of :class:`Cluster`
 		"""
-		eq_idx = self.catalog.index(eq)
-		return self.get_cluster_by_eq_idx(eq_idx)
+		eq_idx = self.catalog.index(eq.ID)
+		if eq_idx is not None:
+			return self.get_cluster_by_eq_idx(eq_idx)
 
 	def get_unclustered_events(self):
 		"""
