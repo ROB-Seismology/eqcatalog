@@ -397,9 +397,10 @@ class WarningCenter():
 			msg += "%s: %s\n" % (MSG_FIELDS['event_type'][lang], eq.event_type)
 
 		dt = eqcatalog.time.to_py_datetime(eq.datetime)
-		msg += ("%s: %d-%02d-%02d %02d:%02d:%02d\n"
-				% (MSG_FIELDS['time'][lang], dt.year, dt.month, dt.day,
-				dt.hour, dt.minute, int(round(dt.second))))
+		if msg_type == 'email':
+			msg += ("%s: %d-%02d-%02d %02d:%02d:%02d\n"
+					% (MSG_FIELDS['time'][lang], dt.year, dt.month, dt.day,
+					dt.hour, dt.minute, int(round(dt.second))))
 		local_dt = utc_to_local_dt(dt)
 		msg += ("%s: %d-%02d-%02d %02d:%02d:%02d\n"
 				% (MSG_FIELDS['local_time'][lang], local_dt.year, local_dt.month,
