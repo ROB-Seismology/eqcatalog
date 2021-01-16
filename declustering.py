@@ -250,6 +250,8 @@ class Reasenberg1985Window(DeclusteringWindow):
 			deltam = (1. - self.xk) * mag[pos_idxs] - self.xmeff
 			deltam = np.maximum(0, deltam)
 			## denom: expected rate of aftershocks
+			## Note: this expression implicitly includes both productivity A
+			## and b-value, but unfortunately we cannot separate them
 			denom = 10**((deltam - 1.) * 2./3)
 			top = -np.log(1. - self.p1) * td[pos_idxs]
 			_tau = top / denom
