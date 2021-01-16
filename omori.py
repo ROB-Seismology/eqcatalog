@@ -1,5 +1,5 @@
 """
-Afterschocks
+Afterschock statistics
 """
 
 from __future__ import absolute_import, division, print_function, unicode_literals
@@ -184,6 +184,7 @@ class OmoriLaw(object):
 		Compute time interval necessary to wait in order to be prob
 		confident of observing the next event in the sequence at
 		time interval delta_t since the mainshock
+		(cf. Reasenberg declustering method)
 
 		:param prob:
 			float, probability
@@ -620,7 +621,7 @@ class ExpGROmoriLaw(GROmoriLaw):
 	Omori law where K depends on difference between mainshock and
 	cutoff magnitude, and on efficiency parameter alpha, which in fact
 	corresponds to the beta value (= b * ln(10)) of the aftershock
-	sequence in the exponential notation of the Gutenberg-Richte relation
+	sequence in the exponential notation of the Gutenberg-Richter relation
 
 	:param A:
 		float, productivity parameter
@@ -640,6 +641,9 @@ class ExpGROmoriLaw(GROmoriLaw):
 
 	Note that, in contrast to :class:`OmoriLaw`, Mm and/or Mc can be
 	changed to adjust the Omori law!
+	Change Mm to predict for a different (hypothetical) mainshock magnitude
+	Change Mc to predict for different lower magnitudes (possibly higher
+	than the mainshock magnitude)
 	"""
 	def __init__(self, A, c, p, alpha, Mm, Mc, time_unit='D'):
 		self.A = A
@@ -696,6 +700,9 @@ class Base10GROmoriLaw(GROmoriLaw):
 
 	Note that, in contrast to :class:`OmoriLaw`, Mm and/or Mc can be
 	changed to adjust the Omori law!
+	Change Mm to predict for a different (hypothetical) mainshock magnitude
+	Change Mc to predict for different lower magnitudes (possibly higher
+	than the mainshock magnitude)
 	"""
 	def __init__(self, A, c, p, b, Mm, Mc, time_unit='D'):
 		self.A = A
