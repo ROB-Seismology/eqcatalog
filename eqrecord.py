@@ -980,13 +980,25 @@ class LocalEarthquake(object):
 		"""
 		return geodetic.spherical_point_at(self.lon, self.lat, distance*1000, azimuth)
 
-	def to_folium_marker(self, marker_size=9, edge_color='blue', edge_width=1.,
-						fill_color=None, opacity=0.5, add_popup=True):
+	def to_folium_marker(self, marker_shape='circle', marker_size=9,
+						edge_color='blue', edge_width=1., fill_color=None,
+						opacity=0.5, add_popup=True):
 		"""
 		Create circle marker to plot with folium
 
+		Note: if marker_shape = 'circle' and marker_size > 0, a circle marker
+		will be drawn. The size can be adjusted, and edge_color and fill_color
+		refer to circle edge and circle interior, respectively
+		In other cases, a BeautifyIcon marker will be drawn with a star 'icon'
+		(= internal symbol). The size cannot be modified, and edge_color and
+		fill_color refer to the 'icon' color and the surrounding marker color,
+		respectively. border-width is ignored
+
+		:param marker_shape:
+			str, marker shape, e.g. 'circle', 'balloon'
+			(default: 'circle')
 		:param marker_size:
-			float, marker radius
+			float, marker radius (if :param:`marker_shape` = 'circle')
 			(default: 9)
 		:param edge_color:
 			str, line color
@@ -1007,7 +1019,9 @@ class LocalEarthquake(object):
 		:return:
 			instance of :class:`folium.CircleMarker`
 		"""
-		from folium import CircleMarker, Popup, IFrame
+		from folium import CircleMarker, Popup, IFrame, Marker
+		from matplotlib.colors import rgb2hex
+		from folium.plugins import BeautifyIcon
 
 		fill = True
 		if fill_color is None:
@@ -1035,11 +1049,56 @@ class LocalEarthquake(object):
 		else:
 			popup = None
 
-		return CircleMarker(location=location, radius=marker_size,
-							weight=edge_width, color=edge_color, opacity=opacity,
-							fill=fill, fill_color=fill_color,
-							fill_opacity=fill_opacity, popup=popup)
+		if marker_shape == 'circle' and marker_size:
+			marker = CircleMarker(location=location, radius=marker_size,
+								weight=edge_width, color=edge_color, opacity=opacity,
+								fill=fill, fill_color=fill_color,
+								fill_opacity=fill_opacity, popup=popup)
+		else:
+			fill_color = 'transparent' if fill_color is None else rgb2hex(fill_color)
+			edge_color = 'white' if edge_color is None else rgb2hex(edge_color)
+			#inner_icon_style = 'color:%s;font-size:6pt;;text-align:center;'
+			#inner_icon_style %= edge_color
+			if marker_shape == 'balloon':
+				marker_shape = 'marker'
+			icon = BeautifyIcon(icon='star', icon_shape=marker_shape,
+									#inner_icon_style=inner_icon_style,
+									text_color=edge_color,
+									background_color=fill_color, border_color='transparent')
 
+			marker = Marker(location=(self.lat, self.lon), icon=icon,
+								opacity=opacity, popup=popup)
+
+		return marker
+
+	def to_folium_layer(self, marker_shape='balloon', marker_size=None,
+						edge_color='white', edge_width=1., fill_color='RoyalBlue',
+						opacity=0.75, add_popup=True):
+		"""
+		Create folium layer with just this earthquake
+
+		:param marker_size:
+		:param edge_color:
+		:param edge_width:
+		:param fill_color:
+		:param opacity:
+		:param add_popup:
+			see :meth:`to_folium_marker`
+
+		:return:
+			instance of :class:`folium.FeatureGroup`
+		"""
+		from folium import FeatureGroup, Marker
+
+		layer = FeatureGroup(name=self.name, overlay=True, control=True, show=True)
+
+		marker = self.to_folium_marker(marker_shape=marker_shape,
+								marker_size=marker_size, edge_color=edge_color,
+								edge_width=edge_width, fill_color=fill_color,
+								opacity=opacity, add_popup=add_popup)
+		marker.add_to(layer)
+
+		return layer
 
 
 #class FocMecRecord(LocalEarthquake, MT.FaultGeometry):
