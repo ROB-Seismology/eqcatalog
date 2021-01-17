@@ -979,7 +979,7 @@ class WarningClient():
 		:param dry_run:
 			see :meth:`send_warning`
 		"""
-		from eqcatalog.macro.dyfi import strip_accents
+		from eqcatalog.macro.rob_dyfi import strip_accents
 		msg = self.warcen.compose_message(eq, self.lang, 'sms', revision=revision)
 		msg = strip_accents(msg)
 		self.warcen.send_sms(self, msg, dry_run=dry_run)
