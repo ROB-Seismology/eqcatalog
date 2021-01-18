@@ -91,7 +91,7 @@ class OmoriLaw(object):
 			N = K * ((delta_t1 + c)**(1-p) - (delta_t2 + c)**(1-p)) / (p - 1)
 		return N
 
-	def get_time_delta_for_n_aftershocks(self, N):
+	def get_time_delta_for_n_aftershocks(self, N, delta_t1=0):
 		"""
 		Compute time interval since mainshock corresponding to a
 		particular number of aftershocks.
@@ -99,10 +99,16 @@ class OmoriLaw(object):
 
 		:param N:
 			float, number of earthquakes since mainshock
+		:param delta_t1:
+			float, start time with respect to mainshock to start counting
+			(default: 0)
 
 		:return:
 			float, time interval
 		"""
+		if delta_t1 > 0:
+			N += self.get_num_aftershocks(delta_t1)
+
 		K, c, p = self.K, self.c, self.p
 		if p == 1:
 			delta_t = c * (np.exp(N / K) - 1)
