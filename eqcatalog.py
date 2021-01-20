@@ -3045,7 +3045,7 @@ class EQCatalog(object):
 		Mmin, Mmax, dM=0.1,
 		Mtype="MW", Mrelation={},
 		completeness=None, end_date=None,
-		b_val=None,
+		b_val=None, prior_weight=0.5,
 		verbose=True):
 		"""
 		Calculate a and b values of Gutenberg-Richter relation using
@@ -3076,6 +3076,9 @@ class EQCatalog(object):
 		:param b_val:
 			float, fixed b value to constrain MLE estimation
 			(default: None)
+		:param prior_weight:
+			float, weighting parameter of the prior b-value, can be
+			considered equivalent to the inverse of the maximum allowed variance
 		:param verbose:
 			bool, whether some messages should be printed or not
 			(default: False)
@@ -3100,7 +3103,7 @@ class EQCatalog(object):
 
 		if b_val:
 			prior_b = b_val
-			prior_weight = 1E+5
+			prior_weight = prior_weight
 		else:
 			prior_b = 1.
 			prior_weight = 0.
@@ -3517,6 +3520,7 @@ class EQCatalog(object):
 				local_eq = self.__getitem__(catalog_idx)
 				## If event type in master catalog is se, set it to ke
 				if local_eq.event_type == 'se':
+					print('Suspected eq: ', local_eq)
 					local_eq.event_type = 'ke'
 				## Update mag in master catalog if it is nan
 				if np.isnan(local_eq.mag.get(Mtype, np.nan)):
@@ -4979,9 +4983,14 @@ class EQCatalog(object):
 						marker='o', marker_size=lambda m: 9 + (m - 3) * 3,
 						edge_color='b', fill_color='None',
 						edge_width=0.5, label=None, Mtype="MW", Mrelation={},
+						fault_gis_file='', fault_dip=65,
+						min_fault_depth=0, max_fault_depth=20,
+						fault_color='k', fault_linestyle='-', fault_linewidth=1,
+						num_location_sigma=0, errorbar_color='b', errorbar_linewidth=0.5,
 						**kwargs):
 		"""
-		Plot cross-section along a straight line
+		Plot cross-section along a straight line, optionally adding faults
+		and location uncertainties.
 
 		:param start_pt:
 			(lon, lat) tuple of floats, start point of cross-section
@@ -5015,28 +5024,63 @@ class EQCatalog(object):
 			{str: str} dict, mapping name of magnitude conversion relation
 			to magnitude type ("MW", "MS" or "ML")
 			(default: {})
+		:param fault_gis_file:
+			str, full path to GIS file containing fault traces
+			(default: '')
+		:param fault_dip:
+			float, fault dip (in degrees)
+			(default: 65)
+		:param min_fault_depth:
+			float, minimum depth to draw fault planes (in km)
+			(default: 0)
+		:param max_fault_depth:
+			float, maximum depth to draw fault planes (in km)
+			(default: 20)
+		:param fault_color:
+			matplotlib color spec, line color for faults
+			(default: 'k')
+		:param fault_linestyle:
+			matplotlib linestyle spec, line style for faults
+			(default: '-')
+		:param fault_linewidth:
+			float, line width for faults
+			(default: 1)
+		:param num_location_sigma:
+			float, number of standard deviations on horizontal and vertical
+			location to plot as errorbars
+			(default: 0, will not draw any errorbars)
+		:param errobar_color:
+			matplotlib color spec, color to use for error bars
+			(default: 'b')
+		:param errorbar_linewidth:
+			float, line width for error bars
+			(default: 0.5)
 		:param **kwargs:
 			additional keyword arguments to be passed to
 			:func:`plotting.generic_mpl.plot_xy
 		"""
-		from plotting.generic_mpl import plot_xy
+		from plotting.generic_mpl import (plot_xy, show_or_save_plot)
 
 		subcat = self.subselect_line(start_pt, end_pt, distance)
 
 		distances = subcat.get_distances_along_line(start_pt, end_pt, max_pp_dist=distance)
 		depths = subcat.get_depths()
+		datasets = [(distances, depths)]
 
 		xmin = kwargs.pop('xmin', 0)
 		yscaling = kwargs.pop('yscaling', '-lin')
-		ymin = kwargs.pop('ymin', 0)
+		ymax = kwargs.pop('ymax', 0)
 		xlabel = kwargs.pop('xlabel', 'Distance (km)')
 		ylabel = kwargs.pop('ylabel', 'Depth (km)')
 
 		markers = [marker]
-		edge_colors = [edge_color] if edge_color else []
-		fill_colors = [fill_color] if fill_color else []
-		edge_widths = [edge_width] if edge_width else []
+		marker_edge_colors = [edge_color] if edge_color else []
+		marker_fill_colors = [fill_color] if fill_color else []
+		marker_edge_widths = [edge_width] if edge_width else []
 		labels = [label] if label else []
+		linestyles = [''] * len(markers)
+		linewidths = [0] * len(markers)
+		colors = ['None'] * len(markers)
 
 		if callable(marker_size):
 			mags = subcat.get_magnitudes(Mtype, Mrelation=Mrelation)
@@ -5047,14 +5091,81 @@ class EQCatalog(object):
 		else:
 			marker_sizes = [marker_size]
 
-		return plot_xy([(distances, depths)], labels=labels,
+		## Plot faults
+		if fault_gis_file:
+			import mapping.layeredbasemap as lbm
+			from mapping.geotools.geodetic import spherical_distance
+
+			xsection = lbm.LineData([start_pt[0], end_pt[0]],
+											[start_pt[1], end_pt[1]])
+			gis_data = lbm.GisData(fault_gis_file)
+			_, fault_traces, _ = gis_data.get_data()
+			intersection_lons, intersection_lats = [], []
+			fault_strikes = []
+			for flt_trace in fault_traces:
+				intersection = flt_trace.get_intersection(xsection)
+				if intersection:
+					## Note: we could also obtain fault dip from fault_trace.value
+					## if it is defined as a column in the GIS file
+					intersection_lons.append(intersection.lon)
+					intersection_lats.append(intersection.lat)
+					fault_strikes.append(flt_trace.get_mean_strike())
+			intersection_lons = np.array(intersection_lons)
+			intersection_lats = np.array(intersection_lats)
+			## Compute angle between cross section and faults
+			az0 = xsection.get_mean_strike()
+			daz = np.array(fault_strikes) -az0
+			daz[daz > 180] -= 360
+			## Compute apparent fault dips
+			apparent_dips = np.arctan(np.sin(np.radians(daz))
+											* np.tan(np.radians(fault_dip)))
+			## Convention: negative daz means dip is to the right
+			apparent_dips = -apparent_dips
+			## Compute distance along line
+			top_distances = spherical_distance(intersection_lons, intersection_lats,
+														start_pt[0], start_pt[1]) / 1000.
+			bottom_distances = top_distances + max_fault_depth / np.tan(apparent_dips)
+			for dtop, dbottom in zip(top_distances, bottom_distances):
+				datasets.append(([dtop, dbottom], [min_fault_depth, max_fault_depth]))
+				markers.append('')
+				marker_sizes.append(0)
+				marker_edge_colors.append('None')
+				marker_fill_colors.append('None')
+				colors.append(fault_color)
+				linewidths.append(fault_linewidth)
+				linestyles.append(fault_linestyle)
+			if len(labels) == 0:
+				labels = ['Earthquakes']
+			labels.append('Faults')
+			labels.extend(['_nolegend_'] * (len(intersection_lons) - 1))
+
+		if num_location_sigma:
+			fig_filespec = kwargs.pop('fig_filespec', None)
+			kwargs['fig_filespec'] = 'wait'
+			dpi = kwargs.pop('dpi', 300)
+			border_width = kwargs.pop('border_width', 0.2)
+
+		ax = plot_xy(datasets, labels=labels,
 						markers=markers, marker_sizes=marker_sizes,
-						marker_fill_colors=fill_colors, marker_edge_colors=edge_colors,
-						marker_edge_widths=edge_widths,
-						linestyles=[''],
+						marker_fill_colors=marker_fill_colors,
+						marker_edge_colors=marker_edge_colors,
+						marker_edge_widths=marker_edge_widths,
+						linestyles=linestyles, linewidths=linewidths, colors=colors,
 						xlabel=xlabel, ylabel=ylabel,
-						xmin=xmin, ymin=ymin, yscaling=yscaling,
+						xmin=xmin, ymax=ymax, yscaling=yscaling,
 						**kwargs)
+
+		## Plot location uncertainties
+		if num_location_sigma:
+			xerr = np.array([eq.errh for eq in subcat]) * num_location_sigma
+			yerr = np.array([eq.errz for eq in subcat]) * num_location_sigma
+			ecolor = errorbar_color or edge_color or fill_color
+			ax.errorbar(distances, depths, xerr, yerr, marker='', fmt='none',
+							ecolor=ecolor, elinewidth=errorbar_linewidth, linestyle='--'),
+			ax = show_or_save_plot(ax, fig_filespec=fig_filespec, dpi=dpi,
+										border_width=border_width)
+
+		return ax
 
 	## Export methods
 
@@ -6934,53 +7045,6 @@ def distribute_avalues(zones, catalog, M=0):
 	for zone in zones:
 		N_zones += 10 ** zone.a_new
 	N_diff = 10 ** catalog.a - N_zones
-
-
-def Poisson(life_time=None, return_period=None, prob=None):
-	"""
-	Compute return period, life time or probability from any combination of two
-		of the other parameters for a Poisson distribution
-	Parameters:
-		life_time: life time (default: None)
-		return_period: return period (default: None)
-		prob: probability (default: None)
-	Two parameters need to be specified, the value will be computed for the remaining
-		parameters
-	"""
-	if prob and prob > 1:
-		prob /= 100.0
-	if life_time:
-		life_time = float(life_time)
-	if return_period:
-		return_period = float(return_period)
-	if life_time and prob:
-		return -life_time / np.log(1.0 - prob)
-	elif return_period and prob:
-		return -return_period * np.log(1.0 - prob)
-	elif life_time and return_period:
-		return 1.0 - np.exp(-life_time / return_period)
-	else:
-		raise TypeError("Need to specify 2 parameters")
-
-
-def tr2tl(tr, prob):
-	"""
-	Convert return period to life time for a given probability
-	Parameters:
-		tr: return period
-		prob: probability
-	"""
-	return -tr * np.log(1.0 - prob)
-
-
-def tl2tr(tl, prob):
-	"""
-	Convert life time to return period for a given probability
-	Parameters:
-		tl: life time
-		prob: probability
-	"""
-	return -tl / np.log(1.0 - prob)
 
 
 
