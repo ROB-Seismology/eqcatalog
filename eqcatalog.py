@@ -4984,7 +4984,7 @@ class EQCatalog(object):
 						edge_color='b', fill_color='None',
 						edge_width=0.5, label=None, Mtype="MW", Mrelation={},
 						fault_gis_file='', fault_dip=65,
-						min_fault_depth=0, max_fault_depth=20,
+						min_fault_depth=0, max_fault_depth=20, fault_label='Faults',
 						fault_color='k', fault_linestyle='-', fault_linewidth=1,
 						num_location_sigma=0, errorbar_color='b', errorbar_linewidth=0.5,
 						**kwargs):
@@ -5036,6 +5036,9 @@ class EQCatalog(object):
 		:param max_fault_depth:
 			float, maximum depth to draw fault planes (in km)
 			(default: 20)
+		:param fault_label:
+			str, label to use for faults in legend
+			(default: 'Faults')
 		:param fault_color:
 			matplotlib color spec, line color for faults
 			(default: 'k')
@@ -5136,7 +5139,7 @@ class EQCatalog(object):
 				linestyles.append(fault_linestyle)
 			if len(labels) == 0:
 				labels = ['Earthquakes']
-			labels.append('Faults')
+			labels.append(fault_label)
 			labels.extend(['_nolegend_'] * (len(intersection_lons) - 1))
 
 		if num_location_sigma:
