@@ -1085,6 +1085,10 @@ class LocalEarthquake(object):
 		:param add_popup:
 			see :meth:`to_folium_marker`
 
+		Note that default values are different, because this method is
+		meant for plotting single events, whereas :meth:`to_folium_marker`
+		may also be used to plot many events in 1 layer.
+
 		:return:
 			instance of :class:`folium.FeatureGroup`
 		"""
