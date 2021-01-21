@@ -5029,6 +5029,10 @@ class EQCatalog(object):
 			(default: '')
 		:param fault_dip:
 			float, fault dip (in degrees)
+			May also be negative. In combination with the relative azimuths of
+			faults and cros-section, the sign will determine the dip directions
+			(i.e., faults dipping in opposite directions need to have a difference
+			in strike of ~180°)
 			(default: 65)
 		:param min_fault_depth:
 			float, minimum depth to draw fault planes (in km)
@@ -5063,6 +5067,7 @@ class EQCatalog(object):
 			:func:`plotting.generic_mpl.plot_xy
 		"""
 		from plotting.generic_mpl import (plot_xy, show_or_save_plot)
+		from mapping.geotools.geodetic import spherical_distance
 
 		subcat = self.subselect_line(start_pt, end_pt, distance)
 
@@ -5071,6 +5076,9 @@ class EQCatalog(object):
 		datasets = [(distances, depths)]
 
 		xmin = kwargs.pop('xmin', 0)
+		max_distance = spherical_distance(start_pt[0], start_pt[1],
+													end_pt[0], end_pt[1]) / 1000.
+		xmax = kwargs.pop('xmax', max_distance)
 		yscaling = kwargs.pop('yscaling', '-lin')
 		ymax = kwargs.pop('ymax', 0)
 		xlabel = kwargs.pop('xlabel', 'Distance (km)')
@@ -5097,7 +5105,6 @@ class EQCatalog(object):
 		## Plot faults
 		if fault_gis_file:
 			import mapping.layeredbasemap as lbm
-			from mapping.geotools.geodetic import spherical_distance
 
 			xsection = lbm.LineData([start_pt[0], end_pt[0]],
 											[start_pt[1], end_pt[1]])
@@ -5155,7 +5162,7 @@ class EQCatalog(object):
 						marker_edge_widths=marker_edge_widths,
 						linestyles=linestyles, linewidths=linewidths, colors=colors,
 						xlabel=xlabel, ylabel=ylabel,
-						xmin=xmin, ymax=ymax, yscaling=yscaling,
+						xmin=xmin, xmax=xmax, ymax=ymax, yscaling=yscaling,
 						**kwargs)
 
 		## Plot location uncertainties
