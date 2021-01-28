@@ -388,7 +388,7 @@ class WarningCenter():
 		else:
 			msg = "%s\n\n" % MSG_FIELDS['title'][lang]
 
-		msg += "ML: %.1f\n" % eq.ML
+		msg += "ML: %.1f +/- %.1f\n" % (eq.ML, eq.errM)
 
 		if msg_type == 'email':
 			event_type_name = eqcatalog.get_earthquake_type(eq.event_type, lang)
