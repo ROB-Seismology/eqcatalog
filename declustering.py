@@ -443,6 +443,19 @@ class Cluster():
 		depths = self.get_depths()
 		return eq.hypocentral_distance((lons, lats, depths))
 
+	def get_location_errors(self):
+		"""
+		:return:
+			array containing location errors (in km)
+		"""
+		err = np.array([eq.errh for eq in self])
+		if self.distance_metric == "hypocentral":
+			errz = np.array([eq.errz for eq in self])
+			idxs = ~np.isnan(errz)
+			err[idxs] = np.sqrt(err[idxs]**2 + errz[idxs]**2)
+
+		return err
+
 	@property
 	def lon(self):
 		"""
@@ -757,7 +770,7 @@ class Cluster():
 		end_datetimes = self.get_end_of_time_windows(dc_window)
 		return ((datetimes <= eq.datetime) & (eq.datetime <= end_datetimes))
 
-	def is_in_dist_window(self, eq, dc_window):
+	def is_in_dist_window(self, eq, dc_window, ignore_location_errors=True):
 		"""
 		Determine whether a particular earthquake is in the distance window
 		of any of the events in the cluster.
@@ -777,9 +790,24 @@ class Cluster():
 			distances = eq.hypocentral_distance((lons, lats, depths))
 		else:
 			distances = eq.epicentral_distance((lons, lats))
+
+		if not ignore_location_errors:
+			if not np.isnan(eq.errh):
+				err = eq.errh
+				if self.distance_metric == "hypocentral":
+					if not np.isnan(eq.errz):
+						err = np.sqrt(err**2 + eq.errz**2)
+				distances -= err
+
+			err = self.get_location_errors()
+			idxs = ~np.isnan(err)
+			distances[idxs] -= err
+
+		distances = np.maximum(0, distances)
+
 		return (distances <= distance_limits)
 
-	def is_in_window(self, eq, dc_window):
+	def is_in_window(self, eq, dc_window, ignore_location_errors=True):
 		"""
 		Determine whether a particular earthquake is in the time and
 		distance window of any of the events in the cluster.
@@ -795,7 +823,8 @@ class Cluster():
 		#		& self.is_in_dist_window(eq, dc_window)).any()
 		in_t_window = self.is_in_time_window(eq, dc_window)
 		subcluster = self.__getitem__(in_t_window)
-		in_d_window = subcluster.is_in_dist_window(eq, dc_window)
+		in_d_window = subcluster.is_in_dist_window(eq, dc_window,
+															ignore_location_errors)
 		in_window = in_t_window
 		in_window[in_t_window] &= in_d_window
 		return in_window.any()
@@ -1562,7 +1591,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 						& (datetimes <= (main_datetime + t_window)))
 		return in_t_window
 
-	def is_in_dist_window(self, main_event, main_mag, catalog, dc_window):
+	def is_in_dist_window(self, main_event, main_mag, catalog, dc_window,
+								ignore_location_errors=True):
 		"""
 		Determine if catalog events are in distance window of main event
 
@@ -1571,6 +1601,10 @@ class LinkedWindowMethod(DeclusteringMethod):
 		:param catalog:
 		:param dc_window:
 			see :meth:`is_in_time_window`
+		:param ignore_location_errors:
+			bool, whether location errors should be ignored or
+			subtracted from the distance between event 1 and event 2
+			(default: True)
 
 		:return:
 			bool array
@@ -1584,13 +1618,32 @@ class LinkedWindowMethod(DeclusteringMethod):
 		## Create distance window index
 		if self.distance_metric == "hypocentral":
 			depths = catalog.get_depths()
-			in_d_window = (main_event.hypocentral_distance((lons, lats, depths))
-							<= d_window)
+			distances = main_event.hypocentral_distance((lons, lats, depths))
 		else:
-			in_d_window = main_event.epicentral_distance((lons, lats)) <= d_window
-		return in_d_window
+			distances = main_event.epicentral_distance((lons, lats))
 
-	def is_in_window(self, main_event, main_mag, catalog, dc_window):
+		if not ignore_location_errors:
+			if not np.isnan(main_event.errh):
+				err = main_event.errh
+				if self.distance_metric == "hypocentral":
+					if not np.isnan(main_event.errz):
+						err = np.sqrt(err**2 + main_event.errz**2)
+				distances -= err
+
+			err = np.array([eq.errh for eq in catalog])
+			if self.distance_metric == "hypocentral":
+				errz = np.array([eq.errz for eq in catalog])
+				idxs = ~np.isnan(errz)
+				err[idxs] = np.sqrt(err[idxs]**2 + errz[idxs]**2)
+			idxs = ~np.isnan(err)
+			distances[idxs] -= err[idxs]
+
+			distances = np.maximum(0, distances)
+
+		return (distances <= d_window)
+
+	def is_in_window(self, main_event, main_mag, catalog, dc_window,
+							ignore_location_errors=True):
 		"""
 		Determine if catalog events are in time and distance window
 		of main event
@@ -1600,6 +1653,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 		:param catalog:
 		:param dc_window:
 			see :meth:`is_in_time_window`
+		:param ignore_location_errors:
+			see :meth:`is_in_dist_window`
 
 		:return:
 			bool array
@@ -1607,20 +1662,23 @@ class LinkedWindowMethod(DeclusteringMethod):
 		in_t_window = self.is_in_time_window(main_event, main_mag, catalog, dc_window)
 		#in_d_window = self.is_in_dist_window(main_event, main_mag, catalog, dc_window)
 		#in_window = (in_t_window & in_d_window)
-		in_d_window = self.is_in_dist_window(main_event, main_mag, catalog[in_t_window],
-											dc_window)
+		in_d_window = self.is_in_dist_window(main_event, main_mag,
+											catalog[in_t_window], dc_window,
+											ignore_location_errors=ignore_location_errors)
 		in_window = in_t_window
 		in_window[in_t_window] &= in_d_window
 
 		return in_window
 
-	def _find_aftershocks(self, main_event, catalog, dc_window, Mrelation):
+	def _find_aftershocks(self, main_event, catalog, dc_window, Mrelation,
+								ignore_location_errors=True):
 		"""
 		Re-entrant function used in :meth:`get_aftershocks`
 		"""
 		Mrelation = Mrelation or catalog.default_Mrelations.get('MW', {})
 		main_mag = main_event.get_MW(Mrelation)
-		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
+		in_window = self.is_in_window(main_event, main_mag, catalog, dc_window,
+											ignore_location_errors=ignore_location_errors)
 		time_deltas = catalog.get_datetimes() - main_event.datetime
 		is_later = time_deltas > np.timedelta64(0, 's')
 
@@ -1634,14 +1692,16 @@ class LinkedWindowMethod(DeclusteringMethod):
 				if np.sum(is_later):
 					after_aftershocks = self._find_aftershocks(eq,
 														remaining_catalog[is_later],
-														dc_window, Mrelation)
+														dc_window, Mrelation,
+														ignore_location_errors)
 				for aas in after_aftershocks:
 					if not aas in after_aftershock_list:
 						after_aftershock_list.append(aas)
 
 		return aftershock_list + after_aftershock_list
 
-	def get_aftershocks(self, main_event, catalog, dc_window, Mrelation):
+	def get_aftershocks(self, main_event, catalog, dc_window, Mrelation,
+							ignore_location_errors=True):
 		"""
 		Extract aftershocks of given main event from earthquake catalog
 		It is not necessary that the main event is in the catalog.
@@ -1656,7 +1716,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 			instance of :class:`EQCatalog` containing aftershocks
 		"""
 		# TODO: catalog name, start and end date
-		aftershocks = self._find_aftershocks(main_event, catalog, dc_window, Mrelation)
+		aftershocks = self._find_aftershocks(main_event, catalog, dc_window, Mrelation,
+													ignore_location_errors=ignore_location_errors)
 		if len(aftershocks):
 			return EQCatalog(aftershocks, name=catalog.name + ' (aftershocks)',
 						default_Mrelations={'MW': Mrelation},
@@ -1668,7 +1729,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 		#subcat = catalog[:mainshock_idx + 1]
 		raise NotImplementedError
 
-	def analyze_clusters(self, catalog, dc_window, Mrelation, verbose=False):
+	def analyze_clusters(self, catalog, dc_window, Mrelation,
+							ignore_location_errors=True, verbose=False):
 		"""
 		Full analysis of individual clusters in earthquake catalog.
 
@@ -1678,6 +1740,10 @@ class LinkedWindowMethod(DeclusteringMethod):
 			instance of :class:`DeclusteringWindow`
 		:param Mrelation:
 			dict specifying how to convert catalog magnitudes to MW
+		:param ignore_location_errors:
+			bool, whether location errors should be ignored or
+			subtracted from the distance between event 1 and event 2
+			(default: True)
 		:param verbose:
 			bool, whether or not to print progress information
 
@@ -1717,7 +1783,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 					## Out of time window, proceed to next event i
 					break
 				else:
-					if clust.is_in_window(eqj, dc_window):
+					if clust.is_in_window(eqj, dc_window,
+										ignore_location_errors=ignore_location_errors):
 						## Cluster declared
 						if dc_idxs[i] == -1 and dc_idxs[j] == -1:
 							## Initialize new cluster
@@ -1755,7 +1822,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 
 		return DeclusteringResult(catalog, dc_idxs, Mrelation, self.distance_metric)
 
-	def decluster_catalog(self, catalog, dc_window, Mrelation):
+	def decluster_catalog(self, catalog, dc_window, Mrelation,
+								ignore_location_errors=True):
 		"""
 		Decluster catalog quickly, without identifying individual clusters.
 		This implementation catches aftershocks of aftershocks,
@@ -1770,6 +1838,10 @@ class LinkedWindowMethod(DeclusteringMethod):
 			instance of :class:`DeclusteringWindow`
 		:param Mrelation:
 			dict specifying how to convert catalog magnitudes to MW
+		:param ignore_location_errors:
+			bool, whether location errors should be ignored or
+			subtracted from the distance between event 1 and event 2
+			(default: True)
 
 		:return:
 			instance of :class:`EQCatalog`, declustered catalog
@@ -1800,7 +1872,8 @@ class LinkedWindowMethod(DeclusteringMethod):
 				main_event = catalog[i]
 				is_clustered = not dc_idxs[i]
 				## Find aftershocks of event i in catalog
-				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window)
+				in_window = self.is_in_window(main_event, main_mag, catalog, dc_window,
+										ignore_location_errors=ignore_location_errors)
 				## Mark smaller afterschocks as clustered in declustering index
 				## Larger aftershocks are not yet marked, as one of them will
 				## turn out to be the mainshock
@@ -1928,6 +2001,7 @@ class ReasenbergMethod(DeclusteringMethod):
 		:param ignore_location_errors:
 			bool, whether location errors should be ignored or
 			subtracted from the distance between event 1 and event 2
+			(default: True)
 
 		:return:
 			bool
