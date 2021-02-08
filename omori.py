@@ -390,7 +390,10 @@ class OmoriLaw(object):
 
 	def plot_cumulative(self, delta_t, observed_delta_t=None, observed_N=None,
 							label='', color='b', linestyle='-', linewidth=1,
-							marker='', **kwargs):
+							marker='', marker_size=8,
+							observed_marker='x', observed_marker_sizes=8,
+							observed_cluster_idxs=None, observed_cluster_colors=None,
+							observed_label='Observed', **kwargs):
 		"""
 		Plot cumulative number of aftershocks versus elapsed time
 
@@ -417,9 +420,27 @@ class OmoriLaw(object):
 			float, linewidth to use for plot of predicted values
 			(default: 1)
 		:param marker:
-			str, matplotlib marker spec, marker symbol to use for plot of
-			predicted values
+			str, matplotlib marker spec, marker symbol to use for predicted values
 			(default: '')
+		:param marker_size:
+			float, marker size (in points) if :param:`marker` is set
+			(default: 8)
+		:param observed_marker:
+			str, matplotlib marker spec, marker symbol to use for observed values
+			(default: 'x')
+		:param observed_marker_sizes:
+			float or list, marker size(s) for observed values
+			(default: 8)
+		:param observed_cluster_idxs:
+			list of ints, cluster indexes for observed values, used to assign
+			different colors
+			(default: None)
+		:param observed_cluster_colors:
+			list of matplotlib color specs, colors to use for different clusters
+			(default: None, will choose random colors)
+		:param observed_label:
+			str, label to use for observed values
+			(default: 'Observed')
 		:kwargs:
 			additional keyword arguments understood by :func:`generic_mpl.plot_xy`
 
@@ -434,16 +455,30 @@ class OmoriLaw(object):
 		colors = [color]
 		linestyles = [linestyle]
 		markers = [marker]
+		marker_sizes = [marker_size]
 		if observed_delta_t is not None:
 			if observed_N is None:
 				observed_N = np.arange(len(observed_delta_t)) + 1
 			datasets.append((observed_delta_t, observed_N))
 			if label in (None, ''):
 				labels = ['Omori law']
-			labels.append('Observed')
-			colors.append('r')
+			labels.append(observed_label)
+			if observed_cluster_idxs is None:
+				colors.append('r')
+			else:
+				unique_cluster_idxs = sorted(np.unique(observed_cluster_idxs))
+				num_clusters = len(unique_cluster_idxs)
+				if observed_cluster_colors is None:
+					from matplotlib.colors import CSS4_COLORS
+					CSS4_COLORS = list(CSS4_COLORS.values())
+					random_color_idxs = np.random.choice(len(CSS4_COLORS),
+																num_clusters, replace=False)
+					observed_cluster_colors = [CSS4_COLORS[idx] for idx in random_color_idxs]
+				color_idxs = [unique_cluster_idxs.index(ID) for ID in observed_cluster_idxs]
+				colors.append([observed_cluster_colors[idx] for idx in color_idxs])
 			linestyles.append('')
-			markers.append('x')
+			markers.append(observed_marker)
+			marker_sizes.append(observed_marker_sizes)
 
 		if not 'xlabel' in kwargs:
 			kwargs['xlabel'] = 'Time since mainshock (%s)' % self.time_unit
@@ -459,7 +494,8 @@ class OmoriLaw(object):
 			kwargs['ygrid'] = 1
 
 		return plot_xy(datasets, labels=labels, colors=colors,
-						linestyles=linestyles, markers=markers, **kwargs)
+						linestyles=linestyles, markers=markers,
+						marker_sizes=marker_sizes, **kwargs)
 
 	def to_gr_omori_law(self, b):
 		"""
