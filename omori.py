@@ -461,7 +461,7 @@ class OmoriLaw(object):
 				observed_N = np.arange(len(observed_delta_t)) + 1
 			datasets.append((observed_delta_t, observed_N))
 			if label in (None, ''):
-				labels = ['Omori law']
+				labels = ['Omori fit ($M_c=%.1f$)' % self.Mc]
 			labels.append(observed_label)
 			if observed_cluster_idxs is None:
 				colors.append('r')
