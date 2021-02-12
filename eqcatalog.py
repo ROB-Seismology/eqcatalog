@@ -1696,32 +1696,12 @@ class EQCatalog(object):
 		:return:
 			instance of :class:`EQCatalog`
 		"""
-		import mapping.geotools.geodetic as geodetic
-		from mapping.layeredbasemap import PolygonData
+		from mapping.geotools.pt_along_line import construct_line_buffer
 
-		## Note: we don't use a buffer, as this would also include a region
-		## left and right of the endpoints
-		lon1, lat1 = start_pt[:2]
-		lon2, lat2 = end_pt[:2]
-		line_az = geodetic.spherical_azimuth(lon1, lat1, lon2, lat2)
-		pg_lons, pg_lats = [], []
 		distance *= 1000
-		lons, lats = geodetic.spherical_point_at(np.array([lon1, lon2]),
-								np.array([lat1, lat2]), distance, line_az - 90)
-		pg_lons.extend(lons)
-		pg_lats.extend(lats)
-		pg_lons.append(lon2)
-		pg_lats.append(lat2)
-		lons, lats = geodetic.spherical_point_at(np.array([lon2, lon1]),
-								np.array([lat2, lat1]), distance, line_az + 90)
-		pg_lons.extend(lons)
-		pg_lats.extend(lats)
-		pg_lons.append(lon1)
-		pg_lats.append(lat1)
-		pg_lons.append(pg_lons[0])
-		pg_lats.append(pg_lats[0])
-
-		pg = PolygonData(pg_lons, pg_lats)
+		line_lons = np.array([start_pt[0],end_pt[0]])
+		line_lats = np.array([start_pt[1], end_pt[1]])
+		pg = construct_line_buffer(line_lons, line_lats, distance)
 
 		if not catalog_name:
 			catalog_name = self.name + " (along line)"
