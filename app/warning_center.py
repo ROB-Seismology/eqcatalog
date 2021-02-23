@@ -388,7 +388,7 @@ class WarningCenter():
 		else:
 			msg = "%s\n\n" % MSG_FIELDS['title'][lang]
 
-		errM = eq.errM if not np.isnan(eq.Merr) else 0.3
+		errM = eq.errM if not np.isnan(eq.errM) else 0.3
 		msg += "ML: %.1f +/- %.1f\n" % (eq.ML, errM)
 
 		if msg_type == 'email':
