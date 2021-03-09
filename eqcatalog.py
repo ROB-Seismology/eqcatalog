@@ -4736,12 +4736,12 @@ class EQCatalog(object):
 			catalog_style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
 
 		# TODO: color by depth
-		#values['depth'] = self.get_depths()
+		values['depth'] = self.get_depths()
 		#colorbar_style = lbm.ColorbarStyle(title="Depth (km)", location="bottom", format="%d")
 		#style.fill_color = lbm.ThematicStyleRanges([0,1,10,25,50], ['red', 'orange', 'yellow', 'green'], value_key="depth", colorbar_style=colorbar_style)
 
 		# TODO: color by age
-		#values['year'] = self.get_fractional_years()
+		values['year'] = self.get_fractional_years()
 		#style.fill_color = lbm.ThematicStyleRanges([1350,1910,2050], ['green', (1,1,1,0)], value_key="year")
 
 		point_data = lbm.MultiPointData(self.get_longitudes(), self.get_latitudes(),
