@@ -684,12 +684,12 @@ def plot_map(catalogs,
 				style.size = lbm.ThematicStyleGradient(mags, sizes, value_key="magnitude")
 
 			# TODO: color by depth
-			#values['depth'] = catalog.get_depths()
+			values['depth'] = catalog.get_depths()
 			#colorbar_style = ColorbarStyle(title="Depth (km)", location="bottom", format="%d")
 			#style.fill_color = ThematicStyleRanges([0,1,10,25,50], ['red', 'orange', 'yellow', 'green'], value_key="depth", colorbar_style=colorbar_style)
 
 			# TODO: color by age
-			#values['year'] = catalog.get_fractional_years()
+			values['year'] = catalog.get_fractional_years()
 			#style.fill_color = ThematicStyleRanges([1350,1910,2050], ['green', (1,1,1,0)], value_key="year")
 
 			point_data = lbm.MultiPointData(catalog.get_longitudes(), catalog.get_latitudes(), values=values)
