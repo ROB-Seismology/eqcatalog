@@ -1551,7 +1551,7 @@ def zip2ID(zip_code):
 	return id_com
 
 
-def get_communes(country='BE', main_communes=False, id_com=None):
+def get_communes_legacy(country='BE', main_communes=False, id_com=None):
 	"""
 	Fetch communes from database
 
@@ -1583,7 +1583,7 @@ def get_communes(country='BE', main_communes=False, id_com=None):
 	return query_seismodb_table(table_clause, where_clause=where_clause)
 
 
-def get_subcommunes(id_main):
+def get_subcommunes_legacy(id_main):
 	"""
 	Return subcommune records for particular main commune
 
@@ -1596,6 +1596,115 @@ def get_subcommunes(id_main):
 	table_clause = 'communes'
 	where_clause = 'id_main = %d' %  id_main
 	return query_seismodb_table(table_clause, where_clause=where_clause)
+
+
+def get_communes(country='BE', main_communes=False, id_com=None, verbose=False):
+	"""
+	More powerful version of :func:`get_communes_legacy` to fetch communes from
+	the database, but overriding the lon/lat coordinates with those from the
+	com_zip_XX tables
+
+	:param country:
+		2-char string, country code
+		(default: 'BE')
+	:param main_communes:
+		bool, whether or not to get main communes only
+		(default: False)
+	:param id_com:
+		int, str or list: commune ID(s),
+		mutually exclusive with :param:`main_communes`
+		(default: None)
+	:param verbose:
+		bool, whether or not to print the SQL query
+		(default: False)
+
+	:return:
+		list of dicts
+	"""
+	if isinstance(id_com, (int, np.integer, basestring)):
+		id_com = [id_com]
+
+	table_clause = 'communes'
+	column_clause = ['communes.id', 'id_main', 'code_p', 'id_province', 'border_ref',
+						'IF(com_zip.latitude, com_zip.latitude, communes.latitude) as latitude',
+						'IF(com_zip.longitude, com_zip.longitude, communes.longitude) as longitude',
+						'language', 'country', 'name']
+	where_clause = []
+	if country:
+		where_clause += ['country = "%s"' % country]
+		com_zip_table = 'com_zip_%s' % country
+		if country in ('BE', 'LU'):
+			com_zip_table += '_fr'
+		join_clause = [('LEFT JOIN', '%s as com_zip' % com_zip_table,
+						'communes.id = com_zip.id_com AND communes.code_p = com_zip.zip')]
+		#column_clause.remove('longitude')
+		#column_clause.remove('latitude')
+		#column_clause.append('%s.longitude as longitude' % com_zip_table)
+		#column_clause.append('%s.latitude as latitude' % com_zip_table)
+	else:
+		join_clause = [('LEFT JOIN',
+							'(SELECT id_com, zip, city, longitude, latitude FROM com_zip_BE_fr '
+							'UNION '
+							'SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_DE '
+							'UNION '
+							'SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_FR '
+							'UNION '
+							'SELECT id_com, zip, city, longitude, latitude FROM com_zip_GB '
+							'UNION '
+							'SELECT id_com, zip, city, longitude, latitude FROM com_zip_LU_fr '
+							'UNION '
+							'SELECT id_com, zip, city, longitude, latitude FROM com_zip_NL) '
+							'AS com_zip',
+							'communes.id = com_zip.id_com AND communes.code_p = com_zip.zip')]
+	if not (id_com is None or id_com in ([], '')):
+		where_clause += ['communes.id in (%s)' % ",".join([str(item) for item in id_com])]
+	elif main_communes:
+		where_clause += ['communes.id = id_main']
+
+	return query_seismodb_table(table_clause, column_clause,
+									where_clause=where_clause, join_clause=join_clause,
+									verbose=verbose)
+
+
+def get_subcommune_ids(id_main, country='BE', verbose=False):
+	"""
+	Return subcommune IDs for particular main commune
+
+	:param id_main:
+		int, main commune ID
+	:param country:
+		2-char string, country code
+		(default: 'BE')
+	:param verbose:
+		bool, whether or not to print the SQL query
+		(default: False)
+
+	:return:
+		list of ints
+	"""
+	column_clause = ['id']
+	table_clause = 'communes'
+	where_clause = 'id_main = %d AND country = "%s"' % (id_main, country)
+	recs = query_seismodb_table(table_clause, where_clause=where_clause,
+										verbose=verbose)
+	return [rec['id'] for rec in recs]
+
+
+def get_subcommunes(id_main, country='BE', verbose=False):
+	"""
+	Return subcommune records for particular main commune
+
+	:param id_main:
+	:param country:
+	:param verbose
+		see :func:`get_subcommune_ids`
+
+	:return:
+		list of dicts
+	"""
+	subcommune_ids = get_subcommune_ids(id_main, country=country)
+
+	return get_communes(country=country, id_com=subcommune_ids, verbose=verbose)
 
 
 
