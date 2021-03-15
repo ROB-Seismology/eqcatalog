@@ -54,7 +54,7 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"get_earthquakes_with_online_enquiries",
 			"query_stations", "get_station_coordinates",
 			"get_station_catalog", "query_phase_picks",
-			"zip2ID", "get_communes", "get_subcommunes"]
+			"zip2ID", "get_communes", "get_subcommunes", "get_subcommune_ids"]
 
 
 # Note: median is not supported by MySQL
@@ -669,8 +669,8 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 		'comment',
 		'macro_detail.id_com',
 		'communes.id_main',
-		'communes.longitude',
-		'communes.latitude']
+		'IF(com_zip.latitude, com_zip.latitude, communes.latitude) as latitude',
+		'IF(com_zip.longitude, com_zip.longitude, communes.longitude) as longitude']
 
 	if data_type == 'official':
 		column_clause += [
@@ -698,11 +698,15 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 			id_com_str = ','.join(['%s' % id for id in id_com])
 			where_clause += ' IN (%s)' % id_com_str
 	if data_type == 'historical':
-		where_clause += (' AND CONCAT(id_earth, id_com) NOT IN'
-						' (SELECT CONCAT(id_earth, id_com)'
+		where_clause += (' AND CONCAT(id_earth, macro_detail.id_com) NOT IN'
+						' (SELECT CONCAT(id_earth, macro_detail.id_com)'
 						' FROM macro_official_inquires)')
 
-	join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id')]
+	join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id'),
+						('LEFT JOIN',
+						_get_com_zip_table_clause(['BE']),
+						'communes.id = com_zip.id_com')]
+						# AND communes.code_p = com_zip.zip
 	if data_type == 'official':
 		join_clause.append(('RIGHT JOIN', 'macro_official_inquires',
 			'macro_detail.id_com = macro_official_inquires.id_com'
@@ -1598,6 +1602,33 @@ def get_subcommunes_legacy(id_main):
 	return query_seismodb_table(table_clause, where_clause=where_clause)
 
 
+def _get_com_zip_table_clause(countries=[]):
+	"""
+	"""
+	if len(countries) == 0:
+		countries = ['BE', 'DE', 'FR', 'LU', 'GB', 'NL']
+
+	sql = []
+	if 'BE' in countries:
+		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_BE_fr GROUP BY id_com')
+	if 'DE' in countries:
+		sql.append('SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_DE GROUP BY id_com')
+	if 'FR' in countries:
+		sql.append('SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_FR GROUP BY id_com')
+	if 'LU' in countries:
+		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_LU_fr GROUP BY id_com')
+	if 'GB' in countries:
+		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_GB GROUP BY id_com')
+	if 'NL' in countries:
+		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_NL GROUP BY id_com')
+
+	sql = ' UNION '.join(sql)
+
+	sql = '(%s) AS com_zip' % sql
+
+	return sql
+
+
 def get_communes(country='BE', main_communes=False, id_com=None, verbose=False):
 	"""
 	More powerful version of :func:`get_communes_legacy` to fetch communes from
@@ -1633,29 +1664,13 @@ def get_communes(country='BE', main_communes=False, id_com=None, verbose=False):
 	if country:
 		where_clause += ['country = "%s"' % country]
 		com_zip_table = 'com_zip_%s' % country
-		if country in ('BE', 'LU'):
-			com_zip_table += '_fr'
-		join_clause = [('LEFT JOIN', '%s as com_zip' % com_zip_table,
-						'communes.id = com_zip.id_com AND communes.code_p = com_zip.zip')]
-		#column_clause.remove('longitude')
-		#column_clause.remove('latitude')
-		#column_clause.append('%s.longitude as longitude' % com_zip_table)
-		#column_clause.append('%s.latitude as latitude' % com_zip_table)
+		countries = [country]
 	else:
-		join_clause = [('LEFT JOIN',
-							'(SELECT id_com, zip, city, longitude, latitude FROM com_zip_BE_fr '
-							'UNION '
-							'SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_DE '
-							'UNION '
-							'SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_FR '
-							'UNION '
-							'SELECT id_com, zip, city, longitude, latitude FROM com_zip_GB '
-							'UNION '
-							'SELECT id_com, zip, city, longitude, latitude FROM com_zip_LU_fr '
-							'UNION '
-							'SELECT id_com, zip, city, longitude, latitude FROM com_zip_NL) '
-							'AS com_zip',
-							'communes.id = com_zip.id_com AND communes.code_p = com_zip.zip')]
+		countries = []
+	join_clause = [('LEFT JOIN',
+						_get_com_zip_table_clause(countries),
+						'communes.id = com_zip.id_com')]
+						#  AND communes.code_p = com_zip.zip
 	if not (id_com is None or id_com in ([], '')):
 		where_clause += ['communes.id in (%s)' % ",".join([str(item) for item in id_com])]
 	elif main_communes:
@@ -1684,7 +1699,9 @@ def get_subcommune_ids(id_main, country='BE', verbose=False):
 	"""
 	column_clause = ['id']
 	table_clause = 'communes'
-	where_clause = 'id_main = %d AND country = "%s"' % (id_main, country)
+	where_clause = ['id_main = %d' % id_main]
+	if country:
+		where_clause.append('country = "%s"' % country)
 	recs = query_seismodb_table(table_clause, where_clause=where_clause,
 										verbose=verbose)
 	return [rec['id'] for rec in recs]
@@ -1702,9 +1719,27 @@ def get_subcommunes(id_main, country='BE', verbose=False):
 	:return:
 		list of dicts
 	"""
-	subcommune_ids = get_subcommune_ids(id_main, country=country)
+	if not country:
+		table_clause = 'communes'
+		column_clause = ['country']
+		where_clause = 'id = %d' %  id_main
+		try:
+			[rec] = query_seismodb_table(table_clause, where_clause=where_clause,
+												column_clause=column_clause,
+												verbose=verbose)
+		except:
+			raise
+		else:
+			country = rec['country']
 
-	return get_communes(country=country, id_com=subcommune_ids, verbose=verbose)
+	subcommune_ids = get_subcommune_ids(id_main, country=country,
+												verbose=verbose)
+
+	if subcommune_ids:
+		return get_communes(country=country, id_com=subcommune_ids,
+								verbose=verbose)
+	else:
+		return []
 
 
 
