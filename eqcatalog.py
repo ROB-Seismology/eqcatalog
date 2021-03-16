@@ -5009,6 +5009,7 @@ class EQCatalog(object):
 			(default: '')
 		:param fault_dip:
 			float, fault dip (in degrees)
+			or list
 			May also be negative. In combination with the relative azimuths of
 			faults and cros-section, the sign will determine the dip directions
 			(i.e., faults dipping in opposite directions need to have a difference
@@ -5082,6 +5083,9 @@ class EQCatalog(object):
 		else:
 			marker_sizes = [marker_size]
 
+		if len(labels) == 0:
+			labels = ['Earthquakes']
+
 		## Plot faults
 		if fault_gis_file:
 			import mapping.layeredbasemap as lbm
@@ -5094,6 +5098,11 @@ class EQCatalog(object):
 			fault_strikes = []
 			for flt_trace in fault_traces:
 				intersection = flt_trace.get_intersection(xsection)
+				if not intersection:
+					min_dist = flt_trace.get_min_distance(xsection) / 1000
+					if min_dist <= distance:
+						pt = flt_trace.get_nearest_point_to(xsection)
+						intersection = xsection.get_projected_point(pt)
 				if intersection:
 					## Note: we could also obtain fault dip from fault_trace.value
 					## if it is defined as a column in the GIS file
@@ -5107,27 +5116,30 @@ class EQCatalog(object):
 			daz = np.array(fault_strikes) -az0
 			daz[daz > 180] -= 360
 			## Compute apparent fault dips
-			apparent_dips = np.arctan(np.sin(np.radians(daz))
-											* np.tan(np.radians(fault_dip)))
-			## Convention: negative daz means dip is to the right
-			apparent_dips = -apparent_dips
-			## Compute distance along line
-			top_distances = spherical_distance(intersection_lons, intersection_lats,
-														start_pt[0], start_pt[1]) / 1000.
-			bottom_distances = top_distances + max_fault_depth / np.tan(apparent_dips)
-			for dtop, dbottom in zip(top_distances, bottom_distances):
-				datasets.append(([dtop, dbottom], [min_fault_depth, max_fault_depth]))
-				markers.append('')
-				marker_sizes.append(0)
-				marker_edge_colors.append('None')
-				marker_fill_colors.append('None')
-				colors.append(fault_color)
-				linewidths.append(fault_linewidth)
-				linestyles.append(fault_linestyle)
-			if len(labels) == 0:
-				labels = ['Earthquakes']
-			labels.append(fault_label)
-			labels.extend(['_nolegend_'] * (len(intersection_lons) - 1))
+			if np.isscalar(fault_dip):
+				fault_dips = [fault_dip]
+			else:
+				fault_dips = fault_dip
+			for fault_dip in fault_dips:
+				labels.append(fault_label + ' (%d°)' % fault_dip)
+				apparent_dips = np.arctan(np.sin(np.radians(daz))
+												* np.tan(np.radians(fault_dip)))
+				## Convention: negative daz means dip is to the right
+				apparent_dips = -apparent_dips
+				## Compute distance along line
+				top_distances = spherical_distance(intersection_lons, intersection_lats,
+															start_pt[0], start_pt[1]) / 1000.
+				bottom_distances = top_distances + max_fault_depth / np.tan(apparent_dips)
+				for dtop, dbottom in zip(top_distances, bottom_distances):
+					datasets.append(([dtop, dbottom], [min_fault_depth, max_fault_depth]))
+					markers.append('')
+					marker_sizes.append(0)
+					marker_edge_colors.append('None')
+					marker_fill_colors.append('None')
+					colors.append(fault_color)
+					linewidths.append(fault_linewidth)
+					linestyles.append(fault_linestyle)
+				labels.extend(['_nolegend_'] * (len(intersection_lons) - 1))
 
 		if num_location_sigma:
 			fig_filespec = kwargs.pop('fig_filespec', None)
