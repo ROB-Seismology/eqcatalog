@@ -680,19 +680,20 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		:return:
 			dict, mapping comm_key values to database records (dicts)
 		"""
-		from ..rob.seismodb import query_seismodb_table
+		from ..rob.seismodb import query_seismodb_table, get_communes
 		from difflib import SequenceMatcher as SM
 
 		if comm_key in ("id_com", "id_main"):
 			if comm_key == "id_main" and not hasattr(self, "id_main"):
 				self.set_main_commune_ids()
 			unique_ids = sorted(set(self.get_prop_values(comm_key)))
-			table_clause = ['communes']
-			column_clause = ['*']
-			query_values = ','.join(map(str, unique_ids))
-			where_clause = 'id in (%s)' % query_values
-			comm_recs = query_seismodb_table(table_clause, column_clause,
-								where_clause=where_clause, verbose=verbose)
+			comm_recs = get_communes(country='', id_com=unique_ids, verbose=verbose)
+			#table_clause = ['communes']
+			#column_clause = ['*']
+			#query_values = ','.join(map(str, unique_ids))
+			#where_clause = 'id in (%s)' % query_values
+			#comm_recs = query_seismodb_table(table_clause, column_clause,
+			#					where_clause=where_clause, verbose=verbose)
 			comm_rec_dict = {rec['id']: rec for rec in comm_recs}
 		elif comm_key == "zip":
 			comm_rec_dict = {}
