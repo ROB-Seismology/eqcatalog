@@ -660,8 +660,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		copyright_layer = lbm.MapLayer(text_data, text_style)
 		layers.append(copyright_layer)
 
-	label_style = lbm.TextStyle(font_size=10)
-	legend_style = lbm.LegendStyle(location=1, label_style=label_style)
+	label_style = lbm.TextStyle(font_size=9)
+	legend_style = lbm.LegendStyle(location=1, label_style=label_style, alpha=1)
 	if graticule_interval:
 		graticule_style = lbm.GraticuleStyle()
 	else:
