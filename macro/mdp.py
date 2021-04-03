@@ -1266,6 +1266,75 @@ class MDPCollection():
 		return AggregatedMacroInfoCollection(macro_info_list, agg_type, data_type,
 											proc_info=proc_info)
 
+	def aggregate(self, aggregate_by='id_com',Imin_or_max='mean',
+					agg_function='mean', min_num_mdp=1, **kwargs):
+		"""
+		Generic aggregation function, wrapper for aggregate_by_ methods.
+
+		:param aggregate_by:
+			str, type of aggregation, specifying how macroseismic data
+			should be aggregated, one of:
+			- 'id_com' or 'commune'
+			- 'id_main' or 'main commune'
+			- 'grid_X' (where X is grid spacing in km)
+			- None or '' (= no aggregation, i.e. info is returned for
+			  all replies individually)
+			- 'polygon': requires 'poly_data' and 'value_key' kwargs,
+				and optionally 'include_unmatched_polygons'
+			- 'distance': requires 'ref_pt' and 'distance_interval' kwargs
+			(default: 'id_com')
+		:param Imin_or_max:
+		:param agg_function:
+			see :meth:`get_aggregated_intensity`
+
+		:**kwargs:
+			additional keyword arguments required by some aggregation
+			methods
+
+		:return:
+			instance of :class:`AggregatedMacroInfoCollection`
+		"""
+		if aggregate_by == 'commune':
+			aggregate_by = 'id_com'
+		elif aggregate_by == 'main commune':
+			aggregate_by = 'id_main'
+
+		if aggregate_by in ('id_com', 'id_main'):
+			return self.aggregate_by_property(aggregate_by, Imin_or_max,
+											agg_function, min_num_mdp=min_num_mdp)
+
+		elif not aggregate_by:
+			return self.aggregate_by_nothing(Imin_or_max)
+
+		elif aggregate_by[:4] == 'grid':
+			if '_' in aggregate_by:
+				_, grid_spacing = aggregate_by.split('_')
+				grid_spacing = float(grid_spacing)
+			else:
+				grid_spacing = 5
+			srs = kwargs.get('srs', 'LAMBERT1972')
+			return self.aggregate_by_grid_cells(grid_spacing, Imin_or_max,
+												agg_function, srs=srs,
+												min_num_mdp=min_num_mdp)
+
+		elif aggregate_by == 'polygon':
+			poly_data, value_key = kwargs['poly_data'], kwargs['value_key']
+			include_unmatched_polygons = kwargs.get('include_unmatched_polygons',
+													False)
+			return self.aggregate_by_polygon_data(poly_data, value_key, Imin_or_max,
+												agg_function, min_num_mdp=min_num_mdp,
+												include_unmatched_polygons=include_unmatched_polygons)
+
+		elif aggregate_by == 'distance':
+			ref_pt = kwargs['ref_pt']
+			distance_interval = kwargs['distance_interval']
+			distance_method = kwargs.get('distance_method', 'spherical')
+			create_polygons = kwargs.get('create_polygons', True)
+			return self.aggregate_by_distance(ref_pt, distance_interval, Imin_or_max,
+											agg_function, min_num_mdp=min_num_mdp,
+											create_polygons=create_polygons,
+											distance_method=distance_method)
+
 	def estimate_intensity_attenuation(self, ref_pt, independent_var='distance',
 									Imin_or_max='mean', bin_interval='default',
 									bin_func='mean', bin_min_num_mdp=3,
