@@ -37,7 +37,6 @@ import eqcatalog
 
 
 #TODO:
-# - administrative boundaries for DE / NL / LU / FR
 # - more command-line options
 
 
@@ -52,8 +51,8 @@ MIN_FIABILITY = 80
 ## Command-line options
 parser = argparse.ArgumentParser(description="ROB macroseismic map generator")
 
-parser.add_argument("--id_earth", help="Force creating maps for given earthquake ID",
-					nargs=1, type=int)
+parser.add_argument("--id_earth", help="Force creating maps for given earthquake ID / all / missing",
+					nargs=1)
 parser.add_argument("--data_type", help="Type of macroseismic data",
 					choices=["dyfi", "official", "historical", "traditional"],
 					default="dyfi")
@@ -92,7 +91,21 @@ args = parser.parse_args()
 
 
 ## Retrieve earthquakes
-if args.id_earth:
+if args.id_earth in (['all'], ['missing']):
+	if args.data_type == 'dyfi':
+		start_date = 2000
+	else:
+		start_date = 1000
+	catalog = eqcatalog.rob.query_local_eq_catalog(start_date=start_date)
+	if args.data_type == 'dyfi':
+		catalog = eqcatalog.rob.seismodb.get_earthquakes_with_online_enquiries()
+	else:
+		catalog = eqcatalog.rob.seismodb.get_earthquakes_with_traditional_enquiries()
+	if args.id_earth == ['all']:
+		overwrite_map = True
+	else:
+		overwrite_map = False
+elif args.id_earth:
 	catalog = eqcatalog.rob.query_local_eq_catalog_by_id(args.id_earth)
 	overwrite_map = True
 else:
@@ -104,14 +117,15 @@ for eq in catalog:
 	id_earth = eq.ID
 	## Fetch macroseismic enquiries for event
 	if args.verbose:
-		print("Getting data for event #%d" % id_earth)
+		print("Getting data for event #%s" % id_earth)
 	if args.data_type == "dyfi":
 		macro_data = eq.get_online_macro_enquiries(min_fiability=MIN_FIABILITY)
 	else:
-		macro_data = eq.get_aggregated_traditional_macro_info(data_type=args.data_type,
-							aggregate_by=args.aggregate_by or "commune",
-							agg_method=args.agg_method, min_fiability=MIN_FIABILITY)
+		macro_data = eq.get_traditional_macro_info(data_type=args.data_type,
+												min_fiability=MIN_FIABILITY)
 		args.min_num_replies = 1
+	if args.verbose:
+		print('N = %d' % len(macro_data))
 
 	if len(macro_data) >= args.min_num_replies:
 		if args.data_type == "dyfi":
@@ -124,7 +138,13 @@ for eq in catalog:
 		else:
 			# TODO
 			maxlastmod = np.datetime64('now')
-		minlon, maxlon, minlat, maxlat = macro_data.get_region()
+
+		try:
+			minlon, maxlon, minlat, maxlat = macro_data.get_region()
+		except:
+			## No valid data
+			print('No valid locations found for event #%s' % id_earth)
+			continue
 
 		if args.verbose:
 			print("id_earth = %i | ML=%.1f | %s " % (id_earth, eq.ML, eq.name))
@@ -156,20 +176,23 @@ for eq in catalog:
 			if args.verbose:
 				print("Creating maps!")
 
-			## Aggregate DYFI
+			## Aggregate
 			if args.data_type == "dyfi":
 				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by,
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
 					min_replies=args.min_num_replies, min_fiability=MIN_FIABILITY,
-					fix_records=False, include_other_felt=True,
-					include_heavy_appliance=False, remove_outliers=2.0)
-				if args.verbose and len(macro_info):
-					print('Imin/max: %.1f/%.1f' % macro_info.Iminmax())
+					fix_commune_ids=False, fix_felt=False, remove_duplicates=False,
+					include_other_felt=True, include_heavy_appliance=False,
+					remove_outliers=2.0)
 			else:
-				macro_info = macro_data
+				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by or "commune",
+												agg_function=args.agg_method)
 
 			if not(len(macro_info)):
 				continue
+
+			if args.verbose and len(macro_info):
+				print('Imin/max: %.1f/%.1f' % macro_info.Iminmax())
 
 			minlon, maxlon, minlat, maxlat = macro_info.get_region()
 
@@ -188,8 +211,11 @@ for eq in catalog:
 			cmap = args.cmap
 			color_gradient = args.color_gradient
 			colorbar_style = "default"
-			event_style = lbm.PointStyle(shape=args.epicenter_marker, size=14,
-										fill_color='magenta', line_color='k')
+			label_style = lbm.TextStyle(font_size=9, vertical_alignment="top",
+												horizontal_alignment='center', offset=(0, -5))
+			event_style = lbm.PointStyle(shape=args.epicenter_marker, size=12,
+										fill_color='magenta', line_color='k',
+										label_style=label_style)
 			country_style = "default"
 			admin_style = lbm.LineStyle(line_width=0.5)
 			if args.show_main_cities:
@@ -219,10 +245,12 @@ for eq in catalog:
 						region = [minlon-1, maxlon+1, minlat-.5, maxlat+.5]
 						## Ensure epicenter is inside map if marker is specified
 						if args.epicenter_marker:
-							region[0] = min(region[0], eq.lon)
-							region[1] = max(region[1], eq.lon)
-							region[2] = min(region[2], eq.lat)
-							region[3] = max(region[3], eq.lat)
+							dlon = region[1] - region[0]
+							dlat = region[3] - region[2]
+							region[0] = min(region[0], eq.lon - dlon/5.)
+							region[1] = max(region[1], eq.lon + dlon/5.)
+							region[2] = min(region[2], eq.lat - dlat/5.)
+							region[3] = max(region[3], eq.lat + dlat/5.)
 						if args.admin_level == 'default':
 							admin_level = 'region'
 						else:
