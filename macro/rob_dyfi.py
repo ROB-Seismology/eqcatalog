@@ -1124,7 +1124,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			comm_key = 'id_com'
 			override_commune_locations = True
 
-		dyfi = self.to_simple_dyfi_ensemble(comm_key, fix_felt=True,
+		dyfi = self.to_simple_dyfi_ensemble(comm_key, fix_felt=fix_felt,
 											fix_commune_ids=fix_commune_ids,
 											remove_duplicates=remove_duplicates)
 
