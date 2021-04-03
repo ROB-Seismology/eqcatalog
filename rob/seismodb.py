@@ -49,7 +49,7 @@ __all__ = ["query_seismodb_table_generic", "query_seismodb_table",
 			"query_historical_texts",
 			"query_online_macro_catalog_aggregated",
 			"get_num_online_macro_enquiries",
-			"get_num_official_enquiries",
+			"get_num_official_enquiries", "get_num_traditional_mdps",
 			"get_earthquakes_with_traditional_enquiries",
 			"get_earthquakes_with_online_enquiries",
 			"query_stations", "get_station_coordinates",
@@ -699,7 +699,7 @@ def query_traditional_macro_catalog(id_earth, id_com=None, data_type='',
 			where_clause += ' IN (%s)' % id_com_str
 	if data_type == 'historical':
 		where_clause += (' AND CONCAT(id_earth, macro_detail.id_com) NOT IN'
-						' (SELECT CONCAT(id_earth, macro_detail.id_com)'
+						' (SELECT CONCAT(id_earth, id_com)'
 						' FROM macro_official_inquires)')
 
 	join_clause = [('LEFT JOIN', 'communes', 'macro_detail.id_com = communes.id'),
@@ -1180,7 +1180,7 @@ def query_online_macro_catalog(id_earth=None, id_com=None, zip_code=None,
 	return ROBDYFIEnsemble(id_earth, recs)
 
 
-def get_num_online_macro_enquiries(id_earth, min_fiability=80):
+def get_num_online_macro_enquiries(id_earth, min_fiability=80, verbose=False):
 	"""
 	Count number of online macroseismic enquiries for a particular event.
 
@@ -1189,6 +1189,9 @@ def get_num_online_macro_enquiries(id_earth, min_fiability=80):
 	:param min_fiability:
 		float, minimum fiability of enquiries
 		(default: 80)
+	:param verbose:
+		bool, whether or not to print SQL query
+		(default: False)
 
 	:return:
 		list of ints, number of enquiries for each earthquake
@@ -1201,7 +1204,8 @@ def get_num_online_macro_enquiries(id_earth, min_fiability=80):
 	## Note: apply constraints on web_analyse to the join clause
 	## in order to get 0 if there are no entries in web_analyse for id_earth
 	join_where_clause = 'web_analyse.id_earth=earthquakes.id_earth'
-	join_where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
+	if min_fiability:
+		join_where_clause += ' AND web_analyse.m_fiability >= %.1f' % float(min_fiability)
 	join_where_clause += ' AND web_analyse.deleted = false'
 	join_clause = [('LEFT JOIN', 'web_analyse', join_where_clause)]
 
@@ -1211,18 +1215,23 @@ def get_num_online_macro_enquiries(id_earth, min_fiability=80):
 	group_clause = 'earthquakes.id_earth'
 
 	db_recs = query_seismodb_table(table_clause, column_clause, join_clause=join_clause,
-								where_clause=where_clause, group_clause=group_clause)
+								where_clause=where_clause, group_clause=group_clause,
+								verbose=verbose)
 	num_enquiries = [rec['num_enquiries'] for rec in db_recs]
 	return num_enquiries
 
 
-def get_num_official_enquiries(id_earth):
+def get_num_official_enquiries(id_earth, verbose=False):
 	"""
 	Count number of official macroseismic enquiries for a particular
-	earthquake
+	earthquake. Note that this may not correspond to the number of MDPs
+	(= records in 'macro_detail' table = evaluated enquiries?)
 
 	:param id_earth:
 		int or list of ints, ID(s) of event in ROB catalog
+	:param verbose:
+		bool, whether or not to print SQL query
+		(default: False)
 
 	:return:
 		list of ints, number of enquiries for each earthquake
@@ -1237,15 +1246,71 @@ def get_num_official_enquiries(id_earth):
 	where_clause %= ",".join([str(item) for item in id_earth])
 	group_clause = 'id_earth'
 
+	db_recs = query_seismodb_table(table_clause, column_clause,
+								where_clause=where_clause, group_clause=group_clause,
+								verbose=verbose)
+	num_enquiries = [rec['num_enquiries'] for rec in db_recs]
+	return num_enquiries
+
+
+def get_num_traditional_mdps(id_earth, data_type='', min_fiability=80,
+									verbose=False):
+	"""
+	Count number of traditional macroseismic data points for a particular
+	earthquake
+
+	:param id_earth:
+		int or list of ints, ID(s) of event in ROB catalog
+	:param data_type:
+		str, type of macroseismic data: '', 'official' or 'historical'
+		(default: '')
+	:param min_fiability:
+		float, minimum fiability of enquiry
+		(default: 80)
+	:param verbose:
+		bool, whether or not to print SQL query
+		(default: False)
+
+	:return:
+		list of ints, number of enquiries for each earthquake
+	"""
+	## Convert input arguments, if necessary
+	if isinstance(id_earth, (int, basestring)):
+		id_earth = [id_earth]
+
+	## Construct SQL query
+	table_clause = ['macro_detail']
+
+	column_clause = ['Count(*) as num_enquiries']
+
+	where_clause = 'macro_detail.id_earth in (%s)'
+	where_clause %= ",".join([str(item) for item in id_earth])
+	if min_fiability:
+		where_clause += ' AND macro_detail.fiability >= %d' % min_fiability
+
+	if data_type == 'historical':
+		where_clause += (' AND CONCAT(macro_detail.id_earth, macro_detail.id_com)'
+						' NOT IN (SELECT CONCAT(id_earth, id_com)'
+						' FROM macro_official_inquires)')
+
+	join_clause = []
+	if data_type == 'official':
+		join_clause.append(('RIGHT JOIN', 'macro_official_inquires',
+			'macro_detail.id_com = macro_official_inquires.id_com'
+			' AND macro_detail.id_earth = macro_official_inquires.id_earth'))
+
+	group_clause = 'macro_detail.id_earth'
 
 	db_recs = query_seismodb_table(table_clause, column_clause,
-								where_clause=where_clause, group_clause=group_clause)
+								where_clause=where_clause, join_clause=join_clause,
+								group_clause=group_clause, verbose=verbose)
 	num_enquiries = [rec['num_enquiries'] for rec in db_recs]
 	return num_enquiries
 
 
 def get_earthquakes_with_traditional_enquiries():
 	"""
+
 	Create catalog of earthquakes that have traditional (official or
 	historical) enquiries associated with them.
 
@@ -1602,25 +1667,50 @@ def get_subcommunes_legacy(id_main):
 	return query_seismodb_table(table_clause, where_clause=where_clause)
 
 
-def _get_com_zip_table_clause(countries=[]):
+def _get_com_zip_table_clause(countries=[], average_multiple_zips=False):
 	"""
+	Construct SQL query to extract information (id_com, zip, name, lon, lat)
+	from com_zip_* database tables
+
+	:param countries:
+		list of strings, country codes
+		(default: [])
+	:param average_multiple_zips:
+		bool, whether to average the lon, lat coordinates if multiple ZIPs are
+		associated with 1 id_com, or else return thoe of the first entry
+		(default: False)
+
+	:return:
+		str, SQL query
 	"""
 	if len(countries) == 0:
 		countries = ['BE', 'DE', 'FR', 'LU', 'GB', 'NL']
 
+	if average_multiple_zips:
+		lon_col = 'AVG(longitude) AS longitude'
+		lat_col = 'AVG(latitude) AS latitude'
+	else:
+		lon_col, lat_col = 'longitude', 'latitude'
+
 	sql = []
 	if 'BE' in countries:
-		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_BE_fr GROUP BY id_com')
+		sql.append('SELECT id_com, zip, city, %s, %s FROM com_zip_BE_fr GROUP BY id_com'
+						% (lon_col, lat_col))
 	if 'DE' in countries:
-		sql.append('SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_DE GROUP BY id_com')
+		sql.append('SELECT id_com, zip, commune AS city, %s, %s FROM com_zip_DE GROUP BY id_com'
+						% (lon_col, lat_col))
 	if 'FR' in countries:
-		sql.append('SELECT id_com, zip, commune AS city, longitude, latitude FROM com_zip_FR GROUP BY id_com')
+		sql.append('SELECT id_com, zip, commune AS city, %s, %s FROM com_zip_FR GROUP BY id_com'
+						% (lon_col, lat_col))
 	if 'LU' in countries:
-		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_LU_fr GROUP BY id_com')
+		sql.append('SELECT id_com, zip, city, %s, %s FROM com_zip_LU_fr GROUP BY id_com'
+						% (lon_col, lat_col))
 	if 'GB' in countries:
-		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_GB GROUP BY id_com')
+		sql.append('SELECT id_com, zip, city, %s, %s FROM com_zip_GB GROUP BY id_com'
+						% (lon_col, lat_col))
 	if 'NL' in countries:
-		sql.append('SELECT id_com, zip, city, longitude, latitude FROM com_zip_NL GROUP BY id_com')
+		sql.append('SELECT id_com, zip, city, %s, %s FROM com_zip_NL GROUP BY id_com'
+						% (lon_col, lat_col))
 
 	sql = ' UNION '.join(sql)
 
@@ -1668,7 +1758,7 @@ def get_communes(country='BE', main_communes=False, id_com=None, verbose=False):
 	else:
 		countries = []
 	join_clause = [('LEFT JOIN',
-						_get_com_zip_table_clause(countries),
+						_get_com_zip_table_clause(countries, average_multiple_zips=False),
 						'communes.id = com_zip.id_com')]
 						#  AND communes.code_p = com_zip.zip
 	if not (id_com is None or id_com in ([], '')):
@@ -1740,6 +1830,35 @@ def get_subcommunes(id_main, country='BE', verbose=False):
 								verbose=verbose)
 	else:
 		return []
+
+
+# TODO: historical texts
+"""
+SELECT	c2.id_com,
+       c2.commune_name,
+       COUNT(distinct ht.id_text) AS cpt,
+       GROUP_CONCAT(distinct ht.id_text) AS id_text
+FROM (
+   SELECT 	c.id 			AS id_com,
+           c.name 			AS commune_name,
+           c.country,
+           c.id_main 		AS cmain
+     FROM 	macro_detail 	AS md,
+           communes 		AS c
+    WHERE 	md.id_com 	= c.id
+      AND 	md.id_earth = 89
+) AS c2
+LEFT JOIN 	communes 			AS c3	ON (c2.id_com 	= c3.id 		OR c2.id_com 	= c3.id_main)
+LEFT JOIN 	historical_place	AS hp 	ON c3.id 		= hp.id_commune
+LEFT JOIN 	historical_tp 		AS htp 	ON hp.id_place 	= htp.id_place
+LEFT JOIN 	historical_text 	AS ht 	ON htp.id_text 	= ht.id_text
+   WHERE 	c3.id IS NOT NULL
+     AND 	ht.id_earth 	= 89
+     AND 	ht.validation 	= 1
+     AND 	ht.public_data 	= 1
+GROUP BY 	c2.id_com
+ORDER BY 	c2.country , c2.commune_name
+"""
 
 
 
