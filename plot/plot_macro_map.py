@@ -29,7 +29,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				admin_source='gadm', admin_level="province", admin_style="default",
 				colorbar_style="default", radii=[],
 				plot_pie={}, title="", fig_filespec=None,
-				ax=None, copyright=u"© ROB", text_box={}, dpi="default",
+				ax=None, copyright=u"Â© ROB", text_box={}, dpi="default",
 				border_width=0.2, verbose=True):
 	"""
 	Plot macroseismic map for given earthquake
@@ -140,7 +140,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		(default: None)
 	:param copyright:
 		str, copyright label to plot in lower left corner of map
-		(default: u"© ROB")
+		(default: u"Â© ROB")
 	:param text_box:
 		dict, containing text box parameters (pos, text and style)
 		(default: {})
@@ -169,8 +169,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	## Take a copy, because original intensities may be modified!
 	macro_info_coll = macro_info_coll.copy()
 
+	tot_num_replies = np.sum([rec.num_mdps for rec in macro_info_coll])
+	max_num_replies = np.max([rec.num_mdps for rec in macro_info_coll])
+	min_num_replies = np.min([rec.num_mdps for rec in macro_info_coll])
+
 	if verbose:
-		tot_num_replies = np.sum([rec.num_mdps for rec in macro_info_coll])
 		print("Found %d aggregates (%d MDPs) for event %s:"
 				% (len(macro_info_coll), tot_num_replies, macro_info_coll[0].id_earth))
 		if verbose > 1:
@@ -355,14 +358,22 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		## Symbol size in function of number of replies
 		if plot_info not in ('num_mdps', 'num_replies') and thematic_num_replies:
 			num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
-			#num_replies = num_replies[num_replies >= min_replies]
+			num_replies = num_replies[num_replies <= max_num_replies]
+			if min_num_replies == 2:
+				num_replies[0] = 2
+			elif min_num_replies == 3:
+				num_replies = num_replies[1:]
 			symbol_size = symbol_style.size
 			#sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
-			sizes = symbol_size + np.log10(num_replies) * symbol_size
+			#sizes = symbol_size + np.log10(num_replies) * symbol_size
+			sizes = symbol_size + np.arange(len(num_replies))*1.5
 			ts = lbm.ThematicStyleGradient(num_replies, sizes, value_key="num_mdps")
 			symbol_style.size = ts
 		symbol_style.fill_color = tfc
-		#symbol_style.thematic_legend_style = thematic_legend_style
+		symbol_style.thematic_legend_style = lbm.LegendStyle('Num. MDPs', location=1,
+													title_style=lbm.FontStyle(font_size=9),
+													label_style=lbm.FontStyle(font_size=7),
+													alpha=1)
 		#macro_style = lbm.CompositeStyle(point_style=symbol_style)
 		macro_style = symbol_style
 		legend_label = ""
@@ -551,7 +562,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 						admin_style.line_width = line_width
 						admin_styles.append(admin_style.copy())
 
-		if admin_level == 'region':
+		if 'region' in admin_level:
 			line_width = 1.0
 			gis_file = None
 			selection_dict = {}
@@ -580,8 +591,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		# TODO: label style, thematic size
 		if city_style == "default":
 			city_symbol_size = 4
-			city_label_style = lbm.TextStyle(font_size=6, vertical_alignment="top",
-											offset=(0, -4))
+			city_label_style = lbm.TextStyle(font_size=5, vertical_alignment="center",
+													horizontal_alignment='left', offset=(4, 0))
 			population = np.array([10000, 50000, 100000, 200000, 500000,
 						1000000, 2000000, 5000000, 10000000, 20000000])
 			sizes = city_symbol_size + np.log10(population / 500000) * city_symbol_size
@@ -589,7 +600,21 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			city_style = lbm.PointStyle('s', size=ts, fill_color='k', label_style=city_label_style)
 		gis_file = get_dataset_file_on_seismogis('UN_Cities', 'UN Cities')
 		if gis_file:
-			city_data = lbm.GisData(gis_file, label_colname="Name")
+			dlon = region[1] - region[0]
+			dlat = region[3] - region[2]
+			map_range = max(dlon, dlat)
+			if map_range > 5:
+				min_population = 1000000
+			elif map_range > 2.5:
+				min_population = 250000
+			elif map_range > 1.25:
+				min_population = 50000
+			else:
+				min_population = 10000
+			#attribute_filter = 'MAX(Population_city, Population_agglomeration) >= %d' % min_population
+			attribute_filter = 'Population_agglomeration >= %d' % min_population
+			city_data = lbm.GisData(gis_file, label_colname="Name",
+										selection_dict=attribute_filter)
 			city_layer = lbm.MapLayer(city_data, city_style)
 			layers.append(city_layer)
 
@@ -627,12 +652,13 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	## Plot event
 	if event_style == "default":
-		label_style = lbm.TextStyle(font_size=9)
-		event_style = lbm.PointStyle('*', size=14, fill_color='magenta',
+		label_style = lbm.TextStyle(font_size=8, vertical_alignment="top",
+									horizontal_alignment='center', offset=(0, -5))
+		event_style = lbm.PointStyle('*', size=12, fill_color='magenta',
 								line_color=None, label_style=label_style)
 	if event_style:
 		eq = macro_info_coll[0].get_eq()
-		legend_label = "%s - ML=%.1f" % (eq.date, eq.ML)
+		legend_label = "%s, %s, ML=%.1f" % (eq.name, eq.date, eq.ML)
 		label = ""
 		event_data = lbm.PointData(eq.lon, eq.lat, label=label)
 		event_layer = lbm.MapLayer(event_data, event_style, legend_label=legend_label)
@@ -654,18 +680,22 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if copyright:
 		text_style = lbm.TextStyle(font_size=8, color='w', background_color='k',
 					horizontal_alignment='left', vertical_alignment='bottom',
-					font_weight='bold', alpha=1)
+					font_weight='normal', alpha=1)
 		offset = text_style.border_pad * text_style.font_size
 		text_data = lbm.TextData(offset, offset, copyright, coord_frame="axes points")
 		copyright_layer = lbm.MapLayer(text_data, text_style)
 		layers.append(copyright_layer)
 
 	label_style = lbm.TextStyle(font_size=9)
-	legend_style = lbm.LegendStyle(location=1, label_style=label_style, alpha=1)
+	legend_style = lbm.LegendStyle(location=2, label_style=label_style, alpha=1)
 	if graticule_interval:
 		graticule_style = lbm.GraticuleStyle()
 	else:
 		graticule_style = None
+
+	scalebar_style = lbm.ScalebarStyle(('0.85', '0.075'), length='auto', units='km',
+										label_style='simple', font_size=8,
+										line_width=1.5, yoffset=0.01)
 
 	if dpi == 'default':
 		if fig_filespec:
@@ -675,7 +705,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	map = lbm.LayeredBasemap(layers, title, projection, region=region,
 				graticule_interval=graticule_interval, legend_style=legend_style,
-				graticule_style=graticule_style, resolution='auto', dpi=dpi, ax=ax)
+				graticule_style=graticule_style, scalebar_style=scalebar_style,
+				resolution='auto', dpi=dpi, ax=ax)
 
 	## Text box
 	if text_box:
