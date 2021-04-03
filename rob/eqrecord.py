@@ -307,13 +307,32 @@ class ROBLocalEarthquake(LocalEarthquake):
 
 	def get_num_official_macro_enquiries(self):
 		"""
-		Count number of official macroseismic enquiries  for this earthquake
+		Count number of official macroseismic enquiries for this earthquake
 
 		:return:
 			int, number of enquiries
 		"""
 		from .seismodb import get_num_official_enquiries
 		[num_enquiries] = get_num_official_enquiries([self.ID])
+		return num_enquiries
+
+	def get_num_traditional_mdps(self, data_type='', min_fiability=80):
+		"""
+		Count number of traditional macroseismic enquiries for this earthquake
+
+		:param data_type:
+			str, type of macroseismic data: '', 'official' or 'historical'
+			(default: '')
+		:param min_fiability:
+			float, minimum fiability of enquiries
+			(default: 80)
+
+		:return:
+			int, number of enquiries
+		"""
+		from .seismodb import get_num_traditional_mdps
+		[num_enquiries] = get_num_traditional_mdps([self.ID], data_type=data_type,
+													min_fiability=min_fiability)
 		return num_enquiries
 
 	def get_Imax_online(self, min_replies=3, min_fiability=80.0, filter_floors=(0,4),
