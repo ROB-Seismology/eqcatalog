@@ -174,7 +174,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	min_num_replies = np.min([rec.num_mdps for rec in macro_info_coll])
 
 	if verbose:
-		print("Found %d aggregates (%d MDPs) for event %s:"
+		print("Plotting %d aggregates (%d MDPs) for event %s:"
 				% (len(macro_info_coll), tot_num_replies, macro_info_coll[0].id_earth))
 		if verbose > 1:
 			idxs = np.argsort(macro_info_coll.intensities)
@@ -196,7 +196,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	aggregate_by = macro_info_coll.agg_type
 	if aggregate_by in (None, ''):
 		if not interpolate_grid:
-			symbol_style = symbol_style or lbm.PointStyle(shape='D', size=5)
+			symbol_style = symbol_style or lbm.PointStyle(shape='D', size=5,
+																	line_width=0.5)
 
 	plot_polygons_as_points = False
 	if symbol_style:
@@ -654,11 +655,15 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if event_style == "default":
 		label_style = lbm.TextStyle(font_size=8, vertical_alignment="top",
 									horizontal_alignment='center', offset=(0, -5))
-		event_style = lbm.PointStyle('*', size=12, fill_color='magenta',
-								line_color=None, label_style=label_style)
+		event_style = lbm.PointStyle('*', size=12, fill_color='Fuchsia',
+								line_color='w', label_style=label_style)
 	if event_style:
 		eq = macro_info_coll[0].get_eq()
-		legend_label = "%s, %s, ML=%.1f" % (eq.name, eq.date, eq.ML)
+		legend_label = "%s, %s" % (eq.name, eq.date)
+		for Mtype in ('MW', 'MS', 'ML'):
+			if Mtype in eq.mag:
+				legend_label += ', %s=%.1f' % (Mtype, eq.mag[Mtype])
+				break
 		label = ""
 		event_data = lbm.PointData(eq.lon, eq.lat, label=label)
 		event_layer = lbm.MapLayer(event_data, event_style, legend_label=legend_label)
