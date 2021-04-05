@@ -62,7 +62,7 @@ parser.add_argument("--agg_method", help="Aggregation method (availability depen
 					choices=["mean", "dyfi", "min", "max", "median"], default="mean")
 parser.add_argument("--min_num_replies", help="Min. number of replies per aggregate",
 					type=int, default=2)
-parser.add_argument("--commune_marker", help="Which symbol/geometry to use for commune intensities",
+parser.add_argument("--mdp_marker", help="Which symbol/geometry to use for aggregated MDPs",
 					choices=["o", "s", "v", "^", "p", "*", "h", "D", "polygon"], default="D")
 parser.add_argument("--admin_source", help="Source for administrtive boundaries",
 					choices=["gadm", "statbel", "rob"], default="gadm")
@@ -79,6 +79,10 @@ parser.add_argument("--color_gradient", help="Color gradient",
 					choices=["discrete", "continuous"], default="discrete")
 parser.add_argument("--map_region", help="Size of map region wrt intensity data",
 					choices=["wide", "tight", "both"], default="both")
+parser.add_argument("--min_lon", help="Minimum map longitude", type=float, default=None)
+parser.add_argument("--max_lon", help="Maximum map longitude", type=float, default=None)
+parser.add_argument("--min_lat", help="Minimum map latitude", type=float, default=None)
+parser.add_argument("--max_lat", help="Maximum map latitude", type=float, default=None)
 parser.add_argument("--copyright_label", help="Label to use as copyright",
 					type=str, default="Collaborative project of ROB and BNS")
 parser.add_argument("--base_folder", help="Base folder for generated maps",
@@ -96,11 +100,12 @@ if args.id_earth in (['all'], ['missing']):
 		start_date = 2000
 	else:
 		start_date = 1000
-	catalog = eqcatalog.rob.query_local_eq_catalog(start_date=start_date)
 	if args.data_type == 'dyfi':
 		catalog = eqcatalog.rob.seismodb.get_earthquakes_with_online_enquiries()
 	else:
 		catalog = eqcatalog.rob.seismodb.get_earthquakes_with_traditional_enquiries()
+	catalog = catalog.subselect(start_date=start_date, attr_val=('event_type', 'ke'),
+										region=(-1, 9, 48.5, 52.5))
 	if args.id_earth == ['all']:
 		overwrite_map = True
 	else:
@@ -108,10 +113,15 @@ if args.id_earth in (['all'], ['missing']):
 elif args.id_earth:
 	catalog = eqcatalog.rob.query_local_eq_catalog_by_id(args.id_earth)
 	overwrite_map = True
-else:
+elif args.data_type == 'dyfi':
 	catalog = eqcatalog.rob.query_local_eq_catalog(has_open_enquiry=True, start_date=2000)
 	overwrite_map = False
+else:
+	print('Nothing to do: please check command-line options!')
+	exit()
 
+if not args.aggregate_by:
+	args.min_num_replies = 1
 
 for eq in catalog:
 	id_earth = eq.ID
@@ -121,11 +131,11 @@ for eq in catalog:
 	if args.data_type == "dyfi":
 		macro_data = eq.get_online_macro_enquiries(min_fiability=MIN_FIABILITY)
 	else:
-		macro_data = eq.get_traditional_macro_info(data_type=args.data_type,
+		macro_data = eq.get_traditional_macroseismic_info(data_type=args.data_type,
 												min_fiability=MIN_FIABILITY)
 		args.min_num_replies = 1
-	if args.verbose:
-		print('N = %d' % len(macro_data))
+	#if args.verbose:
+	#	print('N = %d' % len(macro_data))
 
 	if len(macro_data) >= args.min_num_replies:
 		if args.data_type == "dyfi":
@@ -136,14 +146,15 @@ for eq in catalog:
 			lastmod = macro_data.submit_times
 			maxlastmod = np.max(lastmod)
 		else:
-			# TODO
-			maxlastmod = np.datetime64('now')
+			maxlastmod = eq.datetime
 
 		try:
 			minlon, maxlon, minlat, maxlat = macro_data.get_region()
 		except:
 			## No valid data
 			print('No valid locations found for event #%s' % id_earth)
+			if args.verbose:
+				print("------------------------------------------")
 			continue
 
 		if args.verbose:
@@ -189,6 +200,10 @@ for eq in catalog:
 												agg_function=args.agg_method)
 
 			if not(len(macro_info)):
+				print("Not enough data to draw a map (<%d replies)"
+						% args.min_num_replies)
+				if args.verbose:
+					print("------------------------------------------")
 				continue
 
 			if args.verbose and len(macro_info):
@@ -200,11 +215,12 @@ for eq in catalog:
 			projection = 'merc'
 			graticule_interval = 'auto'
 			plot_info = 'intensity'
-			if "grid" in args.aggregate_by or args.commune_marker == "polygon":
+			if "grid" in args.aggregate_by or args.mdp_marker == "polygon":
 				symbol_style = None
 				thematic_num_replies = False
 			else:
-				symbol_style = lbm.PointStyle(shape=args.commune_marker, size=4)
+				symbol_style = lbm.PointStyle(shape=args.mdp_marker, size=4,
+													line_width=0.5)
 				thematic_num_replies = True
 
 			line_style = "default"
@@ -213,8 +229,8 @@ for eq in catalog:
 			colorbar_style = "default"
 			label_style = lbm.TextStyle(font_size=9, vertical_alignment="top",
 												horizontal_alignment='center', offset=(0, -5))
-			event_style = lbm.PointStyle(shape=args.epicenter_marker, size=12,
-										fill_color='magenta', line_color='k',
+			event_style = lbm.PointStyle(shape=args.epicenter_marker, size=14,
+										fill_color='Fuchsia', line_color='w',
 										label_style=label_style)
 			country_style = "default"
 			admin_style = lbm.LineStyle(line_width=0.5)
@@ -247,17 +263,48 @@ for eq in catalog:
 						if args.epicenter_marker:
 							dlon = region[1] - region[0]
 							dlat = region[3] - region[2]
-							region[0] = min(region[0], eq.lon - dlon/5.)
-							region[1] = max(region[1], eq.lon + dlon/5.)
-							region[2] = min(region[2], eq.lat - dlat/5.)
-							region[3] = max(region[3], eq.lat + dlat/5.)
+							if args.min_lon is None:
+								region[0] = min(region[0], eq.lon - dlon/5.)
+							else:
+								region[0] = args.min_lon
+							if args.max_lon is None:
+								region[1] = max(region[1], eq.lon + dlon/5.)
+							else:
+								region[1] = args.max_lon
+							if args.min_lat is None:
+								region[2] = min(region[2], eq.lat - dlat/5.)
+							else:
+								region[2] = args.min_lat
+							if args.max_lat is None:
+								region[3] = max(region[3], eq.lat + dlat/5.)
+							else:
+								region[3] = args.max_lat
 						if args.admin_level == 'default':
 							admin_level = 'region'
 						else:
 							admin_level = args.admin_level
 					else:
-						#region = (eq.lon-1, eq.lon+1, eq.lat-.5, eq.lat+.5)
-						region = (minlon-0.25, maxlon+0.25, minlat-0.1, maxlat+0.1)
+						region = [minlon-0.25, maxlon+0.25, minlat-0.1, maxlat+0.1]
+						## Ensure epicenter is inside map if marker is specified
+						if args.epicenter_marker:
+							dlon = region[1] - region[0]
+							dlat = region[3] - region[2]
+							if args.min_lon is None:
+								region[0] = min(region[0], eq.lon - dlon/10.)
+							else:
+								region[0] = args.min_lon
+							if args.max_lon is None:
+								region[1] = max(region[1], eq.lon + dlon/10.)
+							else:
+								region[1] = args.max_lon
+							if args.min_lat is None:
+								region[2] = min(region[2], eq.lat - dlat/10.)
+							else:
+								region[2] = args.min_lat
+							if args.max_lat is None:
+								region[3] = max(region[3], eq.lat + dlat/10.)
+							else:
+								region[3] = args.max_lat
 						if args.admin_level == 'default':
 							admin_level = 'region,province'
 						else:
