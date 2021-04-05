@@ -402,7 +402,7 @@ class AggregatedMacroInfoCollection():
 		percentiles = [0 + dp/2., 100 - dp/2.]
 		lons, lats = [], []
 		for rec in self:
-			if not None in (rec.lon, rec.lat):
+			if not (None in (rec.lon, rec.lat) or np.nan in (rec.lon, rec.lat)):
 				lons.extend([rec.lon] * rec.num_mdps)
 				lats.extend([rec.lat] * rec.num_mdps)
 		lonmin, lonmax = np.percentile(lons, percentiles)
