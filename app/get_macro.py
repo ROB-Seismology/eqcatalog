@@ -104,7 +104,7 @@ if args.id_earth in (['all'], ['missing']):
 		catalog = eqcatalog.rob.seismodb.get_earthquakes_with_online_enquiries()
 	else:
 		catalog = eqcatalog.rob.seismodb.get_earthquakes_with_traditional_enquiries()
-	catalog = catalog.subselect(start_date=start_date, attr_val=('event_type', 'ke'),
+	catalog = catalog.subselect(start_date=start_date, attr_val=('event_type', ['ke', 'ki']),
 										region=(-1, 9, 48.5, 52.5))
 	if args.id_earth == ['all']:
 		overwrite_map = True
