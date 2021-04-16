@@ -589,11 +589,11 @@ class AggregatedMacroInfoCollection():
 		"""
 		Plot macroseismic map
 
-		see :func:`eqcatalog.plot.plot_macro_map.plot_macroseismic_map`
+		see :func:`eqcatalog.macro.plot_macro_map.plot_macroseismic_map`
 		"""
 		kwargs = locals().copy()
 		kwargs.pop('self')
-		from ..plot.plot_macro_map import plot_macroseismic_map
+		from .plot_macro_map import plot_macroseismic_map
 
 		return plot_macroseismic_map(self, **kwargs)
 
@@ -619,7 +619,7 @@ class AggregatedMacroInfoCollection():
 		:param color_gradient:
 		:param colorbar_style:
 		:param copyright:
-			see :func:`eqcatalog.plot.plot_macro_map.plot_macroseismic_map`
+			see :func:`eqcatalog.macro.plot_macro_map.plot_macroseismic_map`
 		:param dpi:
 			int, image resolution in dots per inch
 			(default: 120)
