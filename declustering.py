@@ -157,6 +157,58 @@ class Gruenthal2009Window(DeclusteringWindow):
 	get_dist_window.__doc__ = DeclusteringWindow.get_dist_window.__doc__
 
 
+class BurkhardGruenthal2009Window(DeclusteringWindow):
+	"""
+	Class implementing Burkhard & Gruenthal (2009) declustering window
+	"""
+	name = "BurkhardGruenthal2009"
+
+	def get_time_window(self, magnitude):
+		if np.isscalar(magnitude):
+			if magnitude >= 6.6:
+				t_window = np.exp(6.44 + 0.055 * magnitude)
+			elif magnitude > 0:
+				t_window = np.exp(-3.95 + np.sqrt(0.62 + 17.32*magnitude))
+			else:
+				t_window = 0
+			return np.timedelta64(int(round(t_window * SECS_PER_DAY)), 's')
+		else:
+			magnitude = np.asarray(magnitude)
+			t_window = np.zeros(len(magnitude))
+			idxs = np.where(magnitude >= 6.6)
+			t_window[idxs] = np.exp(6.44 + 0.055 * magnitude[idxs])
+			idxs = np.where((magnitude > 0) & (magnitude < 6.6))
+			t_window[idxs] = np.exp(-3.95 + np.sqrt(0.62 + 17.32*magnitude[idxs]))
+			return np.round(t_window * SECS_PER_DAY).astype('m8[s]')
+	get_time_window.__doc__ = DeclusteringWindow.get_time_window.__doc__
+
+	def get_fs_time_window(self, magnitude):
+		"""
+		Get time window for foreshocks
+		"""
+		if np.isscalar(magnitude):
+			if magnitude >= 7.8:
+				t_window = np.exp(6.44 + 0.055 * magnitude)
+			elif magnitude > 0:
+				t_window = np.exp(-4.77 + np.sqrt(0.62 + 17.32*magnitude))
+			else:
+				t_window = 0
+			return np.timedelta64(int(round(t_window * SECS_PER_DAY)), 's')
+		else:
+			magnitude = np.asarray(magnitude)
+			t_window = np.zeros(len(magnitude))
+			idxs = np.where(magnitude >= 7.8)
+			t_window[idxs] = np.exp(6.44 + 0.055 * magnitude[idxs])
+			idxs = np.where((magnitude > 0) & (magnitude < 7.8))
+			t_window[idxs] = np.exp(-4.77 + np.sqrt(0.62 + 17.32*magnitude[idxs]))
+			return np.round(t_window * SECS_PER_DAY).astype('m8[s]')
+
+	def get_dist_window(self, magnitude):
+		s_window = np.maximum(0, np.exp(1.77 + np.sqrt(0.037 + 1.02*magnitude)))
+		return s_window
+	get_dist_window.__doc__ = DeclusteringWindow.get_dist_window.__doc__
+
+
 class Reasenberg1985Window(DeclusteringWindow):
 	"""
 	Implements time and distance windows used in declustering
@@ -1128,7 +1180,9 @@ class WindowMethod(DeclusteringMethod):
 	For real use, the cluster (= linked-window) method is preferred.
 
 	:param fa_ratio:
-		float, ratio between foreshock and aftershock time windows
+		float, ratio between foreshock and aftershock time windows,
+		used if declustering window doesn't have a specific get_fs_time_window
+		method
 		(default: 0.17, cf. SHARE project, Danciu pers. comm.)
 	:param distance_metric:
 		str, metric used to compute inter-event distances,
@@ -1161,12 +1215,17 @@ class WindowMethod(DeclusteringMethod):
 		main_datetime = main_event.datetime
 		datetimes = catalog.get_datetimes()
 
-		## Get time window
-		t_window = dc_window.get_time_window(main_mag)
+		## Get time window for aftershocks and foreshocks
+		as_t_window = dc_window.get_time_window(main_mag)
+
+		try:
+			fs_t_window = dc_window.get_fs_time_window(main_mag)
+		except:
+			fs_t_window = self.fa_ratio * as_t_window
 
 		## Create time window index
-		in_t_window = ((datetimes >= (main_datetime - self.fa_ratio * t_window))
-						& (datetimes <= (main_datetime + t_window)))
+		in_t_window = ((datetimes >= (main_datetime - fs_t_window))
+						& (datetimes <= (main_datetime + as_t_window)))
 		return in_t_window
 
 	def is_in_dist_window(self, main_event, main_mag, catalog, dc_window):
