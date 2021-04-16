@@ -604,8 +604,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			dlon = region[1] - region[0]
 			dlat = region[3] - region[2]
 			map_range = max(dlon, dlat)
-			if map_range > 5:
+			if map_range > 10:
 				min_population = 1000000
+			if map_range > 5:
+				min_population = 500000
 			elif map_range > 2.5:
 				min_population = 250000
 			elif map_range > 1.25:
