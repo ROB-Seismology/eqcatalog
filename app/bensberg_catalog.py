@@ -1,5 +1,14 @@
 """
 Fetch Bensberg earthquake catalog from the internet
+
+The catalog is available as annual files from 1975 onward
+http://www.seismo.uni-koeln.de/data/%Y.js
+
+In addition, there are also monthly location files for earthquakes (Q)
+from May 2005 onward
+http://www.seismo.uni-koeln.de/catfiles/%y%MQ.TXT
+and for induced earthquakes (M)
+http://www.seismo.uni-koeln.de/catfiles/%y%MM.TXT
 """
 
 import os
