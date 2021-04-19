@@ -136,7 +136,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 									date_order='DMY', has_header=True)
 
 	elif catalog_name.upper() == 'KNMI':
-		csv_file = get_dataset_file_on_seismogis('KNMI_catalog', 'all_tectonic.csv')
+		csv_file = get_dataset_file_on_seismogis('KNMI_seismology', 'all_tectonic.csv')
 		if csv_file:
 			column_map = {'date': 'YYMMDD', 'time': 'TIME', 'name': 'LOCATION',
 						'lat': 'LAT', 'lon': 'LON', 'depth': 'DEPTH',
@@ -155,7 +155,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 			catalog = catalog.subselect(attr_val=('event_type', ['ke']))
 			for eq in catalog:
 				eq.name = eq.name.replace('"', '').strip()
-			catalog.name = 'Erbebenkatalog der Erbebenstation Bensberg'
+			catalog.name = 'Erdbebenkatalog der Erdbebenstation Bensberg'
 			return catalog
 
 	else:
