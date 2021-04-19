@@ -73,3 +73,10 @@ if not reloading:
 else:
 	reload(isoseismal)
 from .isoseismal import *
+
+## plot_macro_map
+if not reloading:
+	from . import plot_macro_map
+else:
+	reload(plot_macro_map)
+from .plot_macro_map import *

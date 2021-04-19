@@ -30,10 +30,3 @@ if not reloading:
 else:
   reload(plot_catalog)
 from .plot_catalog import *
-
-## plot_macro_map
-if not reloading:
-	from . import plot_macro_map
-else:
-	reload(plot_macro_map)
-from .plot_macro_map import *
