@@ -10,9 +10,15 @@ import numpy as np
 
 
 __all__ = ['estimate_gr_params', 'estimate_gr_params_multi',
-			'calc_gr_sigma',
+			'estimate_gr_params_minimize', 'estimate_gr_params_multi_minimize',
+			'estimate_gr_params_curvefit', 'calc_gr_sigma',
 			'construct_mfd_at_epsilon', 'construct_mfd_pmf',
 			'discretize_normal_distribution']
+
+
+## Upper bound on b-value applied in bound-constrained minimization
+MAX_B_VAL = 2.0
+
 
 
 def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
@@ -132,7 +138,7 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 
 			return np.abs(sum_niMi + penalty_term - est_sum_niMi)
 
-	result = minimize_scalar(minimize_func, bounds=(0, 2*np.log(10)),
+	result = minimize_scalar(minimize_func, bounds=(0, MAX_B_VAL*np.log(10)),
 							method='bounded')
 
 	if not result.success:
@@ -175,24 +181,19 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 						[cov_alpha_beta, cov_beta]])
 
 	if log10:
-		#a = alpha / np.log(10)
-
-		## From calcGR_Weichert
-		#SUMEXP = np.sum(np.exp(-beta * Mi))
-		#SUMTEX = np.sum(ti * np.exp(-beta * Mi))
-		#FNGTMO = N * SUMEXP / SUMTEX
-		#a = np.log10(FNGTMO * np.exp(beta * (Mi[0]-dMi[0])))
 		a = np.log(np.exp(alpha) / beta) / np.log(10)
 		b = beta / np.log(10)
-		## Note: covariance is probably not correct for log10=True !
-		## (because relation between a and alpha is more complex),
+		## Note: covariance_a_b is probably not entirely correct for log10=True !
 		## but I have verified that it is approximately correct
-		## Error propagation for alpha corresponding to a * ln(10)
-		## is almost indistinguishable from sigma_alpha
-		#sigma_alpha, sigma_beta = cov[0, 0], cov[1, 1]
-		#sigma_alpha2 = np.sqrt((sigma_beta / beta)**2 + sigma_alpha**2)
-		#cov[0, 0] = sigma_alpha2
-		cov /= np.log(10)
+		sigma_alpha, sigma_beta = np.sqrt(cov[0, 0]), np.sqrt(cov[1, 1])
+		sign = np.sign(cov[0, 1])
+		sigma_alpha_beta = np.sqrt(np.abs(cov[0, 1]))
+		sigma_b = sigma_beta / np.log(10)
+		sigma_a = np.sqrt((sigma_beta / beta)**2 + sigma_alpha**2)
+		sigma_a_b = sigma_alpha_beta / np.log(10)
+		cov[0, 0] = sigma_a**2
+		cov[1, 1] = sigma_b**2
+		cov[0, 1] = cov[1, 0] = sign * sigma_a_b**2
 		return (a, b, cov)
 
 	else:
@@ -284,7 +285,7 @@ def estimate_gr_params_multi(nij, Mi, dMi, completeness, end_date,
 
 			return np.abs(sum_niMi - est_sum_niMi)
 
-	result = minimize_scalar(minimize_func, bounds=(0, 2*np.log(10)),
+	result = minimize_scalar(minimize_func, bounds=(0, MAX_B_VAL*np.log(10)),
 							method='bounded')
 
 	if not result.success:
@@ -341,6 +342,300 @@ def estimate_gr_params_multi(nij, Mi, dMi, completeness, end_date,
 		cov_list[j] = 1./cov_list[j]
 
 	return (alpha_values, beta, cov_list)
+
+
+def estimate_gr_params_minimize(ni, Mi, dMi, completeness, end_date,
+										prior_b=None, max_b_var=0.001):
+	"""
+	Maximum-likelihood estimation of Gutenberg-Richter parameters by minimizing
+	the negative log-likelihood function directly (instead of the derived formulas)
+
+	This essentially gives the same results as :func:`estimate_gr_params`,
+	but with slightly larger uncertainties
+
+	Notes:
+		- finite bins not yet supported!
+
+	:param ni:
+	:param Mi:
+	:param dMi:
+	:param completeness:
+	:param end_date:
+	:param prior_b:
+		see :func:`estimate_gr_params`
+	:param max_b_var:
+		float, maximum variation allowed for b value if :param:`prior_b` is set
+		(default: 0.001)
+
+	:return:
+		(a/alpha, b/beta, cov) tuple
+		- a/alpha: float, a or alpha value
+		- b/beta: float, b or beta value
+		- cov: 2-D matrix [2,2], covariance matrix
+	"""
+	from scipy.optimize import minimize, minimize_scalar
+
+	try:
+		from scipy.special import factorial
+	except ImportError:
+		## Older scipy versions
+		from scipy.misc import factorial
+
+	I = len(ni)
+
+	assert len(Mi) == I
+
+	if np.isscalar(dMi):
+		dMi = np.array([dMi] * I)
+	assert len(dMi) == I
+	## dM is half-bin size in paper!
+	## Note: do not use /= to avoid modifying original array
+	dMi = dMi / 2.
+
+	ti = completeness.get_completeness_timespans(Mi, end_date)
+	idxs = ~np.isnan(ni)
+
+	if prior_b:
+		## Use max_b_var to define bounds on b(eta) value
+		b_bounds = (prior_b-max_b_var, prior_b+max_b_var)
+	else:
+		prior_b = 1.0
+		b_bounds = (-np.inf, np.inf)
+	prior_beta = prior_b * np.log(10)
+	beta_bounds = [val * np.log(10) for val in b_bounds]
+
+	# TODO: finite bins
+
+	def minimize_func(x):
+		## Function returning negative log-likelihood, which should be minimized
+		## Eq. 7
+		alpha, beta = x
+		abM_term = alpha - beta * Mi[idxs]
+		tdM_term = 2 * ti[idxs] * dMi[idxs]
+		log_likelihood = np.sum(ni[idxs] * (abM_term + np.log(tdM_term))
+									- np.log(factorial(ni[idxs]))
+									- tdM_term * np.exp(abM_term))
+		return -log_likelihood
+
+	## Initial guess
+	beta0 = np.log(10)
+	N = np.nansum(ni)
+	exp_term = np.exp(-beta0 * Mi[idxs])
+	alpha0 = np.log(N / np.sum(2 * ti[idxs] * dMi[idxs] * exp_term))
+	x0 = np.array([alpha0, beta0])
+
+	result = minimize(minimize_func, x0, options={'ftol': 1E-9},
+							bounds=[(None, None), beta_bounds])
+
+	if not result.success:
+		print(result.message)
+		return
+
+	# Compute covariance matrix from minimization result
+	# See: https://stackoverflow.com/questions/43593592/errors-to-fit-parameters-of-scipy-optimize
+	#ftol = 2.220446049250313e-09
+	cov = result.hess_inv.todense() #* max(1, abs(result.fun)) * ftol
+
+	return (result.x[0], result.x[1], cov)
+
+
+def estimate_gr_params_multi_minimize(nij, Mi, dMi, completeness, end_date):
+	"""
+	'minimize' version of :func:`estimate_gr_params_multi`, similar to
+	:func:`estimate_gr_params_minimize`.
+	This function is not yet finished and should not be used!
+
+	Notes:
+		- log10 case not yet supported!
+		- finite bins not yet supported!
+
+	:param nij:
+	:param Mi:
+	:param dMi:
+	:param completeness:
+	:param end_date:
+		see :func:`estimate_gr_params_multi`
+	"""
+	from scipy.optimize import minimize
+
+	try:
+		from scipy.special import factorial
+	except ImportError:
+		## Older scipy versions
+		from scipy.misc import factorial
+
+	J, I = nij.shape
+
+	assert len(Mi) == I
+
+	if np.isscalar(dMi):
+		dMi = np.array([dMi] * I)
+	assert len(dMi) == I
+	## dM is half-bin size in paper!
+	## Note: do not use /= to avoid modifying original array
+	dMi = dMi / 2.
+
+	ti = completeness.get_completeness_timespans(Mi, end_date)
+
+	## Determine common beta value (Note: dMi * 2 !!)
+	ni = np.nansum(nij, axis=0)
+	#alpha0, beta0, cov0
+	result = estimate_gr_params_minimize(ni, Mi, dMi*2, completeness, end_date)
+	alpha0, beta0 = result.x
+
+	## Initial guess for zone alpha values
+	alphas0 = np.array([np.log(np.exp(alpha0) / J)] * J)
+	#alphas0, beta0, covs = estimate_gr_params_multi(nij, Mi, dMi, completeness,
+	#															end_date)
+
+	def constrain_alphas(x):
+		## Constraint function to ensure that summed activity equals total activity
+		## Should return zero
+		# TODO: take into account variance on alpha0?
+		alphas = x[1:]
+		return np.log(np.sum(np.exp(alphas))) - alpha0
+
+	def minimize_func(x):
+		## Function returning negative log-likelihood, which should be minimized
+		## Eq. 7, summed over all zones
+		beta, alphas = x[0], x[1:]
+		log_likelihood = 0
+		for j in range(J):
+			ni = nij[j]
+			idxs = ~np.isnan(ni)
+			abM_term = alphas[j] - beta * Mi[idxs]
+			tdM_term = 2 * ti[idxs] * dMi[idxs]
+			log_likelihood += np.sum(ni[idxs] * (abM_term + np.log(tdM_term))
+										- np.log(factorial(ni[idxs]))
+										- tdM_term * np.exp(abM_term))
+		return -log_likelihood
+
+	# TODO: finite bins
+
+	x0 = np.hstack([[beta0], alphas0])
+	# TODO: allow variance on beta value?
+	result = minimize(minimize_func, x0, method='trust-constr',
+							bounds=[(beta0-1, beta0+1)] + [(None, None)] * J,
+							constraints={"fun": constrain_alphas, "type": "eq"})
+
+	if not result.success:
+		print(result.message)
+		return
+
+	cov = result.hess_inv.todense() #* max(1, abs(result.fun)) * ftol
+
+	return (result.x[0], result.x[1], cov)
+
+
+def estimate_gr_params_curvefit(ni, Mi, dMi, completeness, end_date,
+										log10=False, incremental=False,
+										prior_b=None, max_b_var=0.001):
+	"""
+	Estimate Gutenberg-Richter parameters by directly fitting the incremental
+	or cumulative relation (log_e or log_10), minimizing the sum of squared residuals
+
+	:param ni:
+	:param Mi:
+	:param dMi:
+	:param completeness:
+	:param end_date:
+	:param log10:
+	:param prior_b:
+		see :func:`estimate_gr_params`
+	:param incremental:
+		bool, whether to fit the incremental (True) or the cumulative (False)
+		rates. Note that uncertainties are considerably larger when fitting
+		incremental rates!
+		(default: False)
+	:param max_b_var:
+		float, maximum variation allowed for b value if :param:`prior_b` is set
+		(default: 0.001)
+
+	:return:
+		(a/alpha, b/beta, cov) tuple
+		- a/alpha: float, a or alpha value
+		- b/beta: float, b or beta value
+		- cov: 2-D matrix [2,2], covariance matrix
+	"""
+	from scipy.optimize import curve_fit
+
+	I = len(ni)
+
+	assert len(Mi) == I
+
+	if np.isscalar(dMi):
+		dMi = np.array([dMi] * I)
+	assert len(dMi) == I
+	## dM is half-bin size in paper!
+	## Note: do not use /= to avoid modifying original array
+	dMi = dMi / 2.
+
+	ti = completeness.get_completeness_timespans(Mi, end_date)
+	idxs = ~np.isnan(ni)
+
+	if not incremental:
+		Mmin = Mi[0] - dMi[0]
+		Mmax = Mi[-1] + dMi[-1]
+
+	Mi = Mi[idxs]
+	dMi = dMi[idxs]
+
+	inc_rates = ni[idxs] / ti[idxs]
+	if not incremental:
+		cumul_rates = np.cumsum(inc_rates[::-1])[::-1]
+
+	if prior_b:
+		b_bounds = (prior_b-max_b_var, prior_b+max_b_var)
+	else:
+		prior_b = 1.0
+		b_bounds = (-np.inf, np.inf)
+
+	if not log10:
+		prior_beta = prior_b * np.log(10)
+		beta_bounds = [val * np.log(10) for val in b_bounds]
+
+	a0 = np.log10(ni[0]) + prior_b * Mi[0]
+
+	if log10 is False:
+		alpha0 = np.log(prior_beta * np.exp(a0 * np.log(10)))
+		initial_guess = (alpha0, prior_beta)
+		bounds = ((-np.inf, beta_bounds[0]), (np.inf, beta_bounds[1]))
+
+		def inc_gr_rate(M, alpha, beta):
+			## Eq. 4
+			dnu = 2 * np.exp(alpha - beta * M) * np.sinh(beta * dMi) / beta
+			return dnu
+
+		def cumul_gr_rate(M, alpha, beta):
+			M = M - dMi
+			lamda0 = np.exp(alpha) / beta / np.exp(beta * Mmin)
+			Mmax_term = np.exp(-beta * Mmax)
+			lamda = (lamda0
+					* (np.exp(-beta * M) - Mmax_term) / (np.exp(-beta * Mmin) - Mmax_term))
+			return lamda
+
+	else:
+		initial_guess = (a0, prior_b)
+		bounds = ((-np.inf, b_bounds[0]), (np.inf, b_bounds[1]))
+
+		def inc_gr_rate(M, a, b):
+			a_inc = a + np.log10(10**(b*dMi) - 10**(-b*dMi))
+			return 10**(a_inc - b*M)
+
+		def cumul_gr_rate(M, a, b):
+			M = M - dMi
+			return 10**(a - b*M) - 10**(a - b*Mmax)
+
+	if incremental:
+		popt, pcov = curve_fit(inc_gr_rate, Mi, inc_rates, p0=initial_guess,
+									bounds=bounds, method='trf')
+	else:
+		popt, pcov = curve_fit(cumul_gr_rate, Mi, cumul_rates, p0=initial_guess,
+									bounds=bounds, method=('trf'))
+
+	#perr = np.sqrt(np.diag(pcov))
+
+	return (popt[0], popt[1], pcov)
 
 
 def calc_gr_sigma(Mi, cov):
@@ -421,8 +716,12 @@ def construct_mfd_at_epsilon(a_or_alpha, b_or_beta, cov, epsilon, Mmin, Mmax, dM
 		sigma_m = calc_gr_sigma(Mi, cov)
 		if log10:
 			a_val, b_val = a_or_alpha, b_or_beta
-			Ndisc = (10**(a_val - b_val * (Mi - dM/2.) + sigma_m * epsilon)
-					-10**(a_val - b_val * (Mi + dM/2.) + sigma_m * epsilon))
+			Mi1 = Mi - dM / 2.
+			Mi2 = Mi + dM / 2.
+			sigma_m1 = calc_gr_sigma(Mi1, cov)
+			sigma_m2 = calc_gr_sigma(Mi2, cov)
+			Ndisc = (10**(a_val - b_val * Mi1 + sigma_m1 * epsilon)
+					- 10**(a_val - b_val * Mi2 + sigma_m2 * epsilon))
 		else:
 			alpha, beta = a_or_alpha, b_or_beta
 			Ndisc = 2 * np.exp(alpha - beta * Mi + sigma_m * epsilon)
