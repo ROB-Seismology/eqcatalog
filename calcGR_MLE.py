@@ -28,6 +28,11 @@ def estimate_gr_params(ni, Mi, dMi, completeness, end_date, precise=False,
 	uncertainties using maximum-likelihood estimation, following
 	the equations in Stromeyer & Gruenthal (2015)
 
+	An important property of MLE is that it always results in a MFD where the
+	cumulative number of events is equal to the observed cumulative number
+	(i.e., the cumulative MFD always goes through the 1st data point, which
+	acts like a kind of hinge point)!
+
 	:param ni:
 		1D array, number of observed earthquakes in each magnitude bin
 		Note:
@@ -532,7 +537,10 @@ def estimate_gr_params_curvefit(ni, Mi, dMi, completeness, end_date,
 										prior_b=None, max_b_var=0.001):
 	"""
 	Estimate Gutenberg-Richter parameters by directly fitting the incremental
-	or cumulative relation (log_e or log_10), minimizing the sum of squared residuals
+	or cumulative relation (log_e or log_10), minimizing the sum of squared residuals.
+
+	Note that, in contrast to MLE, earthquake numbers and timespans are
+	collapsed into rates.
 
 	:param ni:
 	:param Mi:
