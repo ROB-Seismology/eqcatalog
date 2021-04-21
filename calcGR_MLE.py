@@ -672,7 +672,10 @@ def construct_mfd_at_epsilon(a_or_alpha, b_or_beta, cov, epsilon, Mmin, Mmax, dM
 							precise=True, log10=False):
 	"""
 	Construct magnitude-frequency distribution (MFD) corresponding to a
-	particular epsilon value
+	particular epsilon value, by adding the uncertainties given by the
+	covariance matrix to the incremental rates following Stromeyer & Gruenthal
+	(2015). Note that this results in non-Gutenberg-Richter MFDs (i.e., not a
+	straight line in a classical log-linear plot)
 
 	:param a_or_alpha:
 		float, alpha or a value
@@ -703,8 +706,10 @@ def construct_mfd_at_epsilon(a_or_alpha, b_or_beta, cov, epsilon, Mmin, Mmax, dM
 
 	:return:
 		instance of :class:`rshalib.mfd.EvenlyDiscretizedMfd`
-		or (if :param:`epsilon` = 0 and :param:`log10` is True)
-		instance of :class:`rshalib.mfd.TruncatedGRMFD`
+		or (if :param:`epsilon` = 0)
+		instance of :class:`rshalib.mfd.TruncatedGRMFD` (if :param:`log10` is True)
+		or instance of :class:`rshalib.mfd.NatLogTruncatedGRMFD`
+		(if :param:`log10` is False)
 	"""
 	from hazard.rshalib.mfd import (TruncatedGRMFD, NatLogTruncatedGRMFD,
 											EvenlyDiscretizedMFD)
@@ -731,6 +736,7 @@ def construct_mfd_at_epsilon(a_or_alpha, b_or_beta, cov, epsilon, Mmin, Mmax, dM
 			Ndisc = (10**(a_val - b_val * Mi1 + sigma_m1 * epsilon)
 					- 10**(a_val - b_val * Mi2 + sigma_m2 * epsilon))
 		else:
+			## Eq. 4
 			alpha, beta = a_or_alpha, b_or_beta
 			Ndisc = 2 * np.exp(alpha - beta * Mi + sigma_m * epsilon)
 			if not precise:
