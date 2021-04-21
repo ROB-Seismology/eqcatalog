@@ -6,8 +6,7 @@ import datetime
 import numpy as np
 import hazard.rshalib as rshalib
 import eqcatalog
-from eqcatalog.calcGR_MLE import (estimate_gr_params, calc_gr_sigma,
-									construct_mfd_at_epsilon)
+from eqcatalog.calcGR_MLE import *
 
 
 
@@ -37,24 +36,46 @@ Mi += dM / 2.
 #ni = ni.astype('d')
 #ni[Mi > Mmax_obs] = np.nan
 
+## Curve_fit
+print('Curve fit')
+for incremental in (True, False):
+	for log10 in (True, False):
+		a_or_alpha, b_or_beta, cov = estimate_gr_params_curvefit(ni, Mi, dM,
+															completeness, end_date,
+															incremental=incremental, log10=log10)
+		print({True: 'inc', False: 'cumul'}[incremental],
+				{True: 'log_10', False: 'log_e'}[log10])
+		print('%.3f, %.3f' % (a_or_alpha, b_or_beta))
+		print(cov)
+
+## MLE
+print('MLE')
 precise = False
 alpha, beta, cov = estimate_gr_params(ni, Mi, dM, completeness, end_date,
-									precise=precise, log10=False)
+										precise=precise, log10=False)
 a, b, cov10 = estimate_gr_params(ni, Mi, dM, completeness, end_date,
-									precise=precise, log10=True)
+										precise=precise, log10=True)
+print('alpha', alpha)
+print('beta', beta)
+print('beta->b', beta / np.log(10))
+print('cov: ', cov)
+print('a: ', a)
+print('a->alpha', rshalib.mfd.truncated_gr.alphabetalambda(a, b, Mmin)[0])
+print('b: ', b)
+print('cov10: ', cov10)
+
+print('MLE (minimize)')
+_alpha, _beta, _cov = estimate_gr_params_minimize(ni, Mi, dM, completeness, end_date)
+print('alpha', _alpha)
+print('beta', _beta)
+print('cov', _cov)
+
 
 ## Values from paper
 #alpha = 5.2254
 #beta = 1.7951
 #cov = np.mat([[0.099, 0.0312], [0.0312, 0.0105]])
 
-#a = alpha / np.log(10)
-b = beta / np.log(10)
-print('alpha', alpha)
-print('beta', beta)
-print('a: ', a)
-print('b: ', b)
-print('cov: ', cov)
 
 ## Not correct
 print(np.exp(alpha - beta * Mmin))
@@ -108,3 +129,18 @@ mfd = rshalib.mfd.TruncatedGRMFD(Mmin, Mmax, dM, a, b)
 #print(tmfd.a_val)
 pylab.semilogy(Mi-dM/2., mfd.get_cumulative_rates())
 pylab.show()
+
+num_discretizations = 5
+n2 = (num_discretizations - 1) // 2
+epsilons, weights = discretize_normal_distribution(num_discretizations)
+observed_mfd = cc_cat.get_incremental_mfd(Mmin, Mmax, dM, end_date=end_date)
+mfd_list, weights = construct_mfd_pmf(alpha, beta, cov, Mmin, Mmax, dM,
+									num_discretizations, precise=precise, log10=False)
+mfd_list = [observed_mfd] + mfd_list
+labels = ['Observed'] + ['eps = %f' % eps for eps in epsilons]
+discrete = [True] + [False] * num_discretizations
+cumul_or_inc = ['both'] + ['cumul'] * num_discretizations
+colors = ['b'] + ['r'] * num_discretizations
+styles = ['o'] + ['--'] * n2 + ['-'] + ['--'] * n2
+rshalib.mfd.plot_mfds(mfd_list, labels=labels, colors=colors, styles=styles,
+					discrete=discrete, cumul_or_inc=cumul_or_inc)
