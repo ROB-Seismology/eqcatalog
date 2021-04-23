@@ -49,7 +49,13 @@ if not reloading:
 else:
 	reload(time)
 
-## completeness (no internal dependencies)
+## gen_id (depends on time)
+if not reloading:
+	from . import gen_id as gen_id
+else:
+	reload(gen_id)
+
+## completeness (depends on time)
 if not reloading:
 	from . import completeness
 else:
