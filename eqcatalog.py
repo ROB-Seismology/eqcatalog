@@ -3313,7 +3313,8 @@ class EQCatalog(object):
 	def compare_catalog(self, other_catalog, Mtype='MW', Mrelation={},
 							errt_max={1350: (1, 'D'), 1650: (1, 'h'), 1900: (60, 's'), 1985: (5, 's')},
 							errh_max=100., errM_max=1.,
-							multiple_match_criterion='score', verbose=False):
+							multiple_match_criterion='score', update_master=False,
+							verbose=False):
 		"""
 		Find events in another catalog that match with this (=master) catalog
 		and events that are missing in this catalog
@@ -3344,6 +3345,10 @@ class EQCatalog(object):
 			distance (1 pt. per 10 km) and magnitude difference (1 pt. per 0.3
 			magnitude units)
 			(default: 'score')
+		:param update_master:
+			bool, whether or not missing info (Nan mag, different event type)
+			in master catalog should be updated
+			(default: False)
 		:param verbose:
 			bool, whether or not to print information
 			(default: False)
@@ -3500,12 +3505,17 @@ class EQCatalog(object):
 				local_eq = self.__getitem__(catalog_idx)
 				## If event type in master catalog is se, set it to ke
 				if local_eq.event_type == 'se':
-					print('Suspected eq: ', local_eq)
-					local_eq.event_type = 'ke'
+					print('Suspected eq -> %s: ' % eq.event_type, local_eq)
+					if update_master:
+						local_eq.event_type = eq.event_type
 				## Update mag in master catalog if it is nan
-				if np.isnan(local_eq.mag.get(Mtype, np.nan)):
-					local_eq.mag[Mtype] = M
-				## We could also update ID and/or agency
+				if update_master:
+					if np.isnan(local_eq.mag.get(Mtype, np.nan)):
+						local_eq.mag[Mtype] = M
+					if np.isnan(local_eq.lon) or np.isnan(local_eq.lat):
+						local_eq.lon = eq.lon
+						local_eq.lat = eq.lat
+				## We could also update agency
 
 				if verbose and d >= 25:
 					print(eq)
@@ -4837,18 +4847,20 @@ class EQCatalog(object):
 		else:
 			marker_sizes = [marker_sizes] * len(self)
 		for eq, marker_size in zip(self.eq_list, marker_sizes):
-			cm = eq.to_folium_marker(marker_size=marker_size, edge_color=edge_color,
+			if not (np.isnan(eq.lon) or np.isnan(eq.lat)):
+				cm = eq.to_folium_marker(marker_size=marker_size, edge_color=edge_color,
 									edge_width=edge_width, fill_color=fill_color,
 									opacity=opacity, add_popup=add_popup)
-			cm.add_to(layer)
+				cm.add_to(layer)
 		return layer
 
 	def get_folium_map(self, bgmap='OpenStreetMap',
 						edge_color='blue', edge_width=1.,
-						fill_color=None, opacity=0.5, add_popup=True,
+						fill_color=None, opacity=0.5,
+						add_popup=True, lat_lon_popup=True,
 						Mtype="MW", Mrelation={},
 						mag_size_func=lambda M: 2 * np.sqrt(2.25**(M+1) / np.pi),
-						region=None, additional_layers=[]):
+						region=None, source_model_name='', additional_layers=[]):
 		"""
 		Generate folium map
 
@@ -4864,10 +4876,16 @@ class EQCatalog(object):
 		:param Mrelation:
 		:param mag_size_func:
 			see :meth:`to_folium_layer`
+		:param lat_lon_popup:
+			bool, whether or not to enable lat/lon popup when clicking on map
+			(default: True)
 		:param region:
 			(w, e, s, n) tuple specifying rectangular region of interest
 			in geographic coordinates
 			(default: None)
+		:param source_model_name:
+			str, name of supported source model to plot as background
+			(default: '')
 		:param additional_layers:
 			list with instances of :class:`folium.FeatureGroup` to add to the map
 			(default: [])
@@ -4876,6 +4894,13 @@ class EQCatalog(object):
 			instance of :class:`folium.Map`
 		"""
 		import folium
+
+		if source_model_name:
+			import hazard.rshalib as rshalib
+			somo = rshalib.rob.read_source_model(source_model_name)
+			layer = somo.to_folium_layer(area_fill_color='blue', area_fill_opacity=0.2,
+												fault_geom_type='both')
+			additional_layers = [layer] + additional_layers
 
 		layer = self.to_folium_layer(edge_color=edge_color,
 									edge_width=edge_width, fill_color=fill_color,
@@ -4895,7 +4920,8 @@ class EQCatalog(object):
 
 		map.fit_bounds(bounds)
 		folium.LayerControl().add_to(map)
-		folium.features.LatLngPopup().add_to(map)
+		if lat_lon_popup:
+			folium.features.LatLngPopup().add_to(map)
 
 		return map
 
