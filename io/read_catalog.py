@@ -6,11 +6,13 @@ Read earthquake catalogs from various sources
 
 from __future__ import absolute_import, division, print_function #, unicode_literals
 
-try:
+import sys
+if sys.version_info[0] == 2:
 	## Python 2
-	basestring
-except:
+	PY2 = True
+else:
 	## Python 3
+	PY2 = False
 	basestring = str
 
 
@@ -38,19 +40,23 @@ __all__ = ["read_named_catalog", "read_catalog_sql", "read_catalog_csv",
 
 
 def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=np.nan,
-						verbose=True):
+							include_non_tectonic=False, verbose=True):
 	"""
 	Read a known catalog (corresponding files should be in standard location)
 
 	:param catalog_name:
 		str, name of catalog ("ROB", HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
-		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS", "KNMI", "BENS")
+		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS", "KNMI", "BENS",
+		"HRF2020", "BENS+HRF2020")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
 		(default: np.nan)
+	:param include_non_tectonic:
+		bool, whether or not to include non-tectonic events if available
+		(default: False)
 	:param verbose:
 		bool, whether or not to print information while reading
 		GIS table (default: True)
@@ -62,8 +68,12 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 		from ..rob import query_local_eq_catalog
 		region = (0., 8., 49., 52.)
 		start_date = datetime.date(1350, 1, 1)
+		event_type = 'ke'
+		if include_non_tectonic:
+			event_type = 'all'
 		return query_local_eq_catalog(region=region, start_date=start_date,
-									null_value=null_value, verbose=verbose)
+									null_value=null_value, event_type=event_type,
+									verbose=verbose)
 
 	elif catalog_name.upper() in ("HARVARD_CMT", "HARVARD CMT"):
 		from ..harvard_cmt import get_harvard_cmt_catalog
@@ -137,13 +147,23 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 
 	elif catalog_name.upper() == 'KNMI':
 		csv_file = get_dataset_file_on_seismogis('KNMI_seismology', 'all_tectonic.csv')
+		column_map = {'date': 'YYMMDD', 'time': 'TIME', 'name': 'LOCATION',
+					'lat': 'LAT', 'lon': 'LON', 'depth': 'DEPTH',
+					'ML': 'MAG', 'agency': 'KNMI'}
 		if csv_file:
-			column_map = {'date': 'YYMMDD', 'time': 'TIME', 'name': 'LOCATION',
-						'lat': 'LAT', 'lon': 'LON', 'depth': 'DEPTH',
-						'ML': 'MAG', 'agency': 'KNMI'}
 			catalog = read_catalog_csv(csv_file, column_map, date_sep=None,
 							date_order='YMD', time_sep=None, has_header=True,
-							ID_prefix='KNMI')
+							ID_prefix='KNMI', encoding='utf-8')
+			if include_non_tectonic:
+				csv_file2 = get_dataset_file_on_seismogis('KNMI_seismology',
+																	'all_induced.csv')
+				catalog2 = read_catalog_csv(csv_file2, column_map, date_sep=None,
+								date_order='YMD', time_sep=None, has_header=True,
+								ID_prefix='KNMInd', encoding='utf-8')
+				for eq in catalog2:
+					eq.event_type = 'ki'
+				catalog += catalog2
+				catalog.sort()
 			catalog.name = 'KNMI catalog'
 			return catalog
 
@@ -152,11 +172,46 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 		if csv_file:
 			catalog = read_catalog_csv(csv_file, has_header=True, ID_prefix='BENS',
 											  column_map={'agency': 'BENS'})
-			catalog = catalog.subselect(attr_val=('event_type', ['ke']))
+			if not include_non_tectonic:
+				catalog = catalog.subselect(attr_val=('event_type', ['ke']))
 			for eq in catalog:
 				eq.name = eq.name.replace('"', '').strip()
+
+			## Read MW from CSV file published in JoS
+			if catalog_name.upper()[5:] == 'HRF2020':
+				csv_file2 = get_dataset_file_on_seismogis('Bensberg_seismology',
+															'HinzenReamerFleischer_JoS2020.csv')
+				column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
+								'second': 5, 'lat': 6, 'lon': 7, 'depth': 8, 'ML': 9, 'MW': 10}
+				catalog2 = read_catalog_csv(csv_file2, column_map=column_map, has_header=False,
+													ID_prefix='RHF')
+				eq_list = [eq for eq in catalog2 if not np.isnan(eq.mag['MW'])]
+				catalog2 = EQCatalog(eq_list)
+				common21, common12, missing, surplus = catalog2.compare_catalog(catalog,
+											Mtype='ML', errt_max={1975: np.timedelta64(10,'s')})
+				for eq1, eq2 in zip(common12, common21):
+					eq1.datetime = eq2.datetime
+					eq1.lon = eq2.lon
+					eq1.lat = eq2.lat
+					eq1.depth = eq2.depth
+					eq1.mag['ML'] = eq1.mag['ML']
+					eq1.mag['MW'] = eq2.mag['MW']
+					eq1.event_type = 'ke'
+				catalog += surplus
+				catalog.sort()
 			catalog.name = 'Erdbebenkatalog der Erdbebenstation Bensberg'
 			return catalog
+
+	elif catalog_name.upper() == 'HRF2020':
+			csv_file = get_dataset_file_on_seismogis('Bensberg_seismology',
+														'HinzenReamerFleischer_JoS2020.csv')
+			column_map = {'year': 0, 'month': 1, 'day': 2, 'hour': 3, 'minute': 4,
+							'second': 5, 'lat': 6, 'lon': 7, 'depth': 8, 'ML': 9, 'MW': 10}
+			if csv_file:
+				catalog = read_catalog_csv(csv_file, column_map=column_map,
+												has_header=False, ID_prefix='RHF')
+				catalog.name = 'HinzenReamerFleischer 2020'
+				return catalog
 
 	else:
 		date_sep = '/'
@@ -289,11 +344,11 @@ def read_catalog_sql(sql_db, tab_name, query='', column_map={}, ID_prefix='',
 def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 					date_sep='-', time_sep=':', date_order='YMD',
 					comment_char='#', ignore_chars=[], ignore_errors=False,
-					null_value=np.nan, verbose=False, **fmtparams):
+					null_value=np.nan, encoding=None, verbose=False, **fmtparams):
 	"""
 	Read earthquake catalog from CSV file with columns defining
 	earthquake properties: ID, datetime or (date or (year, month, day))
-	and (time or (hours, minutes, seconds)), lon, lat, depth, name,
+	and (time or (hour, minute, second)), lon, lat, depth, name,
 	zone, (Mtype and Mag) or (ML and/or MS and/or MW), intensity_max,
 	macro_radius, errh, errz, errt, errM.
 
@@ -349,6 +404,9 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
 		(default: np.nan)
+	:param encoding:
+		str, encoding of CSV file, if it is different from the standard encoding
+		(default: None)
 	:param verbose:
 		bool, whether or not to print information while reading file
 		(default: True)
@@ -362,7 +420,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 	import csv
 
 	## python CSV module has no mechanism to skip comments
-	def decomment(csv_fp, comment_char):
+	def decomment(csv_fp, comment_char, encoding=None):
 		for row in csv_fp:
 			raw = row.split(comment_char)[0].strip()
 			if raw:
@@ -371,7 +429,10 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 	if verbose:
 		print("Reading CSV earthquake catalog from %s" % csv_filespec)
 
-	with open(csv_filespec, "r") as fp:
+	kwargs = {}
+	if not PY2 and encoding:
+		kwargs['encoding'] = encoding
+	with open(csv_filespec, "r", **kwargs) as fp:
 		## Auto-detect header containing column names
 		if has_header is None:
 			sniffer = csv.Sniffer()
@@ -390,17 +451,19 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 
 		eq_list = []
 		num_skipped = 0
-		reader = csv.DictReader(decomment(fp, comment_char),
+		reader = csv.DictReader(decomment(fp, comment_char, encoding),
 								fieldnames=fieldnames, **fmtparams)
 		for r, row in enumerate(reader):
 			## If column_map is still empty, infer it from keys of 1st row
 			if r == 0 and not column_map:
 				for col_name in row.keys():
-					col_name = col_name.strip()
-					if col_name in ('ID', 'ML', 'MS', 'MW', 'Mtype'):
-						column_map[col_name] = col_name
-					else:
-						if col_name is not None:
+					if col_name is not None:
+						col_name = col_name.strip()
+						if PY2 and encoding:
+							col_name = col_name.decode(encoding)
+						if col_name in ('ID', 'ML', 'MS', 'MW', 'Mtype'):
+							column_map[col_name] = col_name
+						else:
 							column_map[col_name.lower()] = col_name
 
 			## Remove unmapped columns
@@ -424,9 +487,14 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 				if val:
 					row[key] = val.strip()
 
+			## Encoding
+			if PY2 and encoding:
+				for key, val in row.items():
+					val = val.decode(encoding)
+
 			## If no ID is present, use record number
 			ID_key = column_map.get('ID', 'ID')
-			row[ID_key] = ID_prefix + str(row.get(ID_key, r))
+			row[ID_key] = ID_prefix + '-' + str(row.get(ID_key, r))
 
 			try:
 				eq = LocalEarthquake.from_dict_rec(row, column_map=column_map,
