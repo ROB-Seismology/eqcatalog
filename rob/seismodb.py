@@ -140,7 +140,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 						Mmin=None, Mmax=None, min_depth=None, max_depth=None,
 						id_earth=None, sort_key="date", sort_order="asc",
 						event_type="ke", has_open_enquiry=None, null_value=np.nan,
-						verbose=False, errf=None):
+						skip_null=True, verbose=False, errf=None):
 	"""
 	Query ROB catalog of local earthquakes.
 
@@ -188,6 +188,9 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 	:param null_value:
 		float, value to use for NULL values (except magnitude)
 		(default: np.nan)
+	:param skip_null:
+		bool, whether or not to skip records with NULL location and magnitude
+		(default: True)
 	:param verbose:
 		Bool, if True the query string will be echoed to standard output
 	:param errf:
@@ -333,7 +336,7 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 
 		## Skip records without lon, lat, depth and magnitude
 		if not query_for_id:
-			if lon == lat == depth == M == None:
+			if skip_null and (lon == lat == depth == M == None):
 				num_skipped += 1
 				continue
 
