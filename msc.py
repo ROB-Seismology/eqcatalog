@@ -385,6 +385,38 @@ class ReamerHinzen2004Q(MSCE_ML_MW):
 		return None
 
 
+class HinzenEtAl2020L(MSCE_ML_MW):
+	"""
+	Conversion ML(Bensberg) -> MW, linear regression
+	valid for range -0.7 <= ML <= 4.6
+
+	Published in:
+	Hinzen, Reamer & Fleischer, Journal of Seismology, 2020
+	"""
+	def get_mean(self, ML):
+		MW = 0.691 * ML + 0.757
+		return MW
+
+	def get_sigma(self, ML=None):
+		return None
+
+
+class HinzenEtAl2020Q(MSCE_ML_MW):
+	"""
+	Conversion ML(Bensberg) -> MW, quadratic regression
+	valid for range -0.7 <= ML <= 4.6
+
+	Published in:
+	Hinzen, Reamer & Fleischer, Journal of Seismology, 2020
+	"""
+	def get_mean(self, ML):
+		MW = 0.674 * ML + 0.0064 * ML* ML + 0.766
+		return MW
+
+	def get_sigma(self, ML=None):
+		return None
+
+
 class Scordilis2006(MSCE_MS_MW):
 	"""
 	Conversion MS -> MW
