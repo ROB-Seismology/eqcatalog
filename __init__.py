@@ -131,6 +131,13 @@ else:
 	reload(eqcatalog)
 from .eqcatalog import (EQCatalog, concatenate_catalogs)
 
+## merged_catalog (depends on eqcatalog)
+if not reloading:
+	from . import merged_catalog
+else:
+	reload(merged_catalog)
+from .merged_catalog import *
+
 ## composite_catalog (depends on completeness, eqcatalog)
 if not reloading:
 	from . import composite_catalog
