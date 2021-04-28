@@ -208,9 +208,9 @@ class LocalEarthquake(object):
 	def __repr__(self):
 		mag_txt = ', '.join(['%s=%.1f' % (Mtype, getattr(self, Mtype))
 							for Mtype in self.get_Mtypes()])
-		txt = '<EQ #%s | %s %s | %s | %.3f %.3f %.1f km | %s>'
+		txt = '<EQ #%s | %s %s | %s | %.3f %.3f %.1f km | %s | %s>'
 		txt %= (self.ID, self.date, self.time, self.name, self.lon, self.lat,
-				self.depth, mag_txt)
+				self.depth, mag_txt, self.event_type)
 		return txt
 
 	@classmethod
@@ -1042,6 +1042,8 @@ class LocalEarthquake(object):
 				popup += 'MS: %.1f<br>' % MS
 			if MW and not np.isnan(MW):
 				popup += 'MW: %.1f<br>' % MW
+			popup += 'Event type: %s<br>' % self.event_type
+			popup += 'Agency: %s<br>' % self.agency
 			## Note: IFrame is necessary to get line breaks
 			## Popup(..., parse_html=True) is necessary to avoid blank map
 			## if number of markers is too high
