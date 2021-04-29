@@ -3313,8 +3313,8 @@ class EQCatalog(object):
 	def compare_catalog(self, other_catalog, Mtype='MW', Mrelation={},
 							errt_max={1350: (1, 'D'), 1650: (1, 'h'), 1900: (60, 's'), 1985: (5, 's')},
 							errh_max=100., errM_max=1.,
-							multiple_match_criterion='score', update_master=False,
-							verbose=False):
+							multiple_match_criterion='score', match_nan=True,
+							update_master=False, verbose=False):
 		"""
 		Find events in another catalog that match with this (=master) catalog
 		and events that are missing in this catalog
@@ -3345,6 +3345,12 @@ class EQCatalog(object):
 			distance (1 pt. per 10 km) and magnitude difference (1 pt. per 0.3
 			magnitude units)
 			(default: 'score')
+		:param match_nan:
+			bool, whether or not to match NaN magnitudes and/or locations
+			for single matches. If there are multiple matches, NaN locations and
+			NaN magnitudes will receive a lower score but may still be matched.
+			If False, NaN magnitudes/locations are never matched.
+			(default: True)
 		:param update_master:
 			bool, whether or not missing info (Nan mag, different event type)
 			in master catalog should be updated
@@ -3367,7 +3373,6 @@ class EQCatalog(object):
 
 		Notes:
 		- common events have same index in common_catalog1 and common_catalog2
-		- events with NaN magnitude in master catalog are never matched.
 		"""
 		from mapping.geotools.geodetic import spherical_distance
 		from .time import fractional_time_delta
@@ -3405,7 +3410,9 @@ class EQCatalog(object):
 
 		common_events2, missing_events = [], []
 		common_catalog_idxs = []
-		for eq in other_catalog:
+		## Note: to improve matching of events that are closely spaced in time,
+		## we match higher magnitudes first!
+		for eq in other_catalog.get_sorted(key=Mtype, order='desc'):
 			yr = errt_years[eq.year >= errt_years][-1]
 			errt_max = year_errt_max[yr]
 			yr = errh_years[eq.year >= errh_years][-1]
@@ -3418,13 +3425,16 @@ class EQCatalog(object):
 
 			## Compute mag and distances regardless of compare_x options
 			M = eq.get_or_convert_mag(Mtype=Mtype, Mrelation=Mrelation)
-			#dists = (spherical_distance(eq.lon, eq.lat, lons1[unmatched][idxs],
-			#								  lats1[unmatched][idxs]) / 1000.)
 			dists = (spherical_distance(eq.lon, eq.lat, lons1[unmatched],
 											  lats1[unmatched]) / 1000.)
 
 			## idxs refers to unmatched catalog
-			idxs = np.where((time_deltas <= errt_max) & (dists <= errh_max))[0]
+			idxs = (time_deltas <= errt_max)
+			if match_nan:
+				idxs &= ((dists <= errh_max) | (np.isnan(dists)))
+			else:
+				idxs &= (dists <= errh_max)
+			idxs = np.where(idxs)[0]
 			dists = dists[idxs]
 
 			if len(idxs) == 0:
@@ -3434,17 +3444,18 @@ class EQCatalog(object):
 				## Only 1 match, idx refers to unmatched catalog
 				[idx] = idxs
 				[d] = dists
-				if not np.isnan(M):
-					delta_mag = np.abs(M - mags1[unmatched][idx])
-					if np.isnan(delta_mag):
-						## Consider match, M in master catalog will be updated
-						match = 1
-					elif delta_mag <= errM_max:
-						match = 1
-				else:
+				#if not np.isnan(M):
+				delta_mag = np.abs(M - mags1[unmatched][idx])
+				match = 0
+				if np.isnan(delta_mag) and match_nan:
+					## Consider match, M in master catalog will be updated
+					match = 1
+				elif delta_mag <= errM_max:
+					match = 1
+				#else:
 					## If M is nan, consider it no match
 					## eq will not be appended to missing events anyway
-					match = 0
+				#	match = 0
 			else:
 				## More than 1 possible match
 				if verbose:
@@ -3458,27 +3469,34 @@ class EQCatalog(object):
 					match = 1
 					idx = idxs[np.nanargmin(dists)]
 				elif multiple_match_criterion[:3] == 'mag':
-					if not np.isnan(M):
-						delta_mags = np.abs(M - mags1[unmatched][idxs])
-						try:
-							idx = idxs[np.nanargmin(delta_mags)]
-						except ValueError:
-							match = 0
-						else:
-							if np.nanmin(delta_mags) <= errM_max:
-								match = 1
+					match = 0
+					#if not np.isnan(M):
+					delta_mags = np.abs(M - mags1[unmatched][idxs])
+					try:
+						idx = idxs[np.nanargmin(delta_mags)]
+					except ValueError:
+						match = 0
 					else:
+						if delta_mags[idx] <= errM_max:
+							match = 1
+					#else:
 						#idx = idxs[np.nanargmin(time_deltas)]
 						#idx = idxs[np.argmin(mags1[unmatched][idxs])]
 						#match = 1
-						match = 0
+					#	match = 0
 				elif multiple_match_criterion == 'score':
 					## Compute score: 1 pt / sec, 1 pt / 10 km, 1 pt / 0.3 dM
 					time_deltas = timelib.fractional_time_delta(time_deltas, 's')
+					## Give NaN distances lower score
+					if match_nan:
+						dists[np.isnan(dists)] = 100
 					scores = time_deltas[idxs] + dists / 10.
-					if not np.isnan(M):
-						delta_mags = np.abs(M - mags1[unmatched][idxs])
-						scores += (delta_mags / 0.3)
+					#if not np.isnan(M):
+					delta_mags = np.abs(M - mags1[unmatched][idxs])
+					## Give NaN delta_mags lower score
+					if match_nan:
+						delta_mags[np.isnan(delta_mags)] = 3
+					scores += (delta_mags / 0.3)
 						#print(time_deltas[idxs])
 						#print(dists)
 						#print(delta_mags)
@@ -3486,7 +3504,7 @@ class EQCatalog(object):
 					try:
 						idx = idxs[np.nanargmin(scores)]
 					except:
-						## delta_mags is all NaN
+						## dists or delta_mags is all NaN
 						match = 0
 					else:
 						match = 1
@@ -3523,8 +3541,9 @@ class EQCatalog(object):
 					print('   d=%.1f km' % d)
 
 				td = time_deltas[idx]
-				eq.errt = fractional_time_delta(td, 's')
-				eq.errh = d
+				if update_master:
+					eq.errt = fractional_time_delta(td, 's')
+					eq.errh = d
 				#eq.event_type = self.__getitem__(idx).event_type
 				common_events2.append(eq)
 				common_catalog_idxs.append(catalog_idx)
@@ -3534,8 +3553,8 @@ class EQCatalog(object):
 				#	print('')
 			else:
 				## Add to missing events if M is not nan
-				if not np.isnan(M):
-					missing_events.append(eq)
+				#if not np.isnan(M):
+				missing_events.append(eq)
 				#if verbose:
 				#	print(eq)
 				#	print('')
