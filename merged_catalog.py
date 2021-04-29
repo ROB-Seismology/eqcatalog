@@ -92,6 +92,39 @@ class MergedEvent:
 						solution.mag[Mtype] = mag
 		return solution
 
+	def get_average_solution(self):
+		"""
+		Construct average solution for event
+
+		:return:
+			instance of :class:`eqcatalog.LocalEarthquake`
+		"""
+		from . import time as timelib
+		from .eqrecord import LocalEarthquake
+
+		master_solution = self.get_master_solution()
+		ID = self.ID
+		name = master_solution.name
+		## np.mean() not supported for np.datetime64 objects
+		master_dt = master_solution.datetime
+		time_deltas = [eq.datetime - master_dt for eq in self.solutions.values()]
+		print(time_deltas, np.mean(time_deltas))
+		dt = master_dt + np.mean(time_deltas)
+		date = timelib.to_py_date(dt)
+		time = timelib.to_py_time(dt)
+		lon = np.nanmean([eq.lon for eq in self.solutions.values()])
+		lat = np.nanmean([eq.lat for eq in self.solutions.values()])
+		depth = np.nanmean([eq.depth for eq in self.solutions.values()])
+		mag = {}
+		Mtypes = set([])
+		for eq in self.solutions.values():
+			Mtypes = Mtypes.union(eq.mag.keys())
+		for Mtype in Mtypes:
+			mag[Mtype] = np.nanmean([eq.mag.get(Mtype, np.nan)
+							for eq in self.solutions.values()])
+
+		return LocalEarthquake(ID, date, time, lon, lat, depth, mag, name=name)
+
 	def get_agencies(self):
 		"""
 		List all agencies with a solution for this event
@@ -300,9 +333,9 @@ class MergedEvent:
 		distances = self.calc_distances(wrt=wrt)
 		mag_deltas = self.calc_mag_deltas(Mtype=Mtype, Mrelation=Mrelation, wrt=wrt)
 
-		max_time_delta = np.max(np.abs(list(time_deltas.values())))
-		max_dist = np.max(list(distances.values()))
-		max_mag_delta = np.max(np.abs(list(mag_deltas.values())))
+		max_time_delta = np.nanmax(np.abs(list(time_deltas.values())))
+		max_dist = np.nanmax(list(distances.values()))
+		max_mag_delta = np.nanmax(np.abs(list(mag_deltas.values())))
 
 		return (max_time_delta, max_dist, max_mag_delta)
 
