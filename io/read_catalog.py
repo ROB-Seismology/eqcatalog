@@ -187,8 +187,13 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 													ID_prefix='RHF')
 				eq_list = [eq for eq in catalog2 if not np.isnan(eq.mag['MW'])]
 				catalog2 = EQCatalog(eq_list)
-				common21, common12, missing, surplus = catalog2.compare_catalog(catalog,
-											Mtype='ML', errt_max={1975: np.timedelta64(10,'s')})
+				common12, common21, missing, surplus = catalog.compare_catalog(catalog2,
+											Mtype='ML', errt_max={1975: np.timedelta64(10,'s')},
+											match_nan=True)
+				if verbose:
+					print('Merging BENS with HRF2020:')
+					print('matched %d events, added %d events'
+							% (len(common12), len(missing)))
 				for eq1, eq2 in zip(common12, common21):
 					eq1.datetime = eq2.datetime
 					eq1.lon = eq2.lon
@@ -197,7 +202,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 					eq1.mag['ML'] = eq1.mag['ML']
 					eq1.mag['MW'] = eq2.mag['MW']
 					eq1.event_type = 'ke'
-				catalog += surplus
+				catalog += missing
 				catalog.sort()
 			catalog.name = 'Erdbebenkatalog der Erdbebenstation Bensberg'
 			return catalog
