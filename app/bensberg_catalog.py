@@ -66,14 +66,14 @@ def fetch_bensberg_catalog():
 				if time[6:] == '60.000000':
 					time = time[:6] + '59.990000'
 				time = datetime.time.fromisoformat(time)
-				lat = float(line[22:28])
-				lon = float(line[29:35])
+				lat = float(line[21:28])
+				lon = float(line[28:35])
 				try:
 					depth = float(line[36:40])
 				except:
 					depth = np.nan
 				try:
-					mag = float(line[43:46])
+					mag = float(line[42:46])
 				except:
 					mag = np.nan
 				event_type = line[47]
