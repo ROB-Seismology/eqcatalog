@@ -155,7 +155,7 @@ def generate_event_id(datetime, prefix, pattern, offset=0):
 						code = code.upper()
 					event_id += code
 				elif pattern[i] == 'Y':
-					event_id += str(year)
+					event_id += '%04d' % year
 				elif pattern[i] == 'p':
 					event_id += prefix
 				else:
