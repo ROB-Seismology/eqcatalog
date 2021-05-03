@@ -1997,10 +1997,12 @@ class DYFIEnsemble(object):
 			std = np.nanstd(cii)
 			deviation = np.abs(cii - mean)
 			is_outlier = deviation > max_deviation * std
+			filtered_dyfi = self.filter_floors(*filter_floors)
 		else:
 			is_outlier = np.zeros_like(self.CII, dtype=np.bool)
+			filtered_dyfi = self
 
-		return self.__getitem__(~is_outlier)
+		return filtered_dyfi.__getitem__(~is_outlier)
 
 	def filter_floors(self, min_level=0, max_level=4, keep_nan_values=True):
 		"""
