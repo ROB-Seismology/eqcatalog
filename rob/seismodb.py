@@ -215,7 +215,8 @@ def query_local_eq_catalog(region=None, start_date=None, end_date=None,
 		if isinstance(start_date, int):
 			start_date = '%d-01-01' % start_date
 		elif start_date is None:
-			start_date = '1350-01-01'
+			#start_date = '1350-01-01'
+			start_date = '800-01-01'
 		start_date = as_np_datetime(start_date)
 
 		if isinstance(end_date, int):
