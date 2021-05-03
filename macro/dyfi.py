@@ -1726,12 +1726,13 @@ class DYFIEnsemble(object):
 		macro_infos = []
 		imt = agg_info.upper()
 		for key in list(agg_ensemble_dict.keys()):
-			num_replies = agg_ensemble_dict[key].num_replies
+			agg_ensemble = agg_ensemble_dict[key]
+			num_replies = agg_ensemble.num_replies
 			if num_replies < min_replies:
 				agg_ensemble_dict.pop(key)
 				continue
 
-			I, residual = agg_ensemble_dict[key].get_aggregated_intensity(
+			I, residual = agg_ensemble.get_aggregated_intensity(
 								agg_info=agg_info, agg_method=agg_method,
 								include_other_felt=include_other_felt,
 								include_heavy_appliance=include_heavy_appliance,
@@ -1740,11 +1741,20 @@ class DYFIEnsemble(object):
 			if agg_info == "num_replies":
 				I = 1
 
-			unique_id_coms = np.unique(agg_ensemble_dict[key].commune_ids)
+			if max_deviation:
+				## Remove outliers from the ensemble, so we know exactly which
+				## enquiries contribute to the aggregation
+				## Note that this involves some duplicate calculations
+				agg_ensemble = agg_ensemble.remove_outliers(max_deviation)
+				if agg_ensemble.num_replies < min_replies:
+					agg_ensemble_dict.pop(key)
+					continue
+
+			unique_id_coms = np.unique(agg_ensemble.commune_ids)
 			id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
-			unique_id_earths = np.unique(agg_ensemble_dict[key].event_ids)
+			unique_id_earths = np.unique(agg_ensemble.event_ids)
 			id_earth = unique_id_earths[0] if len(unique_id_earths) == 1 else None
-			web_ids = agg_ensemble_dict[key].ids
+			web_ids = agg_ensemble.ids
 
 			if aggregate_by in ('distance', 'polygon'):
 				geom_key_val = key
@@ -1752,8 +1762,8 @@ class DYFIEnsemble(object):
 				geom_key_val = None
 
 			if aggregate_by in ('id_com', 'id_main') or not aggregate_by:
-				lon = agg_ensemble_dict[key].longitudes[0]
-				lat = agg_ensemble_dict[key].latitudes[0]
+				lon = agg_ensemble.longitudes[0]
+				lat = agg_ensemble.latitudes[0]
 			elif aggregate_by[:4] == 'grid':
 				lon, lat = key
 			elif aggregate_by == 'polygon':
@@ -1953,7 +1963,9 @@ class DYFIEnsemble(object):
 					include_unmatched_polygons=include_unmatched_polygons)
 
 	#def remove_outliers(self, min_pct=2.5, max_pct=97.5):
-	def remove_outliers(self, max_deviation=2.):
+	def remove_outliers(self, max_deviation=2., recalc_cii=True,
+							filter_floors=(0, 4), include_other_felt=True,
+							include_heavy_appliance=False):
 		"""
 		Remove outliers (with CII outside of mean +/- nr. of standard deviations)
 		from ensemble
@@ -1962,15 +1974,28 @@ class DYFIEnsemble(object):
 			float, maximum allowed deviation in terms of number of
 			standard deviations
 			(default: 2.)
+		:param recalc_cii:
+			bool, whether or not CII should be recalculated
+			(default: True)
+		:param filter_floors:
+		:param include_other_felt:
+		:param include_heavy_appliance:
+			see :meth:`calc_cii`, only apply if :param:`recalc_cii` is True
 
 		:return:
 			instance of :class:`MDPCollection`
 		"""
-		# TODO: add recalc_cii option, but requires additional parameters...?
 		if max_deviation:
-			mean = np.nanmean(self.CII)
-			std = np.nanstd(self.CII)
-			deviation = np.abs(self.CII - mean)
+			if not recalc_cii:
+				cii = self.CII
+			else:
+				cii = self.calc_cii(aggregate=False, filter_floors=filter_floors,
+										include_other_felt=include_other_felt,
+										include_heavy_appliance=include_heavy_appliance)
+
+			mean = np.nanmean(cii)
+			std = np.nanstd(cii)
+			deviation = np.abs(cii - mean)
 			is_outlier = deviation > max_deviation * std
 		else:
 			is_outlier = np.zeros_like(self.CII, dtype=np.bool)
@@ -2197,7 +2222,7 @@ class DYFIEnsemble(object):
 	def calc_cws(self, aggregate=True, filter_floors=(0, 4),
 				include_other_felt=True, include_heavy_appliance=False,
 				max_deviation=None, max_nan_pct=100,
-				overwrite=False):
+				overwrite=False, return_outlier_indexes=False):
 		"""
 		Compute Community Weighted Sum (CWS) following Wald et al. (1999)
 
@@ -2227,9 +2252,14 @@ class DYFIEnsemble(object):
 			bool, whether or not :prop:`CWS` should be overwritten
 			Only applies if :param:`aggregate` is False
 			(default: False)
+		:param return_outlier_indexes:
+			bool, whether or not to return indexes of outliers as well
+			if :param:`max_devation` is set and :param:`aggregate` is True
+			(default: False)
 
 		:return:
 			float or float array, CWS
+			or (CWS, idxs array)
 		"""
 		if filter_floors:
 			min_floor, max_floor = filter_floors
@@ -2258,7 +2288,7 @@ class DYFIEnsemble(object):
 							+ 5 * damage_indexes)
 
 		if aggregate:
-			## Aggregate calculation may be affected by biases
+			## Aggregated calculation may be affected by biases
 			## It is not possible to remove outliers for individual indexes,
 			## but we can compute non-aggregated intensities first,
 			## and determine outliers from that distribution
@@ -2336,7 +2366,10 @@ class DYFIEnsemble(object):
 			if overwrite:
 				self.set_prop_values('CWS', cws)
 
-		return cws
+		if max_deviation and return_outlier_indexes:
+			return (cws, idxs)
+		else:
+			return cws
 
 	def calc_cdi(self, aggregate=True, filter_floors=(0, 4),
 				include_other_felt=True, include_heavy_appliance=False,
@@ -2462,7 +2495,7 @@ class DYFIEnsemble(object):
 					include_heavy_appliance=include_heavy_appliance)
 		if max_deviation:
 			_mean = np.nanmean(cii_or_cdi)
-			_std = np.std(cii_or_cdi)
+			_std = np.nanstd(cii_or_cdi)
 			deviation = np.abs(cii_or_cdi - _mean)
 			is_outlier = deviation > max_deviation * _std
 			cii_or_cdi = cii_or_cdi[~is_outlier]
