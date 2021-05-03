@@ -1206,9 +1206,9 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			instance of :class:`MacroseismicEnquiryEnsemble`
 		"""
 		ensemble = self.copy()
-		ensemble.fix_felt_is_none()
-		ensemble.fix_not_felt()
-		ensemble.fix_commune_ids()
+		ensemble.fix_felt_is_none(verbose=verbose)
+		ensemble.fix_not_felt(verbose=verbose)
+		ensemble.fix_commune_ids(verbose=verbose)
 		if len(ensemble) > 0:
 			ensemble.set_main_commune_ids()
 		ensemble = ensemble.remove_duplicate_records(verbose=verbose)
