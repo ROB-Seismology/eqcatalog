@@ -1648,6 +1648,13 @@ class DYFIEnsemble(object):
 				grid_spacing = 5
 			srs = kwargs.get('srs', 'LAMBERT1972')
 			agg_ensemble_dict = ensemble.split_by_grid_cells(grid_spacing, srs=srs)
+			try:
+				unassigned = agg_ensemble_dict.pop((np.inf, np.inf))
+			except KeyError:
+				unassigned = None
+			else:
+				print('Note: %d enquiries have no location info'
+						% unassigned.num_replies)
 
 		elif aggregate_by == 'polygon':
 			poly_data, value_key = kwargs['poly_data'], kwargs['value_key']
