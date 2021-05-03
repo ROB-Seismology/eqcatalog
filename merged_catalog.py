@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 """
+Create merged catalog based on ROB / KNMI / BENS and optionally SIHEX /BGS
+catalogs, keeping solutions by all agencies for each event.
+
 Created on Wed Apr 21 11:25:44 2021
 
 @author: kris
@@ -607,6 +610,7 @@ class MergedCatalog:
 				if unique and len(ev_agencies) > 1:
 					continue
 				merged_events.append(ev)
+
 		return self.__class__(merged_events,
 									default_completeness=self.default_completeness,
 									default_Mrelations=self.default_Mrelations,
@@ -1175,3 +1179,68 @@ class MergedCatalog:
 
 		return ordered_match_scores
 
+	def find_missing_events(self, agency, buffer_distance=0,
+									start_date=None, Mmin=None, Mmax=None,
+									Mtype='MW', Mrelation={}):
+		"""
+		Find events in the authoritative area and period of activity of a given
+		agency that have not been detected by this agency, but by one or more
+		other agencies
+
+		:param agency:
+			str, name of agency for which to find missing events
+		:param buffer_distance:
+			float, buffer distance (in km) to consider around agency's
+			authoritative area
+			(default: 0)
+		:param start_date:
+			date specification understood by eqcatalog, start date
+			(default: None, will auto-determine start date of agency catalog)
+		:param Mmin:
+			float, minimum magnitude to consider
+			(default: None)
+		:param Mmax:
+			float, maximum magnitude to consider
+			(default: None)
+		:param Mtype:
+			str, magnitude type for :param:`Mmin` and :param:`Mmax`
+			(default: 'MW')
+		:param Mrelation:
+			dict, mapping agency names to dicts, mapping Mtypes to instances
+			of :class:`eqcatalog.msc.MSCE`
+			or dict mapping Mtypes to instances of :class:`eqcatalog.msc.MSCE`
+			for converting to given Mtype
+			(default: {})
+
+		:return:
+			instance of :class:`MergedCatalog`
+		"""
+		from itertools import combinations
+
+		## Determine start date if not given
+		if not start_date:
+			agency_merged_cat = self.subselect_by_agency(agency, unique=True)
+			start_date = agency_merged_cat.get_master_catalog().Tminmax()[0]
+
+		area_agency_merged_cat = self.subselect_by_agency_area(agency,
+															buffer_distance=buffer_distance)
+		area_agency_merged_cat = area_agency_merged_cat.subselect(start_date=start_date,
+															Mmin=Mmin, Mmax=Mmax,
+															Mtype=Mtype, Mrelation=Mrelation)
+
+		other_agencies = self.get_agencies()
+		other_agencies.remove(agency)
+		merged_events = []
+		for n in range(len(other_agencies)):
+			for agency_combo in combinations(other_agencies, n+1):
+				unique_agency_merged_cat = area_agency_merged_cat.subselect_by_agencies(
+																	agency_combo, unique=True)
+				merged_events += unique_agency_merged_cat.merged_events
+
+		catalog_name = '%s missing events' % agency
+		merged_catalog = self.__class__(merged_events, name=catalog_name,
+											default_completeness=self.default_completeness,
+											default_Mrelations=self.default_Mrelations,
+											agency_areas=self.agency_areas)
+
+		return merged_catalog.get_sorted()
