@@ -433,6 +433,9 @@ class MDPCollection():
 		from mapping.geotools.geodetic import ellipsoidal_distance_and_azimuth
 
 		rec_lons, rec_lats = self.get_longitudes(), self.get_latitudes()
+		## Catch np.inf values
+		rec_lons[np.isinf(rec_lons)] = np.nan
+		rec_lats[np.isinf(rec_lats)] = np.nan
 		distances, azimuths, back_azimuths = ellipsoidal_distance_and_azimuth(
 															lon, lat, rec_lons, rec_lats)
 		distances = np.array(distances) / 1000.
