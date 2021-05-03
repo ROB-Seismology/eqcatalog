@@ -43,7 +43,7 @@ class MergedEvent:
 		return len(self.solutions)
 
 	def __iter__(self):
-		return self.solutions.iter()
+		return self.solutions.values().__iter__()
 
 	## Note: set all defaults to False because otherwise get_event_index
 	## method of MergedCatalog takes too long!
@@ -1238,9 +1238,36 @@ class MergedCatalog:
 				merged_events += unique_agency_merged_cat.merged_events
 
 		catalog_name = '%s missing events' % agency
+		default_completeness = self.default_completeness.copy().pop(agency)
+		default_Mrelations = self.default_Mrelations.copy().pop(agency)
+		agency_areas = self.agency_areas.copy().pop(agency)
+		merged_catalog = self.__class__(merged_events, name=catalog_name,
+											default_completeness=default_completeness,
+											default_Mrelations=default_Mrelations,
+											agency_areas=agency_areas)
+
+		return merged_catalog.get_sorted()
+
+	def find_ambiguous_event_types(self):
+		"""
+		Find events with different event types assigned by different agencies
+
+		:return:
+			instance of :class:`MergedCatalog`
+		"""
+		merged_events = []
+		for ev in self:
+			num_solutions = len(ev)
+			if num_solutions > 1:
+				event_types = set([solution.event_type for solution in ev])
+				if len(event_types) > 1:
+					merged_events.append(ev)
+
+		catalog_name = self.name + ' (ambiguous event types)'
+
 		merged_catalog = self.__class__(merged_events, name=catalog_name,
 											default_completeness=self.default_completeness,
 											default_Mrelations=self.default_Mrelations,
 											agency_areas=self.agency_areas)
 
-		return merged_catalog.get_sorted()
+		return merged_catalog
