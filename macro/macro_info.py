@@ -577,8 +577,9 @@ class AggregatedMacroInfoCollection():
 		return multi_data.export_gis(format, filespec, encoding=encoding)
 
 	def plot_map(self, region=(2, 7, 49.25, 51.75), projection="merc",
-				graticule_interval=(1, 1), plot_info="intensity",
-				int_conversion="round", symbol_style=None, line_style="default",
+				graticule_interval=(1, 1), graticule_style="default",
+				plot_info="intensity", int_conversion="round",
+				symbol_style=None, line_style="default",
 				thematic_num_replies=False, thematic_classes=None, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
 				country_style="default", city_style="default",
