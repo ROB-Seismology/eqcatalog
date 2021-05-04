@@ -5,11 +5,13 @@ Classes corresponding to records in database
 
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-try:
+import sys
+if sys.version_info[0] == 2:
 	## Python 2
-	basestring
-except:
+	PY2 = True
+else:
 	## Python 3
+	PY2 = False
 	basestring = str
 
 
@@ -478,17 +480,15 @@ class LocalEarthquake(object):
 		"""
 		Generate json string
 		"""
-		def json_handler(obj):
-			if isinstance(obj, (datetime.time, datetime.date)):
-				return repr(obj)
-			elif isinstance(obj, np.datetime64):
-				return str(obj)
-			else:
-				return obj.__dict__
+		from mapping.geotools.json_handler import json_handler
 
 		key = '__%s__' % self.__class__.__name__
 		dct = {key: self.__dict__}
-		return json.dumps(dct, default=json_handler, encoding="latin1")
+
+		if PY2:
+			return json.dumps(dct, default=json_handler, encoding="latin1")
+		else:
+			return json.dumps(dct, default=json_handler)
 
 	@classmethod
 	def from_HY4(self, hypdat, Mtype='ML', ID=0):
