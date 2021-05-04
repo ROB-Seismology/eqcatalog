@@ -181,10 +181,9 @@ def generate_unique_event_id(datetime, prefix, pattern, blacklist, verbose=False
 		(default: False)
 
 	:return:
-		(event_id, resolution) tuple
+		(event_id, num_attempts) tuple
 		- event_id (str)
-		- resolution (float): resolution in milliseconds corresponding to
-		  given pattern
+		- num_attempts (int): number of attempts needed to obtain unique ID
 	"""
 	event_id, resolution = generate_event_id(datetime, prefix, pattern)
 	i = 0
@@ -195,7 +194,7 @@ def generate_unique_event_id(datetime, prefix, pattern, blacklist, verbose=False
 		offset = i * resolution + 1
 		event_id, resolution = generate_event_id(datetime, prefix, pattern, offset=offset)
 
-	return event_id
+	return (event_id, i)
 
 
 def generate_event_ids(datetimes, prefix, pattern='%p%Y%4c', verbose=False):
@@ -217,10 +216,20 @@ def generate_event_ids(datetimes, prefix, pattern='%p%Y%4c', verbose=False):
 		list of strings
 	"""
 	event_ids = []
+	num_clashes = 0
+	num_attempts = {}
 	for dt in np.sort(datetimes):
-		event_id = generate_unique_event_id(dt, prefix, pattern, event_ids,
-													verbose=verbose)
+		event_id, _num_attempts = generate_unique_event_id(dt, prefix, pattern,
+													event_ids, verbose=False)
+		if _num_attempts > 0:
+			num_clashes += 1
+			num_attempts[event_id] = _num_attempts
 		event_ids.append(event_id)
+
+	if verbose:
+		print('Number of clashes: %d' % num_clashes)
+		for event_id in sorted(num_attempts.keys()):
+			print('  %s: n=%d' % (event_id, num_attempts[event_id]))
 
 	return event_ids
 
