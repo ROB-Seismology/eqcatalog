@@ -21,7 +21,8 @@ __all__ = ["plot_macroseismic_map"]
 
 
 def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
-				projection="merc", graticule_interval=(1, 1), plot_info="intensity",
+				projection="merc", graticule_interval=(1, 1),
+				graticule_style="default", plot_info="intensity",
 				int_conversion="round", symbol_style=None, line_style="default",
 				thematic_num_replies=False, thematic_classes=None, interpolate_grid={},
 				cmap="rob", color_gradient="discontinuous", event_style="default",
@@ -48,6 +49,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	:param graticule_interval:
 		(lon_spacing, lat_spacing) tuple
 		(default: (1, 1))
+	:param graticule_style:
+		instance of :class:`mapping.layeredbasemap.GraticuleStyle`,
+		style for map graticule
+		(default: "default")
 	:param plot_info:
 		str, information that should be plotted, either 'intensity',
 		'num_replies' or 'residual'
@@ -397,7 +402,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	## Country layer
 	if country_style == 'default':
-		country_style = lbm.LineStyle(line_width=1.25)
+		country_style = lbm.LineStyle(line_width=1.0)
 	if country_style:
 		if admin_source in ('belstat', 'rob'):
 			for feature in ('coastlines', 'countries'):
@@ -459,7 +464,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 		admin_level = admin_level.lower()
 		if 'sector' in admin_level:
-			line_width = 0.3
+			line_width = 0.1
+			alpha = 0.2
 			gis_file = None
 			if admin_source == 'statbel':
 				coll_name, ds_name = 'STATBEL', 'scbel01012011_gen13.shp'
@@ -469,10 +475,12 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 											region=region)
 				admin_data.append(adm_data)
 				admin_style.line_width = line_width
+				admin_style.alpha = alpha
 				admin_styles.append(admin_style.copy())
 
 		if 'commune' in admin_level.lower():
-			line_width = 0.3
+			line_width = 0.2
+			alpha = 0.4
 			gis_file = None
 			if admin_source == 'rob':
 				coll_name, ds_name = "Bel_administrative_ROB", "Bel_communes_avant_fusion"
@@ -481,10 +489,12 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 											region=region)
 				admin_data.append(adm_data)
 				admin_style.line_width = line_width
+				admin_style.alpha = alpha
 				admin_styles.append(admin_style.copy())
 
 		if 'main commune' in admin_level:
-			line_width = 0.3
+			line_width = 0.2
+			alpha = 0.5
 			if admin_source in ('statbel', 'rob'):
 				if admin_source == 'rob':
 					coll_name, ds_name = "Bel_administrative_ROB", "Bel_villages_polygons"
@@ -495,6 +505,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 					adm_data = lbm.GisData(gis_file, region=region)
 					admin_data.append(adm_data)
 					admin_style.line_width = line_width
+					admin_style.alpha = alpha
 					admin_styles.append(admin_style.copy())
 			elif admin_source == 'gadm':
 				for i in range(3):
@@ -513,10 +524,12 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 													 region=region)
 						admin_data.append(adm_data)
 						admin_style.line_width = line_width
+						admin_style.alpha = alpha
 						admin_styles.append(admin_style.copy())
 
 		if 'arrondissement' in admin_level:
-			line_width = 0.5
+			line_width = 0.4
+			alpha = 0.6
 			if admin_source == 'statbel':
 				coll_name, ds_name = 'STATBEL', 'Arrondissements'
 				gis_file = get_dataset_file_on_seismogis(coll_name, ds_name)
@@ -524,6 +537,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 					adm_data = lbm.GisData(gis_file, region=region)
 					admin_data.append(adm_data)
 					admin_style.line_width = line_width
+					admin_style.alpha = alpha
 					admin_styles.append(admin_style.copy())
 			elif admin_source == 'gadm':
 				for i in range(2):
@@ -539,10 +553,12 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 													region=region)
 						admin_data.append(adm_data)
 						admin_style.line_width = line_width
+						admin_style.alpha = alpha
 						admin_styles.append(admin_style.copy())
 
 		if 'province' in admin_level:
-			line_width = 0.75
+			line_width = 0.6
+			alpha = 0.75
 			if admin_source in ('statbel', 'rob'):
 				if admin_source == 'rob':
 					coll_name, ds_name = "Bel_administrative_ROB", "Bel_provinces"
@@ -553,6 +569,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 					adm_data = lbm.GisData(gis_file, region=region)
 					admin_data.append(adm_data)
 					admin_style.line_width = line_width
+					admin_style.alpha = alpha
 					admin_styles.append(admin_style.copy())
 			elif admin_source == 'gadm':
 				for i in range(2):
@@ -568,10 +585,12 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 													region=region)
 						admin_data.append(adm_data)
 						admin_style.line_width = line_width
+						admin_style.alpha = alpha
 						admin_styles.append(admin_style.copy())
 
 		if 'region' in admin_level:
-			line_width = 1.0
+			line_width = 0.8
+			alpha = 0.875
 			gis_file = None
 			selection_dict = {}
 			if admin_source == 'rob':
@@ -588,6 +607,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 											region=region)
 				admin_data.append(adm_data)
 				admin_style.line_width = line_width
+				admin_style.alpha = alpha
 				admin_styles.append(admin_style.copy())
 
 		for adm_data, adm_style in zip(admin_data, admin_styles):
@@ -600,7 +620,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		if city_style == "default":
 			city_symbol_size = 4
 			city_label_style = lbm.TextStyle(font_size=5, vertical_alignment="center",
-													horizontal_alignment='left', offset=(4, 0))
+													horizontal_alignment='left', offset=(4, 0),
+													background_color='w')
 			population = np.array([10000, 50000, 100000, 200000, 500000,
 						1000000, 2000000, 5000000, 10000000, 20000000])
 			sizes = city_symbol_size + np.log10(population / 500000) * city_symbol_size
@@ -702,10 +723,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	label_style = lbm.TextStyle(font_size=9)
 	legend_style = lbm.LegendStyle(location=2, label_style=label_style, alpha=1)
-	if graticule_interval:
-		graticule_style = lbm.GraticuleStyle()
-	else:
-		graticule_style = None
+	if graticule_style in ("default", None):
+		if graticule_interval:
+			graticule_style = lbm.GraticuleStyle()
+		else:
+			graticule_style = None
 
 	scalebar_style = lbm.ScalebarStyle(('0.85', '0.075'), length='auto', units='km',
 										label_style='simple', font_size=8,
