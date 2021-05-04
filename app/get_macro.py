@@ -94,6 +94,9 @@ parser.add_argument("--verbose", help="Whether or not to print progress informat
 args = parser.parse_args()
 
 
+if args.verbose:
+	print('get-macro running at %s' % datetime.datetime.now())
+
 ## Retrieve earthquakes
 if args.id_earth in (['all'], ['missing']):
 	if args.data_type == 'dyfi':
@@ -116,6 +119,8 @@ elif args.id_earth:
 elif args.data_type == 'dyfi':
 	catalog = eqcatalog.rob.query_local_eq_catalog(has_open_enquiry=True, start_date=2000)
 	overwrite_map = False
+	if args.verbose and len(catalog) == 0:
+		print('Nothing to do: no open enquiries...')
 else:
 	print('Nothing to do: please check command-line options!')
 	exit()
