@@ -30,7 +30,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				colorbar_style="default", radii=[],
 				plot_pie={}, title="", fig_filespec=None,
 				ax=None, copyright=u"© ROB", text_box={}, dpi="default",
-				border_width=0.2, verbose=True):
+				border_width=0.2, verbose=True, export_json=False):
 	"""
 	Plot macroseismic map for given earthquake
 
@@ -154,6 +154,9 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		(default: 0.2)
 	:param verbose:
 		bool, whether or not to plot some useful information
+	:param export_json:
+		bool, whether or not to output json file as well
+		(default: False)
 
 	:return:
 		None
@@ -384,6 +387,10 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		macro_geom_data = None
 	else:
 		macro_geom_data = macro_info_coll.get_geometries(plot_polygons_as_points)
+		if export_json:
+			json_file = os.path.splitext(fig_filespec)[0] + '.json'
+			with open(json_file, 'w') as of:
+				macro_geom_data.export_geojson(fp=of)
 	if macro_geom_data:
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
