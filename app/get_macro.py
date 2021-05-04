@@ -87,6 +87,8 @@ parser.add_argument("--copyright_label", help="Label to use as copyright",
 					type=str, default="Collaborative project of ROB and BNS")
 parser.add_argument("--base_folder", help="Base folder for generated maps",
 					type=str, default=BASE_FOLDER)
+parser.add_argument("--export_json", help="Whether or not to export json file as well",
+					type=strtobool, default="false")
 parser.add_argument("--dry_run", help="Run script without actually plotting anything",
 					type=strtobool, default="false")
 parser.add_argument("--verbose", help="Whether or not to print progress information",
@@ -219,6 +221,8 @@ for eq in catalog:
 			## Plot parameters
 			projection = 'merc'
 			graticule_interval = 'auto'
+			graticule_style = lbm.GraticuleStyle()
+			graticule_style.line_style.line_width = 0
 			plot_info = 'intensity'
 			if "grid" in args.aggregate_by or args.mdp_marker == "polygon":
 				symbol_style = None
@@ -320,7 +324,8 @@ for eq in catalog:
 						if agency == 'ROB':
 							rob_filespec = map_filespec
 							macro_info.plot_map(region=region, projection=projection,
-								graticule_interval=graticule_interval, plot_info=plot_info,
+								graticule_interval=graticule_interval,
+								graticule_style=graticule_style, plot_info=plot_info,
 								int_conversion='round', symbol_style=symbol_style,
 								line_style=line_style, thematic_num_replies=thematic_num_replies,
 								interpolate_grid={}, cmap=cmap,
@@ -330,7 +335,8 @@ for eq in catalog:
 								city_style=city_style, colorbar_style=colorbar_style,
 								radii=[], plot_pie=None,
 								title='', fig_filespec=map_filespec, copyright=copyright,
-								text_box={}, dpi=dpi, verbose=args.verbose)
+								text_box={}, dpi=dpi, verbose=args.verbose,
+								export_json=args.export_json)
 						else:
 							## Sync ROB and BNS maps rather than plotting them both
 							shutil.copyfile(rob_filespec, map_filespec)
