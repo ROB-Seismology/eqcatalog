@@ -57,7 +57,8 @@ parser.add_argument("--data_type", help="Type of macroseismic data",
 					choices=["dyfi", "official", "historical", "traditional"],
 					default="dyfi")
 parser.add_argument("--aggregate_by", help="How to aggregate macroseismic data points",
-					choices=["", "commune", "main commune", "grid5", "grid10"], default="commune")
+					choices=["", "commune", "main commune", "grid5", "grid10"],
+					default="main commune")
 parser.add_argument("--agg_method", help="Aggregation method (availability depends on data_type option!)",
 					choices=["mean", "dyfi", "min", "max", "median"], default="mean")
 parser.add_argument("--min_num_replies", help="Min. number of replies per aggregate",
