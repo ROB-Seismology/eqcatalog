@@ -1082,7 +1082,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 			comm_ensemble_dict[comm_key_val] = ensemble
 		return comm_ensemble_dict
 
-	def aggregate(self, aggregate_by='id_com', min_replies=3,
+	def aggregate(self, aggregate_by='id_com', min_replies=3, keep_not_felt=False,
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
@@ -1094,6 +1094,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 
 		:param aggregate_by:
 		:param min_replies:
+		:param keep_not_felt:
 		:param min_fiability:
 		:param filter_floors:
 		:param agg_info:
@@ -1129,6 +1130,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 											remove_duplicates=remove_duplicates)
 
 		return dyfi.aggregate(aggregate_by, min_replies=min_replies,
+					keep_not_felt=keep_not_felt,
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					agg_info=agg_info, agg_method=agg_method,
 					include_other_felt=include_other_felt,
@@ -1137,7 +1139,8 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					**kwargs)
 
 	def aggregate_by_commune(self, comm_key='id_main',
-					min_replies=3, min_fiability=80, filter_floors=(0, 4),
+					min_replies=3, keep_not_felt=False,
+					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100,
@@ -1155,6 +1158,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		"""
 		aggregate_by = comm_key
 		agg_macro_coll = self.aggregate(aggregate_by, min_replies=min_replies,
+						keep_not_felt=keep_not_felt,
 						min_fiability=min_fiability, filter_floors=filter_floors,
 						agg_info=agg_info, agg_method=agg_method,
 						include_other_felt=include_other_felt,
