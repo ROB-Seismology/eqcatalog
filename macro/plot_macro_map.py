@@ -367,15 +367,17 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 		## Symbol size in function of number of replies
 		if plot_info not in ('num_mdps', 'num_replies') and thematic_num_replies:
 			num_replies = np.array([1, 3, 5, 10, 20, 50, 100, 500])
+			symbol_size = symbol_style.size
+			#sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
+			#sizes = symbol_size + np.log10(num_replies) * symbol_size
+			sizes = symbol_size + np.arange(len(num_replies))*1.5
+			sizes = sizes[num_replies <= max_num_replies]
 			num_replies = num_replies[num_replies <= max_num_replies]
 			if min_num_replies == 2:
 				num_replies[0] = 2
 			elif min_num_replies == 3:
 				num_replies = num_replies[1:]
-			symbol_size = symbol_style.size
-			#sizes = symbol_size + np.log10(num_replies-min_replies+1) * symbol_size
-			#sizes = symbol_size + np.log10(num_replies) * symbol_size
-			sizes = symbol_size + np.arange(len(num_replies))*1.5
+				sizes = sizes[1:]
 			ts = lbm.ThematicStyleGradient(num_replies, sizes, value_key="num_mdps")
 			symbol_style.size = ts
 		symbol_style.fill_color = tfc
@@ -647,7 +649,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			city_data = lbm.GisData(gis_file, label_colname="Name",
 										selection_dict=attribute_filter)
 			city_layer = lbm.MapLayer(city_data, city_style)
-			layers.append(city_layer)
+			if symbol_style and len(macro_geom_data) < 20:
+				## Symbols may be hidden below city names
+				layers.insert(0, city_layer)
+			else:
+				layers.append(city_layer)
 
 	## Pie charts
 	# TODO: legend
