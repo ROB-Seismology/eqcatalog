@@ -1551,7 +1551,7 @@ class DYFIEnsemble(object):
 
 		return (I, residual)
 
-	def aggregate(self, aggregate_by='id_com', min_replies=3,
+	def aggregate(self, aggregate_by='id_com', min_replies=3, keep_not_felt=False,
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
@@ -1574,6 +1574,10 @@ class DYFIEnsemble(object):
 		:param min_replies:
 			int, minimum number of replies to use for aggregating
 			(default: 3)
+		:param keep_not_felt:
+			bool, whether or not to keep not-felt locations even if the
+			number of replies is too low
+			(default: False)
 		:param min_fiability:
 			int, minimum fiability of enquiries to include in aggregate
 			(default: 80)
@@ -1728,9 +1732,6 @@ class DYFIEnsemble(object):
 		for key in list(agg_ensemble_dict.keys()):
 			agg_ensemble = agg_ensemble_dict[key]
 			num_replies = agg_ensemble.num_replies
-			if num_replies < min_replies:
-				agg_ensemble_dict.pop(key)
-				continue
 
 			I, residual = agg_ensemble.get_aggregated_intensity(
 								agg_info=agg_info, agg_method=agg_method,
@@ -1738,6 +1739,13 @@ class DYFIEnsemble(object):
 								include_heavy_appliance=include_heavy_appliance,
 								max_deviation=max_deviation,
 								max_nan_pct=max_nan_pct)
+
+			if num_replies < min_replies:
+				## Keep not-felt locations even if number of replies is too low
+				if I > 1 or not keep_not_felt:
+					agg_ensemble_dict.pop(key)
+					continue
+
 			if agg_info == "num_replies":
 				I = 1
 
@@ -1747,8 +1755,9 @@ class DYFIEnsemble(object):
 				## Note that this involves some duplicate calculations
 				agg_ensemble = agg_ensemble.remove_outliers(max_deviation)
 				if agg_ensemble.num_replies < min_replies:
-					agg_ensemble_dict.pop(key)
-					continue
+					if I > 1 or not keep_not_felt:
+						agg_ensemble_dict.pop(key)
+						continue
 
 			unique_id_coms = np.unique(agg_ensemble.commune_ids)
 			id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
@@ -1792,8 +1801,9 @@ class DYFIEnsemble(object):
 
 		return macro_info_coll
 
-	def aggregate_by_nothing(self, min_replies=3, min_fiability=80,
-					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
+	def aggregate_by_nothing(self, min_replies=3, keep_not_felt=False,
+					min_fiability=80, filter_floors=(0, 4),
+					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100):
 		"""
@@ -1801,6 +1811,7 @@ class DYFIEnsemble(object):
 		each enquiry corresponding to an aggregate
 
 		:param min_replies:
+		:param keep_not_felt:
 		:param min_fiability:
 		:param filter_floors:
 		:param agg_info:
@@ -1816,19 +1827,22 @@ class DYFIEnsemble(object):
 		"""
 		aggregate_by = ''
 		return self.aggregate(aggregate_by, min_replies=min_replies,
+					keep_not_felt=keep_not_felt,
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct)
 
-	def aggregate_by_commune(self, min_replies=3, min_fiability=80,
-					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
+	def aggregate_by_commune(self, min_replies=3, keep_not_felt=False,
+					min_fiability=80, filter_floors=(0, 4),
+					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100):
 		"""
 		Aggregate DYFI collection by commune
 
 		:param min_replies:
+		:param keep_not_felt:
 		:param min_fiability:
 		:param filter_floors:
 		:param agg_info:
@@ -1845,6 +1859,7 @@ class DYFIEnsemble(object):
 		# Note: no **kwargs needed because ROBDYFIEnsemble has method with same name
 		aggregate_by = 'id_com'
 		return self.aggregate(aggregate_by, min_replies=min_replies,
+					keep_not_felt=keep_not_felt,
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					agg_info=agg_info, agg_method=agg_method,
 					include_other_felt=include_other_felt,
@@ -1853,7 +1868,8 @@ class DYFIEnsemble(object):
 
 	def aggregate_by_distance(self, ref_pt, distance_interval,
 					distance_method='spherical', create_polygons=True,
-					min_replies=3, min_fiability=80, filter_floors=(0, 4),
+					min_replies=3, keep_not_felt=False,
+					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100):
@@ -1869,6 +1885,7 @@ class DYFIEnsemble(object):
 			for plotting on a map
 			(default: True)
 		:param min_replies:
+		:param keep_not_felt:
 		:param min_fiability:
 		:param filter_floors:
 		:param agg_info:
@@ -1884,6 +1901,7 @@ class DYFIEnsemble(object):
 		"""
 		aggregate_by = 'distance'
 		return self.aggregate(aggregate_by, min_replies=min_replies,
+					keep_not_felt=keep_not_felt,
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
@@ -1892,7 +1910,7 @@ class DYFIEnsemble(object):
 					distance_method=distance_method, create_polygons=create_polygons)
 
 	def aggregate_by_grid_cells(self, grid_spacing, srs='LAMBERT1972',
-					min_replies=3, min_fiability=80,
+					min_replies=3, keep_not_felt=False, min_fiability=80,
 					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100):
@@ -1903,6 +1921,7 @@ class DYFIEnsemble(object):
 		:param srs:
 			see :meth:`split_by_grid_cells`
 		:param min_replies:
+		:param keep_not_felt:
 		:param min_fiability:
 		:param filter_floors:
 		:param agg_info:
@@ -1918,6 +1937,7 @@ class DYFIEnsemble(object):
 		"""
 		aggregate_by = 'grid_%G' % grid_spacing
 		return self.aggregate(aggregate_by, min_replies=min_replies,
+					keep_not_felt=keep_not_felt,
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
@@ -1925,7 +1945,8 @@ class DYFIEnsemble(object):
 
 	def aggregate_by_polygon_data(self, poly_data, value_key,
 					include_unmatched_polygons=False,
-					min_replies=3, min_fiability=80, filter_floors=(0, 4),
+					min_replies=3, keep_not_felt=False,
+					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100):
@@ -1940,6 +1961,7 @@ class DYFIEnsemble(object):
 			in the result (their intensity will be set to nan!)
 			(default: True)
 		:param min_replies:
+		:param keep_not_felt:
 		:param min_fiability:
 		:param filter_floors:
 		:param agg_info:
@@ -1955,6 +1977,7 @@ class DYFIEnsemble(object):
 		"""
 		aggregate_by = 'polygon'
 		return self.aggregate(aggregate_by, min_replies=min_replies,
+					keep_not_felt=keep_not_felt,
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
