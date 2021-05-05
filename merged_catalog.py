@@ -1238,9 +1238,9 @@ class MergedCatalog:
 				merged_events += unique_agency_merged_cat.merged_events
 
 		catalog_name = '%s missing events' % agency
-		default_completeness = self.default_completeness.copy().pop(agency)
-		default_Mrelations = self.default_Mrelations.copy().pop(agency)
-		agency_areas = self.agency_areas.copy().pop(agency)
+		default_completeness = self.default_completeness.copy().pop(agency, None)
+		default_Mrelations = self.default_Mrelations.copy().pop(agency, {})
+		agency_areas = self.agency_areas.copy().pop(agency, {})
 		merged_catalog = self.__class__(merged_events, name=catalog_name,
 											default_completeness=default_completeness,
 											default_Mrelations=default_Mrelations,
