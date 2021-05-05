@@ -198,7 +198,8 @@ for eq in catalog:
 			if args.data_type == "dyfi":
 				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by,
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
-					min_replies=args.min_num_replies, min_fiability=MIN_FIABILITY,
+					min_replies=args.min_num_replies, keep_not_felt=True,
+					min_fiability=MIN_FIABILITY,
 					fix_commune_ids=False, fix_felt=False, remove_duplicates=False,
 					include_other_felt=True, include_heavy_appliance=False,
 					remove_outliers=2.0)
