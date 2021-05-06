@@ -405,8 +405,8 @@ class AggregatedMacroInfoCollection():
 			if not (None in (rec.lon, rec.lat) or np.nan in (rec.lon, rec.lat)):
 				lons.extend([rec.lon] * rec.num_mdps)
 				lats.extend([rec.lat] * rec.num_mdps)
-		lonmin, lonmax = np.percentile(lons, percentiles)
-		latmin, latmax = np.percentile(lats, percentiles)
+		lonmin, lonmax = np.percentile(lons, percentiles, interpolation='nearest')
+		latmin, latmax = np.percentile(lats, percentiles, interpolation='nearest')
 		return (lonmin, lonmax, latmin, latmax)
 
 	def get_geometries(self, polygons_as_points=False):
