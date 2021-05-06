@@ -417,8 +417,9 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			labels = ['F' if I >= 1.5 else 'NF'
 						for I in macro_geom_data.values['intensity']]
 			macro_geom_data.labels = labels
+			## Note: background_color=(1, 1, 1, 0.5) results in error
 			label_style = lbm.TextStyle(font_size=8, font_weight='normal',
-												background_color='1., 1., 1., 0.5')
+												background_color='w')
 			macro_style = lbm.PointStyle(shape='', label_style=label_style)
 			macro_layer = lbm.MapLayer(macro_geom_data, macro_style)
 			layers.append(macro_layer)
