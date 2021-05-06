@@ -31,7 +31,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 				colorbar_style="default", radii=[],
 				plot_pie={}, title="", fig_filespec=None,
 				ax=None, copyright=u"© ROB", text_box={}, dpi="default",
-				border_width=0.2, verbose=True, export_json=False):
+				border_width=0.2, verbose=True, export_json=False,
+				rejected_macro_info_coll=None):
 	"""
 	Plot macroseismic map for given earthquake
 
@@ -162,6 +163,11 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	:param export_json:
 		bool, whether or not to output json file as well
 		(default: False)
+	:param rejected_macro_info_coll:
+		instance of :class:`AggregatedMacroInfoCollection`, representing
+		aggregated macroseismic information that is rejected because of
+		too few answers
+		(default: None)
 
 	:return:
 		None
@@ -401,6 +407,21 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 	if macro_geom_data:
 		macro_layer = lbm.MapLayer(macro_geom_data, macro_style, legend_label=legend_label)
 		layers.append(macro_layer)
+
+	## Rejected macro layer
+	if rejected_macro_info_coll:
+		macro_geom_data = rejected_macro_info_coll.get_geometries(polygons_as_points=True)
+		if macro_geom_data:
+			## Note: When using mean aggregation of DYFI data, intensity may
+			## be between 1 and 2, not sure what to do in this case
+			labels = ['F' if I >= 1.5 else 'NF'
+						for I in macro_geom_data.values['intensity']]
+			macro_geom_data.labels = labels
+			label_style = lbm.TextStyle(font_size=8, font_weight='normal',
+												background_color='w')
+			macro_style = lbm.PointStyle(shape='', label_style=label_style)
+			macro_layer = lbm.MapLayer(macro_geom_data, macro_style)
+			layers.append(macro_layer)
 
 	## Country layer
 	if country_style == 'default':
