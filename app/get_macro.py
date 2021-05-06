@@ -197,14 +197,24 @@ for eq in catalog:
 
 			## Aggregate
 			if args.data_type == "dyfi":
+				min_replies = args.min_num_replies
+				if len(macro_data) < 20:
+					## If there are only few enquiries, set min_replies to 1
+					min_replies = 1
+					print('Few data: lowering min_num_replies to 1!')
 				macro_info, rejected_macro_info = macro_data.aggregate(
 					aggregate_by=args.aggregate_by,
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
-					min_replies=args.min_num_replies, keep_not_felt=True,
+					min_replies=min_replies, keep_not_felt=True,
 					min_fiability=MIN_FIABILITY,
 					fix_commune_ids=False, fix_felt=False, remove_duplicates=False,
 					include_other_felt=True, include_heavy_appliance=False,
 					remove_outliers=2.0, return_rejected=True)
+				if len(macro_info) == 0 and len(rejected_macro_info) > 0:
+					## If there are no aggregates with required number of replies,
+					## plot rejected aggregates instead
+					print('No aggregates: lowering min_num_replies to 1!')
+					macro_info, rejected_macro_info = rejected_macro_info, macro_info
 			else:
 				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by or "commune",
 												agg_function=args.agg_method)
