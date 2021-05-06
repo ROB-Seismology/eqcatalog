@@ -218,7 +218,7 @@ for eq in catalog:
 			if args.verbose and len(macro_info):
 				print('Imin/max: %.1f/%.1f' % macro_info.Iminmax())
 
-			minlon, maxlon, minlat, maxlat = macro_info.get_region()
+			minlon, maxlon, minlat, maxlat = macro_info.get_region(percentile_width=98)
 
 			## Plot parameters
 			projection = 'merc'
