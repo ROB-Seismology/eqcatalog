@@ -866,8 +866,8 @@ class DYFIEnsemble(object):
 		longitudes = longitudes[np.isfinite(longitudes)]
 		latitudes = self.latitudes
 		latitudes = latitudes[np.isfinite(latitudes)]
-		lonmin, lonmax = np.percentile(longitudes, percentiles)
-		latmin, latmax = np.percentile(latitudes, percentiles)
+		lonmin, lonmax = np.percentile(longitudes, percentiles, interpolation='nearest')
+		latmin, latmax = np.percentile(latitudes, percentiles, interpolation='nearest')
 		return (lonmin, lonmax, latmin, latmax)
 
 	def get_centroid(self):
