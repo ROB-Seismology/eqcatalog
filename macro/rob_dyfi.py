@@ -1088,7 +1088,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100,
 					fix_commune_ids=True, fix_felt=True, remove_duplicates=False,
-					**kwargs):
+					return_rejected=False, **kwargs):
 		"""
 		Get aggregated macroseismic information.
 
@@ -1108,6 +1108,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 		:param fix_commune_ids:
 		:param fix_felt:
 		:param remove_duplicates:
+		:param return_rejected:
 			see :meth:`to_simple_dyfi_ensemble`
 
 		:return:
@@ -1136,7 +1137,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
-					**kwargs)
+					return_rejected=return_rejected, **kwargs)
 
 	def aggregate_by_commune(self, comm_key='id_main',
 					min_replies=3, keep_not_felt=False,
@@ -1144,7 +1145,7 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
 					max_deviation=2., max_nan_pct=100,
-					fix_commune_ids=True, fix_felt=True):
+					fix_commune_ids=True, fix_felt=True, return_rejected=False):
 		"""
 		Aggregate DYFI collection by commune
 
@@ -1164,7 +1165,8 @@ class ROBDYFIEnsemble(DYFIEnsemble):
 						include_other_felt=include_other_felt,
 						include_heavy_appliance=include_heavy_appliance,
 						max_deviation=max_deviation, max_nan_pct=max_nan_pct,
-						fix_commune_ids=fix_commune_ids, fix_felt=fix_felt)
+						fix_commune_ids=fix_commune_ids, fix_felt=fix_felt,
+						return_rejected=return_rejected)
 
 		## Override agg_type, as DYFIEnsemble only knows id_com
 		if comm_key in ('id_main', 'zip'):
