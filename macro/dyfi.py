@@ -1555,7 +1555,8 @@ class DYFIEnsemble(object):
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2, max_nan_pct=100, **kwargs):
+					max_deviation=2, max_nan_pct=100,
+					return_rejected=False, **kwargs):
 		"""
 		Get aggregated macroseismic information.
 
@@ -1592,6 +1593,10 @@ class DYFIEnsemble(object):
 		:param max_deviation:
 		:param max_nan_pct:
 			see :meth:`get_aggregated_intensity`
+		:param return_rejected:
+			bool, whether or not to return rejected aggregates (too few replies)
+			separately as well
+			(default: False)
 
 		:**kwargs:
 			additional keyword arguments required by some aggregation
@@ -1599,6 +1604,7 @@ class DYFIEnsemble(object):
 
 		:return:
 			instance of :class:`AggregatedMacroInfoCollection`
+			or tuple of two such instances
 		"""
 		from mapping.geotools.geodetic import spherical_point_at
 		import mapping.layeredbasemap as lbm
@@ -1728,9 +1734,20 @@ class DYFIEnsemble(object):
 
 		## Compute aggregated intensity and convert to aggregated macro info
 		macro_infos = []
+		rejected_macro_infos = []
 		imt = agg_info.upper()
 		for key in list(agg_ensemble_dict.keys()):
 			agg_ensemble = agg_ensemble_dict[key]
+
+			if max_deviation:
+				## Remove outliers from the ensemble, so we know exactly which
+				## enquiries contribute to the aggregation
+				## Note that this involves some duplicate calculations
+				agg_ensemble = agg_ensemble.remove_outliers(max_deviation,
+										filter_floors=(),
+										include_other_felt=include_other_felt,
+										include_heavy_appliance=include_heavy_appliance)
+
 			num_replies = agg_ensemble.num_replies
 
 			I, residual = agg_ensemble.get_aggregated_intensity(
@@ -1743,21 +1760,12 @@ class DYFIEnsemble(object):
 			if num_replies < min_replies:
 				## Keep not-felt locations even if number of replies is too low
 				if I > 1 or not keep_not_felt:
-					agg_ensemble_dict.pop(key)
-					continue
+					if not return_rejected:
+						agg_ensemble_dict.pop(key)
+						continue
 
 			if agg_info == "num_replies":
 				I = 1
-
-			if max_deviation:
-				## Remove outliers from the ensemble, so we know exactly which
-				## enquiries contribute to the aggregation
-				## Note that this involves some duplicate calculations
-				agg_ensemble = agg_ensemble.remove_outliers(max_deviation)
-				if agg_ensemble.num_replies < min_replies:
-					if I > 1 or not keep_not_felt:
-						agg_ensemble_dict.pop(key)
-						continue
 
 			unique_id_coms = np.unique(agg_ensemble.commune_ids)
 			id_com = unique_id_coms[0] if len(unique_id_coms) == 1 else None
@@ -1787,7 +1795,11 @@ class DYFIEnsemble(object):
 									'internet', num_replies, lon=lon, lat=lat,
 									residual=residual, db_ids=web_ids,
 									geom_key_val=geom_key_val)
-			macro_infos.append(macro_info)
+
+			if num_replies >= min_replies or (I == 1 and keep_not_felt):
+				macro_infos.append(macro_info)
+			elif return_rejected:
+				rejected_macro_infos.append(macro_info)
 
 		proc_info = dict(min_replies=min_replies, min_fiability=min_fiability,
 						filter_floors=filter_floors, agg_method=agg_method,
@@ -1799,13 +1811,20 @@ class DYFIEnsemble(object):
 										'internet', macro_geoms=macro_geoms,
 										geom_key=geom_key, proc_info=proc_info)
 
-		return macro_info_coll
+		if return_rejected:
+			rejected_macro_info_coll = AggregatedMacroInfoCollection(rejected_macro_infos,
+													aggregate_by, 'internet',
+													macro_geoms=macro_geoms,
+													geom_key=geom_key, proc_info={})
+			return (macro_info_coll, rejected_macro_info_coll)
+		else:
+			return macro_info_coll
 
 	def aggregate_by_nothing(self, min_replies=3, keep_not_felt=False,
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100):
+					max_deviation=2., max_nan_pct=100, return_rejected=False):
 		"""
 		Turn DYFI collection in aggregated macro information, with
 		each enquiry corresponding to an aggregate
@@ -1820,6 +1839,7 @@ class DYFIEnsemble(object):
 		:param include_heavy_appliance:
 		:param max_deviation:
 		:param max_nan_pct:
+		:param return_rejected:
 			see :meth:`aggregate`
 
 		:return:
@@ -1831,13 +1851,14 @@ class DYFIEnsemble(object):
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					max_deviation=max_deviation, max_nan_pct=max_nan_pct)
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
+					return_rejected=return_rejected)
 
 	def aggregate_by_commune(self, min_replies=3, keep_not_felt=False,
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100):
+					max_deviation=2., max_nan_pct=100, return_rejected=False):
 		"""
 		Aggregate DYFI collection by commune
 
@@ -1851,6 +1872,7 @@ class DYFIEnsemble(object):
 		:param include_heavy_appliance:
 		:param max_deviation:
 		:param max_nan_pct:
+		:param return_rejected:
 			see :meth:`aggregate`
 
 		:return:
@@ -1864,7 +1886,8 @@ class DYFIEnsemble(object):
 					agg_info=agg_info, agg_method=agg_method,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					max_deviation=max_deviation, max_nan_pct=max_nan_pct)
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
+					return_rejected=return_rejected)
 
 	def aggregate_by_distance(self, ref_pt, distance_interval,
 					distance_method='spherical', create_polygons=True,
@@ -1872,7 +1895,7 @@ class DYFIEnsemble(object):
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100):
+					max_deviation=2., max_nan_pct=100, return_rejected=False):
 		"""
 		Aggregate DYFI ensemble by distance
 
@@ -1894,6 +1917,7 @@ class DYFIEnsemble(object):
 		:param include_heavy_appliance:
 		:param max_deviation:
 		:param max_nan_pct:
+		:param return_rejected:
 			see :meth:`aggregate`
 
 		:return:
@@ -1907,13 +1931,14 @@ class DYFIEnsemble(object):
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					ref_pt=ref_pt, distance_interval=distance_interval,
-					distance_method=distance_method, create_polygons=create_polygons)
+					distance_method=distance_method, create_polygons=create_polygons,
+					return_rejected=return_rejected)
 
 	def aggregate_by_grid_cells(self, grid_spacing, srs='LAMBERT1972',
 					min_replies=3, keep_not_felt=False, min_fiability=80,
 					filter_floors=(0, 4), agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100):
+					max_deviation=2., max_nan_pct=100, return_rejected=False):
 		"""
 		Aggregate DYFI ensemble in grid cells
 
@@ -1930,6 +1955,7 @@ class DYFIEnsemble(object):
 		:param include_heavy_appliance:
 		:param max_deviation:
 		:param max_nan_pct:
+		:param return_rejected:
 			see :meth:`aggregate`
 
 		:return:
@@ -1941,7 +1967,8 @@ class DYFIEnsemble(object):
 					min_fiability=min_fiability, filter_floors=filter_floors,
 					include_other_felt=include_other_felt,
 					include_heavy_appliance=include_heavy_appliance,
-					max_deviation=max_deviation, max_nan_pct=max_nan_pct, srs=srs)
+					max_deviation=max_deviation, max_nan_pct=max_nan_pct, srs=srs,
+					return_rejected=return_rejected)
 
 	def aggregate_by_polygon_data(self, poly_data, value_key,
 					include_unmatched_polygons=False,
@@ -1949,7 +1976,7 @@ class DYFIEnsemble(object):
 					min_fiability=80, filter_floors=(0, 4),
 					agg_info='cii', agg_method='mean',
 					include_other_felt=True, include_heavy_appliance=False,
-					max_deviation=2., max_nan_pct=100):
+					max_deviation=2., max_nan_pct=100, return_rejected=False):
 		"""
 		Aggregate DYFI ensemble according to a set of polygons
 
@@ -1970,6 +1997,7 @@ class DYFIEnsemble(object):
 		:param include_heavy_appliance:
 		:param max_deviation:
 		:param max_nan_pct:
+		:param return_rejected:
 			see :meth:`aggregate`
 
 		:return:
@@ -1983,7 +2011,8 @@ class DYFIEnsemble(object):
 					include_heavy_appliance=include_heavy_appliance,
 					max_deviation=max_deviation, max_nan_pct=max_nan_pct,
 					poly_data=poly_data, value_key=value_key,
-					include_unmatched_polygons=include_unmatched_polygons)
+					include_unmatched_polygons=include_unmatched_polygons,
+					return_rejected=return_rejected)
 
 	#def remove_outliers(self, min_pct=2.5, max_pct=97.5):
 	def remove_outliers(self, max_deviation=2., recalc_cii=True,
