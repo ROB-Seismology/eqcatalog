@@ -586,7 +586,8 @@ class AggregatedMacroInfoCollection():
 				admin_source='gadm', admin_level="province", admin_style="default",
 				colorbar_style="default", radii=[], plot_pie=None,
 				title="", fig_filespec=None, ax=None, copyright=u"© ROB", text_box={},
-				dpi="default", border_width=0.2, verbose=True, export_json=False):
+				dpi="default", border_width=0.2, verbose=True, export_json=False,
+				rejected_macro_info_coll=None):
 		"""
 		Plot macroseismic map
 
