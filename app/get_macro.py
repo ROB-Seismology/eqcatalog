@@ -197,16 +197,18 @@ for eq in catalog:
 
 			## Aggregate
 			if args.data_type == "dyfi":
-				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by,
+				macro_info, rejected_macro_info = macro_data.aggregate(
+					aggregate_by=args.aggregate_by,
 					filter_floors=(0, 4), agg_info='cii', agg_method=args.agg_method,
 					min_replies=args.min_num_replies, keep_not_felt=True,
 					min_fiability=MIN_FIABILITY,
 					fix_commune_ids=False, fix_felt=False, remove_duplicates=False,
 					include_other_felt=True, include_heavy_appliance=False,
-					remove_outliers=2.0)
+					remove_outliers=2.0, return_rejected=True)
 			else:
 				macro_info = macro_data.aggregate(aggregate_by=args.aggregate_by or "commune",
 												agg_function=args.agg_method)
+				rejected_macro_info = None
 
 			if not(len(macro_info)):
 				print("Not enough data to draw a map (<%d replies)"
@@ -338,7 +340,8 @@ for eq in catalog:
 								radii=[], plot_pie=None,
 								title='', fig_filespec=map_filespec, copyright=copyright,
 								text_box={}, dpi=dpi, verbose=args.verbose,
-								export_json=args.export_json)
+								export_json=args.export_json,
+								rejected_macro_info_coll=rejected_macro_info)
 						else:
 							## Sync ROB and BNS maps rather than plotting them both
 							shutil.copyfile(rob_filespec, map_filespec)
