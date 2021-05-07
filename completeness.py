@@ -11,6 +11,9 @@ from . import time as timelib
 
 
 
+__all__ = ['Completeness', 'combine_completenesses']
+
+
 class Completeness(object):
 	"""
 	Class defining completeness of earthquake catalog.
@@ -336,3 +339,38 @@ class Completeness(object):
 			table[-1,0] = self.min_years.min()
 			table[-1,1] = Mmax
 		return table
+
+
+def combine_completenesses(completenesses, combine_func='min'):
+	"""
+	Combine different completenesses into a single object
+
+	:param completenesses:
+		list with instances of :class:`Completeness`
+	:param combine_func:
+		str, name of function to apply to minimum magnitudes of different
+		completenesses: 'min', 'max' or 'mean'
+		(default: 'min')
+
+	:return:
+		instance of :class:`Completeness`
+	"""
+	Mtypes = [completeness.Mtype for completeness in completenesses]
+	assert len(set(Mtypes)) == 1
+	Mtype = Mtypes[0]
+
+	min_dates = []
+	for completeness in completenesses:
+		min_dates.extend(completeness.min_dates)
+	min_dates = np.sort(np.unique(min_dates))
+
+	min_mags = []
+	combine_func = getattr(np, combine_func)
+	for min_date in min_dates:
+		mag = combine_func([completeness.get_completeness_magnitude(min_date)
+								for completeness in completenesses])
+		min_mags.append(mag)
+
+	merged_completeness = Completeness(min_dates, min_mags, Mtype)
+
+	return merged_completeness
