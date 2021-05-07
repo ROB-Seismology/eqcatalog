@@ -185,7 +185,8 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 
 	tot_num_replies = np.sum([rec.num_mdps for rec in macro_info_coll])
 	max_num_replies = np.max([rec.num_mdps for rec in macro_info_coll])
-	min_num_replies = np.min([rec.num_mdps for rec in macro_info_coll])
+	min_num_replies = np.min([rec.num_mdps for rec in macro_info_coll
+									if rec.intensity >= 1.5])
 
 	if verbose:
 		print("Plotting %d aggregates (%d MDPs) for event %s:"
@@ -781,6 +782,23 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 						vertical_alignment='bottom', multi_alignment='left',
 						background_color='w', border_color='k', border_pad=0.5)
 		map.draw_text_box(pos, text, text_style, zorder=1000)
+
+	if rejected_macro_info_coll:
+		## Hack to insert entry for 'F' in thematic legend
+
+		## Allow text artists in legends
+		from mapping.layeredbasemap.text_legend_handler import TextHandler
+		from matplotlib.legend import Legend
+		text_handler = TextHandler(font_size=8, font_weight='normal')
+		Legend.update_default_handler_map({str : text_handler})
+
+		map.draw_map_border()
+		map.draw_layers()
+		tl = map.thematic_legends[0]
+		tl.artists.insert(0, 'F')
+		tl.labels.insert(0, 'Felt [1 - %d[' % min_num_replies)
+		map.draw_decoration()
+		map.is_drawn = True
 
 	return map.plot(fig_filespec=("hold" if ax else fig_filespec), dpi=dpi,
 					border_width=border_width)
