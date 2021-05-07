@@ -644,7 +644,7 @@ def plot_macroseismic_map(macro_info_coll, region=(2, 7, 49.25, 51.75),
 			city_symbol_size = 4
 			city_label_style = lbm.TextStyle(font_size=5, vertical_alignment="center",
 													horizontal_alignment='left', offset=(4, 0),
-													background_color='w')
+													background_color=(1., 1., 1., 0.6))
 			population = np.array([10000, 50000, 100000, 200000, 500000,
 						1000000, 2000000, 5000000, 10000000, 20000000])
 			sizes = city_symbol_size + np.log10(population / 500000) * city_symbol_size
