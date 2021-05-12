@@ -148,3 +148,109 @@ def estimate_fc_brune(moment, stress_drop=3E+6, VS=3500):
 	"""
 	fc = 0.37 * VS * ((16 * stress_drop) / (7 * moment))**(1./3)
 	return fc
+
+
+def calc_fc_from_rupture_radius(rupture_radius, beta, phase):
+	"""
+	Calculate corner frequency from source radius and S-wave velocity
+	according to Madariaga (1976)
+
+	Note that the corner frequency of P waves is higher than that of S waves,
+	due to the longer duration of S pulses compared to P pulses
+
+	:param rupture_radius:
+		float, source radius assuming circular rupture (in m)
+	:param beta:
+		float, S-wave velocity (in m/s)
+	:param phase:
+		char, phase, either 'P' or 'S'
+
+	:return:
+		float, corner frequency in Hz
+	"""
+	if phase.lower() == "p":
+		k = 0.32
+	elif phase.lower() == "s":
+		k = 0.21
+	else:
+		msg = "Unknown phase '%s'." % phase
+		raise ValueError(msg)
+
+	return k * beta / rupture_radius
+
+
+def calc_rupture_radius_from_fc(fc, beta, phase):
+	"""
+	Calculate rupture radius from corner frequency and S-wave velocity
+	according to Madariaga (1976)
+
+	:param fc:
+		float, corner frequency (in Hz)
+	:param beta:
+		float, S-wave velocity (in m/s)
+	:param phase:
+		char, phase, either 'P' or 'S'
+
+	:return:
+		float, source radius assuming circular rupture (in m)
+	"""
+	if phase.lower() == "p":
+		k = 0.32
+	elif phase.lower() == "s":
+		k = 0.21
+	else:
+		msg = "Unknown phase '%s'." % phase
+		raise ValueError(msg)
+
+	return k * beta / fc
+
+
+def calc_stress_drop(moment, rupture_radius):
+	"""
+	Calculate stress drop from seismic moment and rupture radius
+
+	:param moment:
+		float, seismic moment (in N.m)
+	:param rupture_radius:
+		float, source radius assuming circular rupture (in m)
+
+	:return:
+		float, stress drop (in Pa)
+	"""
+	return (7 * moment) / (16 * rupture_radius ** 3)
+
+
+def calc_moment_from_low_freq_amplitude(omega_0, density, wavespeed,
+	distance, phase):
+	"""
+	Calculate seimic moment from the low frequency amplitude
+	of a seismic source displacement spectrum. After (Brune, 1970).
+
+	The used radiation pattern is the average radiation pattern over
+	the focal sphere.
+
+	:param omega_0:
+		float, low frequency amplitude in [m/s].
+	:param density:
+		float, rock density in [kg/m^3].
+	:param wavespeed:
+		float, P-or S-wave speed in [m/s].
+	:param distance:
+		float, hypocentral distance in [m].
+	:param phase:
+		char, 'P' or 'S'. Determines the radiation pattern coefficient.
+
+	:return:
+		float, seismic moment in [Nm].
+	"""
+	# After Abercrombie and also Tsuboi
+	if phase.lower() == "p":
+		radiation_coeff = 0.52
+	elif phase.lower() == "s":
+		radiation_coeff = 0.63
+	else:
+		msg = "Unknown phase '%s'." % phase
+		raise ValueError(msg)
+
+	return (4 * np.pi * density * wavespeed ** 3 * distance *
+			omega_0 / radiation_coeff)
