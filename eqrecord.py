@@ -1106,6 +1106,53 @@ class LocalEarthquake(object):
 
 		return layer
 
+	def to_obspy_event(self):
+		"""
+		Convert to obspy Event
+
+		:return:
+			instance of :class:`obspy.core.event.Event`
+		"""
+		from obspy.core.event import Event, Origin
+		from obspy.core.event.magnitude import Magnitude
+		from robspy import parse_datetime
+
+		# TODO: add uncertainties
+		depth = self.depth * 1000
+		if np.isnan(depth):
+			depth = None
+		origin = Origin(time=parse_datetime(self.datetime), longitude=self.lon,
+							latitude=self.lat, depth=depth)
+		magnitudes = [Magnitude(mag=self.mag[Mtype], magnitude_type=Mtype)
+						for Mtype in self.mag]
+		event_type = {'ke': 'earthquake',
+							'se': 'earthquake',
+							'ki': 'induced or triggered event',
+							'si': 'induced or triggered event',
+							'qb': 'quarry blast',
+							'sqb': 'quarry blast',
+							'km': 'mining explosion',
+							'sm': 'mining explosion',
+							'kx': 'experimental explosion',
+							'sx': 'experimental explosion',
+							'kn': 'nuclear explosion',
+							'sn': 'nuclear explosion',
+							'cb': 'controlled explosion',
+							'scb': 'controlled explosion',
+							'kr': 'rock burst',
+							'sr': 'rock burst',
+							'sb': 'sonic boom',
+							'ls': 'landslide'}.get(self.event_type, 'other event')
+		event_type_certainty = {True: 'suspected',
+									False: 'known'}[self.event_type[0] == 's'
+														and self.event_type != 'sb']
+
+		ev = Event(resource_id=str(self.ID), event_type='earthquake',
+					event_type_certainty=event_type_certainty,
+					origins=[origin], magnitudes=magnitudes)
+
+		return ev
+
 
 #class FocMecRecord(LocalEarthquake, MT.FaultGeometry):
 class FocMecRecord(LocalEarthquake):
