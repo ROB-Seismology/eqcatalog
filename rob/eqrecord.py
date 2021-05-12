@@ -483,7 +483,8 @@ class ROBLocalEarthquake(LocalEarthquake):
 		except IndexError:
 			return None
 
-	def get_phase_picks(self, station_code=None, network=None, verbose=False):
+	def get_phase_picks(self, station_code=None, network=None,
+							calc_geodetics=True, verbose=False):
 		"""
 		Get phase picks for this earthquake
 
@@ -493,6 +494,9 @@ class ROBLocalEarthquake(LocalEarthquake):
 		:param network:
 			str, network code
 			(default: None)
+		:param calc_geodetics:
+			bool, whether or not to compute geodetics (distance and back-azimuth)
+			(default: True)
 		:param verbose:
 			bool, if True the query string will be echoed to standard output
 			(default: False)
@@ -503,10 +507,12 @@ class ROBLocalEarthquake(LocalEarthquake):
 			or dict, mapping phase names to PhasePick objects
 			if :param:`station_code` is not None
 		"""
+		import numpy as np
 		import datetime
-		from .seismodb import query_phase_picks
+		from .seismodb import query_phase_picks, get_station_coordinates
 		from robspy import UTCDateTime
 		from robspy.phase_pick import PhasePick
+		from mapping.geotools.geodetic import ellipsoidal_distance_and_azimuth
 
 		recs = query_phase_picks(self.ID, station_code=station_code,
 								network=network, verbose=verbose)
@@ -530,6 +536,17 @@ class ROBLocalEarthquake(LocalEarthquake):
 			if not _station_code in picks:
 				picks[_station_code] = {}
 			picks[_station_code][rec['name']] = pick
+
+			if calc_geodetics:
+				stat_lon, stat_lat, stat_alt = get_station_coordinates(_station_code,
+																				include_z=True)
+				Repi, az, back_az = ellipsoidal_distance_and_azimuth(self.lon, self.lat,
+																			stat_lon, stat_lat)
+				dz = self.depth * 1000 + stat_alt
+				Rhypo = np.sqrt(Repi**2 + dz**2)
+				Rhypo /= 1000
+				pick.azimuth = back_az
+				pick.distance = Rhypo
 
 		if station_code:
 			return picks.get(station_code, {})
@@ -561,6 +578,43 @@ class ROBLocalEarthquake(LocalEarthquake):
 		arrivals = m.get_travel_times(distance_in_degree=dist_deg,
 			source_depth_in_km=self.depth, receiver_depth_in_km=stat_depth)
 		return {arr.name: arr for arr in arrivals}
+
+	def to_obspy_event(self, include_phase_picks=False, calc_phase_geodetics=True):
+		"""
+		Convert to obspy Event
+
+		:param include_phase_picks:
+			bool, whether or not to include phase picks
+			(default: False)
+		:param calc_phase_geodetics:
+			bool, whether or not to calculate phase geodetics (distance and azimuth)
+			in case :param:`include_phase_picks`is True
+			(default: True)
+
+		:return:
+			instance of :class:`obspy.core.event.Event`
+		"""
+		from obspy.core.event.magnitude import Amplitude
+
+		ev = super(ROBLocalEarthquake, self).to_obspy_event()
+
+		picks, amplitudes = [], []
+		if include_phase_picks:
+			pp_dict = self.get_phase_picks(calc_geodetics=calc_phase_geodetics)
+			for station_code, pick_dict in pp_dict.items():
+				pick = list(pick_dict.values())[0]
+				for phase_hint, pick in pick_dict.items():
+					picks.append(pick.to_obspy_pick())
+					if pick.amplitude:
+						amp = Amplitude(generic_amplitude=pick.amplitude / 1E+9,
+											unit='m', pick_id=str(pick.db_id),
+											waveform_id=picks[-1].waveform_id,
+											magnitude_hint='ML')
+						amplitudes.append(amp)
+		ev.picks = picks
+		ev.amplitudes = amplitudes
+
+		return ev
 
 	def calc_MLbg(self, distance_metric='hypocentral', verbose=False):
 		"""
