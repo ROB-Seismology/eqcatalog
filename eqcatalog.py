@@ -6261,7 +6261,36 @@ class EQCatalog(object):
 
 		return show_or_save_plot(fig, fig_filespec, dpi=dpi)
 
-	## HMTK wrappers
+	def to_obspy_catalog(self, include_phase_picks=False, calc_phase_geodetics=True):
+		"""
+		Convert to obspy Catalog
+
+		:param include_phase_picks:
+			bool, whether or not to include phase picks
+			(default: False)
+		:param calc_phase_geodetics:
+			bool, whether or not to calculate phase geodetics (distance and azimuth)
+			in case :param:`include_phase_picks`is True
+			(default: True)
+
+		:return:
+			instance of :class:`obspy.Catalog`
+		"""
+		from obspy import Catalog
+
+		events = []
+		for eq in self:
+			try:
+				ev = eq.to_obspy_event(include_phase_picks=include_phase_picks,
+											calc_phase_geodetics=calc_phase_geodetics)
+			except:
+				ev = eq.to_obspy_event()
+			events.append(ev)
+
+		return Catalog(events=events, description=self.name)
+
+
+		## HMTK wrappers
 
 	def analyse_completeness_Stepp(self, dM=0.1, Mtype="MW", Mrelation={}, dt=5.0, increment_lock=True):
 		"""
