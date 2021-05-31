@@ -47,7 +47,7 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 	:param catalog_name:
 		str, name of catalog ("ROB", HARVARD_CMT", "SHEEC", "CENEC", "ISC-GEM",
 		"CEUS-SCR", "BGS", "EMEC", "LDG", "SIHEX", "RENASS", "KNMI", "BENS",
-		"HRF2020", "BENS+HRF2020")
+		"HRF2020", "BENS+HRF2020", "FCAT")
 	:param fix_zero_days_and_months:
 		bool, if True, zero days and months are replaced with ones
 		(default: False)
@@ -144,6 +144,17 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'Mtype': 'type', 'name': 'lieu'}
 			return read_catalog_csv(csv_file, column_map, date_sep='/',
 									date_order='DMY', has_header=True)
+
+	elif catalog_name.upper() == "FCAT":
+		csv_file = get_dataset_file_on_seismogis('EDF', 'FCAT-17.csv')
+		if csv_file:
+			column_map = {'ID': 'NUMevt', 'year': 'YEAR', 'month': 'MONTH',
+							'day': 'DAY', 'hour': 'HH', 'minute': 'MN',
+							'second': 'SEC', 'lat': 'LAT(deg)', 'lon': 'LON(deg)',
+							'intensity_max': 'Io', 'MW': 'Mw', 'errM': 'Err_Mw',
+							'depth': 'DEPTH2(km)'}
+			return read_catalog_csv(csv_file, column_map, has_header=True,
+											ignore_chars=['*', 'nan', 'F'], ignore_errors=False)
 
 	elif catalog_name.upper() == 'KNMI':
 		csv_file = get_dataset_file_on_seismogis('KNMI_seismology', 'all_tectonic.csv')
@@ -478,7 +489,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 			## Remove ignore_chars from record values
 			for ic in ignore_chars:
 				for key, val in row.items():
-					if val and not key.isalpha():
+					if val and (not val.isalpha() or val == ic):
 						row[key] = val.replace(ic, '')
 
 			## Strip leading/traling white space
@@ -499,7 +510,8 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 
 			## If no ID is present, use record number
 			ID_key = column_map.get('ID', 'ID')
-			row[ID_key] = ID_prefix + '-' + str(row.get(ID_key, r))
+			if ID_prefix:
+				row[ID_key] = ID_prefix + '-' + str(row.get(ID_key, r))
 
 			try:
 				eq = LocalEarthquake.from_dict_rec(row, column_map=column_map,
