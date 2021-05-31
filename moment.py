@@ -150,7 +150,8 @@ def estimate_fc_brune(moment, stress_drop=3E+6, VS=3500):
 	return fc
 
 
-def calc_fc_from_rupture_radius(rupture_radius, beta, phase):
+def calc_fc_from_rupture_radius(rupture_radius, beta, phase,
+										model='KanekoShearer2014'):
 	"""
 	Calculate corner frequency from source radius and S-wave velocity
 	according to Madariaga (1976)
@@ -161,17 +162,26 @@ def calc_fc_from_rupture_radius(rupture_radius, beta, phase):
 	:param rupture_radius:
 		float, source radius assuming circular rupture (in m)
 	:param beta:
-		float, S-wave velocity (in m/s)
+		float, S-wave velocity in the crust near the source (in m/s)
 	:param phase:
 		char, phase, either 'P' or 'S'
+	:param model:
+		str, model name, 'Madariaga1976' or 'KanekoShearer2014'
+		(default: 'KanekoShearer2014')
 
 	:return:
 		float, corner frequency in Hz
 	"""
 	if phase.lower() == "p":
-		k = 0.32
+		if model.lower() == 'madariaga1976':
+			k = 0.32
+		elif model.lower() == 'kanekoshearer2014':
+			k = 0.38
 	elif phase.lower() == "s":
-		k = 0.21
+		if model.lower() == 'madariaga1976':
+			k = 0.21
+		elif model.lower() == 'kanekoshearer2014':
+			k = 0.26
 	else:
 		msg = "Unknown phase '%s'." % phase
 		raise ValueError(msg)
@@ -179,7 +189,7 @@ def calc_fc_from_rupture_radius(rupture_radius, beta, phase):
 	return k * beta / rupture_radius
 
 
-def calc_rupture_radius_from_fc(fc, beta, phase):
+def calc_rupture_radius_from_fc(fc, beta, phase, model='KanekoShearer2014'):
 	"""
 	Calculate rupture radius from corner frequency and S-wave velocity
 	according to Madariaga (1976)
@@ -187,17 +197,26 @@ def calc_rupture_radius_from_fc(fc, beta, phase):
 	:param fc:
 		float, corner frequency (in Hz)
 	:param beta:
-		float, S-wave velocity (in m/s)
+		float, S-wave velocity in the crust near the source (in m/s)
 	:param phase:
 		char, phase, either 'P' or 'S'
+	:param model:
+		str, model name, 'Madariaga1976' or 'KanekoShearer2014'
+		(default: 'KanekoShearer2014')
 
 	:return:
 		float, source radius assuming circular rupture (in m)
 	"""
 	if phase.lower() == "p":
-		k = 0.32
+		if model.lower() == 'madariaga1976':
+			k = 0.32
+		elif model.lower() == 'kanekoshearer2014':
+			k = 0.38
 	elif phase.lower() == "s":
-		k = 0.21
+		if model.lower() == 'madariaga1976':
+			k = 0.21
+		elif model.lower() == 'kanekoshearer2014':
+			k = 0.26
 	else:
 		msg = "Unknown phase '%s'." % phase
 		raise ValueError(msg)
