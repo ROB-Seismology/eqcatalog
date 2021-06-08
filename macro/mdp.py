@@ -83,6 +83,15 @@ class MacroseismicDataPoint():
 		"""
 		return np.nanmean([self.Imin, self.Imax])
 
+	def sample_intensity(self):
+		"""
+		Randomly choose between Imin and Imax
+
+		:return:
+			int, sampled intensity
+		"""
+		return np.random.choice([self.Imin, self.Imax])
+
 	def get_eq(self):
 		"""
 		Get earthquake from ROB catalog
@@ -216,6 +225,17 @@ class MDPCollection():
 	def imt(self):
 		imts = sorted(set([mdp.imt for mdp in self]))
 		return ' / '.join(imts)
+
+	def sample_intensities(self):
+		"""
+		Randomly sample between Imin and Imax for each MDP
+
+		:return:
+			1-D int array, sampled intensities
+		"""
+		intensities = [mdp.sample_intensity() for mdp in self]
+
+		return np.array(intensities)
 
 	def get_longitudes(self):
 		return np.array([mdp.lon for mdp in self])
