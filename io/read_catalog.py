@@ -225,9 +225,23 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 							'second': 5, 'lat': 6, 'lon': 7, 'depth': 8, 'ML': 9, 'MW': 10}
 			if csv_file:
 				catalog = read_catalog_csv(csv_file, column_map=column_map,
-												has_header=False, ID_prefix='RHF')
+												has_header=False, ID_prefix='HRF')
 				catalog.name = 'HinzenReamerFleischer 2020'
 				return catalog
+
+	elif catalog_name.upper() == "ISC-GEM":
+		csv_file = get_dataset_file_on_seismogis('ISC-GEM', 'isc-gem-cat_v8.0.csv')
+		column_map = {'ID': 'eventid', 'lon': 'lon', 'lat': 'lat',
+					#'date': 'date', 'time': 'time',
+					'datetime': 'date',
+					'MW': 'mw', 'depth': 'depth',
+					'errz': 'unc', 'errM': 'unc_2', 'errh': 'smajax',
+					'agency': 'ISC-GEM'}
+		if csv_file:
+			catalog = read_catalog_csv(csv_file, column_map=column_map,
+											has_header=True)
+			catalog.name = 'ISC-GEM v8.0'
+			return catalog
 
 	else:
 		date_sep = '/'
@@ -249,14 +263,6 @@ def read_named_catalog(catalog_name, fix_zero_days_and_months=False, null_value=
 						'Mag': 'Morig', 'Mtype': 'Mtype', 'MW': 'Mw',
 						'depth': 'depth', 'intensity_max': 'Imax',
 						'agency': 'ref'}
-			#convert_zero_magnitudes = True
-		elif catalog_name.upper() == "ISC-GEM":
-			gis_filespec = get_dataset_file_on_seismogis('ISC-GEM',
-														'isc-gem-cat')
-			column_map = {'ID': 'eventid', 'lon': 'lon', 'lat': 'lat',
-						'date': 'date', 'time': 'time',
-						'MW': 'mw', 'depth': 'depth',
-						'errz': 'unc', 'errM': 'unc_2', 'agency': 'ISC-GEM'}
 			#convert_zero_magnitudes = True
 		elif catalog_name.upper() == "CEUS-SCR":
 			gis_filespec = get_dataset_file_on_seismogis('CEUS_SSC_SCR',
@@ -506,7 +512,7 @@ def read_catalog_csv(csv_filespec, column_map={}, has_header=None, ID_prefix='',
 			## Encoding
 			if PY2 and encoding:
 				for key, val in row.items():
-					val = val.decode(encoding)
+					row[key] = val.decode(encoding)
 
 			## If no ID is present, use record number
 			ID_key = column_map.get('ID', 'ID')
