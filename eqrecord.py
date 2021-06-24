@@ -1150,6 +1150,7 @@ class LocalEarthquake(object):
 		ev = Event(resource_id=str(self.ID), event_type='earthquake',
 					event_type_certainty=event_type_certainty,
 					origins=[origin], magnitudes=magnitudes)
+		ev.preferred_origin_id = origin.resource_id
 
 		return ev
 
