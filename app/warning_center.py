@@ -362,14 +362,14 @@ class WarningCenter():
 				client.send_manual_warning(id_earth, dry_run=dry_run)
 
 	@classmethod
-	def compose_message(cls, eq, lang, msg_type, revision=False):
+	def compose_message(cls, eq, client, msg_type, revision=False):
 		"""
 		Compose warning message
 
 		:param eq:
 			instance of :class:`eqcatalog.LocalEarthquake`
-		:param lang:
-			str, language, one of 'EN', 'NL' or 'FR'
+		:param client:
+			instance of :class:`WarningClient`
 		:param msg_type:
 			str, message type, 'sms' or 'email'
 		:param revision:
@@ -381,7 +381,7 @@ class WarningCenter():
 		"""
 		import thirdparty.recipes.tinyurl as tinyurl
 
-		lang = lang.upper()
+		lang = client.lang.upper()
 
 		if revision:
 			msg = "%s\n\n" % MSG_FIELDS['title_revision'][lang]
@@ -417,7 +417,15 @@ class WarningCenter():
 		if num_macro:
 			msg += "%s: %d\n" % (MSG_FIELDS['num_dyfi'][lang], num_macro)
 
-		msg += "ID: %d\n" % eq.ID
+		if client.id < 100:
+			## ROB users
+			msg += "ID: %d\n" % eq.ID
+			try:
+				operator = eq.get_operator()[0]
+			except:
+				pass
+			else:
+				msg += "%s: %s" % (MSG_FIELDS['operator'][lang], operator)
 
 		hash = eq.get_rob_hash()
 		base_url = "http://seismologie.oma.be"
@@ -964,7 +972,7 @@ class WarningClient():
 		:param dry_run:
 			see :meth:`send_warning`
 		"""
-		msg = self.warcen.compose_message(eq, self.lang, 'email', revision=revision)
+		msg = self.warcen.compose_message(eq, self, 'email', revision=revision)
 		if revision:
 			subject = MSG_FIELDS['subject_revision'][self.lang.upper()]
 		else:
@@ -981,7 +989,7 @@ class WarningClient():
 			see :meth:`send_warning`
 		"""
 		from eqcatalog.macro.rob_dyfi import strip_accents
-		msg = self.warcen.compose_message(eq, self.lang, 'sms', revision=revision)
+		msg = self.warcen.compose_message(eq, self, 'sms', revision=revision)
 		msg = strip_accents(msg)
 		self.warcen.send_sms(self, msg, dry_run=dry_run)
 
@@ -1130,7 +1138,10 @@ MSG_FIELDS = {
 						'Observatoire royal de Belgique\n'},
 	'num_dyfi': {'EN': 'Number of felt reports',
 				'NL': 'Aantal meldingen',
-				'FR': 'Nombre de rapports'}}
+				'FR': 'Nombre de rapports'},
+	'operator': {'EN': 'Operator',
+					'NL': 'Operator',
+					'FR': 'Opérateur'}}
 
 
 
