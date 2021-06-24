@@ -483,6 +483,26 @@ class ROBLocalEarthquake(LocalEarthquake):
 		except IndexError:
 			return None
 
+	def get_operator(self):
+		"""
+		Get operator (= person who last reviewed the solution) for this eq
+
+		:return:
+			(first name, last_name) tuple of strings
+		"""
+		from .seismodb import query_seismodb_table
+
+		table_clause = 'earthquakes'
+		column_clause = ['security_users.prenom', 'security_users.name']
+		where_clause = 'id_earth = %s' % self.id_earth
+		join_clause = [('RIGHT', 'security_users', 'earthquakes.id_reviewer=security_users.id')]
+
+		[operator] = query_seismodb_table(table_clause, column_clause,
+												join_clause=join_clause,
+												where_clause=where_clause)
+
+		return (operator['prenom'], operator['name'])
+
 	def get_phase_picks(self, station_code=None, network=None,
 							calc_geodetics=True, verbose=False):
 		"""
