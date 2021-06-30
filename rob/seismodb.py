@@ -64,7 +64,7 @@ AGG_FUNC_DICT = {"average": "AVG", "mean": "AVG",
 
 def query_seismodb_table_generic(query, verbose=False, print_table=False, errf=None):
 	"""
-	Query MySQL table using generic clause, returning each record as a dict
+	Query seismodb table using generic clause, returning each record as a dict
 
 	:param query:
 		str, SQL query
@@ -88,15 +88,29 @@ def query_seismodb_table_generic(query, verbose=False, print_table=False, errf=N
 	except:
 		port = 3306
 
+	from db.simpledb.mysql import OperationalError
+
+	## Test if server is online; if not, fall back to xseisalert
+	query0 = 'SELECT 1'
+	try:
+		query_mysql_db_generic(database, host, user, passwd, query0, port=port,
+									verbose=verbose, errf=errf)
+	except OperationalError:
+		from secrets.seismodb import (alt_host as host, alt_user as user,
+											alt_passwd as passwd)
+		query0 = "SET sql_mode=(SELECT REPLACE(@@sql_mode, 'ONLY_FULL_GROUP_BY', ''))"
+		query_mysql_db_generic(database, host, user, passwd, query0, port=port,
+									verbose=verbose, errf=errf)
+
 	## Avoid Warning: Row XXX was cut by GROUP_CONCAT()
 	## For 32bit systems, the maximum value is 4294967295
 	if "GROUP_CONCAT" in query.upper():
 		query0 = 'SET SESSION group_concat_max_len=4294967295'
 		query_mysql_db_generic(database, host, user, passwd, query0, port=port,
-								verbose=verbose, errf=errf)
+									verbose=verbose, errf=errf)
 
 	return query_mysql_db_generic(database, host, user, passwd, query, port=port,
-							verbose=verbose, print_table=print_table, errf=errf)
+								verbose=verbose, print_table=print_table, errf=errf)
 
 
 def query_seismodb_table(table_clause, column_clause="*", join_clause="",
@@ -1612,15 +1626,31 @@ def get_last_earthID():
 	return id_earth
 
 
-def zip2ID(zip_code):
+def zip2ID(zip_code, country='BE'):
 	"""
 	Look up ID corresponding to ZIP code in database
 
 	:return:
 		int, commune ID
 	"""
-	query = 'SELECT id FROM communes WHERE code_p = %d' % zip_code
-	id_com = query_seismodb_table_generic(query)[0]['id']
+	if country in ('DE', 'FR', 'LU', 'NL', 'GB'):
+		table_name = 'com_zip_%s' % country
+		if country == 'LU':
+			table_name += '_fr'
+		id_column_name = 'id_com'
+		zip_column_name = 'zip'
+	else:
+		table_name = 'communes'
+		id_column_name = 'id'
+		zip_column_name = 'code_p'
+
+	query = 'SELECT %s FROM %s WHERE %s = %d'
+	query %= (id_column_name, table_name, zip_column_name, zip_code)
+	if table_name == 'communes':
+		query += ' AND country = "%s"' % country
+
+	id_com = query_seismodb_table_generic(query)[0][id_column_name]
+
 	return id_com
 
 
